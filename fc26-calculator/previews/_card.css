@@ -1,0 +1,81 @@
+/* Shared styles for preview cards. Each card is a self-contained
+   ~700px-wide artifact for the Design System tab. */
+@import url("../colors_and_type.css");
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg-base);
+  color: var(--fg-1);
+  font-family: var(--font-body), "Inter", sans-serif;
+  font-style: italic;
+  font-weight: 300;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+.card {
+  width: 700px;
+  padding: 28px 32px;
+  background: var(--bg-base);
+  position: relative;
+  overflow: hidden;
+}
+.card.green { background: var(--amf1-racing-green); }
+.card.deep  { background: var(--amf1-racing-green-lo); }
+.card.onyx  { background: var(--amf1-onyx); }
+
+.eyebrow {
+  font-family: "Inter", sans-serif;
+  font-style: italic;
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--amf1-lime);
+  margin-bottom: 14px;
+}
+.row { display: flex; gap: 12px; align-items: stretch; }
+.col { display: flex; flex-direction: column; gap: 8px; }
+
+.swatch {
+  flex: 1;
+  height: 84px;
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 10px;
+  border: 1px solid var(--border-1);
+}
+.swatch .name {
+  font-family: "Aston Martin Flare", "Optima", Georgia, serif;
+  font-style: normal;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-1);
+}
+.swatch .hex {
+  font-family: "Inter", sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: rgba(255,255,255,0.6);
+  margin-top: 2px;
+}
+.swatch.light .name,
+.swatch.light .hex { color: var(--amf1-onyx); }
+.swatch.light .hex { color: rgba(10,15,14,0.6); }
+
+.lime-rule {
+  display: inline-block;
+  width: 24px;
+  height: 2px;
+  background: var(--amf1-lime);
+  vertical-align: middle;
+  margin-right: 10px;
+}

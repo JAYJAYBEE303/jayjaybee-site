@@ -1,0 +1,355 @@
+/* ============================================================
+   Aston Martin Aramco F1 — Colors & Type
+   ============================================================ */
+
+/* ------------------------------------------------------------
+   FONTS
+   We have partial files: Flare in Md/Bd/XBd, Sans only in italic
+   weights (Light/Bold/X-Bold italic). Roman Sans weights are
+   missing — see README "Font substitutions" for the policy.
+   ------------------------------------------------------------ */
+
+@font-face {
+  font-family: "Aston Martin Flare";
+  src: url("fonts/FLARE_MD.TTF") format("truetype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Aston Martin Flare";
+  src: url("fonts/FLARE_BD.TTF") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Aston Martin Flare";
+  src: url("fonts/FLARE_XBD.TTF") format("truetype");
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Aston Martin Sans";
+  src: url("fonts/SANS_LTIT.TTF") format("truetype");
+  font-weight: 300;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Aston Martin Sans";
+  src: url("fonts/SANS_BDIT.TTF") format("truetype");
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Aston Martin Sans";
+  src: url("fonts/SANS_XBDIT.TTF") format("truetype");
+  font-weight: 800;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* ------------------------------------------------------------
+   TOKENS
+   ------------------------------------------------------------ */
+:root {
+  /* ---- Brand core ---- */
+  --amf1-racing-green:    #00352F; /* primary — "Aston Martin Racing Green" (deep) */
+  --amf1-racing-green-hi: #004D43; /* slightly lifted, for hover/elevated surfaces */
+  --amf1-racing-green-lo: #001F1B; /* near-black, for deepest backgrounds */
+  --amf1-podium-green:    #006F62; /* mid teal — accent green seen on the livery */
+  --amf1-teal:            #00A39A; /* bright teal highlight */
+  --amf1-lime:            #CEDC00; /* AMR Lime / Aramco yellow-lime accent */
+  --amf1-lime-hi:         #E2F000;
+  --amf1-onyx:            #0A0F0E; /* secondary background — true near-black */
+  --amf1-carbon:          #14201E; /* warm-tinted black for cards on green */
+  --amf1-neutron:         #FFFFFF; /* pure white */
+
+  /* ---- Neutrals (cool greys with green undertone) ---- */
+  --amf1-grey-950: #0B1311;
+  --amf1-grey-900: #111A18;
+  --amf1-grey-800: #1A2522;
+  --amf1-grey-700: #283632;
+  --amf1-grey-600: #3D4D48;
+  --amf1-grey-500: #5C6E68;
+  --amf1-grey-400: #83958F;
+  --amf1-grey-300: #B0BDB8;
+  --amf1-grey-200: #D2DAD7;
+  --amf1-grey-100: #E8ECEA;
+  --amf1-grey-050: #F4F6F5;
+
+  /* ---- Semantic surface (dark mode is the primary brand mode) ---- */
+  --bg-base:        var(--amf1-onyx);
+  --bg-raised:      var(--amf1-carbon);
+  --bg-elevated:    rgba(255, 255, 255, 0.04);
+  --bg-glass:       rgba(255, 255, 255, 0.06);
+  --bg-glass-strong:rgba(255, 255, 255, 0.10);
+  --bg-green:       var(--amf1-racing-green);
+  --bg-green-deep:  var(--amf1-racing-green-lo);
+
+  --fg-1:           var(--amf1-neutron);          /* primary text */
+  --fg-2:           rgba(255, 255, 255, 0.72);    /* secondary */
+  --fg-3:           rgba(255, 255, 255, 0.50);    /* tertiary / metadata */
+  --fg-4:           rgba(255, 255, 255, 0.32);    /* placeholder */
+  --fg-on-lime:     var(--amf1-onyx);
+  --fg-accent:      var(--amf1-lime);
+  --fg-accent-2:    var(--amf1-teal);
+
+  /* ---- Borders / hairlines ---- */
+  --border-1:       rgba(255, 255, 255, 0.10);
+  --border-2:       rgba(255, 255, 255, 0.18);
+  --border-strong:  rgba(255, 255, 255, 0.32);
+  --border-lime:    var(--amf1-lime);
+
+  /* ---- Status (sparingly used; F1 uses lime for "alert" feel) ---- */
+  --status-live:    #FF3B30; /* live timing / red flag */
+  --status-yellow:  #FFD200; /* yellow flag / caution */
+  --status-go:      var(--amf1-lime);
+  --status-info:    var(--amf1-teal);
+
+  /* ============================================================
+     TYPE FAMILIES
+     ============================================================ */
+  --font-display:  "Aston Martin Flare", "Optima", "Optima nova",
+                   "Palatino", "Palatino Linotype", "URW Classico",
+                   Georgia, serif;
+  --font-body:     "Aston Martin Sans", "Inter", "Helvetica Neue",
+                   Arial, system-ui, sans-serif;
+  --font-mono:     "JetBrains Mono", "IBM Plex Mono", ui-monospace,
+                   SFMono-Regular, Menlo, monospace;
+
+  /* ============================================================
+     TYPE SCALE — built for hi-impact display + technical body
+     ============================================================ */
+  --fs-display-1: clamp(56px, 7.5vw, 120px); /* hero / livery moment */
+  --fs-display-2: clamp(40px, 5vw, 80px);    /* section title */
+  --fs-h1:        48px;
+  --fs-h2:        36px;
+  --fs-h3:        28px;
+  --fs-h4:        22px;
+  --fs-h5:        18px;
+  --fs-body-lg:   18px;
+  --fs-body:      16px;
+  --fs-body-sm:   14px;
+  --fs-caption:   12px;
+  --fs-eyebrow:   11px;
+
+  --lh-tight:    1.02;
+  --lh-snug:     1.15;
+  --lh-normal:   1.4;
+  --lh-loose:    1.6;
+
+  --ls-display: -0.02em;
+  --ls-heading: -0.01em;
+  --ls-body:     0;
+  --ls-eyebrow:  0.18em;
+  --ls-caps:     0.08em;
+
+  /* ============================================================
+     SPACING — 4px base
+     ============================================================ */
+  --s-1:  4px;
+  --s-2:  8px;
+  --s-3:  12px;
+  --s-4:  16px;
+  --s-5:  20px;
+  --s-6:  24px;
+  --s-7:  32px;
+  --s-8:  40px;
+  --s-9:  48px;
+  --s-10: 64px;
+  --s-11: 80px;
+  --s-12: 96px;
+  --s-13: 128px;
+
+  /* ============================================================
+     RADII — small, technical. We rarely soften.
+     ============================================================ */
+  --r-0: 0px;
+  --r-1: 2px;
+  --r-2: 4px;
+  --r-3: 8px;
+  --r-4: 12px;
+  --r-pill: 999px;
+
+  /* ============================================================
+     SHADOWS / GLASS
+     Aesthetic = "floaty glass on green carbon"
+     ============================================================ */
+  --shadow-1: 0 1px 0 rgba(255,255,255,0.04) inset,
+              0 1px 2px rgba(0,0,0,0.40);
+  --shadow-2: 0 1px 0 rgba(255,255,255,0.05) inset,
+              0 8px 24px -8px rgba(0,0,0,0.55);
+  --shadow-3: 0 1px 0 rgba(255,255,255,0.06) inset,
+              0 18px 48px -12px rgba(0,0,0,0.65);
+  --shadow-lime-glow: 0 0 0 1px rgba(206,220,0,0.35),
+                      0 12px 40px -8px rgba(206,220,0,0.35);
+  --shadow-teal-glow: 0 0 0 1px rgba(0,163,154,0.30),
+                      0 12px 40px -8px rgba(0,163,154,0.40);
+
+  --glass-blur: 14px;
+  --glass-saturate: 140%;
+
+  /* ============================================================
+     MOTION
+     ============================================================ */
+  --ease-out:   cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out:cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-snap:  cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dur-1: 120ms;
+  --dur-2: 200ms;
+  --dur-3: 320ms;
+  --dur-4: 480ms;
+}
+
+/* ============================================================
+   SEMANTIC TYPE STYLES
+   Display = Flare (serif-ish flared sans, similar feel to Optima).
+   Body = Sans (italic-only files we have, so when used at body
+   sizes we explicitly set font-style: italic OR fall back to the
+   stack). Headings/labels use Flare.
+   ============================================================ */
+
+.amf1-display-1,
+[data-amf1="display-1"] {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: var(--fs-display-1);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--ls-display);
+  text-transform: uppercase;
+}
+.amf1-display-2,
+[data-amf1="display-2"] {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--fs-display-2);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--ls-display);
+  text-transform: uppercase;
+}
+h1, .amf1-h1 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: var(--fs-h1);
+  line-height: var(--lh-snug);
+  letter-spacing: var(--ls-heading);
+  text-transform: uppercase;
+  margin: 0;
+}
+h2, .amf1-h2 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--fs-h2);
+  line-height: var(--lh-snug);
+  letter-spacing: var(--ls-heading);
+  text-transform: uppercase;
+  margin: 0;
+}
+h3, .amf1-h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--fs-h3);
+  line-height: var(--lh-snug);
+  letter-spacing: 0;
+  margin: 0;
+}
+h4, .amf1-h4 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: var(--fs-h4);
+  line-height: var(--lh-normal);
+  margin: 0;
+}
+h5, .amf1-h5 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: var(--fs-h5);
+  line-height: var(--lh-normal);
+  margin: 0;
+}
+
+p, .amf1-body {
+  font-family: var(--font-body);
+  font-weight: 300;
+  font-style: italic;          /* we only have italic Sans */
+  font-size: var(--fs-body);
+  line-height: var(--lh-loose);
+  letter-spacing: var(--ls-body);
+  margin: 0;
+}
+.amf1-body-roman {
+  /* fallback path for body when italic feels wrong: forces Inter */
+  font-family: "Inter", system-ui, sans-serif;
+  font-weight: 400;
+  font-style: normal;
+  font-size: var(--fs-body);
+  line-height: var(--lh-loose);
+}
+
+.amf1-eyebrow,
+[data-amf1="eyebrow"] {
+  font-family: var(--font-body), "Inter", sans-serif;
+  font-weight: 700;
+  font-style: italic;
+  font-size: var(--fs-eyebrow);
+  letter-spacing: var(--ls-eyebrow);
+  text-transform: uppercase;
+  color: var(--fg-accent);
+}
+
+.amf1-caption {
+  font-family: var(--font-body), "Inter", sans-serif;
+  font-style: italic;
+  font-weight: 300;
+  font-size: var(--fs-caption);
+  letter-spacing: var(--ls-caps);
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+
+.amf1-mono,
+code, kbd, samp {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  letter-spacing: 0;
+}
+
+/* ============================================================
+   GLASS / SURFACE UTILITIES
+   ============================================================ */
+.amf1-glass {
+  background: var(--bg-glass);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-3);
+  box-shadow: var(--shadow-2);
+}
+.amf1-glass-strong {
+  background: var(--bg-glass-strong);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-3);
+  box-shadow: var(--shadow-3);
+}
+
+/* Lime accent rule used to flag the most important thing on screen */
+.amf1-accent-rule {
+  display: inline-block;
+  width: 28px;
+  height: 2px;
+  background: var(--amf1-lime);
+  vertical-align: middle;
+}
+
+/* Selection */
+::selection {
+  background: var(--amf1-lime);
+  color: var(--amf1-onyx);
+}

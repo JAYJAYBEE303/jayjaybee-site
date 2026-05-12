@@ -1,0 +1,23 @@
+# Claude Code working files
+.claude/
+
+# OS junk
+Thumbs.db
+.DS_Store
+*.tmp
+
+# Project notes not for the public site
+SKILL.md
+New 2.docx
+
+# Large binaries — GitHub rejects files over 100 MB
+   *.potx
+   *.pptx
+   *.psd
+   *.mp4
+   *.mov
+   *.zip
+
+   # AMF1 work content — must never end up public
+   *AMF1*
+   *Aston*

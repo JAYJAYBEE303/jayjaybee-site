@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta name="theme-color" content="#fafaf7" id="themeColorMeta">
+<title>FC26 Feel Calculator</title>
+
+<script>
+  // Apply saved theme before paint
+  (function() {
+    try {
+      var saved = localStorage.getItem('fc26_theme');
+      if (saved !== 'light') {
+        document.documentElement.classList.add('dark');
+        var m = document.getElementById('themeColorMeta');
+        if (m) m.setAttribute('content', '#00352F');
+      }
+    } catch (e) {}
+  })();
+  document.documentElement.classList.add('preload');
+  function revealPage() {
+    requestAnimationFrame(function() {
+      document.documentElement.classList.remove('preload');
+      document.documentElement.classList.add('loaded');
+    });
+  }
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(revealPage).catch(revealPage);
+    setTimeout(revealPage, 600);
+  } else {
+    window.addEventListener('load', revealPage);
+    setTimeout(revealPage, 600);
+  }
+</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="min-h-screen relative">
+
+<!-- Ambient gradient orbs — fixed, drifting, contained -->
+<div aria-hidden="true" class="orb-stage">
+  <div class="orb orb-a"></div>
+  <div class="orb orb-b"></div>
+  <div class="orb orb-c"></div>
+</div>
+
+<!-- ─────────────────────────────────────── HEADER ─────────────────────────────────────── -->
+<header class="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 sm:pt-12 pb-6">
+  <div class="flex items-start justify-between gap-4">
+    <div class="min-w-0">
+      <div class="flex items-center gap-3 mb-3 hero-line" style="--hero-delay: 0ms;">
+        <span class="amf1-stripe" aria-hidden="true"></span>
+        <span class="text-[10px] font-mono tracking-[0.24em] text-ink-muted uppercase">Aston Martin Aramco F1 · FC26 Feel Telemetry</span>
+      </div>
+      <h1 class="font-display text-4xl sm:text-5xl lg:text-6xl font-medium text-ink leading-[1.05] tracking-tight hero-line" style="--hero-delay: 80ms;">
+        Feel <span class="italic font-normal text-accent">Calculator</span>
+      </h1>
+      <p class="mt-3 text-sm text-ink-muted max-w-md leading-relaxed hero-line" style="--hero-delay: 200ms;">
+        Effective in-game feel derived from physical profile, playstyles, and chemistry — race telemetry for your virtual squad.
+      </p>
+    </div>
+    <button id="themeToggle" onclick="toggleTheme()"
+      class="shrink-0 inline-flex items-center gap-2 px-3.5 py-2 rounded-full border border-line hover:border-line-strong text-xs font-medium text-ink-soft hover:text-ink bg-surface hover:bg-sunken transition-all active:scale-[0.96] hero-line" style="--hero-delay: 120ms;">
+      ☀ Light
+    </button>
+  </div>
+</header>
+
+<!-- ─────────────────────────────────────── MAIN GRID ─────────────────────────────────────── -->
+<main class="feel-shell relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
+ <div class="unified-card">
+
+  <!-- ═══════════════════ STATS & PHYSICAL PROFILE ═══════════════════ -->
+  <section class="card card-enter bg-surface border border-line rounded-2xl p-5 sm:p-7 shadow-soft">
+    <div class="flex items-center justify-between gap-3 mb-5">
+      <div>
+        <div class="text-[10px] font-mono tracking-[0.18em] text-ink-muted uppercase mb-1">Section 01</div>
+        <h2 class="card-title font-display text-xl sm:text-2xl text-ink font-medium tracking-tight">Stats & Physical Profile</h2>
+      </div>
+    </div>
+
+    <div class="stats-input-grid">
+
+      <!-- Movement & Dribbling -->
+      <div class="stats-input-group">
+        <div class="ps-section-label" style="margin-top: 0;">Movement & Dribbling</div>
+        <div class="grid-3 grid grid-cols-3 gap-2 mb-2.5">
+          <div class="stat-input"><label>Accel</label><input type="number" id="baseAccel" value="80" min="1" max="99"></div>
+          <div class="stat-input"><label>Sprint</label><input type="number" id="baseSprint" value="80" min="1" max="99"></div>
+          <div class="stat-input"><label>Agility</label><input type="number" id="baseAgility" value="80" min="1" max="99"></div>
+          <div class="stat-input"><label>Balance</label><input type="number" id="balance" value="75" min="1" max="99"></div>
+          <div class="stat-input"><label>Dribbling</label><input type="number" id="dribbling" value="70" min="1" max="99"></div>
+          <div class="stat-input"><label>Ball Ctrl</label><input type="number" id="ballControl" value="70" min="1" max="99"></div>
+        </div>
+
+        <div class="ps-section-label" style="font-size: 9px; margin-top: 16px; margin-bottom: 8px;">AcceleRATE Type</div>
+        <div class="grid-3 grid grid-cols-3 gap-1.5">
+          <div class="option-btn slim explosive" data-type="explosive" onclick="selectAccel(this)">Explosive</div>
+          <div class="option-btn slim active" data-type="controlled" onclick="selectAccel(this)">Controlled</div>
+          <div class="option-btn slim lengthy" data-type="lengthy" onclick="selectAccel(this)">Lengthy</div>
+        </div>
+      </div>
+
+      <!-- Physical Profile -->
+      <div class="stats-input-group">
+        <div class="ps-section-label">Physical Profile</div>
+        <div class="grid-3 grid grid-cols-3 gap-2 mb-2.5">
+          <div class="stat-input">
+            <label>Height (cm)</label>
+            <input type="number" id="heightCm" value="183" min="150" max="210">
+            <div class="height-display" id="heightDisplay">6'0"</div>
+          </div>
+          <div class="stat-input"><label>Weight (kg)</label><input type="number" id="weight" value="80" min="50" max="120"></div>
+          <div class="stat-input"><label>Strength</label><input type="number" id="strength" value="70" min="1" max="99"></div>
+        </div>
+        <div class="ps-section-label" style="font-size: 9px; margin-top: 8px; margin-bottom: 8px;">Build Type</div>
+        <div class="grid grid-cols-5 gap-1.5">
+          <div class="option-btn slim" data-build="very_lean" onclick="selectBuild(this)">V. Lean</div>
+          <div class="option-btn slim" data-build="lean" onclick="selectBuild(this)">Lean</div>
+          <div class="option-btn slim active" data-build="normal" onclick="selectBuild(this)">Average</div>
+          <div class="option-btn slim stocky" data-build="stocky" onclick="selectBuild(this)">Stocky</div>
+          <div class="option-btn slim stocky" data-build="very_stocky" onclick="selectBuild(this)">V. Stocky</div>
+        </div>
+      </div>
+
+      <!-- Passing -->
+      <div class="stats-input-group">
+        <div class="ps-section-label">Passing</div>
+        <div class="grid-3 grid grid-cols-3 gap-2">
+          <div class="stat-input"><label>Short Pass</label><input type="number" id="shortPass" value="70" min="1" max="99"></div>
+          <div class="stat-input"><label>Long Pass</label><input type="number" id="longPass" value="70" min="1" max="99"></div>
+          <div class="stat-input"><label>Vision</label><input type="number" id="vision" value="70" min="1" max="99"></div>
+          <div class="stat-input"><label>Crossing</label><input type="number" id="crossing" value="70" min="1" max="99"></div>
+          <div class="stat-input"><label>Curve</label><input type="number" id="curve" value="70" min="1" max="99"></div>
+          <div class="stat-input"><label>FK Accuracy</label><input type="number" id="fkAccuracy" value="70" min="1" max="99"></div>
+        </div>
+      </div>
+
+      <!-- Defending -->
+      <div class="stats-input-group">
+        <div class="ps-section-label">Defending</div>
+        <div class="grid-3 grid grid-cols-3 gap-2">
+          <div class="stat-input"><label>Stand Tackle</label><input type="number" id="standTackle" value="70" min="1" max="99"></div>
+          <div class="stat-input"><label>Slide Tackle</label><input type="number" id="slideTackle" value="70" min="1" max="99"></div>
+          <div class="stat-input"><label>Intercept</label><input type="number" id="interceptions" value="70" min="1" max="99"></div>
+          <div class="stat-input"><label>Def. Aware</label><input type="number" id="defAwareness" value="70" min="1" max="99"></div>
+        </div>
+      </div>
+
+      <!-- Shooting -->
+      <div class="stats-input-group">
+        <div class="ps-section-label">Shooting</div>
+        <div class="grid-3 grid grid-cols-3 gap-2">
+          <div class="stat-input"><label>Finishing</label><input type="number" id="finishing" value="70" min="1" max="99"></div>
+          <div class="stat-input"><label>Shot Power</label><input type="number" id="shotPower" value="70" min="1" max="99"></div>
+          <div class="stat-input"><label>Long Shots</label><input type="number" id="longShots" value="70" min="1" max="99"></div>
+          <div class="stat-input"><label>Volleys</label><input type="number" id="volleys" value="70" min="1" max="99"></div>
+          <div class="stat-input"><label>Att. Pos.</label><input type="number" id="attPositioning" value="70" min="1" max="99"></div>
+        </div>
+      </div>
+
+      <!-- Mental & Physical -->
+      <div class="stats-input-group">
+        <div class="ps-section-label">Mental & Physical</div>
+        <div class="grid-3 grid grid-cols-3 gap-2">
+          <div class="stat-input"><label>Composure</label><input type="number" id="composure" value="70" min="1" max="99"></div>
+          <div class="stat-input"><label>Reactions</label><input type="number" id="reactions" value="70" min="1" max="99"></div>
+          <div class="stat-input"><label>Stamina</label><input type="number" id="stamina" value="70" min="1" max="99"></div>
+          <div class="stat-input"><label>Jumping</label><input type="number" id="jumping" value="70" min="1" max="99"></div>
+          <div class="stat-input"><label>Heading</label><input type="number" id="headingAcc" value="70" min="1" max="99"></div>
+          <div class="stat-input"><label>Aggression</label><input type="number" id="aggression" value="70" min="1" max="99"></div>
+        </div>
+      </div>
+
+    </div><!-- end stats-input-grid -->
+
+    <!-- Playstyles + Chem Style — side-by-side at lg+ -->
+    <div class="ps-chem-wrap grid grid-cols-1 lg:grid-cols-2 gap-x-8 mt-2">
+
+      <!-- Playstyles column -->
+      <div class="ps-chem-col">
+        <div class="collapsible-toggle" onclick="togglePlaystyles()" style="margin-top: 16px;">
+          <span class="collapsible-chevron open" id="playstylesChevron" style="margin-right: 10px;">▶</span>
+          <span class="collapsible-label">Playstyles</span>
+        </div>
+        <div class="collapsible-body open" id="playstylesBody">
+
+          <div class="ps-section-label">Pace</div>
+          <div class="grid-2 grid grid-cols-2 gap-2">
+            <div class="ps-btn" data-ps="quickstep" data-group="qs" onclick="togglePS(this)">
+              <span class="ps-name">Quickstep</span><span class="ps-effect">Accel +5</span>
+            </div>
+            <div class="ps-btn" data-ps="quickstep_plus" data-group="qs" onclick="togglePS(this)">
+              <span class="ps-name">Quickstep+</span><span class="ps-effect">Accel +10 · Sprint +2</span>
+            </div>
+            <div class="ps-btn" data-ps="rapid" data-group="rapid" onclick="togglePS(this)">
+              <span class="ps-name">Rapid</span><span class="ps-effect">Accel +2 · Agility +2</span>
+            </div>
+            <div class="ps-btn" data-ps="rapid_plus" data-group="rapid" onclick="togglePS(this)">
+              <span class="ps-name">Rapid+</span><span class="ps-effect">Accel +5 · Agility +5</span>
+            </div>
+          </div>
+
+          <div class="ps-section-label">Dribbling</div>
+          <div class="grid-2 grid grid-cols-2 gap-2">
+            <div class="ps-btn" data-ps="technical" data-group="tech" onclick="togglePS(this)">
+              <span class="ps-name">Technical</span><span class="ps-effect">Agility +5</span>
+            </div>
+            <div class="ps-btn" data-ps="technical_plus" data-group="tech" onclick="togglePS(this)">
+              <span class="ps-name">Technical+</span><span class="ps-effect">Agility +10</span>
+            </div>
+            <div class="ps-btn" data-ps="first_touch" data-group="ft" onclick="togglePS(this)">
+              <span class="ps-name">First Touch</span><span class="ps-effect">Accel +2</span>
+            </div>
+            <div class="ps-btn" data-ps="first_touch_plus" data-group="ft" onclick="togglePS(this)">
+              <span class="ps-name">First Touch+</span><span class="ps-effect">Accel +5</span>
+            </div>
+            <div class="ps-btn" data-ps="trickster" data-group="trick" onclick="togglePS(this)">
+              <span class="ps-name">Trickster</span><span class="ps-effect">Dribbling Feel +6 · Agility +2</span>
+            </div>
+            <div class="ps-btn" data-ps="trickster_plus" data-group="trick" onclick="togglePS(this)">
+              <span class="ps-name">Trickster+</span><span class="ps-effect">Dribbling Feel +12 · Agility +4</span>
+            </div>
+          </div>
+
+          <div class="ps-section-label">Physical</div>
+          <div class="grid-2 grid grid-cols-2 gap-2">
+            <div class="ps-btn" data-ps="enforcer" data-group="enf" onclick="togglePS(this)">
+              <span class="ps-name">Enforcer</span><span class="ps-effect">Tenacity +5</span>
+            </div>
+            <div class="ps-btn" data-ps="enforcer_plus" data-group="enf" onclick="togglePS(this)">
+              <span class="ps-name">Enforcer+</span><span class="ps-effect">Tenacity +10</span>
+            </div>
+            <div class="ps-btn" data-ps="bruiser" data-group="brui" onclick="togglePS(this)">
+              <span class="ps-name">Bruiser</span><span class="ps-effect">Bully Feel +6</span>
+            </div>
+            <div class="ps-btn" data-ps="bruiser_plus" data-group="brui" onclick="togglePS(this)">
+              <span class="ps-name">Bruiser+</span><span class="ps-effect">Bully Feel +12</span>
+            </div>
+            <div class="ps-btn" data-ps="press_proven" data-group="press" onclick="togglePS(this)">
+              <span class="ps-name">Press Proven</span><span class="ps-effect">Slipperiness +2 · Tenacity +2</span>
+            </div>
+            <div class="ps-btn" data-ps="press_proven_plus" data-group="press" onclick="togglePS(this)">
+              <span class="ps-name">Press Proven+</span><span class="ps-effect">Slipperiness +5 · Tenacity +5</span>
+            </div>
+            <div class="ps-btn" data-ps="relentless" data-group="rel" onclick="togglePS(this)">
+              <span class="ps-name">Relentless</span><span class="ps-effect">Cosmetic only</span>
+            </div>
+            <div class="ps-btn" data-ps="relentless_plus" data-group="rel" onclick="togglePS(this)">
+              <span class="ps-name">Relentless+</span><span class="ps-effect">Cosmetic only</span>
+            </div>
+            <div class="ps-btn" data-ps="aerial" data-group="aer" onclick="togglePS(this)">
+              <span class="ps-name">Aerial</span><span class="ps-effect">Aerial +10</span>
+            </div>
+            <div class="ps-btn" data-ps="aerial_plus" data-group="aer" onclick="togglePS(this)">
+              <span class="ps-name">Aerial+</span><span class="ps-effect">Aerial +18</span>
+            </div>
+          </div>
+
+          <div class="ps-section-label">Passing</div>
+          <div class="grid-2 grid grid-cols-2 gap-2">
+            <div class="ps-btn" data-ps="incisive" data-group="inc" onclick="togglePS(this)">
+              <span class="ps-name">Incisive Pass</span><span class="ps-effect">Through Ball +8</span>
+            </div>
+            <div class="ps-btn" data-ps="incisive_plus" data-group="inc" onclick="togglePS(this)">
+              <span class="ps-name">Incisive Pass+</span><span class="ps-effect">Through Ball +15</span>
+            </div>
+            <div class="ps-btn" data-ps="pinged" data-group="pin" onclick="togglePS(this)">
+              <span class="ps-name">Pinged Pass</span><span class="ps-effect">Long Pass +8</span>
+            </div>
+            <div class="ps-btn" data-ps="pinged_plus" data-group="pin" onclick="togglePS(this)">
+              <span class="ps-name">Pinged Pass+</span><span class="ps-effect">Long Pass +15</span>
+            </div>
+            <div class="ps-btn" data-ps="long_ball" data-group="lb" onclick="togglePS(this)">
+              <span class="ps-name">Long Ball Pass</span><span class="ps-effect">Long Pass +4 · Through +6</span>
+            </div>
+            <div class="ps-btn" data-ps="long_ball_plus" data-group="lb" onclick="togglePS(this)">
+              <span class="ps-name">Long Ball Pass+</span><span class="ps-effect">Long Pass +10 · Through +12</span>
+            </div>
+            <div class="ps-btn" data-ps="whipped" data-group="whip" onclick="togglePS(this)">
+              <span class="ps-name">Whipped Pass</span><span class="ps-effect">Cross +8</span>
+            </div>
+            <div class="ps-btn" data-ps="whipped_plus" data-group="whip" onclick="togglePS(this)">
+              <span class="ps-name">Whipped Pass+</span><span class="ps-effect">Cross +20</span>
+            </div>
+            <div class="ps-btn" data-ps="tiki_taka" data-group="tiki" onclick="togglePS(this)">
+              <span class="ps-name">Tiki Taka</span><span class="ps-effect">Short Pass +5 · Through +2</span>
+            </div>
+            <div class="ps-btn" data-ps="tiki_taka_plus" data-group="tiki" onclick="togglePS(this)">
+              <span class="ps-name">Tiki Taka+</span><span class="ps-effect">Short Pass +10 · Through +4</span>
+            </div>
+            <div class="ps-btn" data-ps="outside_foot" data-group="out" onclick="togglePS(this)">
+              <span class="ps-name">Inventive</span><span class="ps-effect">Finesse +3 · Through +3 · Low Driven +3 · FK +1</span>
+            </div>
+            <div class="ps-btn" data-ps="outside_foot_plus" data-group="out" onclick="togglePS(this)">
+              <span class="ps-name">Inventive+</span><span class="ps-effect">Finesse +6 · Through +6 · Low Driven +6 · FK +3</span>
+            </div>
+          </div>
+
+          <div class="ps-section-label">Defending</div>
+          <div class="grid-2 grid grid-cols-2 gap-2">
+            <div class="ps-btn" data-ps="intercept_ps" data-group="intc" onclick="togglePS(this)">
+              <span class="ps-name">Intercept</span><span class="ps-effect">Interception +8</span>
+            </div>
+            <div class="ps-btn" data-ps="intercept_ps_plus" data-group="intc" onclick="togglePS(this)">
+              <span class="ps-name">Intercept+</span><span class="ps-effect">Interception +15</span>
+            </div>
+            <div class="ps-btn" data-ps="block" data-group="blk" onclick="togglePS(this)">
+              <span class="ps-name">Block</span><span class="ps-effect">Positioning +6</span>
+            </div>
+            <div class="ps-btn" data-ps="block_plus" data-group="blk" onclick="togglePS(this)">
+              <span class="ps-name">Block+</span><span class="ps-effect">Positioning +12</span>
+            </div>
+            <div class="ps-btn" data-ps="jockey" data-group="jck" onclick="togglePS(this)">
+              <span class="ps-name">Jockey</span><span class="ps-effect">Positioning +6</span>
+            </div>
+            <div class="ps-btn" data-ps="jockey_plus" data-group="jck" onclick="togglePS(this)">
+              <span class="ps-name">Jockey+</span><span class="ps-effect">Positioning +12</span>
+            </div>
+            <div class="ps-btn" data-ps="anticipate" data-group="anti" onclick="togglePS(this)">
+              <span class="ps-name">Anticipate</span><span class="ps-effect">Tackle +8</span>
+            </div>
+            <div class="ps-btn" data-ps="anticipate_plus" data-group="anti" onclick="togglePS(this)">
+              <span class="ps-name">Anticipate+</span><span class="ps-effect">Tackle +15</span>
+            </div>
+            <div class="ps-btn" data-ps="slide_tackle_ps" data-group="slide" onclick="togglePS(this)">
+              <span class="ps-name">Slide Tackle</span><span class="ps-effect">Slide Tackle Feel +8</span>
+            </div>
+            <div class="ps-btn" data-ps="slide_tackle_ps_plus" data-group="slide" onclick="togglePS(this)">
+              <span class="ps-name">Slide Tackle+</span><span class="ps-effect">Slide Tackle Feel +15</span>
+            </div>
+          </div>
+
+          <div class="ps-section-label">Shooting</div>
+          <div class="grid-2 grid grid-cols-2 gap-2">
+            <div class="ps-btn" data-ps="finesse" data-group="fin" onclick="togglePS(this)">
+              <span class="ps-name">Finesse Shot</span><span class="ps-effect">Finesse +8</span>
+            </div>
+            <div class="ps-btn" data-ps="finesse_plus" data-group="fin" onclick="togglePS(this)">
+              <span class="ps-name">Finesse Shot+</span><span class="ps-effect">Finesse +15</span>
+            </div>
+            <div class="ps-btn" data-ps="power_shot" data-group="pwr" onclick="togglePS(this)">
+              <span class="ps-name">Power Shot</span><span class="ps-effect">Power +8</span>
+            </div>
+            <div class="ps-btn" data-ps="power_shot_plus" data-group="pwr" onclick="togglePS(this)">
+              <span class="ps-name">Power Shot+</span><span class="ps-effect">Power +15</span>
+            </div>
+            <div class="ps-btn" data-ps="chip_shot" data-group="chp" onclick="togglePS(this)">
+              <span class="ps-name">Chip Shot</span><span class="ps-effect">Chip +8</span>
+            </div>
+            <div class="ps-btn" data-ps="chip_shot_plus" data-group="chp" onclick="togglePS(this)">
+              <span class="ps-name">Chip Shot+</span><span class="ps-effect">Chip +15</span>
+            </div>
+            <div class="ps-btn" data-ps="dead_ball" data-group="db" onclick="togglePS(this)">
+              <span class="ps-name">Dead Shot (Freekick)</span><span class="ps-effect">FK Taker +15</span>
+            </div>
+            <div class="ps-btn" data-ps="dead_ball_plus" data-group="db" onclick="togglePS(this)">
+              <span class="ps-name">Dead Shot (Freekick)+</span><span class="ps-effect">FK Taker +28</span>
+            </div>
+            <div class="ps-btn" data-ps="first_time" data-group="ft_shot" onclick="togglePS(this)">
+              <span class="ps-name">Acrobatic</span><span class="ps-effect">Volley +10</span>
+            </div>
+            <div class="ps-btn" data-ps="first_time_plus" data-group="ft_shot" onclick="togglePS(this)">
+              <span class="ps-name">Acrobatic+</span><span class="ps-effect">Volley +18</span>
+            </div>
+            <div class="ps-btn" data-ps="low_driven" data-group="ldr" onclick="togglePS(this)">
+              <span class="ps-name">Low Driven</span><span class="ps-effect">Low Driven +10</span>
+            </div>
+            <div class="ps-btn" data-ps="low_driven_plus" data-group="ldr" onclick="togglePS(this)">
+              <span class="ps-name">Low Driven+</span><span class="ps-effect">Low Driven +18</span>
+            </div>
+            <div class="ps-btn" data-ps="game_changer" data-group="gc" onclick="togglePS(this)">
+              <span class="ps-name">Game Changer (Flair)</span><span class="ps-effect">Finishing +5 · Agility +2</span>
+            </div>
+            <div class="ps-btn" data-ps="game_changer_plus" data-group="gc" onclick="togglePS(this)">
+              <span class="ps-name">Game Changer (Flair)+</span><span class="ps-effect">Finishing +10 · Agility +4</span>
+            </div>
+            <div class="ps-btn" data-ps="precision_header" data-group="ph" onclick="togglePS(this)">
+              <span class="ps-name">Precision Header</span><span class="ps-effect">Aerial +8</span>
+            </div>
+            <div class="ps-btn" data-ps="precision_header_plus" data-group="ph" onclick="togglePS(this)">
+              <span class="ps-name">Precision Header+</span><span class="ps-effect">Aerial +15</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chem Style column -->
+      <div class="ps-chem-col">
+        <div class="collapsible-toggle" onclick="toggleChemStyle()" style="margin-top: 16px;">
+          <span class="collapsible-chevron open" id="chemStyleChevron" style="margin-right: 10px;">▶</span>
+          <span class="collapsible-label">Chemistry Style</span>
+        </div>
+        <div class="collapsible-body open" id="chemStyleBody">
+          <div class="ps-section-label" style="margin-top: 12px;">Basic</div>
+          <div class="grid-2 grid grid-cols-2 gap-2">
+            <div class="ps-btn" data-chem="basic" data-chemgroup="chem" onclick="selectChem(this)">
+              <span class="ps-name">Basic</span><span class="ps-effect">+3 to most stats</span>
+            </div>
+          </div>
+
+          <div class="ps-section-label">Attacking</div>
+          <div class="grid-2 grid grid-cols-2 gap-2">
+            <div class="ps-btn" data-chem="hunter" data-chemgroup="chem" onclick="selectChem(this)">
+              <span class="ps-name">Hunter</span><span class="ps-effect">Pace +6 · Volleys · Jumping</span>
+            </div>
+            <div class="ps-btn" data-chem="hawk" data-chemgroup="chem" onclick="selectChem(this)">
+              <span class="ps-name">Hawk</span><span class="ps-effect">Pace · Power · Aerial</span>
+            </div>
+            <div class="ps-btn" data-chem="finisher" data-chemgroup="chem" onclick="selectChem(this)">
+              <span class="ps-name">Finisher</span><span class="ps-effect">Finishing · Dribbling · Agility</span>
+            </div>
+            <div class="ps-btn" data-chem="marksman" data-chemgroup="chem" onclick="selectChem(this)">
+              <span class="ps-name">Marksman</span><span class="ps-effect">Long Shots · Finishing · Strength</span>
+            </div>
+            <div class="ps-btn" data-chem="deadeye" data-chemgroup="chem" onclick="selectChem(this)">
+              <span class="ps-name">Deadeye</span><span class="ps-effect">Shot Power · Passing</span>
+            </div>
+            <div class="ps-btn" data-chem="sniper" data-chemgroup="chem" onclick="selectChem(this)">
+              <span class="ps-name">Sniper</span><span class="ps-effect">Att. Pos. · Strength · Stamina</span>
+            </div>
+          </div>
+
+          <div class="ps-section-label">Midfield</div>
+          <div class="grid-2 grid grid-cols-2 gap-2">
+            <div class="ps-btn" data-chem="catalyst" data-chemgroup="chem" onclick="selectChem(this)">
+              <span class="ps-name">Catalyst</span><span class="ps-effect">Pace +6 · Vision +9 · Passing</span>
+            </div>
+            <div class="ps-btn" data-chem="engine" data-chemgroup="chem" onclick="selectChem(this)">
+              <span class="ps-name">Engine</span><span class="ps-effect">Rounded creator profile</span>
+            </div>
+            <div class="ps-btn" data-chem="artist" data-chemgroup="chem" onclick="selectChem(this)">
+              <span class="ps-name">Artist</span><span class="ps-effect">Agility +9 · Curve +9</span>
+            </div>
+            <div class="ps-btn" data-chem="architect" data-chemgroup="chem" onclick="selectChem(this)">
+              <span class="ps-name">Architect</span><span class="ps-effect">Short Pass +9 · Strength +9 · FK</span>
+            </div>
+            <div class="ps-btn" data-chem="maestro" data-chemgroup="chem" onclick="selectChem(this)">
+              <span class="ps-name">Maestro</span><span class="ps-effect">Long Shots · FK · Passing</span>
+            </div>
+            <div class="ps-btn" data-chem="powerhouse" data-chemgroup="chem" onclick="selectChem(this)">
+              <span class="ps-name">Powerhouse</span><span class="ps-effect">Vision +9 · Tackle · Passing</span>
+            </div>
+          </div>
+
+          <div class="ps-section-label">Defending</div>
+          <div class="grid-2 grid grid-cols-2 gap-2">
+            <div class="ps-btn" data-chem="shadow" data-chemgroup="chem" onclick="selectChem(this)">
+              <span class="ps-name">Shadow</span><span class="ps-effect">Pace +6 · Slide Tackle +9 · Aerial</span>
+            </div>
+            <div class="ps-btn" data-chem="anchor" data-chemgroup="chem" onclick="selectChem(this)">
+              <span class="ps-name">Anchor</span><span class="ps-effect">Pace · Tackle · Strength · Aerial</span>
+            </div>
+            <div class="ps-btn" data-chem="sentinel" data-chemgroup="chem" onclick="selectChem(this)">
+              <span class="ps-name">Sentinel</span><span class="ps-effect">Def. Aware · Jumping · Heading</span>
+            </div>
+            <div class="ps-btn" data-chem="guardian" data-chemgroup="chem" onclick="selectChem(this)">
+              <span class="ps-name">Guardian</span><span class="ps-effect">Tackle +9 · Dribbling · Agility</span>
+            </div>
+            <div class="ps-btn" data-chem="gladiator" data-chemgroup="chem" onclick="selectChem(this)">
+              <span class="ps-name">Gladiator</span><span class="ps-effect">Shot Power · Slide Tackle · Reactions</span>
+            </div>
+            <div class="ps-btn" data-chem="backbone" data-chemgroup="chem" onclick="selectChem(this)">
+              <span class="ps-name">Backbone</span><span class="ps-effect">Tackle · Long Pass · Stamina · Aggression</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- end ps-chem-wrap -->
+  </section>
+
+  <div class="secondary-stack">
+
+  <!-- ═══════════════════ EFFECTIVE FEEL STATS ═══════════════════ -->
+  <section class="card card-enter feel-stats-parent bg-surface border border-line rounded-2xl p-5 sm:p-7 shadow-soft">
+    <div class="flex items-center justify-between gap-3 mb-5">
+      <div>
+        <div class="text-[10px] font-mono tracking-[0.18em] text-ink-muted uppercase mb-1">Section 02</div>
+        <h2 class="card-title font-display text-xl sm:text-2xl text-ink font-medium tracking-tight">Effective Feel Stats</h2>
+      </div>
+    </div>
+
+    <div class="feel-layer-grid">
+
+    <!-- Movement Feel -->
+    <div class="feel-layer-card feel-layer-movement">
+      <div class="collapsible-toggle" onclick="toggleMovementFeel()" style="margin-top: 0; border-top: none; padding-top: 0; padding-bottom: 4px;">
+        <span class="collapsible-chevron open" id="movementFeelChevron" style="margin-right: 10px;">▶</span>
+        <span class="feel-layer-title"><span class="feel-layer-accent"></span>Effective Movement Feel</span>
+      </div>
+      <div class="collapsible-body open" id="movementFeelBody">
+        <div class="stat-row" style="margin-top: 8px;">
+          <span class="stat-label">Acceleration</span>
+          <div class="stat-bar-wrap">
+            <div class="stat-bar-base" id="barAccelBase"></div>
+            <div class="stat-bar-effective" id="barAccelEff"></div>
+          </div>
+          <span class="stat-base-num" id="numAccelBase">80</span>
+          <span class="stat-effective-num" id="numAccelEff">80</span>
+          <span class="delta zero" id="deltaAccel">±0</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Sprint Speed</span>
+          <div class="stat-bar-wrap">
+            <div class="stat-bar-base" id="barSprintBase"></div>
+            <div class="stat-bar-effective" id="barSprintEff"></div>
+          </div>
+          <span class="stat-base-num" id="numSprintBase">80</span>
+          <span class="stat-effective-num" id="numSprintEff">80</span>
+          <span class="delta zero" id="deltaSprint">±0</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Agility</span>
+          <div class="stat-bar-wrap">
+            <div class="stat-bar-base" id="barAgilityBase"></div>
+            <div class="stat-bar-effective" id="barAgilityEff"></div>
+          </div>
+          <span class="stat-base-num" id="numAgilityBase">80</span>
+          <span class="stat-effective-num" id="numAgilityEff">80</span>
+          <span class="delta zero" id="deltaAgility">±0</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label tenacity-label">Tenacity</span>
+          <div class="stat-bar-wrap">
+            <div class="stat-bar-base" id="barTenacityBase"></div>
+            <div class="stat-bar-effective" id="barTenacityEff"></div>
+          </div>
+          <span class="stat-base-num" id="numTenacityBase">75</span>
+          <span class="stat-effective-num" id="numTenacityEff">75</span>
+          <span class="delta zero" id="deltaTenacity">±0</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Slipperiness</span>
+          <div class="stat-bar-wrap">
+            <div class="stat-bar-base" id="barSlipBase"></div>
+            <div class="stat-bar-effective" id="barSlipEff"></div>
+          </div>
+          <span class="stat-base-num" id="numSlipBase">—</span>
+          <span class="stat-effective-num" id="numSlipEff">—</span>
+          <span class="delta zero" id="deltaSlip"></span>
+        </div>
+
+        <div class="collapsible-toggle" onclick="toggleBreakdown()">
+          <span class="collapsible-chevron" id="breakdownChevron" style="margin-right: 10px;">▶</span>
+          <span class="collapsible-label">Modifier Breakdown & Verdict</span>
+        </div>
+        <div class="collapsible-body" id="breakdownBody">
+          <div class="breakdown" style="padding-top: 0; border-top: none;">
+            <div class="breakdown-title">Modifier Breakdown</div>
+            <div id="breakdownList"></div>
+          </div>
+          <div class="breakdown" style="margin-top: 12px;">
+            <div class="breakdown-title slip-breakdown-title">Slipperiness Breakdown</div>
+            <div id="slipBreakdownList"></div>
+          </div>
+          <div class="verdict" style="margin-top: 16px;">
+            <div class="verdict-label">Feel Verdict</div>
+            <div class="verdict-text" id="verdictText">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Passing Feel -->
+    <div class="feel-layer-card feel-layer-passing">
+      <div class="collapsible-toggle" onclick="togglePassingFeel()" style="margin-top: 0; border-top: none; padding-top: 0; padding-bottom: 4px;">
+        <span class="collapsible-chevron open" id="passingFeelChevron" style="margin-right: 10px;">▶</span>
+        <span class="feel-layer-title"><span class="feel-layer-accent"></span>Effective Passing Feel</span>
+      </div>
+      <div class="collapsible-body open" id="passingFeelBody">
+        <div class="sub-stat-row" style="margin-top: 8px;">
+          <span class="sub-stat-label">Short Pass</span>
+          <div class="stat-bar-wrap"><div class="stat-bar-base" id="barPassShortBase"></div><div class="stat-bar-effective" id="barPassShortEff"></div></div>
+          <span class="sub-stat-num" id="numPassShortEff">—</span>
+        </div>
+        <div class="sub-stat-row">
+          <span class="sub-stat-label">Long Pass</span>
+          <div class="stat-bar-wrap"><div class="stat-bar-base" id="barPassLongBase"></div><div class="stat-bar-effective" id="barPassLongEff"></div></div>
+          <span class="sub-stat-num" id="numPassLongEff">—</span>
+        </div>
+        <div class="sub-stat-row">
+          <span class="sub-stat-label">Through Ball</span>
+          <div class="stat-bar-wrap"><div class="stat-bar-base" id="barPassThroughBase"></div><div class="stat-bar-effective" id="barPassThroughEff"></div></div>
+          <span class="sub-stat-num" id="numPassThroughEff">—</span>
+        </div>
+        <div class="sub-stat-row">
+          <span class="sub-stat-label">Cross</span>
+          <div class="stat-bar-wrap"><div class="stat-bar-base" id="barPassCrossBase"></div><div class="stat-bar-effective" id="barPassCrossEff"></div></div>
+          <span class="sub-stat-num" id="numPassCrossEff">—</span>
+        </div>
+        <div class="collapsible-toggle" onclick="togglePassingVerdict()">
+          <span class="collapsible-chevron" id="passingVerdictChevron" style="margin-right: 10px;">▶</span>
+          <span class="collapsible-label">Modifier Breakdown & Verdict</span>
+        </div>
+        <div class="collapsible-body" id="passingVerdictBody">
+          <div class="breakdown" style="padding-top: 0; border-top: none;">
+            <div class="breakdown-title">Modifier Breakdown</div>
+            <div id="passingBreakdownList"></div>
+          </div>
+          <div class="verdict" style="margin-top: 12px;">
+            <div class="verdict-label">Feel Verdict</div>
+            <div class="verdict-text" id="passingVerdictText">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Defending Feel -->
+    <div class="feel-layer-card feel-layer-defending">
+      <div class="collapsible-toggle" onclick="toggleDefendingFeel()" style="margin-top: 0; border-top: none; padding-top: 0; padding-bottom: 4px;">
+        <span class="collapsible-chevron open" id="defendingFeelChevron" style="margin-right: 10px;">▶</span>
+        <span class="feel-layer-title"><span class="feel-layer-accent"></span>Effective Defending Feel</span>
+      </div>
+      <div class="collapsible-body open" id="defendingFeelBody">
+        <div class="sub-stat-row" style="margin-top: 8px;">
+          <span class="sub-stat-label">Tackle</span>
+          <div class="stat-bar-wrap"><div class="stat-bar-base" id="barDefTackleBase"></div><div class="stat-bar-effective" id="barDefTackleEff"></div></div>
+          <span class="sub-stat-num" id="numDefTackleEff">—</span>
+        </div>
+        <div class="sub-stat-row">
+          <span class="sub-stat-label">Positioning</span>
+          <div class="stat-bar-wrap"><div class="stat-bar-base" id="barDefPosBase"></div><div class="stat-bar-effective" id="barDefPosEff"></div></div>
+          <span class="sub-stat-num" id="numDefPosEff">—</span>
+        </div>
+        <div class="sub-stat-row">
+          <span class="sub-stat-label">Interception</span>
+          <div class="stat-bar-wrap"><div class="stat-bar-base" id="barDefIntBase"></div><div class="stat-bar-effective" id="barDefIntEff"></div></div>
+          <span class="sub-stat-num" id="numDefIntEff">—</span>
+        </div>
+        <div class="sub-stat-row">
+          <span class="sub-stat-label">Aerial</span>
+          <div class="stat-bar-wrap"><div class="stat-bar-base" id="barDefAerBase"></div><div class="stat-bar-effective" id="barDefAerEff"></div></div>
+          <span class="sub-stat-num" id="numDefAerEff">—</span>
+        </div>
+        <div class="sub-stat-row">
+          <span class="sub-stat-label">Bully</span>
+          <div class="stat-bar-wrap"><div class="stat-bar-base" id="barDefBullyBase"></div><div class="stat-bar-effective" id="barDefBullyEff"></div></div>
+          <span class="sub-stat-num" id="numDefBullyEff">—</span>
+        </div>
+        <div class="sub-stat-row">
+          <span class="sub-stat-label">Slide Tackles</span>
+          <div class="stat-bar-wrap"><div class="stat-bar-base" id="barDefSlideBase"></div><div class="stat-bar-effective" id="barDefSlideEff"></div></div>
+          <span class="sub-stat-num" id="numDefSlideEff">—</span>
+        </div>
+        <div class="collapsible-toggle" onclick="toggleDefendingVerdict()">
+          <span class="collapsible-chevron" id="defendingVerdictChevron" style="margin-right: 10px;">▶</span>
+          <span class="collapsible-label">Modifier Breakdown & Verdict</span>
+        </div>
+        <div class="collapsible-body" id="defendingVerdictBody">
+          <div class="breakdown" style="padding-top: 0; border-top: none;">
+            <div class="breakdown-title">Modifier Breakdown</div>
+            <div id="defendingBreakdownList"></div>
+          </div>
+          <div class="verdict" style="margin-top: 12px;">
+            <div class="verdict-label">Feel Verdict</div>
+            <div class="verdict-text" id="defendingVerdictText">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Shooting Feel -->
+    <div class="feel-layer-card feel-layer-shooting">
+      <div class="collapsible-toggle" onclick="toggleShootingFeel()" style="margin-top: 0; border-top: none; padding-top: 0; padding-bottom: 4px;">
+        <span class="collapsible-chevron open" id="shootingFeelChevron" style="margin-right: 10px;">▶</span>
+        <span class="feel-layer-title"><span class="feel-layer-accent"></span>Effective Shooting Feel</span>
+      </div>
+      <div class="collapsible-body open" id="shootingFeelBody">
+        <div class="sub-stat-row" style="margin-top: 8px;">
+          <span class="sub-stat-label">Finishing</span>
+          <div class="stat-bar-wrap"><div class="stat-bar-base" id="barShootFinBase"></div><div class="stat-bar-effective" id="barShootFinEff"></div></div>
+          <span class="sub-stat-num" id="numShootFinEff">—</span>
+        </div>
+        <div class="sub-stat-row">
+          <span class="sub-stat-label">Shot Power</span>
+          <div class="stat-bar-wrap"><div class="stat-bar-base" id="barShootPwrBase"></div><div class="stat-bar-effective" id="barShootPwrEff"></div></div>
+          <span class="sub-stat-num" id="numShootPwrEff">—</span>
+        </div>
+        <div class="sub-stat-row">
+          <span class="sub-stat-label">Finesse</span>
+          <div class="stat-bar-wrap"><div class="stat-bar-base" id="barShootFineBase"></div><div class="stat-bar-effective" id="barShootFineEff"></div></div>
+          <span class="sub-stat-num" id="numShootFineEff">—</span>
+        </div>
+        <div class="sub-stat-row">
+          <span class="sub-stat-label">Volley</span>
+          <div class="stat-bar-wrap"><div class="stat-bar-base" id="barShootVolBase"></div><div class="stat-bar-effective" id="barShootVolEff"></div></div>
+          <span class="sub-stat-num" id="numShootVolEff">—</span>
+        </div>
+        <div class="sub-stat-row">
+          <span class="sub-stat-label">Low Driven</span>
+          <div class="stat-bar-wrap"><div class="stat-bar-base" id="barShootLdrBase"></div><div class="stat-bar-effective" id="barShootLdrEff"></div></div>
+          <span class="sub-stat-num" id="numShootLdrEff">—</span>
+        </div>
+        <div class="sub-stat-row">
+          <span class="sub-stat-label">Free Kick Taker</span>
+          <div class="stat-bar-wrap"><div class="stat-bar-base" id="barShootFkBase"></div><div class="stat-bar-effective" id="barShootFkEff"></div></div>
+          <span class="sub-stat-num" id="numShootFkEff">—</span>
+        </div>
+        <div class="collapsible-toggle" onclick="toggleShootingVerdict()">
+          <span class="collapsible-chevron" id="shootingVerdictChevron" style="margin-right: 10px;">▶</span>
+          <span class="collapsible-label">Modifier Breakdown & Verdict</span>
+        </div>
+        <div class="collapsible-body" id="shootingVerdictBody">
+          <div class="breakdown" style="padding-top: 0; border-top: none;">
+            <div class="breakdown-title">Modifier Breakdown</div>
+            <div id="shootingBreakdownList"></div>
+          </div>
+          <div class="verdict" style="margin-top: 12px;">
+            <div class="verdict-label">Feel Verdict</div>
+            <div class="verdict-text" id="shootingVerdictText">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    </div><!-- end feel-layer-grid -->
+
+  </section>
+
+  <!-- ═══════════════════ SAVES ═══════════════════ -->
+  <section class="card card-enter bg-surface border border-line rounded-2xl p-5 sm:p-7 shadow-soft">
+    <div class="text-[10px] font-mono tracking-[0.18em] text-ink-muted uppercase mb-1">Section 03</div>
+    <div class="flex items-center gap-3 cursor-pointer group" onclick="toggleSaves()">
+      <span class="collapsible-chevron open" id="savesChevron" style="font-size: 12px;">▶</span>
+      <h2 class="card-title font-display text-xl sm:text-2xl text-ink font-medium tracking-tight group-hover:text-accent transition-colors">
+        Saves
+      </h2>
+    </div>
+
+    <div class="collapsible-body open" id="savesBody">
+      <div class="save-section flex flex-col" style="margin-top: 12px;">
+        <!-- Saved players list first -->
+        <div id="savedPlayersList" style="order: 1;"></div>
+
+        <!-- Save configuration UI -->
+        <div class="save-config" style="order: 2; margin-top: 18px; padding-top: 16px; border-top: 1px solid rgb(var(--c-line));">
+          <div class="ps-section-label" style="margin-top: 0; margin-bottom: 10px;">Save Configuration</div>
+
+          <div class="save-row" style="margin-bottom: 8px;">
+            <input type="text" id="folderName" placeholder="New folder name…" class="name-input">
+            <button class="save-btn" onclick="createFolder()">+ Folder</button>
+          </div>
+          <div class="save-row">
+            <input type="text" id="playerName" placeholder="Player name…" class="name-input">
+            <select id="folderSelect" class="folder-select">
+              <option value="">Select folder…</option>
+            </select>
+            <button class="save-btn" onclick="savePlayer()">Save</button>
+          </div>
+          <div class="role-chips" id="roleChips">
+            <span class="role-chip" data-role="ST" onclick="toggleRole(this)">ST</span>
+            <span class="role-chip" data-role="CAM" onclick="toggleRole(this)">CAM</span>
+            <span class="role-chip" data-role="Wing" onclick="toggleRole(this)">Wing</span>
+            <span class="role-chip" data-role="CDM" onclick="toggleRole(this)">CDM</span>
+            <span class="role-chip" data-role="FB" onclick="toggleRole(this)">FB</span>
+            <span class="role-chip" data-role="CB" onclick="toggleRole(this)">CB</span>
+          </div>
+          <div class="chips-label" style="display: flex; align-items: center; gap: 6px;">Attacker<button class="info-btn" type="button" data-info="archetype_attackers" aria-label="Info about attacker archetypes">i</button></div>
+          <div class="role-chips" id="archetypeChipsAttackers">
+            <span class="archetype-chip" data-arch="Assassin" onclick="toggleArchetype(this)">Assassin</span>
+            <span class="archetype-chip" data-arch="Fighter" onclick="toggleArchetype(this)">Fighter</span>
+            <span class="archetype-chip" data-arch="Bulldozer" onclick="toggleArchetype(this)">Bulldozer</span>
+            <span class="archetype-chip" data-arch="Jungler" onclick="toggleArchetype(this)">Jungler</span>
+            <span class="archetype-chip" data-arch="Freight Train" onclick="toggleArchetype(this)">Freight Train</span>
+          </div>
+          <div class="chips-label" style="display: flex; align-items: center; gap: 6px;">Defender<button class="info-btn" type="button" data-info="archetype_defenders" aria-label="Info about defender archetypes">i</button></div>
+          <div class="role-chips" id="archetypeChipsDefenders">
+            <span class="archetype-chip" data-arch="Surgeon" onclick="toggleArchetype(this)">Surgeon</span>
+            <span class="archetype-chip" data-arch="Bruiser" onclick="toggleArchetype(this)">Bruiser</span>
+            <span class="archetype-chip" data-arch="Brawler" onclick="toggleArchetype(this)">Brawler</span>
+            <span class="archetype-chip" data-arch="Spider" onclick="toggleArchetype(this)">Spider</span>
+            <span class="archetype-chip" data-arch="Wall" onclick="toggleArchetype(this)">Wall</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="io-row" style="margin-top: 16px; padding-top: 14px; border-top: 1px solid rgb(var(--c-line));">
+        <button class="export-btn" onclick="showExport()">Export Saves</button>
+        <button class="import-btn" onclick="showImport()">Import Saves</button>
+      </div>
+
+      <div id="ioPanel" style="display: none; margin-top: 12px;">
+        <div class="io-panel-label" id="ioPanelLabel"></div>
+        <textarea id="ioTextarea" class="io-textarea" placeholder=""></textarea>
+        <div class="io-row" style="margin-top: 8px;">
+          <button class="export-btn" id="ioActionBtn" onclick="ioAction()"></button>
+          <button class="import-btn" onclick="closeIO()">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ COMPARE PLAYERS ═══════════════════ -->
+  <section class="compare-card card-enter bg-surface border border-line rounded-2xl p-5 sm:p-7 shadow-soft" id="compareCard">
+    <div class="compare-header flex items-end justify-between gap-3">
+      <div class="min-w-0">
+        <div class="text-[10px] font-mono tracking-[0.18em] text-ink-muted uppercase mb-1">Section 04</div>
+        <div class="flex items-center gap-3 cursor-pointer group min-w-0" onclick="toggleCompare()">
+          <span class="collapsible-chevron" id="compareChevron" style="font-size: 12px;">▶</span>
+          <h2 class="card-title font-display text-xl sm:text-2xl text-ink font-medium tracking-tight group-hover:text-accent transition-colors">Compare Players</h2>
+        </div>
+      </div>
+      <div class="compare-header-controls">
+        <div class="view-toggle" role="group" aria-label="Compare view mode">
+          <button class="view-toggle-btn active" id="compareViewRadar" onclick="setCompareView('radar')" type="button" title="Radar charts">Radar</button>
+          <button class="view-toggle-btn" id="compareViewBars" onclick="setCompareView('bars')" type="button" title="Bar table">Bars</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="collapsible-body" id="compareBody">
+      <div class="compare-selectors" id="compareSlots"></div>
+      <div class="compare-actions">
+        <button class="save-btn" id="compareAddBtn" onclick="addCompareSlot()">+ Add Slot</button>
+        <span class="compare-actions-hint">Pick saved players or an Ideal archetype profile (up to 6)</span>
+      </div>
+      <div id="compareResults"></div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ SQUAD VIEW ═══════════════════ -->
+  <section class="compare-card card-enter bg-surface border border-line rounded-2xl p-5 sm:p-7 shadow-soft" id="squadCard">
+    <div class="compare-header">
+      <div class="text-[10px] font-mono tracking-[0.18em] text-ink-muted uppercase mb-1">Section 05</div>
+      <div class="flex items-center gap-3 cursor-pointer group min-w-0" onclick="toggleSquad()">
+        <span class="collapsible-chevron" id="squadChevron" style="font-size: 12px;">▶</span>
+        <h2 class="card-title font-display text-xl sm:text-2xl text-ink font-medium tracking-tight group-hover:text-accent transition-colors">Squad View</h2>
+      </div>
+    </div>
+    <div class="collapsible-body" id="squadBody">
+      <div class="flex gap-2 mt-3 flex-wrap items-center">
+        <select id="squadFilterRole" class="folder-select" onchange="renderSquad()" style="min-width: 100px; flex: 0 1 auto;">
+          <option value="">All positions</option>
+          <option value="ST">ST</option>
+          <option value="CAM">CAM</option>
+          <option value="Wing">Wing</option>
+          <option value="CDM">CDM</option>
+          <option value="FB">FB</option>
+          <option value="CB">CB</option>
+        </select>
+        <select id="squadFilterArch" class="folder-select" onchange="renderSquad()" style="min-width: 130px; flex: 0 1 auto;">
+          <option value="">All archetypes</option>
+          <optgroup label="Attacker">
+            <option value="Assassin">Assassin</option>
+            <option value="Fighter">Fighter</option>
+            <option value="Bulldozer">Bulldozer</option>
+            <option value="Jungler">Jungler</option>
+            <option value="Freight Train">Freight Train</option>
+          </optgroup>
+          <optgroup label="Defender">
+            <option value="Surgeon">Surgeon</option>
+            <option value="Bruiser">Bruiser</option>
+            <option value="Brawler">Brawler</option>
+            <option value="Spider">Spider</option>
+            <option value="Wall">Wall</option>
+          </optgroup>
+        </select>
+        <label class="flex items-center gap-1.5 text-[11px] text-ink-muted cursor-pointer whitespace-nowrap" title="Match only saves whose primary is the selected archetype AND have no secondary at all">
+          <input type="checkbox" id="squadFilterPrimaryOnly" onchange="renderSquad()" class="cursor-pointer">
+          Primary only
+        </label>
+        <label class="flex items-center gap-1.5 text-[11px] text-ink-muted cursor-pointer whitespace-nowrap" title="Match saves whose primary is the selected archetype; do not match saves where it is only the secondary">
+          <input type="checkbox" id="squadFilterExcludeSecondary" onchange="renderSquad()" class="cursor-pointer">
+          Exclude secondary
+        </label>
+        <button class="save-btn" onclick="document.getElementById('squadFilterRole').value='';document.getElementById('squadFilterArch').value='';document.getElementById('squadFilterPrimaryOnly').checked=false;document.getElementById('squadFilterExcludeSecondary').checked=false;renderSquad();">Clear</button>
+      </div>
+      <div id="squadGrid" style="margin-top: 12px; overflow-x: auto;"></div>
+    </div>
+  </section>
+
+  </div><!-- end secondary-stack -->
+
+ </div><!-- end unified-card -->
+</main>
+
+<!-- Footer note -->
+<footer class="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-12 text-center">
+  <div class="text-[10px] font-mono tracking-[0.16em] text-ink-faint uppercase">
+    Theoretical model · Outputs reflect estimated in-game feel
+  </div>
+</footer>
+
+<script src="animations.js"></script>
+<script src="calculator.js"></script>
+<script src="ui.js"></script>
+
+
+</body>
+</html>
