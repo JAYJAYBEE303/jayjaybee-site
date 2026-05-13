@@ -1,408 +1,258 @@
-<!doctype html>
-<html lang="en" data-theme="auto" class="no-js">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Josh Bailey — IT Desktop Analyst, Aston Martin F1</title>
-  <meta name="description" content="Josh Bailey. IT Desktop Analyst at Aston Martin F1. Endpoint work, PowerShell tooling, and the small, sharp tools that should already exist." />
+---
+layout: default
+title: Josh Bailey — IT Desktop Analyst, Aston Martin F1
+description: Josh Bailey. IT Desktop Analyst at Aston Martin F1. Endpoint work, PowerShell tooling, and the small, sharp tools that should already exist.
+---
 
-  <!-- Pre-paint setup: theme preference + JS detection.
-       Both must run before first paint to avoid a flash of unstyled content
-       (wrong theme) or a flash of unanimated content (revealed before hidden). -->
-  <script>
-    (function () {
-      try {
-        var saved = localStorage.getItem('theme');
-        if (saved === 'light' || saved === 'dark') {
-          document.documentElement.setAttribute('data-theme', saved);
-        } else {
-          document.documentElement.removeAttribute('data-theme');
-        }
-      } catch (e) {}
-      // Swap no-js -> js as early as possible so .js-scoped CSS rules
-      // (the reveal "hidden" initial state) apply before paint.
-      document.documentElement.classList.replace('no-js', 'js');
-    })();
-  </script>
+<!-- ============================================================
+     Opening line — the lede. Sets point of view in one sentence.
+     ============================================================ -->
+<section class="lede-block" aria-label="Introduction">
+  <p class="mono-label lede-meta">Josh&nbsp;Bailey&nbsp;·&nbsp;Silverstone</p>
+  <h1 class="lede-line">
+    Innovation, drive, and service that pushes teams to win.
+  </h1>
+</section>
 
-  <link rel="stylesheet" href="/assets/css/global.css" />
-</head>
-<body>
-  <a class="skip-link" href="#main">Skip to content</a>
+<!-- ============================================================
+     Narrative — three or four sentences. Who, what, the arc.
+     ============================================================ -->
+<section class="narrative" aria-label="About">
+  <div class="prose">
+    <p>
+      I'm an IT Desktop Analyst at Aston Martin F1, supporting HR, Finance, and Commercial through the parts of a season nobody puts on television.
+      Before this I ran the helpdesk for Manshead Academy on the MSP side, before that I was on the IT deployment team at Red Bull Racing, and before that I spent five years on the Genius Bar at Apple — different rooms, the same shape of problem.
+      The throughline is endpoint work: making fleets of laptops behave, quietly, while the people using them get on with everything else.
+      On the side I write PowerShell, build the occasional tool, and play metal guitar.
+    </p>
+  </div>
+</section>
 
-  <!-- ============================================================
-       Site navigation — wordmark left, links right, accent CTA.
-       No logo, no hamburger; the link row collapses on narrow screens.
-       ============================================================ -->
-  <header class="site-header" role="banner">
-    <div class="site-header__inner">
-      <a class="site-wordmark" href="/" aria-label="Josh Bailey — home">Josh&nbsp;Bailey</a>
-      <nav class="site-nav" aria-label="Primary">
-        <ul class="site-nav__list" role="list">
-
-          <!-- Experiences — dropdown of roles in reverse-chronological order -->
-          <li class="site-nav__item has-menu">
-            <button
-              type="button"
-              class="site-nav__link site-nav__trigger"
-              aria-expanded="false"
-              aria-haspopup="true"
-              aria-controls="menu-experiences"
-              data-menu-trigger="experiences"
-            >
-              Experiences
-              <span class="site-nav__caret" aria-hidden="true">▾</span>
-            </button>
-            <ul
-              id="menu-experiences"
-              class="site-nav__menu"
-              role="menu"
-              data-menu="experiences"
-              hidden
-            >
-              <li role="none"><a role="menuitem" class="site-nav__menu-link" href="#exp-amf1">Aston Martin Aramco — Desktop Support Analyst</a></li>
-              <li role="none"><a role="menuitem" class="site-nav__menu-link" href="#exp-partnership">Partnership Education — IT Engineer</a></li>
-              <li role="none"><a role="menuitem" class="site-nav__menu-link" href="#exp-redbull">Red Bull Racing — IT Deployment Engineer</a></li>
-              <li role="none"><a role="menuitem" class="site-nav__menu-link" href="#exp-apple">Apple — Technical Specialist</a></li>
-            </ul>
-          </li>
-
-          <li><a class="site-nav__link" href="#work-heading">Projects</a></li>
-          <li><a class="site-nav__link site-nav__link--accent" href="/files/CV.pdf" target="_blank" rel="noopener">CV</a></li>
-
-          <!-- Software Development portfolio — dropdown -->
-          <li class="site-nav__item has-menu">
-            <button
-              type="button"
-              class="site-nav__link site-nav__trigger"
-              aria-expanded="false"
-              aria-haspopup="true"
-              aria-controls="menu-portfolio"
-              data-menu-trigger="portfolio"
-            >
-              Software&nbsp;Development&nbsp;portfolio
-              <span class="site-nav__caret" aria-hidden="true">▾</span>
-            </button>
-            <ul
-              id="menu-portfolio"
-              class="site-nav__menu site-nav__menu--right"
-              role="menu"
-              data-menu="portfolio"
-              hidden
-            >
-              <li role="none"><a role="menuitem" class="site-nav__menu-link" href="/projects/fc26-calculator/">FC26 Calculator</a></li>
-            </ul>
-          </li>
-
-        </ul>
-      </nav>
-    </div>
+<!-- ============================================================
+     Past roles — reverse-chronological, anchored from the nav.
+     Each row: mono date range, serif organisation, sans role,
+     one editorial sentence.
+     ============================================================ -->
+<section class="roles" aria-labelledby="roles-heading">
+  <header class="section-head">
+    <span class="mono-label">Past&nbsp;roles</span>
+    <h2 id="roles-heading" class="section-title">Where I've been.</h2>
   </header>
 
-  <main id="main" class="page">
+  <ol class="role-list" role="list">
 
-    <!-- ============================================================
-         Opening line — the lede. Sets point of view in one sentence.
-         ============================================================ -->
-    <section class="lede-block" aria-label="Introduction">
-      <p class="mono-label lede-meta">Josh&nbsp;Bailey&nbsp;·&nbsp;Silverstone</p>
-      <h1 class="lede-line">
-        Innovation, drive, and service that pushes teams to win.
-      </h1>
-    </section>
-
-    <!-- ============================================================
-         Narrative — three or four sentences. Who, what, the arc.
-         ============================================================ -->
-    <section class="narrative" aria-label="About">
-      <div class="prose">
-        <p>
-          I'm an IT Desktop Analyst at Aston Martin F1, supporting HR, Finance, and Commercial through the parts of a season nobody puts on television.
-          Before this I ran the helpdesk for Manshead Academy on the MSP side, before that I was on the IT deployment team at Red Bull Racing, and before that I spent five years on the Genius Bar at Apple — different rooms, the same shape of problem.
-          The throughline is endpoint work: making fleets of laptops behave, quietly, while the people using them get on with everything else.
-          On the side I write PowerShell, build the occasional tool, and play metal guitar.
+    <!-- Current — Aston Martin F1 -->
+    <li id="exp-amf1" class="role-item is-current">
+      <div class="role-when">
+        <span class="mono">2024&nbsp;— Present</span>
+        <span class="mono role-status">Current</span>
+      </div>
+      <div class="role-body">
+        <p class="role-org">Aston Martin Aramco Formula One<sup class="role-tm">™</sup> Team</p>
+        <h3 class="role-title">IT Desktop Support Analyst</h3>
+        <p class="role-note">
+          Endpoint support across HR, Finance, and Commercial — the unglamorous half of a race weekend, and the half that keeps the rest of it going.
         </p>
       </div>
-    </section>
+    </li>
 
-    <!-- ============================================================
-         Past roles — reverse-chronological, anchored from the nav.
-         Each row: mono date range, serif organisation, sans role,
-         one editorial sentence. Dates are placeholders for the
-         non-Apple roles — confirm/edit before publishing.
-         ============================================================ -->
-    <section class="roles" aria-labelledby="roles-heading">
-      <header class="section-head">
-        <span class="mono-label">Past&nbsp;roles</span>
-        <h2 id="roles-heading" class="section-title">Where I've been.</h2>
-      </header>
-
-      <ol class="role-list" role="list">
-
-        <!-- Current — Aston Martin F1 -->
-        <li id="exp-amf1" class="role-item is-current">
-          <div class="role-when">
-            <span class="mono">2024&nbsp;— Present</span>
-            <span class="mono role-status">Current</span>
-          </div>
-          <div class="role-body">
-            <p class="role-org">Aston Martin Aramco Formula One<sup class="role-tm">™</sup> Team</p>
-            <h3 class="role-title">IT Desktop Support Analyst</h3>
-            <p class="role-note">
-              Endpoint support across HR, Finance, and Commercial — the unglamorous half of a race weekend, and the half that keeps the rest of it going.
-            </p>
-          </div>
-        </li>
-
-        <!-- Previous — MSP at a school. Dates TBC. -->
-        <li id="exp-partnership" class="role-item">
-          <div class="role-when">
-            <span class="mono">2023&nbsp;— 2024</span>
-          </div>
-          <div class="role-body">
-            <p class="role-org">Partnership Education <span class="role-org-sub">(Manshead C of E Academy)</span></p>
-            <h3 class="role-title">IT Engineer</h3>
-            <p class="role-note">
-              IT engineer at an MSP serving secondary schools — fleets of student laptops, an MDM that mostly worked, and the daily reality of fixing what teachers haven't got time to.
-            </p>
-          </div>
-        </li>
-
-        <!-- Red Bull Racing IT Deployment. Dates TBC. -->
-        <li id="exp-redbull" class="role-item">
-          <div class="role-when">
-            <span class="mono">2022&nbsp;— 2023</span>
-          </div>
-          <div class="role-body">
-            <p class="role-org">Red Bull Racing</p>
-            <h3 class="role-title">IT Deployment Engineer</h3>
-            <p class="role-note">
-              Imaging, deploying, and decommissioning kit through the back end of two seasons — the part of an F1 operation nobody photographs, and the part everyone notices when it slips.
-            </p>
-          </div>
-        </li>
-
-        <!-- Apple — 2017–2022 per brief -->
-        <li id="exp-apple" class="role-item">
-          <div class="role-when">
-            <span class="mono">2017&nbsp;— 2022</span>
-          </div>
-          <div class="role-body">
-            <p class="role-org">Apple</p>
-            <h3 class="role-title">Technical Specialist <span class="role-title-sub">(Genius&nbsp;Bar)</span></h3>
-            <p class="role-note">
-              Five years on the Genius Bar — diagnostics, repairs, and the slow craft of explaining what's wrong without making someone feel stupid for asking.
-            </p>
-          </div>
-        </li>
-
-      </ol>
-    </section>
-
-    <!-- ============================================================
-         Selected work — three cards. FC26 featured; two placeholders.
-         ============================================================ -->
-    <section class="work" aria-labelledby="work-heading">
-      <header class="section-head">
-        <span class="mono-label">Selected&nbsp;work</span>
-        <h2 id="work-heading" class="section-title">Three things I've made.</h2>
-      </header>
-
-      <ol class="work-list" role="list">
-
-        <!-- Featured: FC26 Feel Calculator ------------------------- -->
-        <li class="work-item work-item--featured">
-          <div class="work-meta">
-            <span class="mono">HTML&nbsp;·&nbsp;JS&nbsp;·&nbsp;Tailwind</span>
-            <span class="mono-sep" aria-hidden="true">·</span>
-            <span class="mono">2025</span>
-            <span class="mono-sep" aria-hidden="true">·</span>
-            <span class="mono">Maintained</span>
-          </div>
-          <h3 class="work-title">
-            <a href="/projects/fc26-calculator/" class="work-link">FC26 Feel Calculator</a>
-          </h3>
-          <p class="work-lede">
-            A single-file tool that models what a player <em>actually</em> feels like on the pitch in EA FC 26 — past the raw card numbers, into chemistry, PlayStyles, and the curves the game runs under the hood.
-          </p>
-          <p class="work-body">
-            Around 2,500 lines of HTML and vanilla JS in one file, no build step. Several rounds of formula tuning against in-game testing, two layouts (a focused mobile read, a comparison-heavy desktop one), and a full UI rebuild in Tailwind once the maths stabilised. It exists because I wanted the version of this calculator I couldn't find — and because writing it taught me more about state management in plain JS than any framework tutorial has.
-          </p>
-          <dl class="work-attrs">
-            <div class="work-attr">
-              <dt class="mono-label">Role</dt>
-              <dd>Design, formulas, code</dd>
-            </div>
-            <div class="work-attr">
-              <dt class="mono-label">Stack</dt>
-              <dd>HTML, JS, Tailwind</dd>
-            </div>
-            <div class="work-attr">
-              <dt class="mono-label">Status</dt>
-              <dd>Live, iterating</dd>
-            </div>
-          </dl>
-        </li>
-
-        <!-- Placeholder #2 ----------------------------------------- -->
-        <li class="work-item is-placeholder">
-          <div class="work-meta">
-            <span class="mono">PowerShell</span>
-            <span class="mono-sep" aria-hidden="true">·</span>
-            <span class="mono">Year</span>
-            <span class="mono-sep" aria-hidden="true">·</span>
-            <span class="mono">Placeholder</span>
-          </div>
-          <h3 class="work-title">
-            <a href="#" class="work-link">Project name goes here</a>
-          </h3>
-          <p class="work-lede">
-            One-line description of the project — what it is, who it's for, why it exists.
-          </p>
-          <p class="work-body">
-            A paragraph or two of context. What the problem was, what the constraint was, what the shape of the solution turned out to be. Two or three sentences is plenty; this isn't a case study, it's a card.
-          </p>
-          <dl class="work-attrs">
-            <div class="work-attr">
-              <dt class="mono-label">Role</dt>
-              <dd>—</dd>
-            </div>
-            <div class="work-attr">
-              <dt class="mono-label">Stack</dt>
-              <dd>—</dd>
-            </div>
-            <div class="work-attr">
-              <dt class="mono-label">Status</dt>
-              <dd>—</dd>
-            </div>
-          </dl>
-        </li>
-
-        <!-- Placeholder #3 ----------------------------------------- -->
-        <li class="work-item is-placeholder">
-          <div class="work-meta">
-            <span class="mono">Stack</span>
-            <span class="mono-sep" aria-hidden="true">·</span>
-            <span class="mono">Year</span>
-            <span class="mono-sep" aria-hidden="true">·</span>
-            <span class="mono">Placeholder</span>
-          </div>
-          <h3 class="work-title">
-            <a href="#" class="work-link">Project name goes here</a>
-          </h3>
-          <p class="work-lede">
-            One-line description of the project — what it is, who it's for, why it exists.
-          </p>
-          <p class="work-body">
-            A paragraph or two of context. Replace with the next thing worth showing — a script, an automation, a small tool, a write-up.
-          </p>
-          <dl class="work-attrs">
-            <div class="work-attr">
-              <dt class="mono-label">Role</dt>
-              <dd>—</dd>
-            </div>
-            <div class="work-attr">
-              <dt class="mono-label">Stack</dt>
-              <dd>—</dd>
-            </div>
-            <div class="work-attr">
-              <dt class="mono-label">Status</dt>
-              <dd>—</dd>
-            </div>
-          </dl>
-        </li>
-
-      </ol>
-    </section>
-
-    <!-- ============================================================
-         Currently — a dated "now" section. Editorial micro-paragraphs.
-         ============================================================ -->
-    <section class="currently" aria-labelledby="currently-heading">
-      <header class="section-head">
-        <span class="mono-label">Updated&nbsp;·&nbsp;May&nbsp;2026</span>
-        <h2 id="currently-heading" class="section-title">Currently.</h2>
-      </header>
-
-      <div class="now-list">
-        <article class="now-item">
-          <p class="now-line">
-            <span class="mono-label now-tag">Working&nbsp;on</span>
-            Folding a small fleet of new HR laptops into our Intune baselines — the unglamorous half of the work, and the half that keeps the rest of it possible.
-          </p>
-        </article>
-
-        <article class="now-item">
-          <p class="now-line">
-            <span class="mono-label now-tag">Learning</span>
-            More Graph API than I'd planned to. The PowerShell module gets you ninety percent of the way; the last ten is worth the detour into raw calls.
-          </p>
-        </article>
-
-        <article class="now-item">
-          <p class="now-line">
-            <span class="mono-label now-tag">Reading</span>
-            <em>The Pragmatic Programmer</em>, again, for the parts about tracer bullets — and Julian Simpson on infrastructure-as-code, which reads better the second time.
-          </p>
-        </article>
-
-        <article class="now-item">
-          <p class="now-line">
-            <span class="mono-label now-tag">Listening</span>
-            New Gojira, a lot of Plini, and the Periphery records I keep coming back to. Practising clean tone for once.
-          </p>
-        </article>
+    <!-- Previous — MSP at a school. -->
+    <li id="exp-partnership" class="role-item">
+      <div class="role-when">
+        <span class="mono">2023&nbsp;— 2024</span>
       </div>
-    </section>
-
-  </main>
-
-  <!-- ============================================================
-       Footer — contact + links + theme toggle. Subtle, not loud.
-       ============================================================ -->
-  <footer class="site-footer" role="contentinfo">
-    <div class="footer-inner">
-
-      <div class="footer-block footer-block--say">
-        <span class="mono-label">Say&nbsp;hello</span>
-        <p class="footer-line">
-          <a href="mailto:jjb303@hotmail.co.uk">jjb303@hotmail.co.uk</a>
+      <div class="role-body">
+        <p class="role-org">Partnership Education <span class="role-org-sub">(Manshead C of E Academy)</span></p>
+        <h3 class="role-title">IT Engineer</h3>
+        <p class="role-note">
+          IT engineer at an MSP serving secondary schools — fleets of student laptops, an MDM that mostly worked, and the daily reality of fixing what teachers haven't got time to.
         </p>
       </div>
+    </li>
 
-      <div class="footer-block footer-block--elsewhere">
-        <span class="mono-label">Elsewhere</span>
-        <ul class="footer-links" role="list">
-          <li><a href="https://github.com/" rel="noopener">GitHub&nbsp;<span aria-hidden="true">↗</span></a></li>
-          <li><a href="https://linkedin.com/" rel="noopener">LinkedIn&nbsp;<span aria-hidden="true">↗</span></a></li>
-          <li><a href="/files/CV.pdf" target="_blank" rel="noopener">CV&nbsp;(PDF)</a></li>
-        </ul>
+    <!-- Red Bull Racing IT Deployment. -->
+    <li id="exp-redbull" class="role-item">
+      <div class="role-when">
+        <span class="mono">2022&nbsp;— 2023</span>
       </div>
-
-      <div class="footer-block footer-block--colophon">
-        <span class="mono-label">Colophon</span>
-        <p class="footer-line">
-          Set in Newsreader, Hanken Grotesk, and IBM Plex Mono. Built in Silverstone. Last touched May&nbsp;2026.
+      <div class="role-body">
+        <p class="role-org">Red Bull Racing</p>
+        <h3 class="role-title">IT Deployment Engineer</h3>
+        <p class="role-note">
+          Imaging, deploying, and decommissioning kit through the back end of two seasons — the part of an F1 operation nobody photographs, and the part everyone notices when it slips.
         </p>
       </div>
+    </li>
 
-    </div>
+    <!-- Apple — 2017–2022 -->
+    <li id="exp-apple" class="role-item">
+      <div class="role-when">
+        <span class="mono">2017&nbsp;— 2022</span>
+      </div>
+      <div class="role-body">
+        <p class="role-org">Apple</p>
+        <h3 class="role-title">Technical Specialist <span class="role-title-sub">(Genius&nbsp;Bar)</span></h3>
+        <p class="role-note">
+          Five years on the Genius Bar — diagnostics, repairs, and the slow craft of explaining what's wrong without making someone feel stupid for asking.
+        </p>
+      </div>
+    </li>
 
-    <div class="footer-rule">
-      <p class="footer-fineprint mono">© Josh Bailey · jayjaybee.com</p>
-      <!-- Theme toggle: small, unobtrusive, footer-local. Cycles light → dark → system. -->
-      <button
-        id="theme-toggle"
-        class="theme-toggle mono"
-        type="button"
-        aria-label="Change colour theme"
-        aria-live="polite"
-      >
-        <span class="theme-toggle__current" data-theme-label>System</span>
-      </button>
-    </div>
-  </footer>
+  </ol>
+</section>
 
-  <script src="/assets/js/animations.js" defer></script>
-</body>
-</html>
+<!-- ============================================================
+     Selected work — three cards. FC26 featured; two placeholders.
+     ============================================================ -->
+<section class="work" aria-labelledby="work-heading">
+  <header class="section-head">
+    <span class="mono-label">Selected&nbsp;work</span>
+    <h2 id="work-heading" class="section-title">Three things I've made.</h2>
+  </header>
+
+  <ol class="work-list" role="list">
+
+    <!-- Featured: FC26 Feel Calculator -->
+    <li class="work-item work-item--featured">
+      <div class="work-meta">
+        <span class="mono">HTML&nbsp;·&nbsp;JS&nbsp;·&nbsp;Tailwind</span>
+        <span class="mono-sep" aria-hidden="true">·</span>
+        <span class="mono">2025</span>
+        <span class="mono-sep" aria-hidden="true">·</span>
+        <span class="mono">Maintained</span>
+      </div>
+      <h3 class="work-title">
+        <a href="/projects/fc26-calculator/" class="work-link">FC26 Feel Calculator</a>
+      </h3>
+      <p class="work-lede">
+        A single-file tool that models what a player <em>actually</em> feels like on the pitch in EA FC 26 — past the raw card numbers, into chemistry, PlayStyles, and the curves the game runs under the hood.
+      </p>
+      <p class="work-body">
+        Around 2,500 lines of HTML and vanilla JS in one file, no build step. Several rounds of formula tuning against in-game testing, two layouts (a focused mobile read, a comparison-heavy desktop one), and a full UI rebuild in Tailwind once the maths stabilised. It exists because I wanted the version of this calculator I couldn't find — and because writing it taught me more about state management in plain JS than any framework tutorial has.
+      </p>
+      <dl class="work-attrs">
+        <div class="work-attr">
+          <dt class="mono-label">Role</dt>
+          <dd>Design, formulas, code</dd>
+        </div>
+        <div class="work-attr">
+          <dt class="mono-label">Stack</dt>
+          <dd>HTML, JS, Tailwind</dd>
+        </div>
+        <div class="work-attr">
+          <dt class="mono-label">Status</dt>
+          <dd>Live, iterating</dd>
+        </div>
+      </dl>
+    </li>
+
+    <!-- Placeholder #2 -->
+    <li class="work-item is-placeholder">
+      <div class="work-meta">
+        <span class="mono">PowerShell</span>
+        <span class="mono-sep" aria-hidden="true">·</span>
+        <span class="mono">Year</span>
+        <span class="mono-sep" aria-hidden="true">·</span>
+        <span class="mono">Placeholder</span>
+      </div>
+      <h3 class="work-title">
+        <a href="#" class="work-link">Project name goes here</a>
+      </h3>
+      <p class="work-lede">
+        One-line description of the project — what it is, who it's for, why it exists.
+      </p>
+      <p class="work-body">
+        A paragraph or two of context. What the problem was, what the constraint was, what the shape of the solution turned out to be. Two or three sentences is plenty; this isn't a case study, it's a card.
+      </p>
+      <dl class="work-attrs">
+        <div class="work-attr">
+          <dt class="mono-label">Role</dt>
+          <dd>—</dd>
+        </div>
+        <div class="work-attr">
+          <dt class="mono-label">Stack</dt>
+          <dd>—</dd>
+        </div>
+        <div class="work-attr">
+          <dt class="mono-label">Status</dt>
+          <dd>—</dd>
+        </div>
+      </dl>
+    </li>
+
+    <!-- Placeholder #3 -->
+    <li class="work-item is-placeholder">
+      <div class="work-meta">
+        <span class="mono">Stack</span>
+        <span class="mono-sep" aria-hidden="true">·</span>
+        <span class="mono">Year</span>
+        <span class="mono-sep" aria-hidden="true">·</span>
+        <span class="mono">Placeholder</span>
+      </div>
+      <h3 class="work-title">
+        <a href="#" class="work-link">Project name goes here</a>
+      </h3>
+      <p class="work-lede">
+        One-line description of the project — what it is, who it's for, why it exists.
+      </p>
+      <p class="work-body">
+        A paragraph or two of context. Replace with the next thing worth showing — a script, an automation, a small tool, a write-up.
+      </p>
+      <dl class="work-attrs">
+        <div class="work-attr">
+          <dt class="mono-label">Role</dt>
+          <dd>—</dd>
+        </div>
+        <div class="work-attr">
+          <dt class="mono-label">Stack</dt>
+          <dd>—</dd>
+        </div>
+        <div class="work-attr">
+          <dt class="mono-label">Status</dt>
+          <dd>—</dd>
+        </div>
+      </dl>
+    </li>
+
+  </ol>
+</section>
+
+<!-- ============================================================
+     Currently — a dated "now" section. Editorial micro-paragraphs.
+     ============================================================ -->
+<section class="currently" aria-labelledby="currently-heading">
+  <header class="section-head">
+    <span class="mono-label">Updated&nbsp;·&nbsp;May&nbsp;2026</span>
+    <h2 id="currently-heading" class="section-title">Currently.</h2>
+  </header>
+
+  <div class="now-list">
+    <article class="now-item">
+      <p class="now-line">
+        <span class="mono-label now-tag">Working&nbsp;on</span>
+        Folding a small fleet of new HR laptops into our Intune baselines — the unglamorous half of the work, and the half that keeps the rest of it possible.
+      </p>
+    </article>
+
+    <article class="now-item">
+      <p class="now-line">
+        <span class="mono-label now-tag">Learning</span>
+        More Graph API than I'd planned to. The PowerShell module gets you ninety percent of the way; the last ten is worth the detour into raw calls.
+      </p>
+    </article>
+
+    <article class="now-item">
+      <p class="now-line">
+        <span class="mono-label now-tag">Reading</span>
+        <em>The Pragmatic Programmer</em>, again, for the parts about tracer bullets — and Julian Simpson on infrastructure-as-code, which reads better the second time.
+      </p>
+    </article>
+
+    <article class="now-item">
+      <p class="now-line">
+        <span class="mono-label now-tag">Listening</span>
+        New Gojira, a lot of Plini, and the Periphery records I keep coming back to. Practising clean tone for once.
+      </p>
+    </article>
+  </div>
+</section>
