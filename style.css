@@ -1,0 +1,1228 @@
+/* =========================================================================
+   jayjaybee.com — style.css
+   Layout, typography, components, and motion.
+   Tokens come from the design system; see colors_and_type.css below.
+   We inline the tokens here to keep the project self-contained (no
+   cross-project @imports). Edit values in this :root if rebranding;
+   otherwise refer to them by name everywhere else.
+
+   File is split into two halves:
+     A. STRUCTURE — tokens, reset, typography, components, layout.
+     B. MOTION    — reveal system, hover transitions, reduced-motion.
+   ========================================================================= */
+
+/* ---------- Web fonts (Google Fonts) -------------------------------------- */
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400;1,6..72,500&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@300;400;500&display=swap');
+
+/* =========================================================================
+   1. TOKENS
+   These are lifted verbatim from the Josh Bailey design system
+   (colors_and_type.css). Don't invent new values — extend here.
+   ========================================================================= */
+:root {
+  /* Type families */
+  --font-serif: 'Newsreader', 'Charter', 'Iowan Old Style', Georgia, 'Times New Roman', serif;
+  --font-sans:  'Hanken Grotesk', -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono:  'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+
+  /* Type scale — roles, not sizes */
+  --fs-display:   clamp(3.25rem, 5.6vw + 1rem, 5.5rem);
+  --fs-headline:  clamp(2.25rem, 2.8vw + 1rem, 3.25rem);
+  --fs-subhead:   clamp(1.5rem, 1.2vw + 1rem, 1.875rem);
+  --fs-lede:      1.3125rem;
+  --fs-body:      1.0625rem;
+  --fs-ui:        0.9375rem;
+  --fs-small:     0.8125rem;
+  --fs-mono:      0.8125rem;
+  --fs-mono-lg:   0.9375rem;
+
+  /* Line heights */
+  --lh-tight: 1.05; --lh-snug: 1.18; --lh-prose: 1.55; --lh-ui: 1.45; --lh-flush: 1.0;
+
+  /* Tracking */
+  --tr-display:  -0.02em;
+  --tr-headline: -0.015em;
+  --tr-body:      0em;
+  --tr-ui:       -0.005em;
+  --tr-mono:      0.04em;
+  --tr-mono-caps: 0.08em;
+
+  /* Weights */
+  --fw-light: 300; --fw-regular: 400; --fw-medium: 500; --fw-semibold: 600; --fw-bold: 700;
+
+  /* Color — light (default) */
+  --paper:        #F4EFE6;
+  --paper-2:      #ECE5D7;
+  --paper-3:      #E2DAC8;
+  --ink:          #1A1714;
+  --ink-2:        #4A4540;
+  --ink-3:        #7A746C;
+  --ink-4:        #A8A096;
+  --accent:       #B5391C;
+  --accent-hover: #8E2C13;
+  --accent-soft:  #E8C8BD;
+  --rule:         rgba(26, 23, 20, 0.14);
+  --rule-strong:  rgba(26, 23, 20, 0.28);
+  --selection-bg: #E8C8BD;
+  --selection-fg: #1A1714;
+
+  /* Role tokens — refer to these, not the raw palette */
+  --bg:          var(--paper);
+  --bg-recessed: var(--paper-2);
+  --fg:          var(--ink);
+  --fg-muted:    var(--ink-2);
+  --fg-quiet:    var(--ink-3);
+  --fg-faint:    var(--ink-4);
+  --link:        var(--accent);
+  --link-hover:  var(--accent-hover);
+  --hairline:    var(--rule);
+
+  /* Spacing — 4px base. --baseline is 24px and everything snaps to it. */
+  --space-1: 0.25rem; --space-2: 0.5rem; --space-3: 0.75rem;
+  --space-4: 1rem;    --space-5: 1.5rem; --space-6: 2rem;
+  --space-7: 3rem;    --space-8: 4rem;   --space-9: 6rem;
+  --space-10: 8rem;   --space-11: 12rem;
+  --baseline: 1.5rem;
+
+  --section-gap-s: var(--space-7);
+  --section-gap-m: var(--space-9);
+  --section-gap-l: var(--space-11);
+
+  /* Content widths */
+  --measure-prose: 62ch;
+  --measure-wide:  76ch;
+  --measure-ui:    34rem;
+  --container:     72rem;
+
+  /* Borders + radii — almost none */
+  --radius-0: 0;
+  --radius-1: 2px;
+  --radius-2: 4px;
+  --border-hairline: 1px solid var(--hairline);
+  --border-rule:     1px solid var(--rule-strong);
+
+  /* Elevation — only one legal shadow */
+  --shadow-none: none;
+  --shadow-1:    0 1px 0 0 var(--rule);
+
+  /* Motion */
+  --dur-1: 120ms; --dur-2: 200ms; --dur-3: 320ms;
+  --ease:    cubic-bezier(.2, 0, 0, 1);
+  --ease-in: cubic-bezier(.4, 0, .8, .2);
+
+  /* Paper grain — subtle SVG noise, layered over --bg.
+     Light mode = dark specks; dark mode override below uses light specks.
+     Tile is 480px with asymmetric baseFrequency + 3 octaves so the repeat
+     doesn't read as a grid; --bg shows through wherever the SVG is transparent. */
+  --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='640' height='640'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.48 0.56' numOctaves='4' stitchTiles='stitch' seed='23'/><feColorMatrix values='0 0 0 0 0.10  0 0 0 0 0.09  0 0 0 0 0.08  0.85 0 0 0 -0.48'/><feGaussianBlur stdDeviation='1.0'/></filter><rect width='100%25' height='100%25' filter='url(%23g)'/></svg>");
+}
+
+/* Dark mode by user preference, when no manual override is set */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper:   #14110E;
+    --paper-2: #1C1814;
+    --paper-3: #25201A;
+    --ink:     #EBE4D5;
+    --ink-2:   #B8B0A0;
+    --ink-3:   #857E72;
+    --ink-4:   #4F4A42;
+    --accent:       #D2553A;
+    --accent-hover: #E27052;
+    --accent-soft:  #5A2B1F;
+    --rule:        rgba(235, 228, 213, 0.12);
+    --rule-strong: rgba(235, 228, 213, 0.24);
+    --selection-bg: #5A2B1F;
+    --selection-fg: #EBE4D5;
+    /* Dark-mode grain — pale specks at lower opacity (dark bg shows them louder) */
+    --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='640' height='640'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.48 0.56' numOctaves='4' stitchTiles='stitch' seed='23'/><feColorMatrix values='0 0 0 0 0.92  0 0 0 0 0.89  0 0 0 0 0.83  0.65 0 0 0 -0.48'/><feGaussianBlur stdDeviation='1.0'/></filter><rect width='100%25' height='100%25' filter='url(%23g)'/></svg>");
+  }
+}
+/* Manual override — wins over system preference */
+:root[data-theme="dark"] {
+  --paper:   #14110E;
+  --paper-2: #1C1814;
+  --paper-3: #25201A;
+  --ink:     #EBE4D5;
+  --ink-2:   #B8B0A0;
+  --ink-3:   #857E72;
+  --ink-4:   #4F4A42;
+  --accent:       #D2553A;
+  --accent-hover: #E27052;
+  --accent-soft:  #5A2B1F;
+  --rule:        rgba(235, 228, 213, 0.12);
+  --rule-strong: rgba(235, 228, 213, 0.24);
+  --selection-bg: #5A2B1F;
+  --selection-fg: #EBE4D5;
+  --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='640' height='640'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.48 0.56' numOctaves='4' stitchTiles='stitch' seed='23'/><feColorMatrix values='0 0 0 0 0.92  0 0 0 0 0.89  0 0 0 0 0.83  0.65 0 0 0 -0.48'/><feGaussianBlur stdDeviation='1.0'/></filter><rect width='100%25' height='100%25' filter='url(%23g)'/></svg>");
+}
+
+/* =========================================================================
+   2. RESET + BASE ELEMENTS
+   ========================================================================= */
+*, *::before, *::after { box-sizing: border-box; }
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+body {
+  margin: 0;
+  /* Paper texture: the colour sits underneath the SVG grain, so the
+     speckle reads as imperfection in the paper, not as a layer on top.
+     background-attachment: fixed keeps the grain anchored to the viewport
+     so it doesn't slide when the page scrolls. */
+  background-color: var(--bg);
+  background-image: var(--grain);
+  background-repeat: repeat;
+  background-size: 640px 640px;
+  background-attachment: fixed;
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: var(--fs-body);
+  line-height: var(--lh-prose);
+  letter-spacing: var(--tr-body);
+  font-feature-settings: "ss01", "kern", "liga";
+  /* The page is mostly text; let long words break instead of overflow on
+     narrow screens (project names with hyphens etc.) */
+  overflow-wrap: break-word;
+}
+
+/* Don't print the grain — it just wastes toner */
+@media print {
+  body { background-image: none; }
+}
+::selection { background: var(--selection-bg); color: var(--selection-fg); }
+
+h1, h2, h3, h4, p, ol, ul, dl, dd, figure, blockquote { margin: 0; padding: 0; }
+ol, ul { list-style: none; }
+
+img, svg { max-width: 100%; height: auto; display: block; }
+
+/* Accessibility — skip link visible only on focus */
+.skip-link {
+  position: absolute;
+  left: var(--space-4);
+  top: var(--space-4);
+  background: var(--fg);
+  color: var(--bg);
+  padding: var(--space-2) var(--space-4);
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  letter-spacing: var(--tr-mono-caps);
+  text-transform: uppercase;
+  text-decoration: none;
+  border-radius: var(--radius-1);
+  transform: translateY(-200%);
+  transition: transform var(--dur-2) var(--ease);
+  z-index: 100;
+}
+.skip-link:focus { transform: translateY(0); }
+
+/* =========================================================================
+   3. TYPOGRAPHY
+   ========================================================================= */
+h1, .h1 {
+  font-family: var(--font-serif);
+  font-weight: var(--fw-regular);
+  font-size: var(--fs-display);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--tr-display);
+  font-optical-sizing: auto;
+  text-wrap: balance;
+}
+h2, .h2 {
+  font-family: var(--font-serif);
+  font-weight: var(--fw-regular);
+  font-size: var(--fs-headline);
+  line-height: var(--lh-snug);
+  letter-spacing: var(--tr-headline);
+  text-wrap: balance;
+}
+h3, .h3 {
+  font-family: var(--font-serif);
+  font-weight: var(--fw-medium);
+  font-size: var(--fs-subhead);
+  line-height: var(--lh-snug);
+  letter-spacing: var(--tr-headline);
+}
+
+/* Prose blocks — serif, comfortable measure */
+.prose {
+  font-family: var(--font-serif);
+  font-size: var(--fs-lede);          /* the narrative paragraph reads as a lede */
+  line-height: 1.55;
+  max-width: var(--measure-wide);
+  color: var(--fg);
+}
+.prose p { text-wrap: pretty; }
+.prose p + p { margin-top: var(--space-4); }
+
+/* Mono — the deliberate technical accent */
+.mono {
+  font-family: var(--font-mono);
+  font-weight: var(--fw-regular);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono);
+}
+.mono-label {
+  font-family: var(--font-mono);
+  font-weight: var(--fw-regular);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono-caps);
+  text-transform: uppercase;
+  color: var(--fg-quiet);
+  display: inline-block;
+}
+
+/* Links — accent color, underline tracks on hover */
+a {
+  color: var(--link);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  text-decoration-color: var(--accent-soft);
+  transition: color var(--dur-1) var(--ease),
+              text-decoration-color var(--dur-1) var(--ease);
+}
+a:hover {
+  color: var(--link-hover);
+  text-decoration-color: currentColor;
+}
+a:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 3px;
+  border-radius: var(--radius-1);
+}
+
+/* =========================================================================
+   3b. SITE HEADER / NAV
+   Wordmark left, sans-serif links right, one accent link as the CTA.
+   No logo, no hamburger — the link row collapses to a wrap on narrow widths.
+   ========================================================================= */
+.site-header {
+  /* Sits in its own band above .page, with matching gutters/container so
+     the wordmark lines up with the lede below it. */
+  width: 100%;
+}
+.site-header__inner {
+  max-width: var(--container);
+  margin: 0 auto;
+  padding: clamp(var(--space-5), 4vw, var(--space-7))
+           clamp(var(--space-5), 5vw, var(--space-8));
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-5);
+  border-bottom: var(--border-hairline);
+}
+
+/* Wordmark — serif, ink, no underline. Tracks slightly tighter than body. */
+.site-wordmark {
+  font-family: var(--font-serif);
+  font-weight: var(--fw-medium);
+  font-size: clamp(1.375rem, 0.6vw + 1.125rem, 1.625rem);
+  line-height: 1;
+  letter-spacing: var(--tr-headline);
+  color: var(--fg);
+  text-decoration: none;
+  transition: color var(--dur-1) var(--ease);
+}
+.site-wordmark:hover { color: var(--accent); }
+
+/* Link row — sans, ink, no underline. Accent link is the one exception. */
+.site-nav__list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: clamp(var(--space-4), 2.5vw, var(--space-7));
+}
+.site-nav__link {
+  font-family: var(--font-sans);
+  font-size: var(--fs-ui);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--tr-ui);
+  color: var(--fg);
+  text-decoration: none;
+  transition: color var(--dur-1) var(--ease),
+              text-decoration-color var(--dur-1) var(--ease);
+}
+.site-nav__link:hover {
+  color: var(--accent);
+}
+.site-nav__link--accent {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.25em;
+  text-decoration-color: currentColor;
+}
+.site-nav__link--accent:hover {
+  color: var(--accent-hover);
+}
+
+/* Dropdown triggers — buttons styled as nav links */
+.site-nav__item.has-menu { position: relative; }
+.site-nav__trigger {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35em;
+  font: inherit; /* picks up .site-nav__link styling */
+}
+.site-nav__caret {
+  font-size: 0.7em;
+  line-height: 1;
+  color: var(--fg-quiet);
+  transition: transform var(--dur-2) var(--ease),
+              color var(--dur-1) var(--ease);
+  transform: translateY(-0.1em);
+}
+.site-nav__trigger:hover .site-nav__caret { color: currentColor; }
+.site-nav__trigger[aria-expanded="true"] .site-nav__caret {
+  transform: translateY(-0.1em) rotate(180deg);
+}
+
+/* Dropdown panel — hairline bordered card, anchored under the trigger */
+.site-nav__menu {
+  position: absolute;
+  top: calc(100% + var(--space-3));
+  left: 0;
+  z-index: 50;
+  min-width: max-content;
+  max-width: 22rem;
+  margin: 0;
+  padding: var(--space-2);
+  background: var(--bg);
+  border: var(--border-hairline);
+  border-radius: var(--radius-2);
+  box-shadow: 0 8px 24px -12px rgba(0,0,0,0.18), var(--shadow-1);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.site-nav__menu[hidden] { display: none; }
+.site-nav__menu--right { left: auto; right: 0; }
+
+.site-nav__menu-link {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-sans);
+  font-size: var(--fs-ui);
+  font-weight: var(--fw-regular);
+  line-height: var(--lh-ui);
+  color: var(--fg);
+  text-decoration: none;
+  border-radius: var(--radius-1);
+  white-space: nowrap;
+  transition: background-color var(--dur-1) var(--ease),
+              color var(--dur-1) var(--ease);
+}
+.site-nav__menu-link:hover,
+.site-nav__menu-link:focus-visible {
+  background: var(--bg-recessed);
+  color: var(--accent);
+  outline: none;
+}
+
+@media (max-width: 36rem) {
+  .site-header__inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
+  .site-nav__list {
+    gap: var(--space-5);
+  }
+  /* On narrow screens, anchor the right-aligned menu back to the left
+     so it doesn't clip off the viewport. */
+  .site-nav__menu--right { left: 0; right: auto; }
+}
+
+/* =========================================================================
+   4. PAGE SHELL + RHYTHM
+   --container is the outer max, but content uses --measure-* widths.
+   Sections are separated by space, not by dividers.
+   ========================================================================= */
+.page {
+  max-width: var(--container);
+  margin: 0 auto;
+  /* Generous side gutters that shrink gracefully */
+  padding: clamp(var(--space-7), 6vw, var(--space-10))
+           clamp(var(--space-5), 5vw, var(--space-8))
+           var(--space-10);
+}
+
+/* Vertical rhythm between major sections */
+.page > section + section {
+  margin-top: clamp(var(--space-9), 9vw, var(--section-gap-l));
+}
+
+/* Section headers — small mono eyebrow above a serif title */
+.section-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: var(--space-7);
+}
+.section-title {
+  font-family: var(--font-serif);
+  font-weight: var(--fw-regular);
+  font-size: var(--fs-headline);
+  line-height: var(--lh-snug);
+  letter-spacing: var(--tr-headline);
+}
+
+/* =========================================================================
+   5. LEDE — the opening line
+   The single biggest element on the page. Tight, balanced, no decoration.
+   ========================================================================= */
+.lede-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  /* The lede gets its own measure — wider than prose to let the line breathe */
+  max-width: var(--measure-wide);
+}
+.lede-meta {
+  /* Tiny meta line above the lede; "Josh Bailey · Silverstone" */
+  color: var(--fg-quiet);
+}
+.lede-line {
+  /* Serif display, hung from the baseline with the meta */
+  font-family: var(--font-serif);
+  font-weight: var(--fw-regular);
+  font-size: var(--fs-display);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--tr-display);
+  text-wrap: balance;
+  color: var(--fg);
+}
+
+/* =========================================================================
+   6. NARRATIVE
+   Single prose paragraph. Sits inside the wide measure.
+   ========================================================================= */
+.narrative .prose {
+  font-size: var(--fs-lede);   /* 21px — feels like a magazine lede column */
+  color: var(--fg-muted);      /* one shade softer than display ink */
+}
+
+/* =========================================================================
+   6b. PAST ROLES
+   A reverse-chronological list of past positions. Two-column layout:
+   mono date range on the left, serif organisation + sans role title +
+   one-line note on the right. Stacks to one column on narrow widths.
+
+   No card chrome, no logos, no employer brand colors. Hairlines and
+   space, per the design system.
+
+   The :target hook (clicking a role from the nav dropdown) draws a
+   vermillion left rule so the visitor's eye lands in the right place
+   without a colour flash.
+   ========================================================================= */
+.role-list {
+  display: flex;
+  flex-direction: column;
+  /* Roles flush to the page edge; their hairlines are the structure. */
+}
+.role-item {
+  border-top: var(--border-hairline);
+  padding: var(--space-6) 0;
+  display: grid;
+  /* Fixed-width date column keeps the dates aligned regardless of
+     role title length — the typographic version of a CV gutter. */
+  grid-template-columns: 11rem 1fr;
+  gap: var(--space-7);
+  align-items: baseline;
+
+  /* :target uses an inset left rule. Keep a transparent border-left in
+     the default state so layout doesn't jump when the rule appears. */
+  border-left: 2px solid transparent;
+  padding-left: var(--space-4);
+  margin-left: calc(var(--space-4) * -1); /* pull back so the row still aligns to the page edge */
+  transition: border-color var(--dur-3) var(--ease),
+              background-color var(--dur-3) var(--ease);
+}
+.role-item:last-child { padding-bottom: 0; }
+
+/* Mono date column — vertical micro-stack so "Current" can sit under
+   the date range on the current role. */
+.role-when {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  color: var(--fg-quiet);
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono-caps);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+/* "Current" tag — accent ink, sits below the year range on the live role */
+.role-status {
+  color: var(--accent);
+  /* Tiny leading dot, drawn with ::before so it reuses currentColor */
+}
+.role-status::before {
+  content: "● ";
+  font-size: 0.7em;
+  vertical-align: 0.15em;
+  margin-right: 0.15em;
+}
+
+/* Right column — org over role title over one-line note */
+.role-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: var(--measure-prose);
+}
+
+/* Organisation — sans, medium weight, sits like a kicker above the title */
+.role-org {
+  font-family: var(--font-sans);
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-ui);
+  line-height: var(--lh-ui);
+  letter-spacing: var(--tr-ui);
+  color: var(--fg);
+}
+.role-org-sub {
+  font-weight: var(--fw-regular);
+  color: var(--fg-quiet);
+}
+/* Trademark glyph — pull up slightly so it doesn't visually inflate the line */
+.role-tm {
+  font-size: 0.55em;
+  vertical-align: 0.6em;
+  margin-left: 0.05em;
+  color: var(--fg-quiet);
+}
+
+/* Role title — serif, the row's headline */
+.role-title {
+  font-family: var(--font-serif);
+  font-weight: var(--fw-regular);
+  font-size: clamp(1.375rem, 1vw + 1rem, 1.75rem);
+  line-height: 1.2;
+  letter-spacing: var(--tr-headline);
+  color: var(--fg);
+}
+.role-title-sub {
+  font-style: italic;
+  color: var(--fg-muted);
+  font-size: 0.78em;
+  margin-left: 0.15em;
+}
+
+/* The one-line note. Serif, softer ink. */
+.role-note {
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
+  line-height: var(--lh-prose);
+  color: var(--fg-muted);
+  text-wrap: pretty;
+  margin-top: var(--space-1);
+}
+
+/* Targeted-by-anchor state — vermillion left rule lights up.
+   No background fill, no shadow, no scroll bounce. Just the rule. */
+.role-item:target {
+  border-left-color: var(--accent);
+}
+.role-item:target .role-title {
+  color: var(--fg);
+}
+
+/* Narrow screens — stack the date above the body content. */
+@media (max-width: 48rem) {
+  .role-item {
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+  }
+  .role-when {
+    flex-direction: row;
+    gap: var(--space-3);
+    align-items: baseline;
+  }
+}
+
+/* =========================================================================
+   7. WORK
+   Cards are list rows: hairline rule above, serif title, mono metadata,
+   description, then a small definition list of attributes.
+   No box, no shadow, no hover-lift. Per design system.
+   ========================================================================= */
+.work-list {
+  /* Each item has its own internal hairline on top */
+  display: flex;
+  flex-direction: column;
+}
+.work-item {
+  border-top: var(--border-hairline);
+  padding-top: var(--space-7);
+  padding-bottom: var(--space-7);
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+  /* The featured one gets a slightly stronger top rule + extra breathing room */
+}
+.work-item:last-child { padding-bottom: 0; }
+
+.work-item--featured {
+  border-top: var(--border-rule);
+  padding-top: var(--space-8);
+  padding-bottom: var(--space-8);
+}
+
+/* Metadata — mono, separated by middle dots */
+.work-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  color: var(--fg-quiet);
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono-caps);
+  text-transform: uppercase;
+}
+.work-meta .mono { color: var(--fg-quiet); }
+.mono-sep { color: var(--fg-faint); }
+
+/* Title — serif, big, link colored as ink not accent (per DS comp-project-card).
+   The underline thickens on hover; no card-lift. */
+.work-title {
+  font-family: var(--font-serif);
+  font-weight: var(--fw-regular);
+  font-size: clamp(1.625rem, 2vw + 1rem, 2.25rem);
+  line-height: 1.15;
+  letter-spacing: var(--tr-headline);
+}
+.work-item--featured .work-title {
+  font-size: clamp(2rem, 3vw + 1rem, 2.875rem);
+}
+.work-link {
+  color: var(--fg);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-decoration-color: transparent;
+  text-underline-offset: 0.2em;
+  transition: text-decoration-color var(--dur-2) var(--ease),
+              color var(--dur-2) var(--ease);
+}
+.work-link:hover {
+  color: var(--accent);
+  text-decoration-color: var(--accent);
+}
+
+/* Lede — one-line description in serif */
+.work-lede {
+  font-family: var(--font-serif);
+  font-size: var(--fs-lede);
+  line-height: 1.45;
+  color: var(--fg);
+  max-width: var(--measure-prose);
+  text-wrap: pretty;
+}
+
+/* Body — longer paragraph in serif at body size, softer color */
+.work-body {
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
+  line-height: var(--lh-prose);
+  color: var(--fg-muted);
+  max-width: var(--measure-prose);
+  text-wrap: pretty;
+}
+
+/* Attributes — a small dl on its own row. Three columns at wider widths,
+   wrapped onto multiple rows on narrow ones. */
+.work-attrs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, max-content));
+  gap: var(--space-3) var(--space-7);
+  margin-top: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: var(--border-hairline);
+}
+.work-attr {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.work-attr dt {
+  /* mono-label styling */
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono-caps);
+  text-transform: uppercase;
+  color: var(--fg-quiet);
+}
+.work-attr dd {
+  font-family: var(--font-sans);
+  font-size: var(--fs-ui);
+  line-height: var(--lh-ui);
+  color: var(--fg);
+}
+
+/* Placeholder rows — visually quieter so it's obvious they're empty */
+.work-item.is-placeholder .work-link {
+  color: var(--fg-quiet);
+  font-style: italic;
+}
+.work-item.is-placeholder .work-lede,
+.work-item.is-placeholder .work-body {
+  color: var(--fg-quiet);
+}
+
+/* =========================================================================
+   8. CURRENTLY
+   Dated "now" section. Editorial micro-paragraphs, not bullets.
+   Each entry: small mono tag inline with serif sentence.
+   ========================================================================= */
+.now-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  max-width: var(--measure-wide);
+}
+.now-item {
+  border-top: var(--border-hairline);
+  padding-top: var(--space-4);
+}
+.now-line {
+  font-family: var(--font-serif);
+  font-size: var(--fs-lede);
+  line-height: 1.45;
+  color: var(--fg);
+  text-wrap: pretty;
+}
+.now-tag {
+  /* Inline mono tag — pull it slightly up to baseline the serif sentence */
+  margin-right: var(--space-3);
+  /* Small visual nudge so the cap-height of the mono sits with the
+     x-height of the serif rather than above it. */
+  position: relative;
+  top: -0.08em;
+}
+
+/* =========================================================================
+   9. FOOTER
+   Three info blocks, then a hairline-separated bottom strip with the
+   theme toggle. Subtle, not loud.
+   ========================================================================= */
+.site-footer {
+  border-top: var(--border-hairline);
+  /* Transparent so the body's paper grain reads continuously into the footer */
+  background: transparent;
+  margin-top: clamp(var(--space-9), 9vw, var(--section-gap-l));
+}
+.footer-inner {
+  max-width: var(--container);
+  margin: 0 auto;
+  padding: var(--space-9) clamp(var(--space-5), 5vw, var(--space-8)) var(--space-7);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-7) var(--space-8);
+}
+.footer-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.footer-line {
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
+  line-height: var(--lh-prose);
+  color: var(--fg);
+  max-width: 34ch;
+}
+.footer-links {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.footer-links a {
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
+}
+
+/* Bottom strip — fineprint + theme toggle */
+.footer-rule {
+  border-top: var(--border-hairline);
+  max-width: var(--container);
+  margin: 0 auto;
+  padding: var(--space-5) clamp(var(--space-5), 5vw, var(--space-8));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.footer-fineprint {
+  color: var(--fg-quiet);
+  font-size: var(--fs-mono);
+}
+
+/* Theme toggle — small, unobtrusive, mono. Cycles label on click. */
+.theme-toggle {
+  appearance: none;
+  background: transparent;
+  border: var(--border-hairline);
+  color: var(--fg-quiet);
+  padding: var(--space-2) var(--space-4);
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono-caps);
+  text-transform: uppercase;
+  border-radius: var(--radius-1);
+  cursor: pointer;
+  transition: color var(--dur-2) var(--ease),
+              border-color var(--dur-2) var(--ease),
+              background-color var(--dur-2) var(--ease);
+}
+.theme-toggle:hover {
+  color: var(--fg);
+  border-color: var(--rule-strong);
+}
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
+}
+.theme-toggle::before {
+  /* Small leading glyph that swaps with the theme — light=○, dark=●, system=◐ */
+  content: attr(data-glyph) " ";
+  margin-right: 0.1em;
+  color: var(--fg-quiet);
+}
+
+/* =========================================================================
+   10. RESPONSIVE
+   Mobile-first by way of clamp() above; this block handles the few
+   layouts that actually need a breakpoint (the footer grid).
+   ========================================================================= */
+@media (max-width: 56rem) {
+  .footer-inner {
+    grid-template-columns: 1fr 1fr;
+  }
+  .footer-block--colophon { grid-column: 1 / -1; }
+}
+@media (max-width: 36rem) {
+  .footer-inner {
+    grid-template-columns: 1fr;
+    gap: var(--space-6);
+  }
+  .work-attrs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3) var(--space-5);
+  }
+  .footer-rule {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
+}
+
+/* =========================================================================
+   11. MOTION
+   Subtle, brief, eased. No bounce, no parallax, no scroll-jacking.
+   Per the design system: motion needs a reason.
+
+   Two systems:
+     1. Reveal system — elements listed below start hidden under .js
+        and transition to visible when the JS adds .is-visible.
+     2. State + hover transitions — defined on the elements themselves
+        so every interaction accelerates and decelerates the same way.
+
+   IMPORTANT: hiding is done by element selectors (not a .reveal class)
+   so the styles take effect at parse time, before the deferred JS runs.
+   That prevents the flash-of-visible-content → flicker. The .js class
+   on <html> is set pre-paint by an inline <head> script.
+   ========================================================================= */
+
+/* -------------------------------------------------------------------------
+   11a. REVEAL SYSTEM
+   Initial hidden state. Mirror this selector list in the JS
+   (REVEAL_SELECTOR) — it's the same group.
+   ------------------------------------------------------------------------- */
+.js :is(
+  .site-wordmark,
+  .site-nav__list > li,
+  .lede-meta,
+  .lede-line,
+  .narrative .prose,
+  .roles .section-head,
+  .role-item,
+  .work  .section-head,
+  .work-item,
+  .currently .section-head,
+  .now-item,
+  .footer-block,
+  .footer-rule
+) {
+  opacity: 0;
+  transform: translateY(10px);
+  transition:
+    opacity   var(--reveal-dur, 620ms) var(--ease),
+    transform var(--reveal-dur, 620ms) var(--ease);
+  transition-delay: var(--reveal-delay, 0ms);
+  /* GPU hint, dropped once .is-visible lands */
+  will-change: opacity, transform;
+}
+
+/* Per-element starting transforms — variants. Set after the shared
+   declaration so they override the default translateY. */
+.js .site-wordmark           { transform: translate3d(-12px, 0, 0); }
+.js .site-nav__list > li     { transform: translate3d( 12px, 0, 0); }
+.js :is(.lede-meta, .footer-rule) { transform: none; }
+.js .lede-line               { transform: translateY(14px); --reveal-dur: 760ms; }
+
+/* Revealed state — same end state for every element. */
+.js :is(
+  .site-wordmark,
+  .site-nav__list > li,
+  .lede-meta,
+  .lede-line,
+  .narrative .prose,
+  .roles .section-head,
+  .role-item,
+  .work  .section-head,
+  .work-item,
+  .currently .section-head,
+  .now-item,
+  .footer-block,
+  .footer-rule
+).is-visible {
+  opacity: 1;
+  transform: none;
+  will-change: auto;
+}
+
+/* -------------------------------------------------------------------------
+   11b. PAGE INTERACTIONS
+   Every transition uses --ease (a smooth ease-out) so motion looks of a
+   piece — accelerate from rest, decelerate into the new state.
+   ------------------------------------------------------------------------- */
+
+/* Wordmark — subtle ink-to-accent fade is defined above. Add a
+   barely-there nudge on hover so it reads as alive without bouncing. */
+.site-wordmark {
+  transition:
+    color           var(--dur-2) var(--ease),
+    transform       var(--dur-2) var(--ease),
+    letter-spacing  var(--dur-3) var(--ease);
+}
+.site-wordmark:hover {
+  /* Layered on top of any reveal-end transform (which is `none`), so a
+     hover during the entrance just chains cleanly. */
+  transform: translateY(-1px);
+  letter-spacing: calc(var(--tr-headline) + 0.005em);
+}
+
+/* Nav links — colour fades are defined above. Add a 1px lift so hover
+   feels responsive without changing layout. */
+.site-nav__link {
+  transition:
+    color     var(--dur-1) var(--ease),
+    transform var(--dur-2) var(--ease);
+}
+.site-nav__link:hover  { transform: translateY(-1px); }
+.site-nav__link:active { transform: translateY(0); transition-duration: 60ms; }
+
+/* Dropdown caret — the existing rotate is defined above; ease it here so
+   it shares the same curve as everything else. */
+.site-nav__caret {
+  transition:
+    transform var(--dur-2) var(--ease),
+    color     var(--dur-1) var(--ease);
+}
+
+/* Dropdown panels — override the default [hidden] (display:none) so we
+   can transition open and close. The panel stays in the layout while
+   hidden, just invisible and inert. */
+.site-nav__menu[hidden] {
+  display: flex;            /* keep flex column so layout is preserved */
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-6px) scale(0.985);
+  pointer-events: none;
+  transition:
+    opacity    var(--dur-2) var(--ease),
+    transform  var(--dur-2) var(--ease),
+    visibility 0s var(--dur-2);
+}
+.site-nav__menu:not([hidden]) {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+  transition:
+    opacity    var(--dur-2) var(--ease),
+    transform  var(--dur-2) var(--ease),
+    visibility 0s 0s;
+}
+
+/* Menu items — when the panel opens, items stagger in. The JS sets
+   --menu-item-delay per item so it scales to any item count. */
+.site-nav__menu .site-nav__menu-link {
+  transition:
+    background-color var(--dur-1) var(--ease),
+    color            var(--dur-1) var(--ease),
+    transform        var(--dur-2) var(--ease),
+    opacity          var(--dur-2) var(--ease);
+}
+.site-nav__menu[hidden] .site-nav__menu-link {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+.site-nav__menu:not([hidden]) .site-nav__menu-link {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: var(--menu-item-delay, 0ms);
+}
+
+/* Work, role, and now items — quiet hover state. Title nudges right by
+   2px so the hover lives in the typography, not the chrome. */
+.work-item, .role-item, .now-item {
+  transition: transform var(--dur-2) var(--ease);
+}
+.work-title, .role-title, .now-line {
+  transition: transform var(--dur-2) var(--ease);
+}
+.work-item:hover .work-title,
+.role-item:hover .role-title,
+.now-item:hover .now-line {
+  transform: translateX(2px);
+}
+
+/* Footer links — same micro-lift as nav so behaviour stays consistent. */
+.footer-links a {
+  display: inline-block;
+  transition:
+    color     var(--dur-1) var(--ease),
+    transform var(--dur-2) var(--ease);
+}
+.footer-links a:hover { transform: translateY(-1px); }
+
+/* -------------------------------------------------------------------------
+   11c. NAMED ACCENTS
+   Small one-offs — used sparingly.
+   ------------------------------------------------------------------------- */
+
+/* Subtle underline draw on the lede mono meta — only on hover of the
+   parent lede block. */
+.lede-meta::after {
+  content: "";
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 0.6em;
+  width: 0;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.5;
+  transition: width var(--dur-3) var(--ease);
+}
+.lede-block:hover .lede-meta::after,
+.lede-block:focus-within .lede-meta::after {
+  width: 3.5rem;
+}
+
+/* Theme toggle: tiny opacity dip on the label when it changes. */
+.theme-toggle__current {
+  display: inline-block;
+  transition: opacity var(--dur-2) var(--ease);
+}
+.theme-toggle.is-changing .theme-toggle__current {
+  opacity: 0;
+}
+.theme-toggle {
+  transition:
+    color            var(--dur-2) var(--ease),
+    border-color     var(--dur-2) var(--ease),
+    background-color var(--dur-2) var(--ease),
+    transform        var(--dur-2) var(--ease);
+}
+.theme-toggle:active { transform: scale(0.97); transition-duration: 80ms; }
+
+/* One-shot flash for any value that updates after boot. */
+@keyframes flash-once {
+   0% { background-color: var(--accent-soft); }
+ 100% { background-color: transparent; }
+}
+.flash {
+  animation: flash-once 480ms var(--ease) 1;
+  border-radius: var(--radius-1);
+}
+
+/* -------------------------------------------------------------------------
+   11d. SMOOTH IN-PAGE SCROLL
+   Anchor jumps (e.g. dropdown links to #exp-apple) glide rather than jump.
+   ------------------------------------------------------------------------- */
+html { scroll-behavior: smooth; }
+
+/* -------------------------------------------------------------------------
+   11e. NO-JS FALLBACK SAFETY
+   If JS somehow never runs (e.g. fetch fails), make sure the .js-hidden
+   elements still become visible after a generous timeout. Done with a
+   plain CSS animation that fires once and ends in the visible state.
+   This is belt-and-braces — the .js class is only set when scripts can
+   run at all, so this rarely needs to fire.
+   ------------------------------------------------------------------------- */
+@keyframes failsafe-reveal {
+  to { opacity: 1; transform: none; }
+}
+.js :is(
+  .site-wordmark,
+  .site-nav__list > li,
+  .lede-meta,
+  .lede-line,
+  .narrative .prose,
+  .roles .section-head,
+  .role-item,
+  .work  .section-head,
+  .work-item,
+  .currently .section-head,
+  .now-item,
+  .footer-block,
+  .footer-rule
+) {
+  animation: failsafe-reveal 1ms linear 3s forwards;
+}
+/* Once the JS takes over and adds .is-visible, the .is-visible rule
+   above (with `transform: none; opacity: 1`) wins on the cascade. */
+
+/* -------------------------------------------------------------------------
+   11f. REDUCED MOTION
+   Honor the system preference strictly.
+   ------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .js :is(
+    .site-wordmark,
+    .site-nav__list > li,
+    .lede-meta,
+    .lede-line,
+    .narrative .prose,
+    .roles .section-head,
+    .role-item,
+    .work  .section-head,
+    .work-item,
+    .currently .section-head,
+    .now-item,
+    .footer-block,
+    .footer-rule
+  ) {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
