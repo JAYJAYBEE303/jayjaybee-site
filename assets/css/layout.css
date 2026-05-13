@@ -306,11 +306,17 @@
   margin-top: var(--space-1);
 }
 
-/* Targeted-by-anchor state — vermillion left rule lights up. */
-.role-item:target {
+/* Targeted-by-anchor state — vermillion left rule lights up.
+   :target handles deep-links (e.g. someone shares /#exp-amf1).
+   .is-targeted is the JS-applied equivalent for in-page nav clicks,
+   where animations.js strips the hash from the URL after scrolling
+   and adds this class so the highlight still fires. */
+.role-item:target,
+.role-item.is-targeted {
   border-left-color: var(--accent);
 }
-.role-item:target .role-title {
+.role-item:target .role-title,
+.role-item.is-targeted .role-title {
   color: var(--fg);
 }
 

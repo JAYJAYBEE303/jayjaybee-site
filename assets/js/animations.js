@@ -272,23 +272,75 @@
   }
 
   // -------------------------------------------------------------------------
-  // d. Close any open dropdown when navigating to an in-page anchor
+  // d. Anchor navigation
+  //
+  // Intercept clicks on any link whose hash points to an element on the
+  // current page (handles both "#foo" and rooted "/#foo" forms — the
+  // layout uses the rooted form so the nav works from sub-pages too).
+  //
+  // For matched clicks we:
+  //   1. Close any open nav dropdown (replaces the old setupAnchorClose).
+  //   2. Mark the target with .is-targeted so the design system's role
+  //      highlight still fires once we strip the hash from the URL.
+  //   3. Smooth-scroll to the target (respecting reduced-motion).
+  //   4. Replace the URL state so the address bar stays clean — no
+  //      "#exp-amf1" hanging off the end after the user clicks.
+  //
+  // The skip-link is excluded so screen-reader / keyboard users keep the
+  // browser's default focus-jump behaviour.
   // -------------------------------------------------------------------------
-  function setupAnchorClose() {
+  function setupAnchorScroll() {
     document.addEventListener('click', function (e) {
-      var link = e.target.closest('a[href^="#"]');
-      if (!link) return;
-      var openTrigger = document.querySelector(
-        '.site-nav__trigger[aria-expanded="true"]'
-      );
-      if (!openTrigger) return;
-      // Defer one tick so the core outside-click handler runs first.
-      setTimeout(function () {
-        if (openTrigger.getAttribute('aria-expanded') === 'true') {
-          openTrigger.click();
-        }
-      }, 0);
-    }, { passive: true });
+      var link = e.target.closest('a');
+      if (!link || link.classList.contains('skip-link')) return;
+
+      var href = link.getAttribute('href');
+      if (!href) return;
+
+      // Resolve to a URL so we can compare path + hash regardless of href form.
+      var url;
+      try { url = new URL(href, window.location.href); } catch (err) { return; }
+
+      // Only intercept same-origin, same-path links with a real hash.
+      if (url.origin   !== window.location.origin)   return;
+      if (url.pathname !== window.location.pathname) return;
+      if (!url.hash || url.hash === '#')             return;
+
+      // Bail if the target doesn't exist on this page (e.g. dropdown link
+      // copied onto a page that doesn't contain the role list).
+      var target;
+      try { target = document.querySelector(url.hash); } catch (err) { return; }
+      if (!target) return;
+
+      e.preventDefault();
+
+      // Close any open dropdown — defer one tick so the core outside-click
+      // handler runs first without us double-toggling.
+      var openTrigger = document.querySelector('.site-nav__trigger[aria-expanded="true"]');
+      if (openTrigger) {
+        setTimeout(function () {
+          if (openTrigger.getAttribute('aria-expanded') === 'true') {
+            openTrigger.click();
+          }
+        }, 0);
+      }
+
+      // Move the .is-targeted class onto the new destination. Pairs with the
+      // ".role-item:target, .role-item.is-targeted" rule in layout.css so the
+      // vermillion left rule still appears once the URL hash is gone.
+      document.querySelectorAll('.is-targeted').forEach(function (el) {
+        el.classList.remove('is-targeted');
+      });
+      target.classList.add('is-targeted');
+
+      target.scrollIntoView({
+        behavior: REDUCED_MOTION ? 'auto' : 'smooth',
+        block:    'start'
+      });
+
+      // Strip the hash from the address bar without adding a history entry.
+      history.replaceState(null, '', window.location.pathname + window.location.search);
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -298,7 +350,7 @@
     setupReveal();
     setupMenuStagger();
     setupHaptics();
-    setupAnchorClose();
+    setupAnchorScroll();
   }
 
   if (document.readyState === 'loading') {
