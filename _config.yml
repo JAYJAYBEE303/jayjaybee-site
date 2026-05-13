@@ -1,0 +1,38 @@
+# =============================================================================
+# jayjaybee.com — Jekyll config
+# GitHub Pages reads this file on every push and rebuilds the site. Edit
+# site-wide defaults here; per-page details live in each page's front matter.
+# =============================================================================
+
+# Site-level fallbacks. Used by _layouts/default.html when a page omits its
+# own title or description in front matter.
+title: Josh Bailey
+description: IT Desktop Analyst at Aston Martin F1. Endpoint work, PowerShell tooling, and the small, sharp tools that should already exist.
+url: https://jayjaybee.com
+
+# -----------------------------------------------------------------------------
+# Self-contained sub-projects: never wrap them in the site layout.
+# The FC26 calculator has its own <head>, <body>, fonts, and design system —
+# Jekyll would only get in its way. Setting layout: null at this path is
+# belt-and-braces; the file has no front matter, so Jekyll already treats it
+# as a static asset and copies it verbatim.
+# -----------------------------------------------------------------------------
+defaults:
+  - scope:
+      path: "projects/fc26-calculator"
+    values:
+      layout: null
+
+# -----------------------------------------------------------------------------
+# Files Jekyll should ignore entirely (not copied to the live site).
+# README.md and SKILL.md are repo meta. templates/ is a developer reference,
+# not site content. node_modules/ etc. are defensive — none currently exist.
+# -----------------------------------------------------------------------------
+exclude:
+  - README.md
+  - SKILL.md
+  - templates
+  - Gemfile
+  - Gemfile.lock
+  - vendor
+  - node_modules

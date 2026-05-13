@@ -1,6 +1,13 @@
 # Claude Code working files
 .claude/
 
+# Jekyll build output (GitHub Pages rebuilds on push; local builds stay local)
+_site/
+.jekyll-cache/
+.jekyll-metadata
+Gemfile.lock
+vendor/
+
 # OS junk
 Thumbs.db
 .DS_Store

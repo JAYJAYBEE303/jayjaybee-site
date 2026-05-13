@@ -1,0 +1,169 @@
+<!doctype html>
+<!-- =============================================================
+     jayjaybee.com — default layout
+     Every page with `layout: default` in its front matter is
+     wrapped in this scaffold at build time. Edit here to change
+     the header, footer, head metadata, or shared scripts across
+     the entire site.
+
+     Per-page front matter variables this template reads:
+       title       — used for <title>. Falls back to site.title.
+       description — used for <meta description>. Falls back to
+                     site.description (defined in _config.yml).
+     ============================================================= -->
+<html lang="en" data-theme="auto" class="no-js">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ page.title | default: site.title }}</title>
+  <meta name="description" content="{{ page.description | default: site.description }}" />
+
+  <!-- Pre-paint setup: theme preference + JS detection.
+       Both must run before first paint to avoid a flash of unstyled
+       content (wrong theme) or a flash of unanimated content (revealed
+       before hidden). -->
+  <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem('theme');
+        if (saved === 'light' || saved === 'dark') {
+          document.documentElement.setAttribute('data-theme', saved);
+        } else {
+          document.documentElement.removeAttribute('data-theme');
+        }
+      } catch (e) {}
+      document.documentElement.classList.replace('no-js', 'js');
+    })();
+  </script>
+
+  <link rel="stylesheet" href="/assets/css/global.css" />
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <!-- ============================================================
+       Site navigation — wordmark left, links right, accent CTA.
+       In-page anchors are rooted at / so the nav works from every
+       page: on the home page the browser just updates the hash and
+       smooth-scrolls; from a sub-page it navigates home and scrolls.
+       ============================================================ -->
+  <header class="site-header" role="banner">
+    <div class="site-header__inner">
+      <a class="site-wordmark" href="/" aria-label="Josh Bailey — home">Josh&nbsp;Bailey</a>
+      <nav class="site-nav" aria-label="Primary">
+        <ul class="site-nav__list" role="list">
+
+          <!-- Experiences — dropdown of roles, links into the home page -->
+          <li class="site-nav__item has-menu">
+            <button
+              type="button"
+              class="site-nav__link site-nav__trigger"
+              aria-expanded="false"
+              aria-haspopup="true"
+              aria-controls="menu-experiences"
+              data-menu-trigger="experiences"
+            >
+              Experiences
+              <span class="site-nav__caret" aria-hidden="true">▾</span>
+            </button>
+            <ul
+              id="menu-experiences"
+              class="site-nav__menu"
+              role="menu"
+              data-menu="experiences"
+              hidden
+            >
+              <li role="none"><a role="menuitem" class="site-nav__menu-link" href="/#exp-amf1">Aston Martin Aramco — Desktop Support Analyst</a></li>
+              <li role="none"><a role="menuitem" class="site-nav__menu-link" href="/#exp-partnership">Partnership Education — IT Engineer</a></li>
+              <li role="none"><a role="menuitem" class="site-nav__menu-link" href="/#exp-redbull">Red Bull Racing — IT Deployment Engineer</a></li>
+              <li role="none"><a role="menuitem" class="site-nav__menu-link" href="/#exp-apple">Apple — Technical Specialist</a></li>
+            </ul>
+          </li>
+
+          <li><a class="site-nav__link" href="/#work-heading">Projects</a></li>
+          <li><a class="site-nav__link site-nav__link--accent" href="/files/CV.pdf" target="_blank" rel="noopener">CV</a></li>
+
+          <!-- Software Development portfolio — dropdown of project pages -->
+          <li class="site-nav__item has-menu">
+            <button
+              type="button"
+              class="site-nav__link site-nav__trigger"
+              aria-expanded="false"
+              aria-haspopup="true"
+              aria-controls="menu-portfolio"
+              data-menu-trigger="portfolio"
+            >
+              Software&nbsp;Development&nbsp;portfolio
+              <span class="site-nav__caret" aria-hidden="true">▾</span>
+            </button>
+            <ul
+              id="menu-portfolio"
+              class="site-nav__menu site-nav__menu--right"
+              role="menu"
+              data-menu="portfolio"
+              hidden
+            >
+              <li role="none"><a role="menuitem" class="site-nav__menu-link" href="/projects/fc26-calculator/">FC26 Calculator</a></li>
+            </ul>
+          </li>
+
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Page-specific body. Each page's front matter + content is rendered
+       in here. The .page wrapper handles outer container + gutters. -->
+  <main id="main" class="page">
+    {{ content }}
+  </main>
+
+  <!-- ============================================================
+       Footer — contact + links + theme toggle. Subtle, not loud.
+       ============================================================ -->
+  <footer class="site-footer" role="contentinfo">
+    <div class="footer-inner">
+
+      <div class="footer-block footer-block--say">
+        <span class="mono-label">Say&nbsp;hello</span>
+        <p class="footer-line">
+          <a href="mailto:jjb303@hotmail.co.uk">jjb303@hotmail.co.uk</a>
+        </p>
+      </div>
+
+      <div class="footer-block footer-block--elsewhere">
+        <span class="mono-label">Elsewhere</span>
+        <ul class="footer-links" role="list">
+          <li><a href="https://github.com/" rel="noopener">GitHub&nbsp;<span aria-hidden="true">↗</span></a></li>
+          <li><a href="https://linkedin.com/" rel="noopener">LinkedIn&nbsp;<span aria-hidden="true">↗</span></a></li>
+          <li><a href="/files/CV.pdf" target="_blank" rel="noopener">CV&nbsp;(PDF)</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-block footer-block--colophon">
+        <span class="mono-label">Colophon</span>
+        <p class="footer-line">
+          Set in Newsreader, Hanken Grotesk, and IBM Plex Mono. Built in Silverstone. Last touched May&nbsp;2026.
+        </p>
+      </div>
+
+    </div>
+
+    <div class="footer-rule">
+      <p class="footer-fineprint mono">© Josh Bailey · jayjaybee.com</p>
+      <!-- Theme toggle: small, unobtrusive, footer-local. Cycles light → dark → system. -->
+      <button
+        id="theme-toggle"
+        class="theme-toggle mono"
+        type="button"
+        aria-label="Change colour theme"
+        aria-live="polite"
+      >
+        <span class="theme-toggle__current" data-theme-label>System</span>
+      </button>
+    </div>
+  </footer>
+
+  <script src="/assets/js/animations.js" defer></script>
+</body>
+</html>
