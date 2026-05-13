@@ -306,6 +306,52 @@
   margin-top: var(--space-1);
 }
 
+/* Longer-form role detail — bullet list of responsibilities.
+   Short roles (Red Bull, Apple) use just .role-note and stop there;
+   richer roles add this list under the lead paragraph. Each item
+   is hung off a quiet em-dash so the list reads as editorial bullets
+   rather than tickbox UI. */
+.role-points {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+.role-points li {
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
+  line-height: var(--lh-prose);
+  color: var(--fg-muted);
+  position: relative;
+  padding-left: var(--space-5);
+  text-wrap: pretty;
+}
+.role-points li::before {
+  content: "—";
+  color: var(--fg-quiet);
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+/* Key wins — small mono eyebrow above a final serif sentence.
+   Used to spotlight the things from the role most worth pointing
+   at. Slightly stronger ink than .role-note so the eye lands on
+   it as the closer for the row. */
+.role-wins {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+}
+.role-wins-line {
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
+  line-height: var(--lh-prose);
+  color: var(--fg);
+  text-wrap: pretty;
+}
+
 /* Targeted-by-anchor state — vermillion left rule lights up.
    :target handles deep-links (e.g. someone shares /#exp-amf1).
    .is-targeted is the JS-applied equivalent for in-page nav clicks,
