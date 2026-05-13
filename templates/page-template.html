@@ -1,0 +1,136 @@
+<!doctype html>
+<!-- =============================================================
+     jayjaybee.com — page template
+     Starter HTML for a new page. Duplicate, rename, edit the parts
+     marked with TODO. The global stylesheet and animations.js give
+     you the design system for free.
+
+     Conventions this template follows:
+       * Absolute asset paths (/assets/..., /files/..., /projects/...)
+         so the same file works from any folder depth.
+       * Pre-paint inline script (theme + .js class) before the
+         stylesheet to avoid flash-of-wrong-theme / flash-of-visible.
+       * Same site-header / site-footer pattern as index.html so any
+         new page reads as one of the same family.
+     ============================================================= -->
+<html lang="en" data-theme="auto" class="no-js">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- TODO: page title — keep it specific. "<Page name> — Josh Bailey" -->
+  <title>Page title — Josh Bailey</title>
+
+  <!-- TODO: meta description — one editorial sentence, ~150 chars. -->
+  <meta name="description" content="One-line description of what this page is and why it exists." />
+
+  <!-- Pre-paint setup: theme preference + JS detection.
+       Must run before the stylesheet so the first paint is correct. -->
+  <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem('theme');
+        if (saved === 'light' || saved === 'dark') {
+          document.documentElement.setAttribute('data-theme', saved);
+        } else {
+          document.documentElement.removeAttribute('data-theme');
+        }
+      } catch (e) {}
+      document.documentElement.classList.replace('no-js', 'js');
+    })();
+  </script>
+
+  <link rel="stylesheet" href="/assets/css/global.css" />
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <!-- =============================================================
+       Site header. Keep this consistent across pages. If you don't
+       need the Experiences / Software Development dropdowns on this
+       page, lift them from index.html when you do.
+       ============================================================= -->
+  <header class="site-header" role="banner">
+    <div class="site-header__inner">
+      <a class="site-wordmark" href="/" aria-label="Josh Bailey — home">Josh&nbsp;Bailey</a>
+      <nav class="site-nav" aria-label="Primary">
+        <ul class="site-nav__list" role="list">
+          <li><a class="site-nav__link" href="/projects/">Projects</a></li>
+          <li><a class="site-nav__link site-nav__link--accent" href="/files/CV.pdf" target="_blank" rel="noopener">CV</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- =============================================================
+       Page body. .page handles the outer container + gutters.
+       Each top-level section under .page is separated by vertical
+       rhythm (see .page > section + section in layout.css).
+       ============================================================= -->
+  <main id="main" class="page">
+
+    <!-- Lede — the page's opening line. Optional but recommended;
+         it sets point of view in one sentence. -->
+    <section class="lede-block" aria-label="Introduction">
+      <p class="mono-label lede-meta">TODO&nbsp;·&nbsp;Eyebrow</p>
+      <h1 class="lede-line">
+        TODO: the page's one-line headline.
+      </h1>
+    </section>
+
+    <!-- TODO: real content goes here. Use the section shapes from the
+         design system (see assets/css/layout.css):
+           .narrative .prose       — single body paragraph
+           .roles + .role-item     — two-column list rows
+           .work-list + .work-item — project cards
+           .now-list + .now-item   — dated micro-paragraphs
+         Each section starts with a .section-head containing a
+         .mono-label eyebrow and an h2.section-title. -->
+    <section aria-labelledby="todo-heading">
+      <header class="section-head">
+        <span class="mono-label">Section&nbsp;eyebrow</span>
+        <h2 id="todo-heading" class="section-title">Section title.</h2>
+      </header>
+
+      <div class="prose">
+        <p>
+          TODO: replace this with the page's real content.
+        </p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- =============================================================
+       Footer. Identical to the home page footer. Lift the email,
+       links, and theme toggle from index.html as-is if you want the
+       full version; the slimmed version below is the minimum for a
+       page to still feel "of" the site.
+       ============================================================= -->
+  <footer class="site-footer" role="contentinfo">
+    <div class="footer-inner">
+      <div class="footer-block footer-block--colophon">
+        <span class="mono-label">Colophon</span>
+        <p class="footer-line">
+          Set in Newsreader, Hanken Grotesk, and IBM Plex Mono.
+        </p>
+      </div>
+    </div>
+
+    <div class="footer-rule">
+      <p class="footer-fineprint mono">© Josh Bailey · jayjaybee.com</p>
+      <button
+        id="theme-toggle"
+        class="theme-toggle mono"
+        type="button"
+        aria-label="Change colour theme"
+        aria-live="polite"
+      >
+        <span class="theme-toggle__current" data-theme-label>System</span>
+      </button>
+    </div>
+  </footer>
+
+  <script src="/assets/js/animations.js" defer></script>
+</body>
+</html>
