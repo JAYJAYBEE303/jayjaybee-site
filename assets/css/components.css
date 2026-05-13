@@ -1,0 +1,290 @@
+/* =========================================================================
+   jayjaybee.com — components.css
+   Reusable bits + every motion concern: theme toggle, the reveal-on-scroll
+   system, hover/state transitions shared across nav/work/role/now/footer,
+   the .flash utility, and the no-JS failsafe.
+
+   This file owns transitions and animations. Layout.css holds the static
+   shape; the motion that brings it alive lives here. Anything you can
+   drop onto another page (a button, the theme toggle, the reveal hook)
+   belongs here.
+   ========================================================================= */
+
+/* =========================================================================
+   THEME TOGGLE
+   Small, unobtrusive footer button. Cycles light → dark → system.
+   ========================================================================= */
+.theme-toggle {
+  appearance: none;
+  background: transparent;
+  border: var(--border-hairline);
+  color: var(--fg-quiet);
+  padding: var(--space-2) var(--space-4);
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono-caps);
+  text-transform: uppercase;
+  border-radius: var(--radius-1);
+  cursor: pointer;
+  transition:
+    color            var(--dur-2) var(--ease),
+    border-color     var(--dur-2) var(--ease),
+    background-color var(--dur-2) var(--ease),
+    transform        var(--dur-2) var(--ease);
+}
+.theme-toggle:hover {
+  color: var(--fg);
+  border-color: var(--rule-strong);
+}
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
+}
+.theme-toggle::before {
+  /* Leading glyph that swaps with the theme — light=○, dark=●, system=◐ */
+  content: attr(data-glyph) " ";
+  margin-right: 0.1em;
+  color: var(--fg-quiet);
+}
+.theme-toggle:active {
+  transform: scale(0.97);
+  transition-duration: 80ms;
+}
+.theme-toggle__current {
+  display: inline-block;
+  transition: opacity var(--dur-2) var(--ease);
+}
+.theme-toggle.is-changing .theme-toggle__current {
+  opacity: 0;
+}
+
+/* =========================================================================
+   FLASH — one-shot tint utility for values that update after boot
+   ========================================================================= */
+@keyframes flash-once {
+   0% { background-color: var(--accent-soft); }
+ 100% { background-color: transparent; }
+}
+.flash {
+  animation: flash-once 480ms var(--ease) 1;
+  border-radius: var(--radius-1);
+}
+
+/* =========================================================================
+   REVEAL-ON-SCROLL SYSTEM
+   Initial hidden state for the elements listed below; animations.js adds
+   .is-visible when they enter the viewport. The selector list must stay
+   in sync with REVEAL_SELECTOR in animations.js.
+
+   Hiding is scoped to .js (set pre-paint by an inline <head> script) so
+   pages without JS never start invisible. The failsafe at the bottom of
+   this file is a belt-and-braces for the .js-but-no-IO case.
+   ========================================================================= */
+.js :is(
+  .site-wordmark,
+  .site-nav__list > li,
+  .lede-meta,
+  .lede-line,
+  .narrative .prose,
+  .roles .section-head,
+  .role-item,
+  .work  .section-head,
+  .work-item,
+  .currently .section-head,
+  .now-item,
+  .footer-block,
+  .footer-rule
+) {
+  opacity: 0;
+  transform: translateY(10px);
+  transition:
+    opacity   var(--reveal-dur, 620ms) var(--ease),
+    transform var(--reveal-dur, 620ms) var(--ease);
+  transition-delay: var(--reveal-delay, 0ms);
+  /* GPU hint, dropped once .is-visible lands */
+  will-change: opacity, transform;
+}
+
+/* Per-element starting transforms — variants. Set after the shared
+   declaration so they override the default translateY. */
+.js .site-wordmark           { transform: translate3d(-12px, 0, 0); }
+.js .site-nav__list > li     { transform: translate3d( 12px, 0, 0); }
+.js :is(.lede-meta, .footer-rule) { transform: none; }
+.js .lede-line               { transform: translateY(14px); --reveal-dur: 760ms; }
+
+/* Revealed state — same end state for every element. */
+.js :is(
+  .site-wordmark,
+  .site-nav__list > li,
+  .lede-meta,
+  .lede-line,
+  .narrative .prose,
+  .roles .section-head,
+  .role-item,
+  .work  .section-head,
+  .work-item,
+  .currently .section-head,
+  .now-item,
+  .footer-block,
+  .footer-rule
+).is-visible {
+  opacity: 1;
+  transform: none;
+  will-change: auto;
+}
+
+/* =========================================================================
+   HOVER / STATE TRANSITIONS
+   Every transition uses --ease so motion reads as one piece —
+   accelerate from rest, decelerate into the new state.
+   ========================================================================= */
+
+/* Wordmark — colour fade + subtle lift + tracking nudge on hover */
+.site-wordmark {
+  transition:
+    color           var(--dur-2) var(--ease),
+    transform       var(--dur-2) var(--ease),
+    letter-spacing  var(--dur-3) var(--ease);
+}
+.site-wordmark:hover {
+  transform: translateY(-1px);
+  letter-spacing: calc(var(--tr-headline) + 0.005em);
+}
+
+/* Nav links — 1px lift on hover */
+.site-nav__link {
+  transition:
+    color     var(--dur-1) var(--ease),
+    transform var(--dur-2) var(--ease);
+}
+.site-nav__link:hover  { transform: translateY(-1px); }
+.site-nav__link:active { transform: translateY(0); transition-duration: 60ms; }
+
+/* Dropdown caret — eased rotation when expanded */
+.site-nav__caret {
+  transition:
+    transform var(--dur-2) var(--ease),
+    color     var(--dur-1) var(--ease);
+}
+
+/* Dropdown panels — override [hidden] (display:none) so we can transition
+   open and close. The panel stays in layout while hidden, just invisible
+   and inert. */
+.site-nav__menu[hidden] {
+  display: flex;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-6px) scale(0.985);
+  pointer-events: none;
+  transition:
+    opacity    var(--dur-2) var(--ease),
+    transform  var(--dur-2) var(--ease),
+    visibility 0s var(--dur-2);
+}
+.site-nav__menu:not([hidden]) {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+  transition:
+    opacity    var(--dur-2) var(--ease),
+    transform  var(--dur-2) var(--ease),
+    visibility 0s 0s;
+}
+
+/* Menu items — when the panel opens, items stagger in. animations.js
+   sets --menu-item-delay per item so the count scales. */
+.site-nav__menu .site-nav__menu-link {
+  transition:
+    background-color var(--dur-1) var(--ease),
+    color            var(--dur-1) var(--ease),
+    transform        var(--dur-2) var(--ease),
+    opacity          var(--dur-2) var(--ease);
+}
+.site-nav__menu[hidden] .site-nav__menu-link {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+.site-nav__menu:not([hidden]) .site-nav__menu-link {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: var(--menu-item-delay, 0ms);
+}
+
+/* Work / role / now items — quiet hover state. Title nudges right 2px
+   so the hover lives in the typography, not the chrome. */
+.work-item, .role-item, .now-item {
+  transition: transform var(--dur-2) var(--ease);
+}
+.work-title, .role-title, .now-line {
+  transition: transform var(--dur-2) var(--ease);
+}
+.work-item:hover .work-title,
+.role-item:hover .role-title,
+.now-item:hover .now-line {
+  transform: translateX(2px);
+}
+
+/* Work link — fade in the underline on hover */
+.work-link {
+  transition:
+    text-decoration-color var(--dur-2) var(--ease),
+    color                 var(--dur-2) var(--ease);
+}
+
+/* Footer links — same micro-lift as nav so behaviour stays consistent. */
+.footer-links a {
+  display: inline-block;
+  transition:
+    color     var(--dur-1) var(--ease),
+    transform var(--dur-2) var(--ease);
+}
+.footer-links a:hover { transform: translateY(-1px); }
+
+/* =========================================================================
+   NAMED ACCENTS — small one-offs, used sparingly
+   ========================================================================= */
+
+/* Subtle underline draw on the lede meta — only on hover of the parent block */
+.lede-meta::after {
+  content: "";
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 0.6em;
+  width: 0;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.5;
+  transition: width var(--dur-3) var(--ease);
+}
+.lede-block:hover .lede-meta::after,
+.lede-block:focus-within .lede-meta::after {
+  width: 3.5rem;
+}
+
+/* =========================================================================
+   NO-JS FALLBACK SAFETY
+   If JS somehow never runs (or IntersectionObserver isn't available),
+   the .js-hidden elements still become visible after a generous timeout.
+   Once the JS adds .is-visible, the rule above with `transform: none;
+   opacity: 1` wins on the cascade.
+   ========================================================================= */
+@keyframes failsafe-reveal {
+  to { opacity: 1; transform: none; }
+}
+.js :is(
+  .site-wordmark,
+  .site-nav__list > li,
+  .lede-meta,
+  .lede-line,
+  .narrative .prose,
+  .roles .section-head,
+  .role-item,
+  .work  .section-head,
+  .work-item,
+  .currently .section-head,
+  .now-item,
+  .footer-block,
+  .footer-rule
+) {
+  animation: failsafe-reveal 1ms linear 3s forwards;
+}

@@ -1,0 +1,196 @@
+/* =========================================================================
+   jayjaybee.com — global.css
+   Entry point. Pulls in the three partials, then handles base/reset
+   styles, body, typography defaults, and links.
+
+   Every page links this one file:
+     <link rel="stylesheet" href="/assets/css/global.css">
+
+   Cascade order matters — variables first (so role tokens exist before
+   anything tries to use them), then layout, then components, then the
+   base rules below.
+   ========================================================================= */
+
+@import url('variables.css');
+@import url('layout.css');
+@import url('components.css');
+
+/* =========================================================================
+   RESET + BASE
+   ========================================================================= */
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  /* Anchor jumps (e.g. dropdown links to #exp-apple) glide rather than jump. */
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  /* Paper texture: the colour sits underneath the SVG grain, so the
+     speckle reads as imperfection in the paper, not as a layer on top.
+     background-attachment: fixed keeps the grain anchored to the viewport
+     so it doesn't slide when the page scrolls. */
+  background-color: var(--bg);
+  background-image: var(--grain);
+  background-repeat: repeat;
+  background-size: 640px 640px;
+  background-attachment: fixed;
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: var(--fs-body);
+  line-height: var(--lh-prose);
+  letter-spacing: var(--tr-body);
+  font-feature-settings: "ss01", "kern", "liga";
+  /* The page is mostly text; let long words break instead of overflowing
+     on narrow screens (project names with hyphens etc.) */
+  overflow-wrap: break-word;
+}
+
+/* Don't print the grain — it just wastes toner */
+@media print {
+  body { background-image: none; }
+}
+
+::selection { background: var(--selection-bg); color: var(--selection-fg); }
+
+h1, h2, h3, h4, p, ol, ul, dl, dd, figure, blockquote { margin: 0; padding: 0; }
+ol, ul { list-style: none; }
+
+img, svg { max-width: 100%; height: auto; display: block; }
+
+/* Accessibility — skip link visible only on focus */
+.skip-link {
+  position: absolute;
+  left: var(--space-4);
+  top: var(--space-4);
+  background: var(--fg);
+  color: var(--bg);
+  padding: var(--space-2) var(--space-4);
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  letter-spacing: var(--tr-mono-caps);
+  text-transform: uppercase;
+  text-decoration: none;
+  border-radius: var(--radius-1);
+  transform: translateY(-200%);
+  transition: transform var(--dur-2) var(--ease);
+  z-index: 100;
+}
+.skip-link:focus { transform: translateY(0); }
+
+/* =========================================================================
+   TYPOGRAPHY DEFAULTS
+   Element-level styling. Section-specific headings (.section-title,
+   .role-title, .work-title) override these in layout.css via class
+   specificity.
+   ========================================================================= */
+h1, .h1 {
+  font-family: var(--font-serif);
+  font-weight: var(--fw-regular);
+  font-size: var(--fs-display);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--tr-display);
+  font-optical-sizing: auto;
+  text-wrap: balance;
+}
+h2, .h2 {
+  font-family: var(--font-serif);
+  font-weight: var(--fw-regular);
+  font-size: var(--fs-headline);
+  line-height: var(--lh-snug);
+  letter-spacing: var(--tr-headline);
+  text-wrap: balance;
+}
+h3, .h3 {
+  font-family: var(--font-serif);
+  font-weight: var(--fw-medium);
+  font-size: var(--fs-subhead);
+  line-height: var(--lh-snug);
+  letter-spacing: var(--tr-headline);
+}
+
+/* Prose blocks — serif, comfortable measure */
+.prose {
+  font-family: var(--font-serif);
+  font-size: var(--fs-lede);
+  line-height: 1.55;
+  max-width: var(--measure-wide);
+  color: var(--fg);
+}
+.prose p { text-wrap: pretty; }
+.prose p + p { margin-top: var(--space-4); }
+
+/* Mono — the deliberate technical accent */
+.mono {
+  font-family: var(--font-mono);
+  font-weight: var(--fw-regular);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono);
+}
+.mono-label {
+  font-family: var(--font-mono);
+  font-weight: var(--fw-regular);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono-caps);
+  text-transform: uppercase;
+  color: var(--fg-quiet);
+  display: inline-block;
+}
+
+/* Links — accent colour, underline tracks on hover */
+a {
+  color: var(--link);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  text-decoration-color: var(--accent-soft);
+  transition: color var(--dur-1) var(--ease),
+              text-decoration-color var(--dur-1) var(--ease);
+}
+a:hover {
+  color: var(--link-hover);
+  text-decoration-color: currentColor;
+}
+a:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 3px;
+  border-radius: var(--radius-1);
+}
+
+/* =========================================================================
+   REDUCED MOTION
+   Honour the system preference strictly. The universal selector blunts
+   every transition and animation; the .js block forces the reveal
+   elements to their final visible state so nothing stays hidden.
+   ========================================================================= */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .js :is(
+    .site-wordmark,
+    .site-nav__list > li,
+    .lede-meta,
+    .lede-line,
+    .narrative .prose,
+    .roles .section-head,
+    .role-item,
+    .work  .section-head,
+    .work-item,
+    .currently .section-head,
+    .now-item,
+    .footer-block,
+    .footer-rule
+  ) {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}

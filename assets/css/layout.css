@@ -1,0 +1,548 @@
+/* =========================================================================
+   jayjaybee.com — layout.css
+   Structural rules: page shell, header, nav, footer, and the section
+   shapes used on the home page (lede, narrative, roles, work, currently).
+
+   Static visual properties only — colours, sizes, gutters, grids,
+   hover state changes. Motion (transitions, animations, reveal system,
+   transform-based hover lifts) lives in components.css.
+   ========================================================================= */
+
+/* =========================================================================
+   SITE HEADER / NAV
+   Wordmark left, sans-serif links right, one accent link as the CTA.
+   No logo, no hamburger — the link row collapses on narrow widths.
+   ========================================================================= */
+.site-header {
+  width: 100%;
+}
+.site-header__inner {
+  max-width: var(--container);
+  margin: 0 auto;
+  padding: clamp(var(--space-5), 4vw, var(--space-7))
+           clamp(var(--space-5), 5vw, var(--space-8));
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-5);
+  border-bottom: var(--border-hairline);
+}
+
+/* Wordmark — serif, ink, no underline. */
+.site-wordmark {
+  font-family: var(--font-serif);
+  font-weight: var(--fw-medium);
+  font-size: clamp(1.375rem, 0.6vw + 1.125rem, 1.625rem);
+  line-height: 1;
+  letter-spacing: var(--tr-headline);
+  color: var(--fg);
+  text-decoration: none;
+}
+.site-wordmark:hover { color: var(--accent); }
+
+/* Link row — sans, ink, no underline. Accent link is the one exception. */
+.site-nav__list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: clamp(var(--space-4), 2.5vw, var(--space-7));
+}
+.site-nav__link {
+  font-family: var(--font-sans);
+  font-size: var(--fs-ui);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--tr-ui);
+  color: var(--fg);
+  text-decoration: none;
+}
+.site-nav__link:hover {
+  color: var(--accent);
+}
+.site-nav__link--accent {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.25em;
+  text-decoration-color: currentColor;
+}
+.site-nav__link--accent:hover {
+  color: var(--accent-hover);
+}
+
+/* Dropdown triggers — buttons styled as nav links */
+.site-nav__item.has-menu { position: relative; }
+.site-nav__trigger {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35em;
+  font: inherit;
+}
+.site-nav__caret {
+  font-size: 0.7em;
+  line-height: 1;
+  color: var(--fg-quiet);
+  transform: translateY(-0.1em);
+}
+.site-nav__trigger:hover .site-nav__caret { color: currentColor; }
+.site-nav__trigger[aria-expanded="true"] .site-nav__caret {
+  transform: translateY(-0.1em) rotate(180deg);
+}
+
+/* Dropdown panel — hairline-bordered card, anchored under the trigger */
+.site-nav__menu {
+  position: absolute;
+  top: calc(100% + var(--space-3));
+  left: 0;
+  z-index: 50;
+  min-width: max-content;
+  max-width: 22rem;
+  margin: 0;
+  padding: var(--space-2);
+  background: var(--bg);
+  border: var(--border-hairline);
+  border-radius: var(--radius-2);
+  box-shadow: var(--shadow-2), var(--shadow-1);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.site-nav__menu[hidden] { display: none; }
+.site-nav__menu--right { left: auto; right: 0; }
+
+.site-nav__menu-link {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-sans);
+  font-size: var(--fs-ui);
+  font-weight: var(--fw-regular);
+  line-height: var(--lh-ui);
+  color: var(--fg);
+  text-decoration: none;
+  border-radius: var(--radius-1);
+  white-space: nowrap;
+}
+.site-nav__menu-link:hover,
+.site-nav__menu-link:focus-visible {
+  background: var(--bg-recessed);
+  color: var(--accent);
+  outline: none;
+}
+
+@media (max-width: 36rem) {
+  .site-header__inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
+  .site-nav__list {
+    gap: var(--space-5);
+  }
+  /* Anchor the right-aligned menu back to the left so it doesn't
+     clip off the viewport on narrow screens. */
+  .site-nav__menu--right { left: 0; right: auto; }
+}
+
+/* =========================================================================
+   PAGE SHELL + RHYTHM
+   --container is the outer max, but content uses --measure-* widths.
+   Sections are separated by space, not dividers.
+   ========================================================================= */
+.page {
+  max-width: var(--container);
+  margin: 0 auto;
+  padding: clamp(var(--space-7), 6vw, var(--space-10))
+           clamp(var(--space-5), 5vw, var(--space-8))
+           var(--space-10);
+}
+
+/* Vertical rhythm between major sections */
+.page > section + section {
+  margin-top: clamp(var(--space-9), 9vw, var(--section-gap-l));
+}
+
+/* Section headers — small mono eyebrow above a serif title */
+.section-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: var(--space-7);
+}
+.section-title {
+  font-family: var(--font-serif);
+  font-weight: var(--fw-regular);
+  font-size: var(--fs-headline);
+  line-height: var(--lh-snug);
+  letter-spacing: var(--tr-headline);
+}
+
+/* =========================================================================
+   LEDE — the opening line. The single biggest element on the page.
+   ========================================================================= */
+.lede-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  max-width: var(--measure-wide);
+}
+.lede-meta {
+  color: var(--fg-quiet);
+}
+.lede-line {
+  font-family: var(--font-serif);
+  font-weight: var(--fw-regular);
+  font-size: var(--fs-display);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--tr-display);
+  text-wrap: balance;
+  color: var(--fg);
+}
+
+/* =========================================================================
+   NARRATIVE — single prose paragraph inside the wide measure.
+   ========================================================================= */
+.narrative .prose {
+  font-size: var(--fs-lede);
+  color: var(--fg-muted);
+}
+
+/* =========================================================================
+   PAST ROLES
+   Reverse-chronological list. Two-column row: mono date left, serif
+   org / sans role / one-line note right. Stacks on narrow widths.
+   No card chrome, no logos. Hairlines and space, per the design system.
+   ========================================================================= */
+.role-list {
+  display: flex;
+  flex-direction: column;
+}
+.role-item {
+  border-top: var(--border-hairline);
+  padding: var(--space-6) 0;
+  display: grid;
+  /* Fixed-width date column keeps the dates aligned regardless of role
+     title length — the typographic version of a CV gutter. */
+  grid-template-columns: 11rem 1fr;
+  gap: var(--space-7);
+  align-items: baseline;
+
+  /* :target uses an inset left rule. Keep a transparent border-left in
+     the default state so layout doesn't jump when the rule appears. */
+  border-left: 2px solid transparent;
+  padding-left: var(--space-4);
+  margin-left: calc(var(--space-4) * -1);
+}
+.role-item:last-child { padding-bottom: 0; }
+
+.role-when {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  color: var(--fg-quiet);
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono-caps);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.role-status {
+  color: var(--accent);
+}
+.role-status::before {
+  content: "● ";
+  font-size: 0.7em;
+  vertical-align: 0.15em;
+  margin-right: 0.15em;
+}
+
+.role-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: var(--measure-prose);
+}
+.role-org {
+  font-family: var(--font-sans);
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-ui);
+  line-height: var(--lh-ui);
+  letter-spacing: var(--tr-ui);
+  color: var(--fg);
+}
+.role-org-sub {
+  font-weight: var(--fw-regular);
+  color: var(--fg-quiet);
+}
+.role-tm {
+  font-size: 0.55em;
+  vertical-align: 0.6em;
+  margin-left: 0.05em;
+  color: var(--fg-quiet);
+}
+.role-title {
+  font-family: var(--font-serif);
+  font-weight: var(--fw-regular);
+  font-size: clamp(1.375rem, 1vw + 1rem, 1.75rem);
+  line-height: 1.2;
+  letter-spacing: var(--tr-headline);
+  color: var(--fg);
+}
+.role-title-sub {
+  font-style: italic;
+  color: var(--fg-muted);
+  font-size: 0.78em;
+  margin-left: 0.15em;
+}
+.role-note {
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
+  line-height: var(--lh-prose);
+  color: var(--fg-muted);
+  text-wrap: pretty;
+  margin-top: var(--space-1);
+}
+
+/* Targeted-by-anchor state — vermillion left rule lights up. */
+.role-item:target {
+  border-left-color: var(--accent);
+}
+.role-item:target .role-title {
+  color: var(--fg);
+}
+
+@media (max-width: 48rem) {
+  .role-item {
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+  }
+  .role-when {
+    flex-direction: row;
+    gap: var(--space-3);
+    align-items: baseline;
+  }
+}
+
+/* =========================================================================
+   WORK — project cards as list rows. No box, no shadow.
+   ========================================================================= */
+.work-list {
+  display: flex;
+  flex-direction: column;
+}
+.work-item {
+  border-top: var(--border-hairline);
+  padding-top: var(--space-7);
+  padding-bottom: var(--space-7);
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+}
+.work-item:last-child { padding-bottom: 0; }
+
+.work-item--featured {
+  border-top: var(--border-rule);
+  padding-top: var(--space-8);
+  padding-bottom: var(--space-8);
+}
+
+/* Metadata — mono, separated by middle dots */
+.work-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  color: var(--fg-quiet);
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono-caps);
+  text-transform: uppercase;
+}
+.work-meta .mono { color: var(--fg-quiet); }
+.mono-sep { color: var(--fg-faint); }
+
+/* Title — serif, big, link coloured as ink not accent. */
+.work-title {
+  font-family: var(--font-serif);
+  font-weight: var(--fw-regular);
+  font-size: clamp(1.625rem, 2vw + 1rem, 2.25rem);
+  line-height: 1.15;
+  letter-spacing: var(--tr-headline);
+}
+.work-item--featured .work-title {
+  font-size: clamp(2rem, 3vw + 1rem, 2.875rem);
+}
+.work-link {
+  color: var(--fg);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-decoration-color: transparent;
+  text-underline-offset: 0.2em;
+}
+.work-link:hover {
+  color: var(--accent);
+  text-decoration-color: var(--accent);
+}
+
+.work-lede {
+  font-family: var(--font-serif);
+  font-size: var(--fs-lede);
+  line-height: 1.45;
+  color: var(--fg);
+  max-width: var(--measure-prose);
+  text-wrap: pretty;
+}
+.work-body {
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
+  line-height: var(--lh-prose);
+  color: var(--fg-muted);
+  max-width: var(--measure-prose);
+  text-wrap: pretty;
+}
+
+.work-attrs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, max-content));
+  gap: var(--space-3) var(--space-7);
+  margin-top: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: var(--border-hairline);
+}
+.work-attr {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.work-attr dt {
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono-caps);
+  text-transform: uppercase;
+  color: var(--fg-quiet);
+}
+.work-attr dd {
+  font-family: var(--font-sans);
+  font-size: var(--fs-ui);
+  line-height: var(--lh-ui);
+  color: var(--fg);
+}
+
+.work-item.is-placeholder .work-link {
+  color: var(--fg-quiet);
+  font-style: italic;
+}
+.work-item.is-placeholder .work-lede,
+.work-item.is-placeholder .work-body {
+  color: var(--fg-quiet);
+}
+
+/* =========================================================================
+   CURRENTLY — dated "now" section. Editorial micro-paragraphs.
+   ========================================================================= */
+.now-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  max-width: var(--measure-wide);
+}
+.now-item {
+  border-top: var(--border-hairline);
+  padding-top: var(--space-4);
+}
+.now-line {
+  font-family: var(--font-serif);
+  font-size: var(--fs-lede);
+  line-height: 1.45;
+  color: var(--fg);
+  text-wrap: pretty;
+}
+.now-tag {
+  /* Inline mono tag — small nudge so the mono cap-height baselines with
+     the serif x-height rather than sitting above it. */
+  margin-right: var(--space-3);
+  position: relative;
+  top: -0.08em;
+}
+
+/* =========================================================================
+   FOOTER — three info blocks then a hairline-separated bottom strip.
+   ========================================================================= */
+.site-footer {
+  border-top: var(--border-hairline);
+  /* Transparent so the body grain reads continuously into the footer */
+  background: transparent;
+  margin-top: clamp(var(--space-9), 9vw, var(--section-gap-l));
+}
+.footer-inner {
+  max-width: var(--container);
+  margin: 0 auto;
+  padding: var(--space-9) clamp(var(--space-5), 5vw, var(--space-8)) var(--space-7);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-7) var(--space-8);
+}
+.footer-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.footer-line {
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
+  line-height: var(--lh-prose);
+  color: var(--fg);
+  max-width: 34ch;
+}
+.footer-links {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.footer-links a {
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
+}
+
+.footer-rule {
+  border-top: var(--border-hairline);
+  max-width: var(--container);
+  margin: 0 auto;
+  padding: var(--space-5) clamp(var(--space-5), 5vw, var(--space-8));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.footer-fineprint {
+  color: var(--fg-quiet);
+  font-size: var(--fs-mono);
+}
+
+/* =========================================================================
+   RESPONSIVE — breakpoints that don't fit cleanly inside clamp().
+   ========================================================================= */
+@media (max-width: 56rem) {
+  .footer-inner {
+    grid-template-columns: 1fr 1fr;
+  }
+  .footer-block--colophon { grid-column: 1 / -1; }
+}
+@media (max-width: 36rem) {
+  .footer-inner {
+    grid-template-columns: 1fr;
+    gap: var(--space-6);
+  }
+  .work-attrs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3) var(--space-5);
+  }
+  .footer-rule {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
+}
