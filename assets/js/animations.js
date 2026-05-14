@@ -354,6 +354,19 @@
   // -------------------------------------------------------------------------
   function setupDisclosures() {
     var buttons = document.querySelectorAll('.role-disclosure-summary');
+
+    // Clicking anywhere on the role card triggers the disclosure button,
+    // unless the click landed inside the open panel (so text stays selectable).
+    document.querySelectorAll('.role-item').forEach(function (item) {
+      var btn = item.querySelector('.role-disclosure-summary');
+      if (!btn) return;
+      item.addEventListener('click', function (e) {
+        if (e.target.closest('.role-disclosure-summary')) return; // button handles itself
+        if (e.target.closest('.role-disclosure-panel')) return;   // don't toggle while reading
+        btn.click();
+      });
+    });
+
     buttons.forEach(function (btn) {
       btn.addEventListener('click', function () {
         var expanded = btn.getAttribute('aria-expanded') === 'true';

@@ -11,9 +11,9 @@
    base rules below.
    ========================================================================= */
 
-@import url('variables.css');
-@import url('layout.css');
-@import url('components.css');
+@import url('variables.css?v=31');
+@import url('layout.css?v=31');
+@import url('components.css?v=31');
 
 /* =========================================================================
    RESET + BASE

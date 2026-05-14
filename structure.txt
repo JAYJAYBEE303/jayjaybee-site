@@ -1,0 +1,31 @@
+Root files
+|.gitignore — tells Git which files/folders to never commit (build output, secrets, AMF1 content, OS junk).
+|CNAME — single-line file telling GitHub Pages to serve the site at the custom domain jayjaybee.com.
+|Gemfile — declares the Ruby gems needed to build the site locally (github-pages + webrick), matching what GitHub Pages uses.
+|Gemfile.lock — auto-generated record of the exact gem versions resolved on your last bundle install (gitignored because GitHub Pages locks its own).
+|README.md — human-readable repo intro shown on the GitHub page (excluded from the built site).
+|SKILL.md — your Claude Code project notes/conventions, kept local and not published (gitignored + excluded by Jekyll).
+|_config.yml — Jekyll's central config: site title/URL, layout defaults for the FC26 sub-project, and the list of files Jekyll should not publish.
+|index.html — the homepage content, wrapped at build time by _layouts/default.html.
+|
+|----_layouts/
+	|default.html — the shared page chrome (head, body, header, footer, theme script, asset links) that wraps every page declaring layout: default.
+|
+|-----templates/
+	|page-template.html — starter scaffold to copy when creating a new page; excluded from the built site, lives in the repo as reference only.
+|
+|assets/css/
+	|variables.css — design-system tokens (colors, spacing, type scale, breakpoints) used by every other stylesheet.
+	|global.css — base resets and element-level defaults (typography, links, body) that apply site-wide.
+	|components.css — styles for reusable UI pieces (buttons, chips, cards, nav, etc.).
+	|layout.css — page-level structure and section rhythm (the .page, .section-head, role/work/now list layouts).
+|
+|assets/js/
+	|main.js — placeholder for site-wide non-motion JS, loaded on every page.
+	|animations.js — theme toggle, nav dropdowns, reveal-on-scroll, stagger, and anchor behavior.
+|
+|assets/fonts/ and assets/images/
+	|.gitkeep — empty marker files so Git tracks the otherwise-empty directories.
+|
+|files/
+	|CV.pdf — your downloadable CV, linked from the site.

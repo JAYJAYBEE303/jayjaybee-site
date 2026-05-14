@@ -223,6 +223,7 @@
 .role-item {
   border-top: var(--border-hairline);
   padding: var(--space-6) 0;
+  cursor: pointer;
   display: grid;
   /* Fixed-width date column keeps the dates aligned regardless of role
      title length — the typographic version of a CV gutter. */
@@ -311,6 +312,17 @@
    richer roles add this list under the lead paragraph. Each item
    is hung off a quiet em-dash so the list reads as editorial bullets
    rather than tickbox UI. */
+.role-subsection-label {
+  margin-top: var(--space-5);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-body);
+  letter-spacing: var(--tr-ui);
+}
+.role-subsection-label:first-child {
+  margin-top: var(--space-3);
+}
 .role-points {
   display: flex;
   flex-direction: column;
@@ -320,6 +332,7 @@
 .role-points li {
   font-family: var(--font-serif);
   font-size: var(--fs-body);
+  color: var(--fg-muted);
   line-height: var(--lh-prose);
   color: var(--fg-muted);
   position: relative;
@@ -368,6 +381,7 @@
 .role-disclosure-summary {
   -webkit-appearance: none;
   appearance: none;
+  color: var(--accent);
   background: transparent;
   background-color: transparent;
   background-image: none;
@@ -402,9 +416,10 @@
   color: var(--accent);
   transition: transform 300ms var(--ease), color var(--dur-1) var(--ease);
 }
+.role-disclosure-summary .mono-label,
 .role-disclosure-summary:hover .mono-label,
 .role-disclosure-summary:focus-visible .mono-label {
-  color: var(--fg);
+  color: var(--accent);
 }
 .role-disclosure-summary:focus-visible {
   outline: 2px solid var(--link);
@@ -513,7 +528,7 @@
   font-size: clamp(2rem, 3vw + 1rem, 2.875rem);
 }
 .work-link {
-  color: var(--fg);
+  color: var(--accent);
   text-decoration: underline;
   text-decoration-thickness: 1px;
   text-decoration-color: transparent;
@@ -619,13 +634,44 @@
   margin: 0 auto;
   padding: var(--space-9) clamp(var(--space-5), 5vw, var(--space-8)) var(--space-7);
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: 7rem repeat(3, 1fr);
   gap: var(--space-7) var(--space-8);
+  align-items: start;
 }
 .footer-block {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+}
+.footer-block--portrait {
+  /* Portrait sits in its own narrow column. Pull the visual up so it baselines
+     with the mono labels in the neighbouring columns — the feathered top edge
+     has no hard line to align to. */
+  margin-top: calc(var(--space-3) * -1);
+}
+.footer-portrait {
+  width: 6rem;
+  /* Two linear gradients (one per axis) composited with `intersect` give a
+     feathered rectangle: every edge fades over the same small band, and the
+     corners naturally double up to a softer round-off. */
+  -webkit-mask-image:
+    linear-gradient(to right, transparent 0, #000 11.5%, #000 88.5%, transparent 100%),
+    linear-gradient(to bottom, transparent 0, #000 11.5%, #000 88.5%, transparent 100%);
+  -webkit-mask-composite: source-in;
+          mask-image:
+    linear-gradient(to right, transparent 0, #000 11.5%, #000 88.5%, transparent 100%),
+    linear-gradient(to bottom, transparent 0, #000 11.5%, #000 88.5%, transparent 100%);
+          mask-composite: intersect;
+  -webkit-mask-repeat: no-repeat;
+          mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+          mask-size: 100% 100%;
+}
+.footer-portrait img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 12%;
 }
 .footer-line {
   font-family: var(--font-serif);
@@ -664,15 +710,18 @@
    ========================================================================= */
 @media (max-width: 56rem) {
   .footer-inner {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 6rem 1fr 1fr;
   }
   .footer-block--colophon { grid-column: 1 / -1; }
+  .footer-portrait { width: 6rem; }
 }
 @media (max-width: 36rem) {
   .footer-inner {
     grid-template-columns: 1fr;
     gap: var(--space-6);
   }
+  .footer-block--portrait { margin-top: 0; }
+  .footer-portrait { width: 6rem; }
   .work-attrs {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--space-3) var(--space-5);

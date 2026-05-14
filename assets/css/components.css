@@ -218,9 +218,14 @@
 .work-title, .role-title, .now-line {
   transition: transform var(--dur-2) var(--ease);
 }
-.work-item:hover .work-title,
-.role-item:hover .role-title,
+.work-title:hover,
 .now-item:hover .now-line {
+  transform: translateX(2px);
+}
+.role-disclosure-summary {
+  transition: transform var(--dur-2) var(--ease);
+}
+.role-item:hover .role-disclosure-summary {
   transform: translateX(2px);
 }
 
