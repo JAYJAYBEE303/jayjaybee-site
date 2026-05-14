@@ -315,7 +315,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  margin-top: var(--space-4);
+  margin-top: var(--space-3);
 }
 .role-points li {
   font-family: var(--font-serif);
@@ -350,6 +350,91 @@
   line-height: var(--lh-prose);
   color: var(--fg);
   text-wrap: pretty;
+  margin-top: var(--space-2);
+}
+
+/* Disclosure rows — Responsibilities & Key wins/achievements/competencies.
+   A button + panel pair: the button is a clickable mono eyebrow with a small
+   rotating chevron; the panel below holds the content. Collapsed by default
+   so the role reads as a paragraph and visitors choose what to expand. */
+.role-disclosure {
+  margin-top: var(--space-4);
+}
+
+/* Button reset + clickable mono-label styling. Using a real <button> gives us
+   keyboard support and the pointer cursor for free; the reset strips every bit
+   of native browser chrome (the box, the focus ring, the OS background) so the
+   label reads as plain text — just like the nav links — until you hover it. */
+.role-disclosure-summary {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  background-color: transparent;
+  background-image: none;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  transition: color var(--dur-1) var(--ease);
+}
+.role-disclosure-summary:focus { outline: none; }
+.role-disclosure-summary::after {
+  content: "›";
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  line-height: 1;
+  color: var(--fg-quiet);
+  display: inline-block;
+  transform: translateY(-1px);
+  transition: transform var(--dur-2) var(--ease), color var(--dur-1) var(--ease);
+}
+.role-disclosure-summary[aria-expanded="true"]::after {
+  transform: translateY(-1px) rotate(90deg);
+  color: var(--accent);
+  transition: transform 300ms var(--ease), color var(--dur-1) var(--ease);
+}
+.role-disclosure-summary:hover .mono-label,
+.role-disclosure-summary:focus-visible .mono-label {
+  color: var(--fg);
+}
+.role-disclosure-summary:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 3px;
+  border-radius: var(--radius-1);
+}
+
+/* Animated panel — max-height with a generous ceiling collapses the panel
+   inline. Paired with the nav's fade + 6px slide + 0.985 scale so the motion
+   language matches across the site. Asymmetric timing: 500ms to open (letting
+   the eye follow content unfolding), 200ms to close (snappy dismissal). */
+.role-disclosure-panel {
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-6px) scale(0.985);
+  transform-origin: top left;
+  transition:
+    max-height var(--dur-2) var(--ease),
+    opacity    var(--dur-2) var(--ease),
+    transform  var(--dur-2) var(--ease);
+}
+.role-disclosure-panel.is-open {
+  max-height: 2000px;
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition:
+    max-height 300ms var(--ease),
+    opacity    300ms var(--ease),
+    transform  300ms var(--ease);
 }
 
 /* Targeted-by-anchor state — vermillion left rule lights up.

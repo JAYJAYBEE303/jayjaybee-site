@@ -344,6 +344,64 @@
   }
 
   // -------------------------------------------------------------------------
+  // e. Role disclosures — toggle the .is-open class + measure height in JS.
+  //
+  // CSS owns the easing curve and duration; JS sets the inline max-height to
+  // the panel's actual scrollHeight so the full transition duration is spent
+  // animating the *visible* range, not racing past the content to a fixed
+  // ceiling. After the open transition completes we release max-height so
+  // content can reflow (font load, window resize, etc).
+  // -------------------------------------------------------------------------
+  function setupDisclosures() {
+    var buttons = document.querySelectorAll('.role-disclosure-summary');
+    buttons.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var expanded = btn.getAttribute('aria-expanded') === 'true';
+        var panel = btn.nextElementSibling;
+        if (!panel) return;
+        btn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+
+        if (expanded) {
+          // CLOSE: pin current height (in case it was 'none' after a previous
+          // open), reflow, then drop to 0 via the .is-open class removal.
+          panel.style.maxHeight = panel.scrollHeight + 'px';
+          void panel.offsetHeight;
+          panel.classList.remove('is-open');
+          panel.style.maxHeight = '';
+        } else {
+          // OPEN: add the class, set inline max-height to the measured content
+          // height, then release after the transition.
+          panel.classList.add('is-open');
+          panel.style.maxHeight = panel.scrollHeight + 'px';
+          afterTransition(panel, function () {
+            if (panel.classList.contains('is-open')) {
+              panel.style.maxHeight = 'none';
+            }
+          });
+        }
+      });
+    });
+
+    function afterTransition(el, fn) {
+      var done = false;
+      var finish = function () {
+        if (done) return;
+        done = true;
+        el.removeEventListener('transitionend', handler);
+        clearTimeout(timer);
+        fn();
+      };
+      var handler = function (ev) {
+        if (ev.target !== el) return;
+        if (ev.propertyName !== 'max-height') return;
+        finish();
+      };
+      el.addEventListener('transitionend', handler);
+      var timer = setTimeout(finish, 700);
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // Boot
   // -------------------------------------------------------------------------
   function boot() {
@@ -351,6 +409,7 @@
     setupMenuStagger();
     setupHaptics();
     setupAnchorScroll();
+    setupDisclosures();
   }
 
   if (document.readyState === 'loading') {
