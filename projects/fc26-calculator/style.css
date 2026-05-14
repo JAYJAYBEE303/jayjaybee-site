@@ -3,45 +3,12 @@
      DESIGN TOKENS — light + dark
      ───────────────────────────────────────────────────────── */
   /* ─────────────────────────────────────────────────────────
-     ASTON MARTIN ARAMCO F1 — fonts (self-hosted)
-     ───────────────────────────────────────────────────────── */
-  @font-face {
-    font-family: "Aston Martin Flare";
-    src: url("fonts/FLARE_MD.TTF") format("truetype");
-    font-weight: 500; font-style: normal; font-display: swap;
-  }
-  @font-face {
-    font-family: "Aston Martin Flare";
-    src: url("fonts/FLARE_BD.TTF") format("truetype");
-    font-weight: 700; font-style: normal; font-display: swap;
-  }
-  @font-face {
-    font-family: "Aston Martin Flare";
-    src: url("fonts/FLARE_XBD.TTF") format("truetype");
-    font-weight: 800; font-style: normal; font-display: swap;
-  }
-  @font-face {
-    font-family: "Aston Martin Sans";
-    src: url("fonts/SANS_LTIT.TTF") format("truetype");
-    font-weight: 300; font-style: italic; font-display: swap;
-  }
-  @font-face {
-    font-family: "Aston Martin Sans";
-    src: url("fonts/SANS_BDIT.TTF") format("truetype");
-    font-weight: 700; font-style: italic; font-display: swap;
-  }
-  @font-face {
-    font-family: "Aston Martin Sans";
-    src: url("fonts/SANS_XBDIT.TTF") format("truetype");
-    font-weight: 800; font-style: italic; font-display: swap;
-  }
-
-  /* ─────────────────────────────────────────────────────────
      ASTON MARTIN ARAMCO F1 — palette
      Racing Green #00352F · Lime Essence #CEDC00 · Black #0A0A0A
      ───────────────────────────────────────────────────────── */
   :root {
-    --c-canvas:      245 246 244;   /* cool paper */
+    --c-canvas:      244 239 230;   /* site paper #F4EFE6 */
+    --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='640' height='640'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.48 0.56' numOctaves='4' stitchTiles='stitch' seed='23'/><feColorMatrix values='0 0 0 0 0.10  0 0 0 0 0.09  0 0 0 0 0.08  0.85 0 0 0 -0.48'/><feGaussianBlur stdDeviation='1.0'/></filter><rect width='100%25' height='100%25' filter='url(%23g)'/></svg>");
     --c-surface:     255 255 255;
     --c-sunken:      238 240 236;
     --c-ink:         10 12 11;
@@ -65,7 +32,8 @@
     --slot-6:        145  78 220;   /* violet */
   }
   html.dark {
-    --c-canvas:        0  53  47;   /* AMF1 racing green #00352F */
+    --c-canvas:       20  17  14;   /* site paper dark #14110E */
+    --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='640' height='640'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.48 0.56' numOctaves='4' stitchTiles='stitch' seed='23'/><feColorMatrix values='0 0 0 0 0.92  0 0 0 0 0.89  0 0 0 0 0.83  0.65 0 0 0 -0.48'/><feGaussianBlur stdDeviation='1.0'/></filter><rect width='100%25' height='100%25' filter='url(%23g)'/></svg>");
     --c-surface:      20  37  34;   /* lifted carbon, AMF1 grey-800 */
     --c-sunken:       11  19  17;   /* AMF1 grey-950 */
     --c-ink:         236 240 234;
@@ -108,16 +76,6 @@
   :root { color-scheme: light; }
   html.dark { color-scheme: dark; }
 
-  /* Dark-mode background image */
-  html.dark,
-  html.dark body {
-    background-image: url("assets/Backgrounds/Picture1.jpg");
-    background-size: cover;
-    background-position: center center;
-    background-repeat: no-repeat;
-    background-attachment: fixed;
-  }
-
   /* Lock layout: html + body fill viewport, no horizontal scroll, full bg coverage */
   html, body {
     overflow-x: hidden;
@@ -129,53 +87,54 @@
     min-height: 100%;
   }
   body {
-    background: rgb(var(--c-canvas));
+    background-color: rgb(var(--c-canvas));
+    background-image: var(--grain);
+    background-repeat: repeat;
+    background-size: 640px 640px;
+    background-attachment: fixed;
     color: rgb(var(--c-ink));
-    font-family: 'Aston Martin Sans', 'Inter', system-ui, sans-serif;
-    font-style: italic;
-    font-weight: 300;
+    font-family: 'Hanken Grotesk', -apple-system, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 400;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
-    font-feature-settings: 'cv11', 'ss01';
+    font-feature-settings: 'kern', 'liga';
     min-height: 100dvh;
     position: relative;
   }
-  /* AMF1 — display headers ride Flare */
+  @media print { body { background-image: none; } }
+  /* Display headers — site serif */
   h1, h2, .display, .hero-title, .hero-eyebrow, .section-eyebrow, .text-display,
   .font-display {
-    font-family: 'Aston Martin Flare', 'Optima', 'Palatino Linotype', Georgia, serif !important;
+    font-family: 'Newsreader', 'Charter', 'Iowan Old Style', Georgia, 'Times New Roman', serif !important;
     font-style: normal !important;
-    letter-spacing: 0.005em;
+    font-optical-sizing: auto;
+    letter-spacing: -0.015em;
   }
-  /* AMF1 hero — uppercase Flare with lime accent on the second word */
   h1.font-display {
-    text-transform: uppercase;
-    letter-spacing: 0;
-    font-weight: 800;
-    line-height: 1.0 !important;
+    font-weight: 400;
+    line-height: 1.05 !important;
     margin-bottom: 0.4em;
   }
   h1.font-display .italic {
-    font-style: normal !important;
-    color: rgb(var(--c-gain)) !important;
-    font-weight: 800;
+    font-style: italic !important;
+    color: rgb(var(--c-accent));
+    font-weight: 400;
   }
   h2.font-display {
-    text-transform: uppercase;
-    letter-spacing: 0.01em;
-    font-weight: 700;
+    font-weight: 500;
+    letter-spacing: -0.015em;
   }
-  /* Inputs, body chrome, mono, monos use Inter where Sans-italic would feel wrong */
+  /* Inputs and UI chrome — site sans */
   input, button, select, textarea, .num,
   .stat-input input, .compare-table th, .compare-table td.stat-col,
   .view-toggle-btn, .option-btn, .save-card, .squad-lb-table {
-    font-family: 'Inter', system-ui, sans-serif !important;
+    font-family: 'Hanken Grotesk', system-ui, sans-serif !important;
     font-style: normal !important;
   }
-  /* Tabular numerics + mono stay JetBrains Mono */
+  /* Tabular numerics + mono — site mono */
   code, kbd, pre, samp, .font-mono, [class*="font-mono"],
   input[type="number"] {
-    font-family: 'JetBrains Mono', ui-monospace, monospace !important;
+    font-family: 'IBM Plex Mono', ui-monospace, monospace !important;
     font-style: normal !important;
   }
 
@@ -201,7 +160,7 @@
   }
   .stat-input input {
     width: 100%; background: rgb(var(--c-sunken)); border: 1px solid rgb(var(--c-line));
-    border-radius: 8px; padding: 8px 10px; font-family: 'JetBrains Mono', monospace;
+    border-radius: 8px; padding: 8px 10px; font-family: 'IBM Plex Mono', monospace;
     font-size: 14px; color: rgb(var(--c-ink)); font-variant-numeric: tabular-nums;
     transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
   }
@@ -211,7 +170,7 @@
     box-shadow: 0 0 0 3px rgb(var(--c-accent) / 0.12);
   }
   .height-display {
-    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px;
     color: rgb(var(--c-ink-muted)); margin-top: 2px;
   }
 
@@ -330,13 +289,13 @@
   .stat-bar-base { background: rgb(var(--c-line-strong)); opacity: 0.6; }
   .stat-bar-effective { background: rgb(var(--c-accent)); }
   .stat-base-num, .stat-effective-num, .sub-stat-num {
-    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 12px;
     font-variant-numeric: tabular-nums; text-align: right;
   }
   .stat-base-num { color: rgb(var(--c-ink-muted)); }
   .stat-effective-num { color: rgb(var(--c-ink)); font-weight: 500; }
   .delta {
-    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px;
     font-weight: 500; text-align: right;
     color: rgb(var(--c-ink-muted));
   }
@@ -406,7 +365,7 @@
     flex: 1 1 auto;
   }
   .bd {
-    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px;
     font-weight: 500; padding: 2px 6px; border-radius: 6px;
     background: rgb(var(--c-sunken));
     color: rgb(var(--c-ink-muted));
@@ -438,7 +397,7 @@
     border-radius: 999px;
   }
   .view-toggle-btn {
-    font-family: 'Inter', sans-serif; font-size: 10px;
+    font-family: 'Hanken Grotesk', sans-serif; font-size: 10px;
     padding: 4px 12px; border-radius: 999px;
     background: transparent; color: rgb(var(--c-ink-muted));
     border: none; cursor: pointer;
@@ -459,7 +418,7 @@
     background: rgb(var(--c-sunken)); border: 1px solid rgb(var(--c-line));
     border-radius: 8px; padding: 8px 10px;
     font-size: 12px; color: rgb(var(--c-ink));
-    font-family: 'Inter', sans-serif;
+    font-family: 'Hanken Grotesk', sans-serif;
     transition: border-color 180ms ease, box-shadow 180ms ease;
   }
   .name-input:focus, .folder-select:focus {
@@ -471,7 +430,7 @@
     font-size: 11px; font-weight: 600; letter-spacing: 0.04em;
     cursor: pointer; border: 1px solid transparent;
     transition: all 160ms ease;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Hanken Grotesk', sans-serif;
     white-space: nowrap;
   }
   .save-btn {
@@ -578,7 +537,7 @@
     background: rgb(var(--c-surface)); border: 1px solid rgb(var(--c-accent));
     border-radius: 6px; padding: 4px 8px;
     font-size: 13px; color: rgb(var(--c-ink));
-    font-family: 'Inter', sans-serif;
+    font-family: 'Hanken Grotesk', sans-serif;
     box-shadow: 0 0 0 3px rgb(var(--c-accent) / 0.12);
     outline: none;
   }
@@ -588,7 +547,7 @@
     width: 100%; min-height: 120px;
     background: rgb(var(--c-sunken)); border: 1px solid rgb(var(--c-line));
     border-radius: 8px; padding: 10px 12px;
-    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px;
     color: rgb(var(--c-ink)); resize: vertical;
   }
   .io-textarea:focus {
@@ -638,7 +597,7 @@
   }
   .compare-table {
     width: 100%; border-collapse: collapse;
-    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px;
     margin-top: 14px;
   }
   .compare-table th {
@@ -646,18 +605,18 @@
     font-size: 11px; font-weight: 600;
     color: rgb(var(--c-ink-muted)); letter-spacing: 0.06em;
     border-bottom: 1px solid rgb(var(--c-line));
-    font-family: 'Inter', sans-serif;
+    font-family: 'Hanken Grotesk', sans-serif;
   }
   .compare-table th.stat-col { text-align: left; }
   .compare-table .compare-name-row th {
     font-size: 13px; color: rgb(var(--c-ink)); font-weight: 600;
     padding-bottom: 4px; border-bottom: none;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Hanken Grotesk', sans-serif;
   }
   .compare-table td { padding: 5px 6px; vertical-align: middle; }
   .compare-table td.stat-col {
     text-align: left; color: rgb(var(--c-ink-soft));
-    font-family: 'Inter', sans-serif; font-size: 12px;
+    font-family: 'Hanken Grotesk', sans-serif; font-size: 12px;
   }
   .compare-table td:not(.stat-col) { text-align: center; }
   .winner { color: rgb(var(--c-gain)); font-weight: 600; }
@@ -683,7 +642,7 @@
   .radar-legend {
     display: flex; flex-wrap: wrap; gap: 8px 14px;
     justify-content: center; margin: 8px 0 14px;
-    font-family: 'Inter', sans-serif; font-size: 11px;
+    font-family: 'Hanken Grotesk', sans-serif; font-size: 11px;
   }
   .radar-legend-item {
     display: inline-flex; align-items: center; gap: 6px;
@@ -744,7 +703,7 @@
   }
   .radar-card-hint {
     display: none;
-    font-family: 'Inter', sans-serif; font-size: 9px;
+    font-family: 'Hanken Grotesk', sans-serif; font-size: 9px;
     color: rgb(var(--c-ink-muted));
     margin-top: 10px;
     letter-spacing: 0.16em; text-transform: uppercase;
@@ -753,7 +712,7 @@
   }
   .radar-card.is-zoomed .radar-card-hint { display: block; opacity: 1; }
   .radar-title {
-    font-family: 'Inter', sans-serif; font-size: 10px;
+    font-family: 'Hanken Grotesk', sans-serif; font-size: 10px;
     letter-spacing: 0.18em; text-transform: uppercase;
     color: rgb(var(--c-ink-muted)); font-weight: 600;
     margin-bottom: 4px; display: flex; align-items: center; gap: 6px;
@@ -780,7 +739,7 @@
   .radar-svg:hover .radar-poly { opacity: 0.7; }
   .radar-svg:hover .radar-poly:hover { opacity: 1; }
   .radar-label {
-    font-family: 'Inter', sans-serif; font-size: 9.5px;
+    font-family: 'Hanken Grotesk', sans-serif; font-size: 9.5px;
     fill: rgb(var(--c-ink-muted)); font-weight: 500;
     letter-spacing: 0.04em;
     cursor: help;
@@ -805,7 +764,7 @@
     background: rgb(var(--c-line)); color: rgb(var(--c-ink-muted));
     border: none; padding: 0;
     font-size: 9px; font-weight: 700; line-height: 14px;
-    font-family: 'Inter', sans-serif; font-style: normal;
+    font-family: 'Hanken Grotesk', sans-serif; font-style: normal;
     cursor: pointer; vertical-align: middle;
     transition: all 140ms ease;
     flex-shrink: 0;
@@ -1056,7 +1015,7 @@
   .squad-lb-table {
     width: 100%;
     border-collapse: separate; border-spacing: 0;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Hanken Grotesk', sans-serif;
   }
   .squad-lb-table th, .squad-lb-table td { padding: 0; vertical-align: middle; }
   .squad-lb-header th {
@@ -1084,7 +1043,7 @@
     width: 16px; height: 16px; line-height: 1;
     border-radius: 999px; border: 1px solid rgb(var(--c-line-strong));
     background: transparent; color: rgb(var(--c-ink-muted));
-    font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 700;
+    font-family: 'Hanken Grotesk', sans-serif; font-size: 11px; font-weight: 700;
     cursor: pointer; transition: all 160ms ease;
     display: inline-flex; align-items: center; justify-content: center;
   }
@@ -1126,7 +1085,7 @@
     text-align: center;
     border-bottom: 1px solid rgb(var(--c-line) / 0.4);
     border-left: 1px solid rgb(var(--c-line) / 0.3);
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'IBM Plex Mono', monospace;
   }
   .squad-lb-cell.is-substat { min-width: 44px; }
   .squad-lb-cell.is-overflow { color: rgb(var(--c-surface)); }
@@ -1135,7 +1094,7 @@
   .squad-lb-num.muted { color: rgb(var(--c-ink-faint)); font-weight: 400; }
   .squad-lb-rank {
     position: absolute; top: 3px; right: 4px;
-    font-family: 'Inter', sans-serif; font-size: 8px; font-weight: 700;
+    font-family: 'Hanken Grotesk', sans-serif; font-size: 8px; font-weight: 700;
     width: 13px; height: 13px; line-height: 13px; text-align: center;
     border-radius: 999px; letter-spacing: 0;
   }
@@ -1417,7 +1376,7 @@
     border-radius: 999px;
     text-transform: uppercase;
     letter-spacing: 0.14em;
-    font-family: 'Oswald', 'Inter', sans-serif;
+    font-family: 'Hanken Grotesk', sans-serif;
     font-weight: 500;
   }
   /* Re-style ambient orbs as AMF1 mood */
