@@ -90,8 +90,17 @@
   .role-item,
   .work  .section-head,
   .work-item,
-  .currently .section-head,
-  .now-item,
+  .about  .section-head,
+  .about__rule,
+  .about__sub-kicker,
+  .about__sub-title,
+  .about__prose,
+  .about__rows,
+  .about__columns,
+  .about__comp-grid,
+  .about__comp-foot,
+  .about__pull,
+  .about__keeps,
   .footer-block,
   .footer-rule
 ) {
@@ -129,8 +138,17 @@
   .role-item,
   .work  .section-head,
   .work-item,
-  .currently .section-head,
-  .now-item,
+  .about  .section-head,
+  .about__rule,
+  .about__sub-kicker,
+  .about__sub-title,
+  .about__prose,
+  .about__rows,
+  .about__columns,
+  .about__comp-grid,
+  .about__comp-foot,
+  .about__pull,
+  .about__keeps,
   .footer-block,
   .footer-rule
 ).is-visible {
@@ -216,16 +234,15 @@
   transition-delay: var(--menu-item-delay, 0ms);
 }
 
-/* Work / role / now items — quiet hover state. Title nudges right 2px
-   so the hover lives in the typography, not the chrome. */
-.work-item, .role-item, .now-item {
+/* Work / role items — quiet hover state. Title nudges right 2px so the
+   hover lives in the typography, not the chrome. */
+.work-item, .role-item {
   transition: transform var(--dur-2) var(--ease);
 }
-.work-title, .role-title, .now-line {
+.work-title, .role-title {
   transition: transform var(--dur-2) var(--ease);
 }
-.work-title:hover,
-.now-item:hover .now-line {
+.work-title:hover {
   transform: translateX(2px);
 }
 .role-disclosure-summary {
@@ -276,13 +293,15 @@
    NO-JS FALLBACK SAFETY
    If JS somehow never runs (or IntersectionObserver isn't available),
    the .js-hidden elements still become visible after a generous timeout.
-   Once the JS adds .is-visible, the rule above with `transform: none;
-   opacity: 1` wins on the cascade.
+   Scoped to .js:not(.has-reveal) so it only fires when the reveal logic
+   in animations.js hasn't claimed responsibility — otherwise it would
+   defeat the per-element scroll-triggered fades by popping everything in
+   3s after page load (or gate open).
    ========================================================================= */
 @keyframes failsafe-reveal {
   to { opacity: 1; transform: none; }
 }
-.js :is(
+.js:not(.has-reveal) :is(
   .site-wordmark,
   .site-nav__list > li,
   .lede-meta,
@@ -292,8 +311,17 @@
   .role-item,
   .work  .section-head,
   .work-item,
-  .currently .section-head,
-  .now-item,
+  .about  .section-head,
+  .about__rule,
+  .about__sub-kicker,
+  .about__sub-title,
+  .about__prose,
+  .about__rows,
+  .about__columns,
+  .about__comp-grid,
+  .about__comp-foot,
+  .about__pull,
+  .about__keeps,
   .footer-block,
   .footer-rule
 ) {
@@ -309,8 +337,17 @@
   .role-item,
   .work  .section-head,
   .work-item,
-  .currently .section-head,
-  .now-item,
+  .about  .section-head,
+  .about__rule,
+  .about__sub-kicker,
+  .about__sub-title,
+  .about__prose,
+  .about__rows,
+  .about__columns,
+  .about__comp-grid,
+  .about__comp-foot,
+  .about__pull,
+  .about__keeps,
   .footer-block,
   .footer-rule
 ) {

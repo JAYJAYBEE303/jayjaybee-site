@@ -236,41 +236,171 @@ description: Josh Bailey. IT Desktop Analyst at Aston Martin F1. Endpoint work, 
 </section>
 
 <!-- ============================================================
-     Currently — a dated "now" section. Editorial micro-paragraphs.
+     About — long-form section in four numbered parts. Replaces the
+     old "Currently" block. Uses site tokens; subsection structure
+     mirrors the integration source.
      ============================================================ -->
-<section class="currently" aria-labelledby="currently-heading">
+<section id="about" class="about" aria-labelledby="about-heading">
   <header class="section-head">
-    <span class="mono-label">Updated&nbsp;·&nbsp;May&nbsp;2026</span>
-    <h2 id="currently-heading" class="section-title">Currently.</h2>
+    <span class="mono-label">About&nbsp;·&nbsp;May&nbsp;2026</span>
+    <h2 id="about-heading" class="section-title">A little bit <em style="color: var(--accent);">about me.</em></h2>
   </header>
 
-  <div class="now-list">
-    <article class="now-item">
-      <p class="now-line">
-        <span class="mono-label now-tag">Working&nbsp;on</span>
-        Folding a small fleet of new HR laptops into our Intune baselines — the unglamorous half of the work, and the half that keeps the rest of it possible.
-      </p>
-    </article>
+  <div class="about__rule" aria-hidden="true"></div>
 
-    <article class="now-item">
-      <p class="now-line">
-        <span class="mono-label now-tag">Learning</span>
-        More Graph API than I'd planned to. The PowerShell module gets you ninety percent of the way; the last ten is worth the detour into raw calls.
-      </p>
-    </article>
+  <!-- ─── 01 ─── Competencies ─── -->
+  <section class="about__sub">
+    <div class="about__sub-kicker">
+      <span class="about__num">01</span>
+      <span>Skills and competencies</span>
+    </div>
+    <h3 class="about__sub-title"><em style="color: var(--accent);">"</em>What are the <em style="color: var(--accent);">skills</em> that Josh has to offer?<em style="color: var(--accent);">"</em></h3>
 
-    <article class="now-item">
-      <p class="now-line">
-        <span class="mono-label now-tag">Reading</span>
-        <em>The Pragmatic Programmer</em>, again, for the parts about tracer bullets — and Julian Simpson on infrastructure-as-code, which reads better the second time.
-      </p>
-    </article>
+    <div class="prose about__prose">
+      <p>A short list of what I've actually done at depth, versus the long list of things I've touched once. If it isn't on here, assume I'm a beginner and ask.</p>
+    </div>
 
-    <article class="now-item">
-      <p class="now-line">
-        <span class="mono-label now-tag">Listening</span>
-        New Gojira, a lot of Plini, and the Periphery records I keep coming back to. Practising clean tone for once.
-      </p>
-    </article>
-  </div>
+    <div class="about__comp-grid">
+      <div class="about__comp-col">
+        <div class="mono-label about__comp-head">Endpoint &amp; MDM</div>
+        <ul class="about__comp-list">
+          <li>Microsoft Intune — policies, baselines, autopatch</li>
+          <li>Jamf Pro &amp; School (Mac fleet)</li>
+          <li>Autopilot, hybrid join, Entra ID</li>
+          <li>Windows imaging, package deployment</li>
+        </ul>
+      </div>
+      <div class="about__comp-col">
+        <div class="mono-label about__comp-head">Scripting &amp; Automation</div>
+        <ul class="about__comp-list">
+          <li>PowerShell — modules, Pester, signing</li>
+          <li>Microsoft Graph API (PS &amp; raw)</li>
+          <li>Bash, light Python where it fits</li>
+          <li>Logic Apps &amp; basic Power Automate</li>
+        </ul>
+      </div>
+      <div class="about__comp-col">
+        <div class="mono-label about__comp-head">Operations &amp; people</div>
+        <ul class="about__comp-list">
+          <li>On-call rotations for race weekends</li>
+          <li>Hardware lifecycle &amp; vendor management</li>
+          <li>Writing the runbook the next person will read</li>
+          <li>Translating IT to non-IT</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="about__comp-foot">
+      <div class="about__row-label">Currently learning</div>
+      <p class="about__row-body">Deeper Graph API patterns, Bicep for Azure infra, and the parts of PowerShell I'd been getting away with not knowing.</p>
+    </div>
+  </section>
+
+  <!-- ─── 02 ─── As a person ─── -->
+  <section class="about__sub">
+    <div class="about__sub-kicker">
+      <span class="about__num">02</span>
+      <span>Who&nbsp;am&nbsp;I</span>
+    </div>
+    <h3 class="about__sub-title"><em style="color: var(--accent);">"</em>Great. <em style="color: var(--accent);">Tell me more</em> about Josh.<em style="color: var(--accent);">"</em></h3>
+
+    <div class="about__columns">
+      <div class="prose about__prose">
+        <p>I'm at my best when the work is invisible and the people who depend on it are getting on with theirs. I'd rather ship the boring tool that solves the problem than the clever one that announces it. Most of what I think about — at work and off — is in how things actually run, versus how the diagram says they run.</p>
+        <p>Outside the day job I play metal guitar, lean toward the <em>Periphery</em> end of the dial more than I should admit, and read more about infrastructure-as-code than is strictly healthy. I'm not particularly online.</p>
+      </div>
+
+      <div>
+        <div class="mono-label about__minihead">A few things that are true</div>
+        <ul class="about__bullets">
+          <li>I take "boring" as a compliment about engineering choices.</li>
+          <li>I write the documentation first when I'm sure of what I'm doing, and last when I'm not.</li>
+          <li>I'd rather a small tool, used daily, than a platform that needs a launch plan.</li>
+          <li>I tend to work in <span class="about__mono-inline">Ctrl+K</span> apps and a single window with a lot of tabs I refuse to close.</li>
+          <li>I will out-stubborn anyone in a meeting on whether the script should run as <span class="about__mono-inline">SYSTEM</span> or as the user.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── 03 ─── What keeps me going ─── -->
+  <section class="about__sub">
+    <div class="about__sub-kicker">
+      <span class="about__num">03</span>
+      <span>What&nbsp;am&nbsp;I&nbsp;like</span>
+    </div>
+    <h3 class="about__sub-title"><em style="color: var(--accent);">"</em>But <em style="color: var(--accent);">what is Josh like</em> to work with? <em style="color: var(--accent);">"</em></h3>
+
+    <blockquote class="about__pull">
+      The fewer people who notice the IT, the better the IT was.
+    </blockquote>
+
+    <div class="prose about__prose">
+      <p>I came up through helpdesks and benches, and I've never quite shaken the conviction that good IT is a craft — closer to a stage crew than a software team. The reward is the show going on, not the credit for it.</p>
+    </div>
+
+    <ol class="about__keeps">
+      <li>
+        <span class="about__keeps-num">i.</span>
+        <div>
+          <div class="about__keeps-head">Race weekends.</div>
+          <p>Twelve a year. A fixed deadline that doesn't move because the meeting ran long. Either the laptop works at 13:00 in Suzuka or it doesn't.</p>
+        </div>
+      </li>
+      <li>
+        <span class="about__keeps-num">ii.</span>
+        <div>
+          <div class="about__keeps-head">Small tools, used daily.</div>
+          <p>The script that saves the on-call engineer twenty minutes at 2&nbsp;a.m. is worth more than the platform that gets a launch post.</p>
+        </div>
+      </li>
+      <li>
+        <span class="about__keeps-num">iii.</span>
+        <div>
+          <div class="about__keeps-head">A guitar in the other room.</div>
+          <p>Metal, mostly — the technical kind. Practising clean tone teaches the same thing as practising clean code: do less, on purpose.</p>
+        </div>
+      </li>
+      <li>
+        <span class="about__keeps-num">iv.</span>
+        <div>
+          <div class="about__keeps-head">Writing it down.</div>
+          <p>Half of why this site exists. The other half is so the next Josh — at the next team — doesn't have to learn the same lessons in the same order.</p>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <!-- ─── 04 ─── Who I am ─── -->
+  <section class="about__sub">
+    <div class="about__sub-kicker">
+      <span class="about__num">04</span>
+      <span>What&nbsp;inspires&nbsp;me</span>
+    </div>
+    <h3 class="about__sub-title"><em style="color: var(--accent);">"</em>Okay, so what keeps him going? <em style="color: var(--accent);">What inspires Josh?"</em></h3>
+
+    <div class="prose about__prose">
+      <p>I'm Josh, an IT Desktop Analyst at <em>Aston Martin F1</em>, based out of the Silverstone factory. Most of my days are spent keeping the laptops, identities, and endpoint policy that the team relies on quietly out of the way — so that on a Sunday morning in Spa, the only thing anyone is thinking about is the car.</p>
+      <p>The path here ran through an Apple Genius Bar, a season at Red Bull Racing, and a managed-service stint at a school that taught me more about real-world IT than any certification did. Along the way I picked up the habit of <em>building the small, sharp tools that should already exist</em>: PowerShell modules, a player-stats calculator for FC26, internal dashboards, the boring infrastructure that pays for the interesting work.</p>
+    </div>
+
+    <dl class="about__rows">
+      <div class="about__row">
+        <dt class="about__row-label">Role</dt>
+        <dd class="about__row-body">IT Desktop Analyst, Aston Martin F1 Team — Silverstone.</dd>
+      </div>
+      <div class="about__row">
+        <dt class="about__row-label">Previously</dt>
+        <dd class="about__row-body">Red Bull Racing IT · MSP at an independent school · Apple Genius.</dd>
+      </div>
+      <div class="about__row">
+        <dt class="about__row-label">Works&nbsp;with</dt>
+        <dd class="about__row-body">PowerShell, Intune &amp; Graph, Jamf, Azure AD, the unglamorous middle of the endpoint stack.</dd>
+      </div>
+      <div class="about__row">
+        <dt class="about__row-label">Builds</dt>
+        <dd class="about__row-body">An FC26 player-stats calculator, internal PowerShell tooling, the occasional script that ships before the meeting it was promised in.</dd>
+      </div>
+    </dl>
+  </section>
 </section>

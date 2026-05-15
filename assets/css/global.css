@@ -11,9 +11,9 @@
    base rules below.
    ========================================================================= */
 
-@import url('variables.css?v=35');
-@import url('layout.css?v=35');
-@import url('components.css?v=35');
+@import url('variables.css?v=41');
+@import url('layout.css?v=41');
+@import url('components.css?v=41');
 
 /* =========================================================================
    RESET + BASE
@@ -185,8 +185,17 @@ a:focus-visible {
     .role-item,
     .work  .section-head,
     .work-item,
-    .currently .section-head,
-    .now-item,
+    .about  .section-head,
+    .about__rule,
+    .about__sub-kicker,
+    .about__sub-title,
+    .about__prose,
+    .about__rows,
+    .about__columns,
+    .about__comp-grid,
+    .about__comp-foot,
+    .about__pull,
+    .about__keeps,
     .footer-block,
     .footer-rule
   ) {

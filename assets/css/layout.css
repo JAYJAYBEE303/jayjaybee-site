@@ -1,7 +1,7 @@
 /* =========================================================================
    jayjaybee.com — layout.css
    Structural rules: page shell, header, nav, footer, and the section
-   shapes used on the home page (lede, narrative, roles, work, currently).
+   shapes used on the home page (lede, narrative, roles, work, about).
 
    Static visual properties only — colours, sizes, gutters, grids,
    hover state changes. Motion (transitions, animations, reveal system,
@@ -157,7 +157,7 @@
   margin: 0 auto;
   padding: clamp(var(--space-7), 6vw, var(--space-10))
            clamp(var(--space-5), 5vw, var(--space-8))
-           var(--space-10);
+           var(--space-6);
 }
 
 /* Vertical rhythm between major sections */
@@ -540,12 +540,12 @@
   color: var(--accent);
   text-decoration: underline;
   text-decoration-thickness: 1px;
-  text-decoration-color: transparent;
+  text-decoration-color: var(--accent);
   text-underline-offset: 0.2em;
 }
 .work-link:hover {
-  color: var(--accent);
-  text-decoration-color: var(--accent);
+  color: var(--accent-hover);
+  text-decoration-color: var(--accent-hover);
 }
 
 .work-lede {
@@ -602,32 +602,268 @@
 }
 
 /* =========================================================================
-   CURRENTLY — dated "now" section. Editorial micro-paragraphs.
+   ABOUT — long-form section in four numbered parts. Each .about__sub is
+   its own reveal unit; layout primitives (rows, columns, comp-grid, keeps)
+   are scoped under .about so they can't leak.
    ========================================================================= */
-.now-list {
+
+/* Rule between the section header and the first subsection. */
+.about__rule {
+  border-top: var(--border-hairline);
+  margin: var(--space-7) 0 var(--space-6);
+}
+
+/* Subsection wrapper — vertical rhythm. */
+.about__sub {
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
-  max-width: var(--measure-wide);
 }
-.now-item {
-  border-top: var(--border-hairline);
-  padding-top: var(--space-4);
+.about__sub + .about__sub {
+  margin-top: var(--space-9);
 }
-.now-line {
+
+/* Numbered kicker — mono caps with accent number. */
+.about__sub-kicker {
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono-caps);
+  text-transform: uppercase;
+  color: var(--fg-quiet);
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+.about__num { color: var(--fg-faint); }
+
+/* Subsection title — serif subhead. */
+.about__sub-title {
   font-family: var(--font-serif);
-  font-size: var(--fs-lede);
+  font-weight: var(--fw-medium);
+  font-size: var(--fs-subhead);
+  line-height: var(--lh-snug);
+  letter-spacing: var(--tr-headline);
+  max-width: 32ch;
+  text-wrap: balance;
+  color: var(--fg);
+  margin: 0;
+}
+
+/* Prose inside the About section sits on the standard prose measure. */
+.about__sub .prose {
+  max-width: var(--measure-prose);
+}
+
+/* ----- Labelled rows (01) ---------------------------------------------- */
+.about__rows {
+  display: flex;
+  flex-direction: column;
+  border-top: var(--border-hairline);
+  margin: 0;
+}
+.about__row {
+  display: grid;
+  grid-template-columns: 9.5rem minmax(0, 1fr);
+  gap: var(--space-5);
+  padding: var(--space-4) 0;
+  border-bottom: var(--border-hairline);
+  align-items: baseline;
+}
+@media (max-width: 40rem) {
+  .about__row {
+    grid-template-columns: 1fr;
+    gap: var(--space-2);
+    padding: var(--space-4) 0;
+  }
+}
+.about__row-label {
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono-caps);
+  text-transform: uppercase;
+  color: var(--fg-quiet);
+  line-height: var(--lh-ui);
+  margin: 0;
+  padding-top: 0.2rem;
+}
+.about__row-body {
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
+  line-height: 1.6;
+  color: var(--fg);
+  margin: 0;
+}
+
+/* ----- Two-column layout (02) ------------------------------------------ */
+.about__columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-6) var(--space-8);
+  align-items: start;
+}
+@media (max-width: 45rem) {
+  .about__columns { grid-template-columns: 1fr; }
+}
+.about__minihead {
+  margin-bottom: var(--space-4);
+}
+.about__bullets {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.about__bullets li {
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
+  line-height: 1.55;
+  color: var(--fg);
+  padding-left: var(--space-5);
+  position: relative;
+  max-width: var(--measure-prose);
+  text-wrap: pretty;
+}
+.about__bullets li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.78em;
+  width: 0.6rem;
+  height: 1px;
+  background: var(--fg-faint);
+}
+.about__mono-inline {
+  font-family: var(--font-mono);
+  font-size: 0.95em;
+  color: var(--fg);
+  letter-spacing: var(--tr-mono);
+}
+
+/* ----- Three-column competencies grid (03) ----------------------------- */
+.about__comp-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-top: var(--border-hairline);
+  border-bottom: var(--border-hairline);
+  margin-top: var(--space-3);
+}
+@media (max-width: 45rem) {
+  .about__comp-grid { grid-template-columns: 1fr; }
+}
+.about__comp-col {
+  padding: var(--space-5) var(--space-6) var(--space-5) 0;
+  border-right: var(--border-hairline);
+}
+.about__comp-col:last-child {
+  border-right: 0;
+  padding-right: 0;
+}
+@media (max-width: 45rem) {
+  .about__comp-col {
+    border-right: 0;
+    border-bottom: var(--border-hairline);
+    padding: var(--space-4) 0;
+  }
+  .about__comp-col:last-child { border-bottom: 0; }
+}
+.about__comp-head {
+  margin-bottom: var(--space-4);
+}
+.about__comp-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.about__comp-list li {
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
   line-height: 1.45;
   color: var(--fg);
   text-wrap: pretty;
 }
-.now-tag {
-  /* Inline mono tag — small nudge so the mono cap-height baselines with
-     the serif x-height rather than sitting above it. */
-  margin-right: var(--space-3);
-  position: relative;
-  top: -0.08em;
+/* "Currently learning" row directly under the comp grid — labelled row
+   pattern but without the rows-list borders. */
+.about__comp-foot {
+  display: grid;
+  grid-template-columns: 9.5rem minmax(0, 1fr);
+  gap: var(--space-5);
+  padding-top: var(--space-4);
+  align-items: baseline;
 }
+@media (max-width: 40rem) {
+  .about__comp-foot { grid-template-columns: 1fr; gap: var(--space-2); }
+}
+
+/* ----- Pull quote + numbered keeps list (04) --------------------------- */
+.about__pull {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: var(--fw-regular);
+  font-size: var(--fs-subhead);
+  line-height: 1.3;
+  margin: 0;
+  padding-left: var(--space-5);
+  border-left: 2px solid var(--accent);
+  color: var(--fg);
+  max-width: 44ch;
+  text-wrap: balance;
+}
+.about__keeps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.about__keeps li {
+  display: grid;
+  grid-template-columns: 3.5rem minmax(0, 1fr);
+  gap: var(--space-5);
+  padding: var(--space-5) 0;
+  border-top: var(--border-hairline);
+  align-items: baseline;
+}
+.about__keeps li:last-child {
+  border-bottom: var(--border-hairline);
+}
+@media (max-width: 40rem) {
+  .about__keeps li {
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+    padding: var(--space-4) 0;
+  }
+}
+.about__keeps-num {
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono-caps);
+  text-transform: uppercase;
+  color: var(--fg-quiet);
+  padding-top: 0.25rem;
+}
+.about__keeps-head {
+  font-family: var(--font-serif);
+  font-size: 1.125rem;
+  font-weight: var(--fw-medium);
+  color: var(--fg);
+  margin-bottom: var(--space-2);
+  letter-spacing: -0.01em;
+}
+.about__keeps p {
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
+  line-height: 1.6;
+  color: var(--fg);
+  margin: 0;
+  max-width: 56ch;
+  text-wrap: pretty;
+}
+
 
 /* =========================================================================
    FOOTER — three info blocks then a hairline-separated bottom strip.
@@ -636,7 +872,7 @@
   border-top: var(--border-hairline);
   /* Transparent so the body grain reads continuously into the footer */
   background: transparent;
-  margin-top: clamp(var(--space-9), 9vw, var(--section-gap-l));
+  margin-top: clamp(var(--space-6), 5vw, var(--space-8));
 }
 .footer-inner {
   max-width: var(--container);

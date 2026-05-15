@@ -194,8 +194,17 @@
     '.role-item',
     '.work  .section-head',
     '.work-item',
-    '.currently .section-head',
-    '.now-item',
+    '.about  .section-head',
+    '.about__rule',
+    '.about__sub-kicker',
+    '.about__sub-title',
+    '.about__prose',
+    '.about__rows',
+    '.about__columns',
+    '.about__comp-grid',
+    '.about__comp-foot',
+    '.about__pull',
+    '.about__keeps',
     '.footer-block',
     '.footer-rule'
   ].join(', ');
@@ -240,6 +249,11 @@
     var aboveEls = document.querySelectorAll(ABOVE_GATE_SELECTOR);
     var belowEls = document.querySelectorAll(BELOW_GATE_SELECTOR);
     if (!aboveEls.length && !belowEls.length) return;
+
+    // Tell the CSS "I'm running, suppress the failsafe" — otherwise the
+    // 3s failsafe-reveal animation pops every observed element into view
+    // before the user has had a chance to scroll to it.
+    document.documentElement.classList.add('has-reveal');
 
     if (REDUCED_MOTION || !('IntersectionObserver' in window)) {
       aboveEls.forEach(function (el) { el.classList.add('is-visible'); });
