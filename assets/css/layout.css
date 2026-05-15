@@ -201,6 +201,15 @@
   text-wrap: balance;
   color: var(--fg);
 }
+.lede-line__row {
+  display: block;
+  white-space: nowrap;
+}
+@media (max-width: 30rem) {
+  .lede-line {
+    font-size: clamp(2rem, 8.5vw, 3.25rem);
+  }
+}
 
 /* =========================================================================
    NARRATIVE — single prose paragraph inside the wide measure.

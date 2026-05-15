@@ -18,10 +18,11 @@
   <title>{{ page.title | default: site.title }}</title>
   <meta name="description" content="{{ page.description | default: site.description }}" />
 
-  <!-- Pre-paint setup: theme preference + JS detection.
-       Both must run before first paint to avoid a flash of unstyled
-       content (wrong theme) or a flash of unanimated content (revealed
-       before hidden). -->
+  <!-- Pre-paint setup: theme preference + JS detection + scroll-gate.
+       Must run before first paint to avoid a flash of unstyled content
+       (wrong theme) or a flash of unanimated content (revealed before
+       hidden). The scroll-gate keeps below-hero content hidden until the
+       header divider exits the viewport. -->
   <script>
     (function () {
       try {
@@ -32,11 +33,56 @@
           document.documentElement.removeAttribute('data-theme');
         }
       } catch (e) {}
-      document.documentElement.classList.replace('no-js', 'js');
+
+      var root = document.documentElement;
+      root.classList.replace('no-js', 'js');
+
+      // Reduced-motion users: skip the gate entirely.
+      var reduce = window.matchMedia &&
+                   window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduce) return;
+
+      root.classList.add('is-gated');
+
+      function openGate () {
+        if (!root.classList.contains('is-gated')) return;
+        root.classList.remove('is-gated');
+        try { root.dispatchEvent(new Event('gateopen')); }
+        catch (e) {
+          var ev = document.createEvent('Event');
+          ev.initEvent('gateopen', false, false);
+          root.dispatchEvent(ev);
+        }
+      }
+
+      function setupGate () {
+        var header = document.querySelector('.site-header__inner');
+        if (!header) { openGate(); return; }
+        // Deep-link / restored scroll: header already past the top.
+        if (header.getBoundingClientRect().bottom <= 0) { openGate(); return; }
+        if (!('IntersectionObserver' in window)) { openGate(); return; }
+
+        var io = new IntersectionObserver(function (entries) {
+          for (var i = 0; i < entries.length; i++) {
+            if (entries[i].boundingClientRect.bottom <= 0) {
+              io.disconnect();
+              openGate();
+              return;
+            }
+          }
+        }, { threshold: 0 });
+        io.observe(header);
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', setupGate, { once: true });
+      } else {
+        setupGate();
+      }
     })();
   </script>
 
-  <link rel="stylesheet" href="/assets/css/global.css?v=31" />
+  <link rel="stylesheet" href="/assets/css/global.css?v=35" />
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -172,6 +218,6 @@
     </div>
   </footer>
 
-  <script src="/assets/js/animations.js?v=5" defer></script>
+  <script src="/assets/js/animations.js?v=9" defer></script>
 </body>
 </html>

@@ -111,6 +111,12 @@
 .js .site-nav__list > li     { transform: translate3d( 12px, 0, 0); }
 .js :is(.lede-meta, .footer-rule) { transform: none; }
 .js .lede-line               { transform: translateY(14px); --reveal-dur: 760ms; }
+/* Bio paragraph — opacity-only, no movement. Reveal timing is controlled
+   by the bio-race logic in animations.js (timed or scroll-triggered). */
+.js .narrative .prose        { transform: none; }
+.js .narrative .prose.is-bio-timed {
+  transition: opacity 650ms ease-in-out;
+}
 
 /* Revealed state — same end state for every element. */
 .js :is(
@@ -292,4 +298,21 @@
   .footer-rule
 ) {
   animation: failsafe-reveal 1ms linear 3s forwards;
+}
+
+/* Scroll-gate: while .is-gated is on <html>, suppress the failsafe for
+   below-hero items so they remain hidden until the header divider exits
+   the top of the viewport (managed by the inline pre-paint script). */
+.is-gated :is(
+  .narrative .prose,
+  .roles .section-head,
+  .role-item,
+  .work  .section-head,
+  .work-item,
+  .currently .section-head,
+  .now-item,
+  .footer-block,
+  .footer-rule
+) {
+  animation: none;
 }

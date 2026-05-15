@@ -174,14 +174,22 @@
     window.matchMedia &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // Mirror of the selector group in style.css. Keep both in sync.
+  // Mirror of the selector groups in style.css. Keep both in sync.
   // (Listed top-down so the boot cascade reveals in reading order.)
-  var REVEAL_SELECTOR = [
+  // ABOVE_GATE — hero/nav, revealed on boot regardless of scroll.
+  // BELOW_GATE — everything below the divider, gated until the header
+  // exits the viewport (see the inline pre-paint script in default.html).
+  var ABOVE_GATE_SELECTOR = [
     '.site-wordmark',
     '.site-nav__list > li',
     '.lede-meta',
-    '.lede-line',
-    '.narrative .prose',
+    '.lede-line'
+  ].join(', ');
+
+  // BELOW_GATE — everything below the divider EXCEPT the bio. The bio
+  // has its own race-condition reveal (see setupBioRace) so we don't want
+  // the cascade observer to also fight over it.
+  var BELOW_GATE_SELECTOR = [
     '.roles .section-head',
     '.role-item',
     '.work  .section-head',
@@ -195,15 +203,7 @@
   // -------------------------------------------------------------------------
   // a. Reveal system
   // -------------------------------------------------------------------------
-  function setupReveal() {
-    var els = document.querySelectorAll(REVEAL_SELECTOR);
-    if (!els.length) return;
-
-    if (REDUCED_MOTION || !('IntersectionObserver' in window)) {
-      els.forEach(function (el) { el.classList.add('is-visible'); });
-      return;
-    }
-
+  function makeRevealObserver() {
     // Stagger: siblings in the same batch reveal a beat apart; cumulative
     // delay is capped so large batches don't feel sluggish.
     var perItemDelay  = 70;   // ms between siblings
@@ -233,8 +233,114 @@
       rootMargin: '0px 0px -8% 0px',
       threshold: 0.06
     });
+    return io;
+  }
 
-    els.forEach(function (el) { io.observe(el); });
+  function setupReveal() {
+    var aboveEls = document.querySelectorAll(ABOVE_GATE_SELECTOR);
+    var belowEls = document.querySelectorAll(BELOW_GATE_SELECTOR);
+    if (!aboveEls.length && !belowEls.length) return;
+
+    if (REDUCED_MOTION || !('IntersectionObserver' in window)) {
+      aboveEls.forEach(function (el) { el.classList.add('is-visible'); });
+      belowEls.forEach(function (el) { el.classList.add('is-visible'); });
+      return;
+    }
+
+    // Above-gate: boot-reveal cascade, no scroll gating.
+    if (aboveEls.length) {
+      var aboveIO = makeRevealObserver();
+      aboveEls.forEach(function (el) { aboveIO.observe(el); });
+    }
+
+    // Below-gate: start observing only after the divider has exited the
+    // viewport. The inline pre-paint script owns the gate trigger and
+    // signals via .is-gated removal + a 'gateopen' event on <html>.
+    function startBelowReveal() {
+      if (!belowEls.length) return;
+      var belowIO = makeRevealObserver();
+      belowEls.forEach(function (el) { belowIO.observe(el); });
+    }
+    if (document.documentElement.classList.contains('is-gated')) {
+      document.documentElement.addEventListener('gateopen', startBelowReveal, { once: true });
+    } else {
+      startBelowReveal();
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // a.2 Bio paragraph — race between two reveal triggers
+  //
+  //   Trigger A (timed):  500ms after the headline's opacity transition
+  //                       finishes → fade in over 650ms ease-in-out.
+  //   Trigger B (scroll): if the divider exits the viewport before A
+  //                       fires → reveal immediately using the standard
+  //                       below-gate transition (var(--reveal-dur)).
+  //
+  // Whichever fires first wins; the loser is cancelled. Reduced-motion
+  // users skip the race entirely (reveal handled by setupReveal above).
+  // -------------------------------------------------------------------------
+  function setupBioRace() {
+    if (REDUCED_MOTION || !('IntersectionObserver' in window)) {
+      var bioRm = document.querySelector('.narrative .prose');
+      if (bioRm) bioRm.classList.add('is-visible');
+      return;
+    }
+
+    var bio = document.querySelector('.narrative .prose');
+    if (!bio) return;
+
+    var headline = document.querySelector('.lede-line');
+    var root = document.documentElement;
+
+    var done = false;
+    var aTimer = null;
+    var onHeadlineEnd = null;
+    var onGateOpen   = null;
+
+    function cleanup() {
+      if (aTimer) { clearTimeout(aTimer); aTimer = null; }
+      if (onHeadlineEnd && headline) {
+        headline.removeEventListener('transitionend', onHeadlineEnd);
+      }
+      if (onGateOpen) {
+        root.removeEventListener('gateopen', onGateOpen);
+      }
+    }
+
+    function reveal(winner) {
+      if (done) return;
+      done = true;
+      cleanup();
+      if (winner === 'A') bio.classList.add('is-bio-timed');
+      // Defer one frame so any class addition is committed before the
+      // transition starts.
+      requestAnimationFrame(function () {
+        bio.classList.add('is-visible');
+      });
+    }
+
+    // Trigger A: 800ms after the headline's opacity transition ends.
+    if (headline) {
+      onHeadlineEnd = function (e) {
+        if (e.target !== headline) return;
+        if (e.propertyName !== 'opacity') return;
+        headline.removeEventListener('transitionend', onHeadlineEnd);
+        onHeadlineEnd = null;
+        if (done) return;
+        aTimer = setTimeout(function () { reveal('A'); }, 500);
+      };
+      headline.addEventListener('transitionend', onHeadlineEnd);
+    }
+
+    // Trigger B: divider exited viewport.
+    onGateOpen = function () { reveal('B'); };
+    if (root.classList.contains('is-gated')) {
+      root.addEventListener('gateopen', onGateOpen, { once: true });
+    } else {
+      // Gate already open at boot (deep-link / reduced motion edge case).
+      reveal('B');
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -419,6 +525,7 @@
   // -------------------------------------------------------------------------
   function boot() {
     setupReveal();
+    setupBioRace();
     setupMenuStagger();
     setupHaptics();
     setupAnchorScroll();
