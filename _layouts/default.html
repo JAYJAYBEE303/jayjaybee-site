@@ -82,80 +82,168 @@
     })();
   </script>
 
-  <link rel="stylesheet" href="/assets/css/global.css?v=41" />
+  <link rel="stylesheet" href="/assets/css/global.css?v=46" />
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
 
   <!-- ============================================================
-       Site navigation — wordmark left, links right, accent CTA.
+       Site navigation — large serif wordmark with brand mark on top,
+       a row of nav links + search beneath. The bottom of the inner
+       block carries the single hairline divider into the page body.
+
        In-page anchors are rooted at / so the nav works from every
        page: on the home page the browser just updates the hash and
        smooth-scrolls; from a sub-page it navigates home and scrolls.
        ============================================================ -->
   <header class="site-header" role="banner">
     <div class="site-header__inner">
-      <a class="site-wordmark" href="/" aria-label="Josh Bailey — home">Josh&nbsp;Bailey</a>
-      <nav class="site-nav" aria-label="Primary">
-        <ul class="site-nav__list" role="list">
 
-          <!-- Experiences — dropdown of roles, links into the home page -->
-          <li class="site-nav__item has-menu">
-            <button
-              type="button"
-              class="site-nav__link site-nav__trigger"
-              aria-expanded="false"
-              aria-haspopup="true"
-              aria-controls="menu-experiences"
-              data-menu-trigger="experiences"
-            >
-              Experiences
-              <span class="site-nav__caret" aria-hidden="true">▾</span>
+      <!-- Top row — wordmark on the left, theme toggle on the right.
+           Their right edge aligns with the search icon below via the
+           shared inner container padding. -->
+      <div class="site-header__top">
+        <a class="site-wordmark" href="/" aria-label="Josh Bailey — home">
+          <span class="site-wordmark__name">Josh&nbsp;Bailey</span>
+          <!-- Brand mark: the 8px accent square that punctuates the wordmark.
+               aria-hidden because it's purely visual. -->
+          <span class="site-wordmark__mark" aria-hidden="true"></span>
+        </a>
+
+        <!-- Theme toggle: small, unobtrusive. Cycles light → dark → system. -->
+        <button
+          id="theme-toggle"
+          class="theme-toggle mono"
+          type="button"
+          aria-label="Change colour theme"
+          aria-live="polite"
+        >
+          <span class="theme-toggle__current" data-theme-label>System</span>
+        </button>
+      </div>
+
+      <div class="site-header__row">
+        <nav class="site-nav" aria-label="Primary">
+          <ul class="site-nav__list" role="list">
+
+            <!-- Experiences — dropdown of roles, links into the home page -->
+            <li class="site-nav__item has-menu">
+              <button
+                type="button"
+                class="site-nav__link site-nav__trigger"
+                aria-expanded="false"
+                aria-haspopup="true"
+                aria-controls="menu-experiences"
+                data-menu-trigger="experiences"
+              >
+                Experiences
+                <span class="site-nav__caret" aria-hidden="true">▾</span>
+              </button>
+              <ul
+                id="menu-experiences"
+                class="site-nav__menu"
+                role="menu"
+                data-menu="experiences"
+                hidden
+              >
+                <li role="none"><a role="menuitem" class="site-nav__menu-link" href="/#exp-amf1">Aston Martin Aramco — Desktop Support Analyst</a></li>
+                <li role="none"><a role="menuitem" class="site-nav__menu-link" href="/#exp-partnership">Partnership Education — IT Engineer</a></li>
+                <li role="none"><a role="menuitem" class="site-nav__menu-link" href="/#exp-redbull">Red Bull Racing — IT Deployment Engineer</a></li>
+                <li role="none"><a role="menuitem" class="site-nav__menu-link" href="/#exp-apple">Apple — Technical Specialist</a></li>
+              </ul>
+            </li>
+
+            <li><a class="site-nav__link" href="/#work-heading">Projects</a></li>
+            <li><a class="site-nav__link" href="/#contact">Contact</a></li>
+            <li><a class="site-nav__link site-nav__link--accent" href="/files/CV.pdf" target="_blank" rel="noopener">CV</a></li>
+
+            <!-- Software Development portfolio — dropdown of project pages -->
+            <li class="site-nav__item has-menu">
+              <button
+                type="button"
+                class="site-nav__link site-nav__trigger"
+                aria-expanded="false"
+                aria-haspopup="true"
+                aria-controls="menu-portfolio"
+                data-menu-trigger="portfolio"
+              >
+                Software&nbsp;Development&nbsp;portfolio
+                <span class="site-nav__caret" aria-hidden="true">▾</span>
+              </button>
+              <ul
+                id="menu-portfolio"
+                class="site-nav__menu site-nav__menu--right"
+                role="menu"
+                data-menu="portfolio"
+                hidden
+              >
+                <li role="none"><a role="menuitem" class="site-nav__menu-link" href="/projects/fc26-calculator/">FC26 Calculator</a></li>
+              </ul>
+            </li>
+
+          </ul>
+        </nav>
+
+        <!-- Site search — icon opens an expanding input that highlights
+             matches across the main content area. Hidden checkbox from
+             the design bundle is replaced with a real <button>; state is
+             carried by `.is-open` / `.has-results` classes on .search,
+             toggled by search.js. Sits at the far right of the nav row
+             via .site-header__row's space-between layout. -->
+        <div class="search" data-search>
+
+          <button
+            type="button"
+            class="search__icon"
+            aria-expanded="false"
+            aria-controls="site-search-input"
+            aria-label="Toggle search"
+            data-search-toggle
+          >
+            <svg class="icon-glass" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="10.5" cy="10.5" r="6.25"></circle>
+              <path d="M15.25 15.25 L20 20"></path>
+            </svg>
+            <svg class="icon-close" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 6 L18 18"></path>
+              <path d="M18 6 L6 18"></path>
+            </svg>
+          </button>
+
+          <input
+            id="site-search-input"
+            type="text"
+            class="search__input"
+            placeholder="Looking for a specific quality?"
+            aria-label="Search the site"
+            autocomplete="off"
+            spellcheck="false"
+            data-search-input
+          >
+
+          <!-- Match-count + prev/next arrows. Populated by search.js
+               after each search runs; hidden when the input is empty
+               or before the first search. -->
+          <div class="search__count" data-search-count hidden>
+            <span class="search__count-text" data-search-count-text aria-live="polite">No mentions found</span>
+            <button type="button" class="search__nav" data-search-prev aria-label="Previous match" disabled>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6 L9 12 L15 18"></path></svg>
             </button>
-            <ul
-              id="menu-experiences"
-              class="site-nav__menu"
-              role="menu"
-              data-menu="experiences"
-              hidden
-            >
-              <li role="none"><a role="menuitem" class="site-nav__menu-link" href="/#exp-amf1">Aston Martin Aramco — Desktop Support Analyst</a></li>
-              <li role="none"><a role="menuitem" class="site-nav__menu-link" href="/#exp-partnership">Partnership Education — IT Engineer</a></li>
-              <li role="none"><a role="menuitem" class="site-nav__menu-link" href="/#exp-redbull">Red Bull Racing — IT Deployment Engineer</a></li>
-              <li role="none"><a role="menuitem" class="site-nav__menu-link" href="/#exp-apple">Apple — Technical Specialist</a></li>
-            </ul>
-          </li>
-
-          <li><a class="site-nav__link" href="/#work-heading">Projects</a></li>
-          <li><a class="site-nav__link" href="/#contact">Contact</a></li>
-          <li><a class="site-nav__link site-nav__link--accent" href="/files/CV.pdf" target="_blank" rel="noopener">CV</a></li>
-
-          <!-- Software Development portfolio — dropdown of project pages -->
-          <li class="site-nav__item has-menu">
-            <button
-              type="button"
-              class="site-nav__link site-nav__trigger"
-              aria-expanded="false"
-              aria-haspopup="true"
-              aria-controls="menu-portfolio"
-              data-menu-trigger="portfolio"
-            >
-              Software&nbsp;Development&nbsp;portfolio
-              <span class="site-nav__caret" aria-hidden="true">▾</span>
+            <button type="button" class="search__nav" data-search-next aria-label="Next match" disabled>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6 L15 12 L9 18"></path></svg>
             </button>
-            <ul
-              id="menu-portfolio"
-              class="site-nav__menu site-nav__menu--right"
-              role="menu"
-              data-menu="portfolio"
-              hidden
-            >
-              <li role="none"><a role="menuitem" class="site-nav__menu-link" href="/projects/fc26-calculator/">FC26 Calculator</a></li>
-            </ul>
-          </li>
+          </div>
 
-        </ul>
-      </nav>
+          <div class="search__chips" role="listbox" aria-label="Suggested searches">
+            <button type="button" class="chip" data-search-chip>Conflict Management</button>
+            <button type="button" class="chip" data-search-chip>Powershell</button>
+            <button type="button" class="chip" data-search-chip>JAMF</button>
+            <button type="button" class="chip" data-search-chip>Networking</button>
+            <button type="button" class="chip" data-search-chip>Leadership</button>
+          </div>
+        </div>
+
+      </div>
     </div>
   </header>
 
@@ -205,19 +293,10 @@
 
     <div class="footer-rule">
       <p class="footer-fineprint mono">© Josh Bailey · jayjaybee.com</p>
-      <!-- Theme toggle: small, unobtrusive, footer-local. Cycles light → dark → system. -->
-      <button
-        id="theme-toggle"
-        class="theme-toggle mono"
-        type="button"
-        aria-label="Change colour theme"
-        aria-live="polite"
-      >
-        <span class="theme-toggle__current" data-theme-label>System</span>
-      </button>
     </div>
   </footer>
 
-  <script src="/assets/js/animations.js?v=12" defer></script>
+  <script src="/assets/js/animations.js?v=13" defer></script>
+  <script src="/assets/js/search.js?v=3" defer></script>
 </body>
 </html>

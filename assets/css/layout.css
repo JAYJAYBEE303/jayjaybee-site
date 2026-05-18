@@ -10,8 +10,11 @@
 
 /* =========================================================================
    SITE HEADER / NAV
-   Wordmark left, sans-serif links right, one accent link as the CTA.
-   No logo, no hamburger — the link row collapses on narrow widths.
+   Editorial nameplate layout: a large serif wordmark with an accent
+   brand mark sits on top; a row of sans-serif nav links plus the
+   site search sits below. The hairline runs along the bottom edge of
+   the inner block, dividing header from page body.
+   No logo, no hamburger — the link row wraps on narrow widths.
    ========================================================================= */
 .site-header {
   width: 100%;
@@ -20,25 +23,70 @@
   max-width: var(--container);
   margin: 0 auto;
   padding: clamp(var(--space-5), 4vw, var(--space-7))
-           clamp(var(--space-5), 5vw, var(--space-8));
+           clamp(var(--space-5), 5vw, var(--space-8))
+           var(--space-5);
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: stretch;
   gap: var(--space-5);
   border-bottom: var(--border-hairline);
 }
 
-/* Wordmark — serif, ink, no underline. */
+/* Wordmark — large serif, ink, no underline. The brand mark (an
+   8px accent square) sits next to it, baselined with the cap height. */
 .site-wordmark {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 14px;
   font-family: var(--font-serif);
-  font-weight: var(--fw-medium);
-  font-size: clamp(1.375rem, 0.6vw + 1.125rem, 1.625rem);
+  font-weight: var(--fw-regular);
+  font-size: clamp(2.5rem, 4vw + 1rem, 4rem);
   line-height: 1;
-  letter-spacing: var(--tr-headline);
+  letter-spacing: -0.025em;
   color: var(--fg);
   text-decoration: none;
 }
 .site-wordmark:hover { color: var(--accent); }
+.site-wordmark__name {
+  font-family: var(--font-serif);
+  font-weight: var(--fw-regular);
+  font-size: inherit;
+  line-height: 1;
+  letter-spacing: inherit;
+  color: inherit;
+}
+.site-wordmark__mark {
+  width: 8px;
+  height: 8px;
+  background: var(--accent);
+  align-self: center;
+  /* Optical nudge — without it the dot sits slightly above the visual
+     midpoint of the wordmark's lowercase x-height. */
+  transform: translateY(2px);
+  flex: 0 0 auto;
+}
+
+/* Top row — wordmark on the left, theme toggle on the right.
+   Vertically centred so the toggle pill sits aligned with the
+   wordmark mass. */
+.site-header__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-5);
+}
+
+/* Nav row — links left, search right. position: relative keeps the
+   dropdown panels (anchored to their triggers) inside this stacking
+   context. */
+.site-header__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-6);
+  position: relative;
+  flex-wrap: wrap;
+}
 
 /* Link row — sans, ink, no underline. Accent link is the one exception. */
 .site-nav__list {
@@ -134,14 +182,10 @@
 }
 
 @media (max-width: 36rem) {
-  .site-header__inner {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--space-3);
-  }
-  .site-nav__list {
-    gap: var(--space-5);
-  }
+  /* Tighten internal gap on small screens — the wordmark is already
+     dominating; keep the nav row close. */
+  .site-header__inner { gap: var(--space-3); }
+  .site-nav__list     { gap: var(--space-5); }
   /* Anchor the right-aligned menu back to the left so it doesn't
      clip off the viewport on narrow screens. */
   .site-nav__menu--right { left: 0; right: auto; }
@@ -889,10 +933,8 @@
   gap: var(--space-3);
 }
 .footer-block--portrait {
-  /* Portrait sits in its own narrow column. Pull the visual up so it baselines
-     with the mono labels in the neighbouring columns — the feathered top edge
-     has no hard line to align to. */
-  margin-top: calc(var(--space-3) * -1);
+  /* Portrait sits in its own narrow column; label aligns with the mono labels
+     in the neighbouring columns. */
 }
 .footer-portrait {
   width: 6rem;

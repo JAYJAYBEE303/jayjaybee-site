@@ -83,6 +83,8 @@
 .js :is(
   .site-wordmark,
   .site-nav__list > li,
+  .site-header__row > .search,
+  .site-header__top > .theme-toggle,
   .lede-meta,
   .lede-line,
   .narrative .prose,
@@ -118,6 +120,8 @@
    declaration so they override the default translateY. */
 .js .site-wordmark           { transform: translate3d(-12px, 0, 0); }
 .js .site-nav__list > li     { transform: translate3d( 12px, 0, 0); }
+.js .site-header__row > .search { transform: translate3d( 12px, 0, 0); }
+.js .site-header__top > .theme-toggle { transform: translate3d( 12px, 0, 0); }
 .js :is(.lede-meta, .footer-rule) { transform: none; }
 .js .lede-line               { transform: translateY(14px); --reveal-dur: 760ms; }
 /* Bio paragraph — opacity-only, no movement. Reveal timing is controlled
@@ -131,6 +135,8 @@
 .js :is(
   .site-wordmark,
   .site-nav__list > li,
+  .site-header__row > .search,
+  .site-header__top > .theme-toggle,
   .lede-meta,
   .lede-line,
   .narrative .prose,
@@ -352,4 +358,380 @@
   .footer-rule
 ) {
   animation: none;
+}
+
+/* =========================================================================
+   NAV SEARCH
+   Icon → expanding input + chip tray, plus real-time highlighting of
+   matches inside <main>. The bundle's hidden-checkbox toggle is replaced
+   with a real <button>; state is carried by `.is-open` (input/chips
+   visible) and `.has-results` (match-count row visible).
+
+   Layout: .search is position: relative; the input, chip tray, count
+   row, and prev/next arrows are absolute-positioned children that
+   anchor to the right of the icon and grow leftward — so opening the
+   search overlays neighbouring nav links instead of shifting them.
+   ========================================================================= */
+.search {
+  position: relative;
+  display: inline-flex;
+  align-items: baseline;
+  line-height: var(--lh-ui);
+}
+
+/* Icon — button so click toggles via JS. 1em sizes the SVG to nav
+   text cap-height so it baselines with the surrounding links. */
+.search__icon {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--fs-ui);
+  line-height: var(--lh-ui);
+  color: var(--fg);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  height: 1em;
+  width: 1em;
+  position: relative;
+  z-index: 2;
+  transition: color var(--dur-1) var(--ease);
+}
+.search__icon:hover { color: var(--accent); }
+.search__icon:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: var(--radius-1);
+}
+.search__icon svg {
+  width: 100%;
+  height: 100%;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  overflow: visible;
+}
+.search__icon .icon-glass,
+.search__icon .icon-close {
+  position: absolute;
+  inset: 0;
+  transition:
+    opacity   var(--dur-2) var(--ease),
+    transform var(--dur-2) var(--ease);
+}
+.search__icon .icon-glass { opacity: 1; transform: rotate(0); }
+.search__icon .icon-close { opacity: 0; transform: rotate(-30deg); }
+.search.is-open .search__icon .icon-glass { opacity: 0; transform: rotate(30deg); }
+.search.is-open .search__icon .icon-close { opacity: 1; transform: rotate(0); }
+
+/* Input — anchored right of the icon, grows leftward to 280px.
+   Overlays neighbouring nav links instead of pushing them aside. */
+.search__input {
+  position: absolute;
+  right: calc(1em + var(--space-3));
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  max-width: 0;
+  padding: var(--space-2) 0;
+  border: 0;
+  border-bottom: 1px solid var(--rule-strong);
+  background: transparent;
+  color: var(--fg);
+  caret-color: var(--accent);
+  font-family: var(--font-sans);
+  font-size: var(--fs-ui);
+  letter-spacing: var(--tr-ui);
+  font-weight: var(--fw-medium);
+  line-height: var(--lh-ui);
+  outline: none;
+  opacity: 0;
+  pointer-events: none;
+  overflow: hidden;
+  transition:
+    width     var(--dur-3) var(--ease),
+    max-width var(--dur-3) var(--ease),
+    padding   var(--dur-3) var(--ease),
+    opacity   var(--dur-2) var(--ease) 60ms;
+}
+.search__input::placeholder {
+  color: var(--ink-2);
+  opacity: 0.55;
+  font-family: var(--font-sans);
+  font-weight: var(--fw-regular);
+}
+.search__input:focus { border-bottom-color: var(--fg-muted); }
+
+.search.is-open .search__input {
+  width: 280px;
+  max-width: 280px;
+  padding: var(--space-2) var(--space-4);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Match-count row — sits just under the input. Width matches the input's
+   rendered width (border-box, so 280px end-to-end including padding) so
+   the row tracks the underline exactly. Right-aligned so the arrows
+   trail the count text. */
+.search__count {
+  position: absolute;
+  right: calc(1em + var(--space-3));
+  top: calc(100% + var(--space-3));
+  width: 280px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  font-family: var(--font-sans);
+  font-size: var(--fs-ui);
+  letter-spacing: var(--tr-ui);
+  line-height: var(--lh-ui);
+  color: var(--fg-quiet);
+  opacity: 0;
+  transform: translateY(-2px);
+  pointer-events: none;
+  transition:
+    opacity   var(--dur-2) var(--ease),
+    transform var(--dur-2) var(--ease);
+}
+.search__count[hidden] { display: none; }
+.search.is-open .search__count {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.search__count-text { color: var(--fg-quiet); }
+
+/* Prev/next match arrows — share the icon's stroke language so they
+   read as siblings to the magnifying-glass mark. */
+.search__nav {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 2px;
+  margin: 0;
+  color: var(--fg-muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1em;
+  height: 1.1em;
+  transition:
+    color   var(--dur-1) var(--ease),
+    opacity var(--dur-1) var(--ease);
+}
+.search__nav svg {
+  width: 100%;
+  height: 100%;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.search__nav:hover:not(:disabled) { color: var(--accent); }
+.search__nav:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-1);
+}
+.search__nav:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* Chip tray — left edge aligns with the start of the input's underline.
+   Because the site uses border-box globally, the input's `width: 280px`
+   already includes its 32px of horizontal padding, so the underline is
+   exactly 280px wide. Matching the chips' width here keeps the first
+   chip flush with the underline's left edge. Wraps to a second line on
+   overrun. */
+.search__chips {
+  position: absolute;
+  font-size: var(--fs-ui);
+  right: calc(1em + var(--space-3));
+  width: 280px;
+  top: calc(100% + var(--space-6));
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  justify-content: flex-start;
+  opacity: 0;
+  transform: translateY(-4px);
+  pointer-events: none;
+  transition:
+    opacity   var(--dur-2) var(--ease),
+    transform var(--dur-2) var(--ease);
+}
+.search.is-open .search__chips {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+  transition-delay: var(--dur-3);
+}
+
+/* When a result count is showing, drop the chip tray below it so the
+   two don't overlap. */
+.search.has-results .search__chips {
+  top: calc(100% + var(--space-8));
+}
+
+/* Chip — opaque editorial tag. Pill radius is the one place the system
+   breaks its 0–4px radii rule (chips are the design language for
+   "tappable keyword"). */
+.chip {
+  font-family: var(--font-sans);
+  font-size: var(--fs-ui);
+  letter-spacing: var(--tr-ui);
+  font-weight: var(--fw-regular);
+  line-height: 1;
+  color: var(--fg);
+  background: var(--paper-3);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding: 6px 12px;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(-2px);
+  transition:
+    background   var(--dur-1) var(--ease),
+    border-color var(--dur-1) var(--ease),
+    color        var(--dur-1) var(--ease),
+    opacity      var(--dur-2) var(--ease),
+    transform    var(--dur-2) var(--ease);
+}
+.chip:hover {
+  background: var(--bg-recessed);
+  border-color: var(--rule-strong);
+  color: var(--accent);
+}
+.chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Stagger chips in after the width animation completes. The delay values
+   are listed per-property in the same order as the .chip `transition`
+   shorthand (background, border-color, color, opacity, transform), so
+   only the entry-animation properties (opacity, transform) are staggered.
+   Hover state changes (background/border/color) keep a 0ms delay and
+   stay snappy. */
+.search.is-open .search__chips .chip { opacity: 1; transform: translateY(0); }
+.search.is-open .search__chips .chip:nth-child(1) {
+  transition-delay: 0ms, 0ms, 0ms, calc(var(--dur-3) +   0ms), calc(var(--dur-3) +   0ms);
+}
+.search.is-open .search__chips .chip:nth-child(2) {
+  transition-delay: 0ms, 0ms, 0ms, calc(var(--dur-3) +  50ms), calc(var(--dur-3) +  50ms);
+}
+.search.is-open .search__chips .chip:nth-child(3) {
+  transition-delay: 0ms, 0ms, 0ms, calc(var(--dur-3) + 100ms), calc(var(--dur-3) + 100ms);
+}
+.search.is-open .search__chips .chip:nth-child(4) {
+  transition-delay: 0ms, 0ms, 0ms, calc(var(--dur-3) + 150ms), calc(var(--dur-3) + 150ms);
+}
+.search.is-open .search__chips .chip:nth-child(5) {
+  transition-delay: 0ms, 0ms, 0ms, calc(var(--dur-3) + 200ms), calc(var(--dur-3) + 200ms);
+}
+
+/* On collapse, chips leave first, then input contracts. */
+.search:not(.is-open) .search__chips { transition-delay: 0ms; }
+.search:not(.is-open) .search__input { transition-delay: 100ms, 100ms, 100ms, 0ms; }
+
+/* Highlight marks — wrap the original text exactly as it appears on
+   the page (normalisation is for comparison only). Inherit foreground
+   colour so the text reads naturally on both themes; the accent-soft
+   wash sits behind. */
+mark.search-hit {
+  background: var(--accent-soft);
+  color: inherit;
+  padding: 0 3px;
+  border-bottom: 1px solid transparent;
+  border-radius: var(--radius-1);
+  transition:
+    background   var(--dur-1) var(--ease),
+    border-color var(--dur-1) var(--ease);
+}
+mark.search-hit.active {
+  border-bottom-color: var(--accent);
+}
+
+/* Mobile (<640px): the icon stays in the nav row, but on tap the
+   input expands to fill the line below it. Chips and count stack
+   beneath the input instead of overlaying it.
+
+   The search now lives as a flex sibling of .site-nav inside
+   .site-header__row; giving it width: 100% forces it to wrap onto
+   its own line under the link row. */
+@media (max-width: 40rem) {
+  /* Switch to a flex column so the icon can right-align via
+     align-self, and the input/count/chips stack naturally beneath. */
+  .site-header__row > .search,
+  .search {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    position: relative;
+    width: 100%;
+  }
+  .search__icon { align-self: flex-end; }
+
+  /* Input flows below the icon row, height/max-width collapse to 0
+     when closed so it doesn't take a row of its own. */
+  .search__input {
+    position: static;
+    transform: none;
+    display: block;
+    width: 100%;
+    max-width: 0;
+    height: 0;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+  .search.is-open .search__input {
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    margin-top: var(--space-3);
+    padding: var(--space-2) var(--space-4);
+  }
+
+  /* Count + arrows / chips stack beneath the input instead of overlaying.
+     Count text aligns left so it doesn't feel orphaned at the viewport
+     edge on small screens. */
+  .search__count,
+  .search__chips {
+    position: static;
+    right: auto;
+    width: 100%;
+    margin-top: var(--space-3);
+    transform: none;
+  }
+  .search__count { justify-content: flex-start; }
+  .search.has-results .search__chips { top: auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .search__input,
+  .search__chips,
+  .search__count,
+  .search__nav,
+  .chip,
+  .search__icon .icon-glass,
+  .search__icon .icon-close,
+  mark.search-hit {
+    transition-duration: 0ms !important;
+    transition-delay:    0ms !important;
+  }
 }

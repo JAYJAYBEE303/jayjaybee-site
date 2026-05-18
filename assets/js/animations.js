@@ -182,6 +182,8 @@
   var ABOVE_GATE_SELECTOR = [
     '.site-wordmark',
     '.site-nav__list > li',
+    '.site-header__row > .search',
+    '.site-header__top > .theme-toggle',
     '.lede-meta',
     '.lede-line'
   ].join(', ');
