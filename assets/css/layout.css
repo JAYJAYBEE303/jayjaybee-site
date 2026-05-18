@@ -108,6 +108,7 @@
 }
 .site-nav__link--accent {
   color: var(--accent);
+  font-weight: var(--fw-bold);
   text-decoration: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: 0.25em;
@@ -128,7 +129,6 @@
   display: inline-flex;
   align-items: baseline;
   gap: 0.35em;
-  font: inherit;
 }
 .site-nav__caret {
   font-size: 0.7em;
