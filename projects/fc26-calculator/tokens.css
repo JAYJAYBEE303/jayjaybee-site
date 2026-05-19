@@ -1,0 +1,252 @@
+/* ============================================================
+   FC26 FEEL CALCULATOR — DESIGN TOKENS
+   Ported from "Glass" design system. Sole source for accent,
+   surfaces, type-scale, and the three-layer background.
+   ============================================================ */
+
+:root {
+  /* ── Accent ────────────────────────────────────────────────
+     Hot magenta, matching the design system's vhigh / critical
+     tier: oklch(0.72 0.24 5). Triplet form so it composes with
+     `rgb(var(--accent) / a)`. Change once here to retint the app. */
+  --accent:        252 60 122;           /* ≈ oklch(0.72 0.24 5) — hot magenta */
+  --accent-glow:   rgb(252 60 122 / 0.5);
+
+  /* ── Plus accent (gold) ───────────────────────────────
+     Marks the "playstyle+" upgrade tier. Distinct hue from
+     --accent so the elevated state is unambiguous. */
+  --accent-plus:       255 200 80;       /* warm gold, ≈ oklch(0.83 0.16 80) */
+  --accent-plus-glow:  rgb(255 200 80 / 0.55);
+
+  /* ── Background layers ────────────────────────────────── */
+  --bg-base:           #0a0a0f;
+  --bg-glow-color:     220 40 110;       /* deeper magenta, harmonises with --accent */
+  --bg-glow-opacity:   0.16;
+  --bg-noise-opacity:  0.03;
+
+  /* ── Type ─────────────────────────────────────────────── */
+  --font-display: "Newsreader", "Charter", "Iowan Old Style", Georgia, serif;
+  --font-ui:      "Inter Tight", "Hanken Grotesk", -apple-system, system-ui, sans-serif;
+  --font-mono:    "JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace;
+
+  /* Type scale (design system) — densities tightened slightly for the calculator */
+  --fs-display:   44px;   /* wordmark — calculator uses sm:5xl/lg:6xl in markup */
+  --fs-h1:        28px;   /* section headings  (was 36 in DS — tightened for density) */
+  --fs-h2:        20px;   /* sub-section heads */
+  --fs-body:      14px;
+  --fs-caption:   12px;
+  --fs-eyebrow:   10px;
+
+  --fw-display:   300;
+  --fw-h1:        400;
+  --fw-h2:        500;
+  --fw-body:      500;
+  --fw-eyebrow:   500;
+
+  --tracking-display:  -0.025em;
+  --tracking-h1:       -0.018em;
+  --tracking-body:     -0.005em;
+  --tracking-eyebrow:   0.18em;
+
+  /* ── Glass surface tokens ────────────────────────────── */
+  --glass-thin:    color-mix(in srgb, white 6%, transparent);
+  --glass-base:    color-mix(in srgb, white 10%, transparent);
+  --glass-thick:   color-mix(in srgb, white 16%, transparent);
+  --glass-solid:   color-mix(in srgb, white 22%, transparent);
+
+  --glass-stroke-outer:  color-mix(in srgb, white 18%, transparent);
+  --glass-stroke-inner:  color-mix(in srgb, white 38%, transparent);
+  --glass-stroke-shadow: color-mix(in srgb, black 28%, transparent);
+
+  --blur-soft:  18px;
+  --blur-base:  28px;
+  --blur-thick: 44px;
+
+  /* ── Border / focus / radii ──────────────────────────── */
+  --r-xs: 6px;
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --r-xl: 28px;
+  --r-pill: 999px;
+
+  --focus-ring:   0 0 0 3px rgb(var(--accent) / 0.28);
+  --focus-border: rgb(var(--accent) / 0.85);
+}
+
+/* Light-mode override is intentionally minimal — the calculator's existing
+   light-mode palette stays in style.css; only --accent is shared. The bg
+   layers below are scoped to html.dark so light mode keeps its paper look. */
+
+/* ============================================================
+   THREE-LAYER BACKGROUND (dark mode only)
+   1. html background → solid base (#0a0a0f)
+   2. .bg-field      → fixed radial purple glow, top-right
+   3. .bg-field::after → fine SVG noise overlay
+   ============================================================ */
+html.dark { background: var(--bg-base); }
+
+html.dark body {
+  /* override the calculator's existing grain canvas */
+  background-color: transparent;
+  background-image: none;
+}
+
+.bg-field {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+}
+html.dark .bg-field {
+  background: radial-gradient(
+    1000px 1000px at 88% 12%,
+    rgb(var(--bg-glow-color) / var(--bg-glow-opacity)) 0%,
+    rgb(var(--bg-glow-color) / calc(var(--bg-glow-opacity) * 0.55)) 35%,
+    rgb(var(--bg-glow-color) / 0) 70%
+  );
+}
+html.dark .bg-field::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  opacity: var(--bg-noise-opacity);
+}
+
+/* ============================================================
+   GLASS HELPER CLASSES — applied to container surfaces only.
+   Inputs / chips / tiles must NOT use these.
+   ============================================================ */
+.glass-base,
+.glass-thin {
+  position: relative;
+  isolation: isolate;
+}
+
+html.dark .glass-base {
+  background: var(--glass-base);
+  backdrop-filter: blur(var(--blur-base)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--blur-base)) saturate(180%);
+  border: 1px solid var(--glass-stroke-outer);
+  box-shadow:
+    0 1px 0 0 var(--glass-stroke-inner) inset,
+    0 -1px 0 0 var(--glass-stroke-shadow) inset,
+    0 24px 60px -20px rgba(0,0,0,0.55),
+    0 4px 16px -4px rgba(0,0,0,0.35);
+}
+html.dark .glass-thin {
+  background: var(--glass-thin);
+  backdrop-filter: blur(var(--blur-soft)) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--blur-soft)) saturate(160%);
+  border: 1px solid var(--glass-stroke-outer);
+  box-shadow:
+    0 1px 0 0 color-mix(in srgb, white 22%, transparent) inset,
+    0 -1px 0 0 var(--glass-stroke-shadow) inset,
+    0 12px 28px -12px rgba(0,0,0,0.45);
+}
+
+/* ============================================================
+   EYEBROW + SECTION MARKER
+   ============================================================ */
+.eyebrow,
+.ps-section-label,
+.text-eyebrow {
+  font-family: var(--font-mono) !important;
+  font-size: var(--fs-eyebrow) !important;
+  font-weight: var(--fw-eyebrow) !important;
+  letter-spacing: var(--tracking-eyebrow) !important;
+  text-transform: uppercase;
+}
+
+/* Small left accent bar on h2 section titles inside .card */
+.card-title-with-marker {
+  position: relative;
+  padding-left: 12px;
+}
+.card-title-with-marker::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 8%; bottom: 8%;
+  width: 3px;
+  border-radius: 2px;
+  background: rgb(var(--accent));
+  box-shadow: 0 0 12px rgb(var(--accent) / 0.45);
+}
+
+/* ============================================================
+   SEGMENTED CONTROL — for Build Type + AcceleRATE Type pill rows.
+   Markup: <div class="segmented-rail grid-cols-3"> with
+   .option-btn.slim children. Active uses var(--accent).
+   ============================================================ */
+.segmented-rail {
+  display: grid;
+  position: relative;
+  padding: 3px;
+  border-radius: var(--r-pill);
+  gap: 0;
+  background: rgb(0 0 0 / 0.18);
+  border: 1px solid rgb(var(--c-line));
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.25);
+}
+html.dark .segmented-rail {
+  background: rgb(0 0 0 / 0.32);
+  border-color: var(--glass-stroke-outer);
+  backdrop-filter: blur(12px);
+}
+
+/* The floating indicator — animated via JS-set left/width.
+   FLIP-style spring; ~480ms feels lively without being twitchy. */
+.segmented-indicator {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 0;
+  width: 0;
+  border-radius: var(--r-pill);
+  background: rgb(var(--accent) / 0.18);
+  box-shadow:
+    inset 0 1px 0 rgb(var(--accent) / 0.45),
+    0 1px 0 rgb(0 0 0 / 0.25),
+    0 0 0 1px rgb(var(--accent) / 0.42);
+  transition:
+    left 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    width 320ms cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+}
+.segmented-indicator.ready { opacity: 1; }
+html.dark .segmented-indicator {
+  background: rgb(var(--accent) / 0.22);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.12),
+    0 0 0 1px rgb(var(--accent) / 0.55),
+    0 8px 18px -8px rgb(var(--accent) / 0.45);
+}
+
+.segmented-rail .option-btn.slim {
+  position: relative;
+  z-index: 1;
+  border: none !important;
+  background: transparent !important;
+  color: rgb(var(--c-ink-muted)) !important;
+  border-radius: var(--r-pill) !important;
+  padding: 6px 4px !important;
+  font-size: 11px !important;
+  letter-spacing: 0.02em;
+  box-shadow: none !important;
+  transition: color 220ms ease;
+}
+.segmented-rail .option-btn.slim:hover {
+  color: rgb(var(--c-ink)) !important;
+  background: transparent !important;
+}
+/* Active button is text-only — the indicator IS the visible pill */
+.segmented-rail .option-btn.slim.active {
+  color: rgb(var(--c-ink)) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}

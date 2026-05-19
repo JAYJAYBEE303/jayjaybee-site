@@ -3,67 +3,68 @@
      DESIGN TOKENS — light + dark
      ───────────────────────────────────────────────────────── */
   /* ─────────────────────────────────────────────────────────
-     ASTON MARTIN ARAMCO F1 — palette
-     Racing Green #00352F · Lime Essence #CEDC00 · Black #0A0A0A
+     NEUTRAL SLATE — palette
+     Slate UI · Blue accent #2563EB · Orange highlight #EA580C
      ───────────────────────────────────────────────────────── */
   :root {
-    --c-canvas:      244 239 230;   /* site paper #F4EFE6 */
-    --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='640' height='640'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.48 0.56' numOctaves='4' stitchTiles='stitch' seed='23'/><feColorMatrix values='0 0 0 0 0.10  0 0 0 0 0.09  0 0 0 0 0.08  0.85 0 0 0 -0.48'/><feGaussianBlur stdDeviation='1.0'/></filter><rect width='100%25' height='100%25' filter='url(%23g)'/></svg>");
+    --c-canvas:      245 246 248;   /* slate-50 paper */
+    --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='640' height='640'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.48 0.56' numOctaves='4' stitchTiles='stitch' seed='23'/><feColorMatrix values='0 0 0 0 0.09  0 0 0 0 0.09  0 0 0 0 0.10  0.85 0 0 0 -0.48'/><feGaussianBlur stdDeviation='1.0'/></filter><rect width='100%25' height='100%25' filter='url(%23g)'/></svg>");
     --c-surface:     255 255 255;
-    --c-sunken:      238 240 236;
-    --c-ink:         10 12 11;
-    --c-ink-soft:    32 42 38;
-    --c-ink-muted:   105 116 110;
-    --c-ink-faint:   170 178 172;
-    --c-line:        220 226 220;
-    --c-line-strong: 195 204 196;
-    --c-accent:        0  53  47;   /* AM Racing Green */
-    --c-gain:        206 220   0;   /* Lime Essence */
-    --c-loss:        220  56  56;   /* alert red */
-    --c-warn:        201 168  76;   /* podium gold */
-    --c-neutral:       0 163 154;   /* racing green for "neutral best" */
-    --c-overflow:    226 240   0;   /* deeper green for off-the-charts */
-    /* Driver/slot identity — racing-paddock palette */
-    --slot-1:          0  53  47;   /* AMF1 green */
-    --slot-2:        206 220   0;   /* Lime */
-    --slot-3:         28 100 232;   /* sky / Williams blue */
-    --slot-4:        220  56  56;   /* Ferrari red */
-    --slot-5:        255 140   0;   /* McLaren orange */
-    --slot-6:        145  78 220;   /* violet */
+    --c-sunken:      241 243 245;
+    --c-ink:          15  23  42;   /* slate-900 */
+    --c-ink-soft:     30  41  59;   /* slate-800 */
+    --c-ink-muted:   100 116 139;   /* slate-500 */
+    --c-ink-faint:   148 163 184;   /* slate-400 */
+    --c-line:        226 232 240;   /* slate-200 */
+    --c-line-strong: 203 213 225;   /* slate-300 */
+    --c-accent:      252 60 122;    /* hot magenta — ported from tokens.css --accent (≈ oklch 0.72 0.24 5) */
+    --c-gain:        232 145 105;   /* dusty peach */
+    --c-loss:        215 119 127;   /* dusty rose */
+    --c-warn:        209 168 102;   /* dusty gold */
+    --c-neutral:     130 178 158;   /* dusty sage */
+    --c-overflow:    240 165 120;   /* peach hi */
+    /* Slot identity — distinct pastels for compare/squad views */
+    --slot-1:        111 149 201;   /* dusty blue */
+    --slot-2:        232 145 105;   /* peach */
+    --slot-3:        161 132 198;   /* dusty lavender */
+    --slot-4:        215 119 127;   /* dusty rose */
+    --slot-5:        130 178 158;   /* sage */
+    --slot-6:        209 168 102;   /* gold */
   }
   html.dark {
-    --c-canvas:       20  17  14;   /* site paper dark #14110E */
-    --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='640' height='640'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.48 0.56' numOctaves='4' stitchTiles='stitch' seed='23'/><feColorMatrix values='0 0 0 0 0.92  0 0 0 0 0.89  0 0 0 0 0.83  0.65 0 0 0 -0.48'/><feGaussianBlur stdDeviation='1.0'/></filter><rect width='100%25' height='100%25' filter='url(%23g)'/></svg>");
-    --c-surface:      20  37  34;   /* lifted carbon, AMF1 grey-800 */
-    --c-sunken:       11  19  17;   /* AMF1 grey-950 */
-    --c-ink:         236 240 234;
-    --c-ink-soft:    198 206 198;
-    --c-ink-muted:   135 145 138;
-    --c-ink-faint:    78  88  82;
-    --c-line:         28  40  34;
-    --c-line-strong:  46  62  54;
-    --c-accent:       64 220 180;   /* lifted racing green for dark UI */
-    --c-gain:        206 220   0;   /* Lime stays lime */
-    --c-loss:        236  92  92;
-    --c-warn:        255 200  60;
-    --c-neutral:       0 163 154;   /* teal as "neutral best" in dark */
-    --c-overflow:    226 240   0;   /* lime-hi for off-the-charts */
-    --slot-1:         64 220 180;
-    --slot-2:        206 220   0;
-    --slot-3:         92 168 255;
-    --slot-4:        236 100 100;
-    --slot-5:        255 168  60;
-    --slot-6:        190 140 255;
+    --c-canvas:       15  15  18;   /* neutral charcoal #0F0F12 */
+    --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='640' height='640'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.48 0.56' numOctaves='4' stitchTiles='stitch' seed='23'/><feColorMatrix values='0 0 0 0 0.88  0 0 0 0 0.89  0 0 0 0 0.92  0.65 0 0 0 -0.48'/><feGaussianBlur stdDeviation='1.0'/></filter><rect width='100%25' height='100%25' filter='url(%23g)'/></svg>");
+    --c-surface:      26  26  30;   /* neutral charcoal glass #1A1A1E */
+    --c-sunken:       10  10  12;   /* deeper neutral #0A0A0C */
+    --c-ink:         236 240 244;
+    --c-ink-soft:    203 213 225;
+    --c-ink-muted:   148 163 184;
+    --c-ink-faint:   100 116 139;
+    --c-line:         38  40  46;
+    --c-line-strong:  55  58  66;
+    --c-accent:      252 60 122;    /* hot magenta — ported from tokens.css --accent (≈ oklch 0.72 0.24 5) */
+    --c-gain:        251 200 164;   /* soft peach */
+    --c-loss:        240 170 176;   /* soft rose */
+    --c-warn:        240 204 147;   /* soft buttercream */
+    --c-neutral:     181 218 203;   /* soft mint */
+    --c-overflow:    255 208 168;   /* light peach */
+    --slot-1:        167 199 231;   /* sky */
+    --slot-2:        251 200 164;   /* peach */
+    --slot-3:        200 181 224;   /* lavender */
+    --slot-4:        240 170 176;   /* rose */
+    --slot-5:        181 218 203;   /* mint */
+    --slot-6:        240 204 147;   /* buttercream */
   }
 
-  /* Legacy CSS variable aliases — used by inline styles in original JS */
+  /* Legacy CSS variable aliases — used by inline styles in original JS.
+     NOTE: --accent is intentionally NOT redefined here — it's an RGB triplet
+     declared in tokens.css for use with rgb(var(--accent) / alpha). */
   :root {
     --gain:    rgb(var(--c-gain));
     --loss:    rgb(var(--c-loss));
     --warn:    rgb(var(--c-warn));
     --neutral: rgb(var(--c-neutral));
     --overflow: rgb(var(--c-overflow));
-    --accent:  rgb(var(--c-accent));
     --accent4: rgb(var(--c-warn));
     --muted:   rgb(var(--c-ink-muted));
     --text:    rgb(var(--c-ink));
@@ -1319,79 +1320,220 @@
   }
 
   /* ─────────────────────────────────────────────────────────
-     AMF1 — branded accents
+     GLASS / DESIGN-SYSTEM OVERRIDES
+     Tokens come from tokens.css. This block ports the visual
+     language onto existing markup.
      ───────────────────────────────────────────────────────── */
-  /* Lime stripe — AMF1 livery cue, sits next to the eyebrow */
-  .amf1-stripe {
+
+  /* Old AMF1 ambient orbs — retired in favour of .bg-field */
+  .orb-stage { display: none !important; }
+
+  /* Section marker — small left accent bar, replaces the AMF1 lime stripe */
+  .section-marker {
     display: inline-block;
-    width: 28px;
-    height: 3px;
-    background: rgb(var(--c-gain));
-    box-shadow: 0 0 0 1px rgb(var(--c-gain) / 0.25);
+    width: 3px;
+    height: 14px;
+    border-radius: 2px;
+    background: rgb(var(--accent));
+    box-shadow: 0 0 10px rgb(var(--accent) / 0.45);
     flex-shrink: 0;
   }
-  /* Make the unified card feel like a paddock data sheet */
+
+  /* ── Unified card — outer glass shell ── */
   .unified-card {
-    border-radius: 4px !important;
+    border-radius: 18px !important;
+    position: relative;
+    isolation: isolate;
   }
   html.dark .unified-card {
-    background: rgb(var(--c-surface) / 0.55) !important;
-    border-color: rgb(var(--c-line-strong)) !important;
+    background: var(--glass-base) !important;
+    backdrop-filter: blur(var(--blur-base)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--blur-base)) saturate(180%);
+    border: 1px solid var(--glass-stroke-outer) !important;
     box-shadow:
-      inset 0 1px 0 rgb(255 255 255 / 0.04),
-      inset 0 0 0 1px rgb(0 53 47 / 0.25),
-      0 1px 2px rgb(0 0 0 / 0.4),
-      0 24px 64px -12px rgb(0 0 0 / 0.65) !important;
+      inset 0 1px 0 var(--glass-stroke-inner),
+      inset 0 -1px 0 var(--glass-stroke-shadow),
+      0 24px 60px -20px rgb(0 0 0 / 0.55),
+      0 4px 16px -4px rgb(0 0 0 / 0.35) !important;
   }
-  /* Crisp racing-stripe corner: a thin lime tick on the unified card */
-  .unified-card { position: relative; }
-  .unified-card::before {
+
+  /* Inner section panels (Section 01/02/03) — no container; the outer
+     .unified-card is the only visible surface. Padding/margin preserved. */
+  section.card {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  /* Nested feel-layer cards — also strip the inner container chrome */
+  .feel-layer-card,
+  html.dark .feel-layer-card {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  /* Inputs stay solid + compact. Just align corners and focus to design system. */
+  .stat-input input, .compare-table input, .save-card { border-radius: 8px !important; }
+  .stat-input input:focus {
+    outline: none;
+    border-color: var(--focus-border) !important;
+    box-shadow: var(--focus-ring) !important;
+  }
+
+  /* Card titles — small accent marker on the left */
+  section.card .card-title {
+    position: relative;
+    padding-left: 14px;
+  }
+  section.card .card-title::before {
     content: "";
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 64px;
-    height: 3px;
-    background: rgb(var(--c-gain));
-    border-top-left-radius: 4px;
+    left: 0; top: 14%; bottom: 14%;
+    width: 3px;
+    border-radius: 2px;
+    background: rgb(var(--accent));
+    box-shadow: 0 0 10px rgb(var(--accent) / 0.45);
   }
-  /* Tighten card chrome system-wide — racing dashboards aren't pillowy */
-  section.card, section.compare-card { border-radius: 4px !important; }
-  .stat-input input, .compare-table input, .save-card { border-radius: 3px !important; }
-  /* Buttons — rounded pill stays for primary controls but gets a lime hover signature */
-  .option-btn.active, .option-btn.slim.active {
-    background: rgb(var(--c-accent)) !important;
-    color: rgb(var(--c-gain)) !important;
-    border-color: rgb(var(--c-accent)) !important;
+
+  /* Wordmark italic stays on var(--accent) via .text-accent */
+  .text-accent { color: rgb(var(--accent)) !important; }
+
+  /* ── Option pills — base (non-segmented) ── */
+  .option-btn.active {
+    background: rgb(var(--accent)) !important;
+    color: rgb(255 255 255 / 0.96) !important;
+    border-color: rgb(var(--accent)) !important;
+    box-shadow: 0 1px 2px rgb(var(--accent) / 0.22) !important;
   }
-  html.dark .option-btn.active, html.dark .option-btn.slim.active {
-    background: rgb(var(--c-gain)) !important;
-    color: rgb(0 24 22) !important;
-    border-color: rgb(var(--c-gain)) !important;
+  html.dark .option-btn.active {
+    background: rgb(var(--accent)) !important;
+    color: rgb(15 15 18) !important;
+    border-color: rgb(var(--accent)) !important;
   }
-  /* The accent text class — racing green in light, lifted teal in dark */
-  .text-accent { color: rgb(var(--c-accent)) !important; }
-  /* Theme toggle pill — swap to AMF1 ink */
+
+  /* ── Playstyle / Chemistry tiles — keep tile structure, align active styling ── */
+  .ps-btn { border-radius: 10px !important; }
+  .ps-btn:hover { border-color: rgb(var(--accent) / 0.55) !important; }
+  .ps-btn.active {
+    border-color: rgb(var(--accent)) !important;
+    background: rgb(var(--accent) / 0.12) !important;
+    box-shadow:
+      0 0 0 1px rgb(var(--accent) / 0.35),
+      0 4px 10px -4px rgb(var(--accent) / 0.40) !important;
+  }
+  html.dark .ps-btn { background: rgb(255 255 255 / 0.025); border-color: var(--glass-stroke-outer); }
+  html.dark .ps-btn.active {
+    background: rgb(var(--accent) / 0.16) !important;
+    border-color: rgb(var(--accent)) !important;
+  }
+  .ps-btn.active .ps-name { color: rgb(var(--accent)) !important; }
+
+  /* Plus state — gold tier. Uses --accent-plus instead of --accent so the
+     "+" tier reads as a deliberate upgrade, not just a heavier toggle.
+     Halo: crisp inner gold ring + soft outer bloom, layered over a faint
+     gold-tinted glass fill. */
+  .ps-btn.ps-plus {
+    background: rgb(var(--accent-plus) / 0.16) !important;
+    border-color: rgb(var(--accent-plus) / 0.85) !important;
+    box-shadow:
+      0 0 0 1px rgb(var(--accent-plus) / 0.85),
+      0 0 14px -2px rgb(var(--accent-plus) / 0.55),
+      0 0 32px -6px rgb(var(--accent-plus) / 0.45) !important;
+  }
+  html.dark .ps-btn.ps-plus {
+    background: rgb(var(--accent-plus) / 0.20) !important;
+    border-color: rgb(var(--accent-plus)) !important;
+    box-shadow:
+      0 0 0 1.5px rgb(var(--accent-plus)),
+      0 0 16px -2px rgb(var(--accent-plus) / 0.65),
+      0 0 36px -6px rgb(var(--accent-plus) / 0.55) !important;
+  }
+  /* Override the .active name colour rule for plus state — text goes gold. */
+  .ps-btn.ps-plus .ps-name {
+    color: rgb(var(--accent-plus)) !important;
+    font-weight: 600;
+    text-shadow: 0 0 12px rgb(var(--accent-plus) / 0.45);
+  }
+  .ps-btn.ps-plus .ps-effect {
+    color: rgb(var(--accent-plus) / 0.85) !important;
+  }
+
+  /* ── Stat bars — pure accent ── */
+  .stat-bar-effective { background: rgb(var(--accent)) !important; box-shadow: 0 0 8px rgb(var(--accent) / 0.45); }
+
+  /* ── Feel-layer / radar / squad-lb category dots — unified to accent ── */
+  .feel-layer-movement  .feel-layer-accent,
+  .feel-layer-passing   .feel-layer-accent,
+  .feel-layer-defending .feel-layer-accent,
+  .feel-layer-shooting  .feel-layer-accent,
+  .feel-layer-saves     .feel-layer-accent { background: rgb(var(--accent)) !important; }
+  .radar-card.layer-movement  .radar-title-dot,
+  .radar-card.layer-passing   .radar-title-dot,
+  .radar-card.layer-defending .radar-title-dot,
+  .radar-card.layer-shooting  .radar-title-dot,
+  .radar-card.layer-saves     .radar-title-dot { background: rgb(var(--accent)) !important; }
+  .squad-lb-col.layer-movement  .squad-lb-col-label,
+  .squad-lb-col.layer-passing   .squad-lb-col-label,
+  .squad-lb-col.layer-defending .squad-lb-col-label,
+  .squad-lb-col.layer-shooting  .squad-lb-col-label,
+  .squad-lb-col.layer-saves     .squad-lb-col-label { box-shadow: 0 2px 0 0 rgb(var(--accent)) !important; }
+  /* Tenacity label loses warn-gold (was AMF1-themed) */
+  .tenacity-label { color: rgb(var(--c-ink-soft)) !important; }
+
+  /* ── Theme toggle — primary-style glass pill ── */
   #themeToggle {
+    padding: 9px 16px;
     border-radius: 999px;
-    text-transform: uppercase;
-    letter-spacing: 0.14em;
-    font-family: 'Hanken Grotesk', sans-serif;
+    font-family: var(--font-ui);
+    font-size: 12px;
     font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: rgb(var(--c-ink));
+    background: rgb(255 255 255 / 0.06);
+    border: 1px solid var(--glass-stroke-outer);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    transition: background 220ms ease, transform 160ms cubic-bezier(0.34, 1.4, 0.4, 1), border-color 220ms ease;
+    cursor: pointer;
+    line-height: 1;
   }
-  /* Re-style ambient orbs as AMF1 mood */
-  .orb-stage { display: none !important; }
-  html.dark .orb-a { background: radial-gradient(circle, rgb(var(--c-accent) / 0.18), transparent 70%) !important; }
-  html.dark .orb-b { background: radial-gradient(circle, rgb(var(--c-gain) / 0.07), transparent 70%) !important; }
-  html.dark .orb-c { background: radial-gradient(circle, rgb(0 53 47 / 0.35), transparent 70%) !important; }
-  /* Scrollbar — racing green track, lime thumb */
-  html.dark ::-webkit-scrollbar-track { background: rgb(var(--c-sunken)); }
+  #themeToggle:hover {
+    background: rgb(255 255 255 / 0.10);
+    border-color: rgb(var(--accent) / 0.45);
+    transform: translateY(-1px);
+  }
+  #themeToggle:active { transform: translateY(0) scale(0.97); }
+  #themeToggle .theme-toggle-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: rgb(var(--accent));
+    box-shadow: 0 0 8px rgb(var(--accent) / 0.65);
+    display: inline-block;
+  }
+
+  /* ── Scrollbar — neutral track, accent thumb on hover ── */
+  html.dark ::-webkit-scrollbar-track { background: rgb(255 255 255 / 0.02); }
   html.dark ::-webkit-scrollbar-thumb {
-    background: rgb(var(--c-line-strong));
-    border-radius: 0;
+    background: rgb(255 255 255 / 0.10);
+    border-radius: 999px;
   }
-  html.dark ::-webkit-scrollbar-thumb:hover { background: rgb(var(--c-gain) / 0.4); }
+  html.dark ::-webkit-scrollbar-thumb:hover { background: rgb(var(--accent) / 0.45); }
+
   /* Number readouts a touch tighter */
   .num, [class*="num"], input[type="number"] {
     font-feature-settings: 'tnum', 'zero';
   }
+
+  /* Wordmark / hero — adopt design-system display weight in dark mode */
+  html.dark h1.font-display { font-weight: 300; letter-spacing: -0.03em; }
+  html.dark h1.font-display .italic { font-weight: 300; }

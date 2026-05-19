@@ -8,11 +8,26 @@
    bottom so the calculator and animations are both ready.
    ═══════════════════════════════════════════════════════════════ */
 
+  // Saves persistence — single source of truth is localStorage.
+  // squadData is hydrated from there on boot and mirrored back on every change.
+  const SAVES_KEY = 'fc26_saves';
+  if (typeof squadData === 'undefined') {
+    let initial = { folders: [] };
+    try {
+      const raw = localStorage.getItem(SAVES_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.folders)) initial = parsed;
+      }
+    } catch {}
+    window.squadData = initial;
+  }
+
   let isDark = document.documentElement.classList.contains('dark');
 
   function applyThemeColor() {
     const m = document.getElementById('themeColorMeta');
-    if (m) m.setAttribute('content', isDark ? '#00352F' : '#f5f6f4');
+    if (m) m.setAttribute('content', isDark ? '#0F0F12' : '#f5f6f8');
   }
 
   function toggleTheme() {
@@ -21,7 +36,7 @@
     try { localStorage.setItem('fc26_theme', isDark ? 'dark' : 'light'); } catch(e) {}
     applyThemeColor();
     const btn = document.getElementById('themeToggle');
-    btn.textContent = isDark ? '☀ Light' : '● Dark';
+    btn.innerHTML = '<span class="theme-toggle-dot" aria-hidden="true"></span><span class="theme-toggle-label">' + (isDark ? 'Light' : 'Dark') + '</span>';
 
     // Let the stylesheet drive the body background (image in dark, flat in light)
     document.body.style.backgroundImage = '';
@@ -33,7 +48,7 @@
   // Sync the toggle button label on page load if dark was restored from storage
   (function syncThemeButtonOnLoad() {
     const btn = document.getElementById('themeToggle');
-    if (btn && isDark) btn.textContent = '☀️ Light';
+    if (btn) btn.innerHTML = '<span class="theme-toggle-dot" aria-hidden="true"></span><span class="theme-toggle-label">' + (isDark ? 'Light' : 'Dark') + '</span>';
     applyThemeColor();
   })();
 
@@ -65,13 +80,170 @@
     document.querySelectorAll('[data-type]').forEach(b => b.classList.remove('active'));
     el.classList.add('active');
     accelType = el.dataset.type;
-    calculate();
+    positionSegmentedIndicator(el.closest('.segmented-rail'));
+    // Defer recalc so the indicator animation starts on this frame, not after
+    // the (synchronous) DOM thrash of recomputing every stat row.
+    requestAnimationFrame(calculate);
   }
 
   function selectBuild(el) {
     document.querySelectorAll('[data-build]').forEach(b => b.classList.remove('active'));
     el.classList.add('active');
     buildType = el.dataset.build;
+    positionSegmentedIndicator(el.closest('.segmented-rail'));
+    requestAnimationFrame(calculate);
+  }
+
+  /* ── Segmented control FLIP indicator ──
+     Animates a single floating pill between active buttons. Pulled from
+     the Glass design system. Re-runs on resize + theme toggle since
+     button widths can shift. */
+  function positionSegmentedIndicator(rail) {
+    if (!rail) return;
+    const indicator = rail.querySelector('.segmented-indicator');
+    const active = rail.querySelector('.option-btn.active');
+    if (!indicator || !active) return;
+    const rRail = rail.getBoundingClientRect();
+    const rBtn = active.getBoundingClientRect();
+    indicator.style.left = (rBtn.left - rRail.left) + 'px';
+    indicator.style.width = rBtn.width + 'px';
+    indicator.classList.add('ready');
+  }
+
+  function initSegmentedIndicators() {
+    document.querySelectorAll('.segmented-rail').forEach(rail => {
+      // Prime without animation, then add the .ready class to fade in.
+      const ind = rail.querySelector('.segmented-indicator');
+      if (!ind) return;
+      const prev = ind.style.transition;
+      ind.style.transition = 'none';
+      positionSegmentedIndicator(rail);
+      // next frame: restore transition so future moves animate
+      requestAnimationFrame(() => { ind.style.transition = prev; });
+    });
+  }
+
+  window.addEventListener('resize', () => {
+    document.querySelectorAll('.segmented-rail').forEach(positionSegmentedIndicator);
+  });
+
+  /* ── Tri-state playstyle buttons ─────────────────────────────────────────
+     Each playstyle "pair" (e.g. quickstep + quickstep_plus) collapses into a
+     single button that cycles: off → on → plus → off. The underlying activePS
+     Set still uses the original string keys ("quickstep" / "quickstep_plus")
+     so calculator.js and saved players are unchanged. */
+
+  // Replace a span's text without disturbing child elements (e.g. info-btn).
+  function _setSpanText(span, text) {
+    if (!span) return;
+    // Remove existing text nodes, prepend a fresh one. Element children survive.
+    Array.from(span.childNodes).forEach(n => { if (n.nodeType === 3) n.remove(); });
+    span.insertBefore(document.createTextNode(text), span.firstChild);
+  }
+
+  // On boot: walk every .ps-btn pair, fold the plus button's labels onto the
+  // base button's dataset, hide the plus button, swap onclick → cyclePS.
+  // Idempotent (safe to call more than once).
+  function initPlaystyleButtons() {
+    const groups = new Map();
+    document.querySelectorAll('.ps-btn[data-ps]').forEach(b => {
+      const g = b.dataset.group;
+      if (!g) return;
+      if (!groups.has(g)) groups.set(g, []);
+      groups.get(g).push(b);
+    });
+    groups.forEach(buttons => {
+      if (buttons.length !== 2) return;
+      const base = buttons.find(b => !b.dataset.ps.endsWith('_plus'));
+      const plus = buttons.find(b => b.dataset.ps.endsWith('_plus'));
+      if (!base || !plus || base.dataset.nameBase) return; // already initialised
+      const baseName   = base.querySelector('.ps-name')?.textContent?.trim() || '';
+      const baseEffect = base.querySelector('.ps-effect')?.textContent?.trim() || '';
+      const plusName   = plus.querySelector('.ps-name')?.textContent?.trim() || '';
+      const plusEffect = plus.querySelector('.ps-effect')?.textContent?.trim() || '';
+      base.dataset.nameBase   = baseName;
+      base.dataset.effectBase = baseEffect;
+      base.dataset.namePlus   = plusName;
+      base.dataset.effectPlus = plusEffect;
+      base.dataset.psPlus     = plus.dataset.ps;
+      base.dataset.state      = 'off';
+      base.setAttribute('onclick', 'cyclePS(this)');
+      plus.style.display = 'none';
+      plus.setAttribute('aria-hidden', 'true');
+    });
+  }
+
+  // Restore each button's visuals from the current activePS Set. Used after
+  // applyState() loads a saved player and after reset() clears everything.
+  function applyPlaystyleStateToButtons() {
+    document.querySelectorAll('.ps-btn[data-ps]').forEach(b => {
+      if (b.style.display === 'none') return; // hidden plus buttons
+      const baseKey = b.dataset.ps;
+      const plusKey = b.dataset.psPlus;
+      const nameEl   = b.querySelector('.ps-name');
+      const effectEl = b.querySelector('.ps-effect');
+      b.classList.remove('active', 'ps-plus');
+      if (plusKey && activePS.has(plusKey)) {
+        // Plus wins over base if both were ever set together.
+        if (activePS.has(baseKey)) activePS.delete(baseKey);
+        b.classList.add('active', 'ps-plus');
+        b.dataset.state = 'plus';
+        _setSpanText(nameEl, b.dataset.namePlus || (b.dataset.nameBase + '+'));
+        if (effectEl) effectEl.textContent = b.dataset.effectPlus || '';
+      } else if (activePS.has(baseKey)) {
+        b.classList.add('active');
+        b.dataset.state = 'on';
+        _setSpanText(nameEl, b.dataset.nameBase || '');
+        if (effectEl) effectEl.textContent = b.dataset.effectBase || '';
+      } else {
+        b.dataset.state = 'off';
+        _setSpanText(nameEl, b.dataset.nameBase || '');
+        if (effectEl) effectEl.textContent = b.dataset.effectBase || '';
+      }
+    });
+  }
+
+  function cyclePS(el) {
+    const baseKey = el.dataset.ps;
+    const plusKey = el.dataset.psPlus;
+    const group   = el.dataset.group;
+
+    // Clear any other button in the same group back to off.
+    document.querySelectorAll(`.ps-btn[data-ps][data-group="${group}"]`).forEach(b => {
+      if (b === el || b.style.display === 'none') return;
+      if (b.dataset.ps)     activePS.delete(b.dataset.ps);
+      if (b.dataset.psPlus) activePS.delete(b.dataset.psPlus);
+      b.classList.remove('active', 'ps-plus');
+      b.dataset.state = 'off';
+      _setSpanText(b.querySelector('.ps-name'), b.dataset.nameBase || '');
+      const e = b.querySelector('.ps-effect');
+      if (e) e.textContent = b.dataset.effectBase || '';
+    });
+
+    // Cycle our own state: off → on → plus → off.
+    const state = el.dataset.state || 'off';
+    const next  = state === 'off' ? 'on' : state === 'on' ? 'plus' : 'off';
+
+    activePS.delete(baseKey);
+    if (plusKey) activePS.delete(plusKey);
+    el.classList.remove('active', 'ps-plus');
+
+    if (next === 'on') {
+      activePS.add(baseKey);
+      el.classList.add('active');
+      _setSpanText(el.querySelector('.ps-name'), el.dataset.nameBase);
+      el.querySelector('.ps-effect').textContent = el.dataset.effectBase;
+    } else if (next === 'plus') {
+      activePS.add(plusKey);
+      el.classList.add('active', 'ps-plus');
+      _setSpanText(el.querySelector('.ps-name'), el.dataset.namePlus || (el.dataset.nameBase + '+'));
+      el.querySelector('.ps-effect').textContent = el.dataset.effectPlus;
+    } else {
+      _setSpanText(el.querySelector('.ps-name'), el.dataset.nameBase);
+      el.querySelector('.ps-effect').textContent = el.dataset.effectBase;
+    }
+    el.dataset.state = next;
+
     calculate();
   }
 
@@ -509,7 +681,7 @@
     document.querySelectorAll('[data-type]').forEach(b => { b.classList.remove('active'); if(b.dataset.type==='controlled') b.classList.add('active'); });
     document.querySelectorAll('[data-build]').forEach(b => { b.classList.remove('active'); if(b.dataset.build==='normal') b.classList.add('active'); });
     document.querySelectorAll('[data-chemgroup="chem"]').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.ps-btn').forEach(b => b.classList.remove('active'));
+    applyPlaystyleStateToButtons();
     clearRoleChips();
     clearArchetypeChips();
 
@@ -556,7 +728,7 @@
     activePS  = new Set(s.activePS);
     document.querySelectorAll('[data-type]').forEach(b => { b.classList.remove('active'); if (b.dataset.type === accelType) b.classList.add('active'); });
     document.querySelectorAll('[data-build]').forEach(b => { b.classList.remove('active'); if (b.dataset.build === buildType) b.classList.add('active'); });
-    document.querySelectorAll('.ps-btn').forEach(b => { if (activePS.has(b.dataset.ps)) b.classList.add('active'); else b.classList.remove('active'); });
+    applyPlaystyleStateToButtons();
     // Restore chem style
     activeChem = s.chemStyle || null;
     document.querySelectorAll('[data-chemgroup="chem"]').forEach(b => {
@@ -615,13 +787,24 @@
     return data;
   }
 
+  // localStorage-backed persistence. squadData is the live in-memory state;
+  // every persistData() call mirrors it to localStorage so refreshes keep
+  // the saves. The bootstrap at the top of this file already hydrated
+  // squadData from localStorage on page load.
   function loadData() {
-    try { return JSON.parse(localStorage.getItem('fc26_data') || '{"folders":[]}'); }
-    catch { return { folders: [] }; }
+    if (!squadData || !Array.isArray(squadData.folders)) {
+      squadData.folders = [];
+    }
+    return JSON.parse(JSON.stringify(squadData));
   }
 
   function persistData(data) {
-    localStorage.setItem('fc26_data', JSON.stringify(data));
+    squadData.folders = (data && Array.isArray(data.folders)) ? data.folders : [];
+    try {
+      localStorage.setItem(SAVES_KEY, JSON.stringify({ folders: squadData.folders }));
+    } catch (e) {
+      console.warn('Failed to persist saves to localStorage:', e);
+    }
   }
 
   function createFolder() {
@@ -1769,8 +1952,12 @@
       btn.addEventListener('click', ev => {
         ev.preventDefault();
         ev.stopPropagation();
+        // For tri-state buttons, surface the plus-state info when the button is in plus state.
+        const activeKey = psBtn.dataset.state === 'plus' && psBtn.dataset.psPlus
+          ? psBtn.dataset.psPlus
+          : psId;
         if (activeInfoBtn === btn) { hideBubble(); return; }
-        showBubble(btn, psId);
+        showBubble(btn, activeKey);
       });
       btn.addEventListener('mousedown', ev => ev.stopPropagation());
       nameEl.appendChild(btn);
@@ -1833,7 +2020,9 @@
   }
 
 /* ── Initial render ── */
+  initPlaystyleButtons();
   injectInfoButtons();
 
   calculate();
   renderAll();
+  initSegmentedIndicators();
