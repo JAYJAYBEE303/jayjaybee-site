@@ -40,7 +40,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500;1,600&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
 <link rel="stylesheet" href="tokens.css?v=19">
-<link rel="stylesheet" href="style.css?v=20">
+<link rel="stylesheet" href="style.css?v=28">
 </head>
 <body class="min-h-screen relative">
 
@@ -222,10 +222,10 @@
               <span class="ps-name">Technical+</span><span class="ps-effect">Agility +10</span>
             </div>
             <div class="ps-btn" data-ps="first_touch" data-group="ft" onclick="togglePS(this)">
-              <span class="ps-name">First Touch</span><span class="ps-effect">Accel +2</span>
+              <span class="ps-name">First Touch</span><span class="ps-effect">Accel +2 · Slipperiness +2</span>
             </div>
             <div class="ps-btn" data-ps="first_touch_plus" data-group="ft" onclick="togglePS(this)">
-              <span class="ps-name">First Touch+</span><span class="ps-effect">Accel +5</span>
+              <span class="ps-name">First Touch+</span><span class="ps-effect">Accel +5 · Slipperiness +5</span>
             </div>
             <div class="ps-btn" data-ps="trickster" data-group="trick" onclick="togglePS(this)">
               <span class="ps-name">Trickster</span><span class="ps-effect">Dribbling Feel +6 · Agility +2</span>
@@ -484,6 +484,8 @@
 
   <div class="secondary-stack">
 
+  <div class="feel-saves-group">
+
   <!-- ═══════════════════ EFFECTIVE FEEL STATS ═══════════════════ -->
   <section class="card card-enter feel-stats-parent bg-surface border border-line rounded-2xl p-5 sm:p-7 shadow-soft">
     <div class="flex items-center justify-between gap-3 mb-5">
@@ -499,7 +501,7 @@
     <div class="feel-layer-card feel-layer-movement">
       <div class="collapsible-toggle" onclick="toggleMovementFeel()" style="margin-top: 0; border-top: none; padding-top: 0; padding-bottom: 4px;">
         <span class="collapsible-chevron open" id="movementFeelChevron" style="margin-right: 10px;">▶</span>
-        <span class="feel-layer-title"><span class="feel-layer-accent"></span>Effective Movement Feel</span>
+        <span class="feel-layer-title">Effective Movement Feel</span>
       </div>
       <div class="collapsible-body open" id="movementFeelBody">
         <div class="stat-row" style="margin-top: 8px;">
@@ -568,7 +570,7 @@
     <div class="feel-layer-card feel-layer-passing">
       <div class="collapsible-toggle" onclick="togglePassingFeel()" style="margin-top: 0; border-top: none; padding-top: 0; padding-bottom: 4px;">
         <span class="collapsible-chevron open" id="passingFeelChevron" style="margin-right: 10px;">▶</span>
-        <span class="feel-layer-title"><span class="feel-layer-accent"></span>Effective Passing Feel</span>
+        <span class="feel-layer-title">Effective Passing Feel</span>
       </div>
       <div class="collapsible-body open" id="passingFeelBody">
         <div class="sub-stat-row" style="margin-top: 8px;">
@@ -612,7 +614,7 @@
     <div class="feel-layer-card feel-layer-defending">
       <div class="collapsible-toggle" onclick="toggleDefendingFeel()" style="margin-top: 0; border-top: none; padding-top: 0; padding-bottom: 4px;">
         <span class="collapsible-chevron open" id="defendingFeelChevron" style="margin-right: 10px;">▶</span>
-        <span class="feel-layer-title"><span class="feel-layer-accent"></span>Effective Defending Feel</span>
+        <span class="feel-layer-title">Effective Defending Feel</span>
       </div>
       <div class="collapsible-body open" id="defendingFeelBody">
         <div class="sub-stat-row" style="margin-top: 8px;">
@@ -666,7 +668,7 @@
     <div class="feel-layer-card feel-layer-shooting">
       <div class="collapsible-toggle" onclick="toggleShootingFeel()" style="margin-top: 0; border-top: none; padding-top: 0; padding-bottom: 4px;">
         <span class="collapsible-chevron open" id="shootingFeelChevron" style="margin-right: 10px;">▶</span>
-        <span class="feel-layer-title"><span class="feel-layer-accent"></span>Effective Shooting Feel</span>
+        <span class="feel-layer-title">Effective Shooting Feel</span>
       </div>
       <div class="collapsible-body open" id="shootingFeelBody">
         <div class="sub-stat-row" style="margin-top: 8px;">
@@ -744,12 +746,14 @@
             <button class="save-btn" onclick="createFolder()">+ Folder</button>
           </div>
           <div class="save-row">
-            <input type="text" id="playerName" placeholder="Player name…" class="name-input">
+            <input type="text" id="playerName" placeholder="Player name…" class="name-input" oninput="updateRoleSelectionVisibility()">
             <select id="folderSelect" class="folder-select">
               <option value="">Select folder…</option>
             </select>
             <button class="save-btn" onclick="savePlayer()">Save</button>
           </div>
+          <div id="roleSelection">
+          <div class="role-selection-inner">
           <div class="role-chips" id="roleChips">
             <span class="role-chip" data-role="ST" onclick="toggleRole(this)">ST</span>
             <span class="role-chip" data-role="CAM" onclick="toggleRole(this)">CAM</span>
@@ -774,24 +778,21 @@
             <span class="archetype-chip" data-arch="Spider" onclick="toggleArchetype(this)">Spider</span>
             <span class="archetype-chip" data-arch="Wall" onclick="toggleArchetype(this)">Wall</span>
           </div>
+          </div>
+          </div>
         </div>
       </div>
 
       <div class="io-row" style="margin-top: 16px; padding-top: 14px; border-top: 1px solid rgb(var(--c-line));">
-        <button class="export-btn" onclick="showExport()">Export Saves</button>
-        <button class="import-btn" onclick="showImport()">Import Saves</button>
-      </div>
-
-      <div id="ioPanel" style="display: none; margin-top: 12px;">
-        <div class="io-panel-label" id="ioPanelLabel"></div>
-        <textarea id="ioTextarea" class="io-textarea" placeholder=""></textarea>
-        <div class="io-row" style="margin-top: 8px;">
-          <button class="export-btn" id="ioActionBtn" onclick="ioAction()"></button>
-          <button class="import-btn" onclick="closeIO()">Cancel</button>
-        </div>
+        <button class="export-btn" onclick="exportSaves()">Export Saves</button>
+        <button class="import-btn" onclick="importSaves()">Import Saves</button>
       </div>
     </div>
   </section>
+
+  </div><!-- end feel-saves-group -->
+
+  <div class="compare-squad-group">
 
   <!-- ═══════════════════ COMPARE PLAYERS ═══════════════════ -->
   <section class="compare-card card-enter bg-surface border border-line rounded-2xl p-5 sm:p-7 shadow-soft" id="compareCard">
@@ -805,6 +806,7 @@
       </div>
       <div class="compare-header-controls">
         <div class="view-toggle" role="group" aria-label="Compare view mode">
+          <div class="segmented-indicator" aria-hidden="true"></div>
           <button class="view-toggle-btn active" id="compareViewRadar" onclick="setCompareView('radar')" type="button" title="Radar charts">Radar</button>
           <button class="view-toggle-btn" id="compareViewBars" onclick="setCompareView('bars')" type="button" title="Bar table">Bars</button>
         </div>
@@ -872,6 +874,8 @@
     </div>
   </section>
 
+  </div><!-- end compare-squad-group -->
+
   </div><!-- end secondary-stack -->
 
  </div><!-- end unified-card -->
@@ -885,8 +889,8 @@
 </footer>
 
 <script src="animations.js?v=10"></script>
-<script src="calculator.js?v=13"></script>
-<script src="ui.js?v=12"></script>
+<script src="calculator.js?v=14"></script>
+<script src="ui.js?v=20"></script>
 
 
 </body>

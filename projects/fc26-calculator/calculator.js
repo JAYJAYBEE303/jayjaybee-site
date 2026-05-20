@@ -184,7 +184,8 @@
     const techSlipBonus = activePS.has('technical_plus') ? 5 : activePS.has('technical') ? 2 : 0;
     const buildSlipBonus = buildType === 'very_lean' ? 5 : buildType === 'lean' ? 2 : buildType === 'stocky' ? -2 : buildType === 'very_stocky' ? -5 : 0;
     const pressSlipBonus = activePS.has('press_proven_plus') ? 5 : activePS.has('press_proven') ? 2 : 0;
-    const slip = Math.round((180 + (effG - heightCm)) + ((effT - 100) / 2) + techSlipBonus + buildSlipBonus + pressSlipBonus);
+    const ftSlipBonus = activePS.has('first_touch_plus') ? 5 : activePS.has('first_touch') ? 2 : 0;
+    const slip = Math.round((180 + (effG - heightCm)) + ((effT - 100) / 2) + techSlipBonus + buildSlipBonus + pressSlipBonus + ftSlipBonus);
     updateSlip(slip);
     renderSlipBreakdown(effG, heightCm, effT, techSlipBonus, buildSlipBonus, slip);
 
@@ -1027,7 +1028,8 @@
     const techSlipBonus = ps.has('technical_plus') ? 5 : ps.has('technical') ? 2 : 0;
     const buildSlipBonus = build === 'very_lean' ? 5 : build === 'lean' ? 2 : build === 'stocky' ? -2 : build === 'very_stocky' ? -5 : 0;
     const pressSlipBonus = ps.has('press_proven_plus') ? 5 : ps.has('press_proven') ? 2 : 0;
-    const rSlip = Math.round((180 + (rG - (s.heightCm || 183))) + ((rT - 100) / 2) + techSlipBonus + buildSlipBonus + pressSlipBonus);
+    const ftSlipBonus = ps.has('first_touch_plus') ? 5 : ps.has('first_touch') ? 2 : 0;
+    const rSlip = Math.round((180 + (rG - (s.heightCm || 183))) + ((rT - 100) / 2) + techSlipBonus + buildSlipBonus + pressSlipBonus + ftSlipBonus);
 
     const cappedS = Math.min(rS, SPRINT_CAP);
     const cappedT = Math.min(rT, TENACITY_CAP);

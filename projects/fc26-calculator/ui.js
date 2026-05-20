@@ -101,7 +101,7 @@
   function positionSegmentedIndicator(rail) {
     if (!rail) return;
     const indicator = rail.querySelector('.segmented-indicator');
-    const active = rail.querySelector('.option-btn.active');
+    const active = rail.querySelector('.option-btn.active, .view-toggle-btn.active');
     if (!indicator || !active) return;
     const rRail = rail.getBoundingClientRect();
     const rBtn = active.getBoundingClientRect();
@@ -111,7 +111,7 @@
   }
 
   function initSegmentedIndicators() {
-    document.querySelectorAll('.segmented-rail').forEach(rail => {
+    document.querySelectorAll('.segmented-rail, .view-toggle').forEach(rail => {
       // Prime without animation, then add the .ready class to fade in.
       const ind = rail.querySelector('.segmented-indicator');
       if (!ind) return;
@@ -124,7 +124,7 @@
   }
 
   window.addEventListener('resize', () => {
-    document.querySelectorAll('.segmented-rail').forEach(positionSegmentedIndicator);
+    document.querySelectorAll('.segmented-rail, .view-toggle').forEach(positionSegmentedIndicator);
   });
 
   /* ── Tri-state playstyle buttons ─────────────────────────────────────────
@@ -320,7 +320,9 @@
     const b = document.getElementById('compareViewBars');
     if (r) r.classList.toggle('active', mode === 'radar');
     if (b) b.classList.toggle('active', mode === 'bars');
-    renderComparison();
+    positionSegmentedIndicator(document.querySelector('.view-toggle'));
+    // Defer the (heavy) re-render so the indicator slide starts on this frame.
+    requestAnimationFrame(renderComparison);
   }
   let squadOpen = false;
 
@@ -762,6 +764,7 @@
     activePS  = new Set(s.activePS);
     document.querySelectorAll('[data-type]').forEach(b => { b.classList.remove('active'); if (b.dataset.type === accelType) b.classList.add('active'); });
     document.querySelectorAll('[data-build]').forEach(b => { b.classList.remove('active'); if (b.dataset.build === buildType) b.classList.add('active'); });
+    document.querySelectorAll('.segmented-rail').forEach(positionSegmentedIndicator);
     applyPlaystyleStateToButtons();
     // Restore chem style
     activeChem = s.chemStyle || null;
@@ -883,6 +886,11 @@
     renderAll();
   }
 
+  function updateRoleSelectionVisibility() {
+    const hasName = document.getElementById('playerName').value.trim().length > 0;
+    document.getElementById('roleSelection').classList.toggle('visible', hasName);
+  }
+
   function savePlayer() {
     const name = document.getElementById('playerName').value.trim();
     const folderId = document.getElementById('folderSelect').value;
@@ -928,6 +936,7 @@
     else folder.players.push(entry);
     persistData(data);
     document.getElementById('playerName').value = '';
+    updateRoleSelectionVisibility();
     renderAll();
   }
 
@@ -949,6 +958,7 @@
     if (!player) return;
     applyState(player.state);
     document.getElementById('playerName').value = playerName;
+    updateRoleSelectionVisibility();
     document.querySelectorAll('.role-chip').forEach(c => {
       const roles = player.roles || (player.role ? [player.role] : []);
       c.classList.toggle('active', roles.includes(c.dataset.role));
@@ -982,8 +992,7 @@
   let dragSrcPlayerId = null;
   let dragSrcPlayer = null;
 
-  function renderFolderGroup(folder, depth = 0) {
-    const indent = depth * 14;
+  function renderFolderGroup(folder) {
     const playersHtml = folder.players.length
       ? folder.players.map(p => `
         <div class="saved-player"
@@ -1007,11 +1016,11 @@
         </div>`).join('')
       : '';
 
-    const subHtml = (folder.subfolders || []).map(sf => renderFolderGroup(sf, depth + 1)).join('');
+    const subHtml = (folder.subfolders || []).map(sf => renderFolderGroup(sf)).join('');
     const totalCount = folder.players.length + (folder.subfolders || []).reduce((acc, sf) => acc + allFolders([sf]).reduce((a, f) => a + f.players.length, 0), 0);
 
     return `
-      <div class="folder-group" style="margin-left:${Math.min(indent, 28)}px;"
+      <div class="folder-group"
         ondragstart="onFolderDragStart(event,'${esc(folder.id)}')"
         ondragover="onFolderDragOver(event)"
         ondragleave="onFolderDragLeave(event)"
@@ -1039,7 +1048,7 @@
       el.innerHTML = '<div class="no-saves">No folders yet — create one above</div>';
       return;
     }
-    el.innerHTML = data.folders.map(f => renderFolderGroup(f, 0)).join('');
+    el.innerHTML = data.folders.map(f => renderFolderGroup(f)).join('');
   }
   function onFolderDragStart(e, folderId) {
     dragSrcFolderId = folderId;
@@ -1224,77 +1233,103 @@
     if (typeof populateCompareSelects === 'function') populateCompareSelects();
     if (squadOpen) renderSquad();
   }
-  let ioMode = 'export';
-
-  function showExport() {
-    ioMode = 'export';
+  // Export saves to a Squad_saves.js file. Uses the File System Access API
+  // (native "save as" dialog) where available, else a plain download.
+  function exportSaves() {
     const data = loadData();
-    const json = JSON.stringify(data);
-    document.getElementById('ioPanelLabel').textContent = 'Copy this JSON and save it as a .json file';
-    document.getElementById('ioTextarea').value = json;
-    document.getElementById('ioTextarea').readOnly = true;
-    document.getElementById('ioActionBtn').textContent = 'Copy to Clipboard';
-    document.getElementById('ioPanel').style.display = 'block';
-    document.getElementById('ioTextarea').select();
-  }
+    const json = JSON.stringify({ folders: data.folders || [] }, null, 2);
+    // A real .js file so it can be re-imported or just opened/read.
+    const fileContent =
+      '// FC26 Calculator — Squad saves. Re-import via the "Import Saves" button.\n' +
+      'window.SQUAD_SAVES = ' + json + ';\n';
+    const filename = 'Squad_saves.js';
 
-  function showImport() {
-    ioMode = 'import';
-    document.getElementById('ioPanelLabel').textContent = 'Paste your exported JSON below and click Import';
-    document.getElementById('ioTextarea').value = '';
-    document.getElementById('ioTextarea').readOnly = false;
-    document.getElementById('ioTextarea').placeholder = 'Paste JSON here...';
-    document.getElementById('ioActionBtn').textContent = 'Import';
-    document.getElementById('ioPanel').style.display = 'block';
-    document.getElementById('ioTextarea').focus();
-  }
-
-  function closeIO() {
-    document.getElementById('ioPanel').style.display = 'none';
-    document.getElementById('ioTextarea').value = '';
-  }
-
-  function ioAction() {
-    if (ioMode === 'export') {
-      const text = document.getElementById('ioTextarea').value;
-      navigator.clipboard.writeText(text).then(() => {
-        document.getElementById('ioActionBtn').textContent = 'Copied!';
-        setTimeout(() => document.getElementById('ioActionBtn').textContent = 'Copy to Clipboard', 2000);
-      }).catch(() => {
-        document.getElementById('ioTextarea').select();
-        document.execCommand('copy');
-        document.getElementById('ioActionBtn').textContent = 'Copied!';
-        setTimeout(() => document.getElementById('ioActionBtn').textContent = 'Copy to Clipboard', 2000);
-      });
+    if (window.showSaveFilePicker) {
+      saveViaFilePicker(filename, fileContent);
     } else {
-      try {
-        const json = document.getElementById('ioTextarea').value.trim();
-        const imported = JSON.parse(json);
-        if (!imported.folders || !Array.isArray(imported.folders)) {
-          alert('Invalid data — folders not found.');
-          return;
-        }
-        // Ensure all imported folders have ids and subfolders (migration)
-        function ensureIds(folders) {
-          folders.forEach(f => {
-            if (!f.id) f.id = genId();
-            if (!f.subfolders) f.subfolders = [];
-            if (!f.players) f.players = [];
-            ensureIds(f.subfolders);
-          });
-        }
-        ensureIds(imported.folders);
-        const existingData = loadData();
-        const hasExisting = (existingData.folders || []).length > 0;
-        if (hasExisting && !confirm('Import will replace all of your current saves with the imported data. Continue?')) return;
-        persistData({ folders: imported.folders });
-        renderAll();
-        closeIO();
-        alert('Import successful.');
-      } catch(err) {
-        alert('Invalid JSON — make sure you pasted the full export.');
-      }
+      downloadFile(filename, fileContent);
     }
+  }
+
+  async function saveViaFilePicker(filename, content) {
+    let handle;
+    try {
+      handle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        types: [{ description: 'Squad saves', accept: { 'text/javascript': ['.js'] } }],
+      });
+    } catch (err) {
+      return;  // user dismissed the save dialog — nothing to do
+    }
+    try {
+      const writable = await handle.createWritable();
+      await writable.write(content);
+      await writable.close();
+    } catch (err) {
+      alert('Could not save the file. Please try again.');
+    }
+  }
+
+  function downloadFile(filename, content) {
+    const blob = new Blob([content], { type: 'text/javascript' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  // Import saves by picking a file from the file explorer.
+  function importSaves() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.js,.json,.txt,application/json,text/javascript';
+    input.addEventListener('change', () => {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => applyImportedSaves(reader.result);
+      reader.onerror = () => alert('Could not read that file.');
+      reader.readAsText(file);
+    });
+    input.click();
+  }
+
+  function applyImportedSaves(text) {
+    let imported;
+    try {
+      // Tolerate a JS wrapper — pull out the { ... } object and parse it.
+      const str = String(text);
+      const first = str.indexOf('{');
+      const last = str.lastIndexOf('}');
+      if (first === -1 || last < first) throw new Error('no object');
+      imported = JSON.parse(str.slice(first, last + 1));
+    } catch (err) {
+      alert('That file is not a valid Squad saves file.');
+      return;
+    }
+    if (!imported.folders || !Array.isArray(imported.folders)) {
+      alert('Invalid data — no saved folders found in that file.');
+      return;
+    }
+    // Ensure all imported folders have ids and subfolders (migration)
+    function ensureIds(folders) {
+      folders.forEach(f => {
+        if (!f.id) f.id = genId();
+        if (!f.subfolders) f.subfolders = [];
+        if (!f.players) f.players = [];
+        ensureIds(f.subfolders);
+      });
+    }
+    ensureIds(imported.folders);
+    const hasExisting = (loadData().folders || []).length > 0;
+    if (hasExisting && !confirm('Import will replace all of your current saves with the imported data. Continue?')) return;
+    persistData({ folders: imported.folders });
+    renderAll();
+    alert('Import successful.');
   }
 
   // ---- Comparison Tool ----
@@ -1765,8 +1800,8 @@
     rapid_plus:        { title: 'Rapid+', body: 'Accel +5, Agility +5. Turns short runs into separation moments.' },
     technical:         { title: 'Technical', body: 'Agility +5. Also contributes to Slipperiness and Dribbling Feel.' },
     technical_plus:    { title: 'Technical+', body: 'Agility +10. Big boost to close control, Slipperiness, Dribbling Feel.' },
-    first_touch:       { title: 'First Touch', body: 'Accel +2. Also contributes to Dribbling Feel.' },
-    first_touch_plus:  { title: 'First Touch+', body: 'Accel +5. Better ball settling, improved Dribbling Feel.' },
+    first_touch:       { title: 'First Touch', body: 'Accel +2, Slipperiness +2. Also contributes to Dribbling Feel.' },
+    first_touch_plus:  { title: 'First Touch+', body: 'Accel +5, Slipperiness +5. Better ball settling, improved Dribbling Feel.' },
     trickster:         { title: 'Trickster', body: 'Agility +2, Dribbling Feel +6. Unlocks flair moves and tighter turns.' },
     trickster_plus:    { title: 'Trickster+', body: 'Agility +4, Dribbling Feel +12. Elite close-quarters ball manipulation.' },
     enforcer:          { title: 'Enforcer', body: 'Tenacity +5. Extra resistance in physical duels.' },
@@ -2059,3 +2094,10 @@
   calculate();
   renderAll();
   initSegmentedIndicators();
+
+  // On the 3-column layout, Compare + Squad get their own column — open them
+  // by default so it isn't just two empty headers taking up the space.
+  if (window.matchMedia('(min-width: 2000px)').matches) {
+    toggleCompare();
+    toggleSquad();
+  }

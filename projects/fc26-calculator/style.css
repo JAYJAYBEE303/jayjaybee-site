@@ -338,16 +338,6 @@
     text-transform: uppercase; color: rgb(var(--c-ink));
     display: flex; align-items: center; gap: 8px;
   }
-  .feel-layer-accent {
-    width: 6px; height: 6px; border-radius: 999px;
-    background: rgb(var(--c-accent));
-  }
-  .feel-layer-movement .feel-layer-accent { background: rgb(var(--c-gain)); }
-  .feel-layer-passing  .feel-layer-accent { background: rgb(var(--c-accent)); }
-  .feel-layer-defending .feel-layer-accent { background: rgb(var(--c-warn)); }
-  .feel-layer-shooting .feel-layer-accent { background: rgb(var(--c-loss)); }
-  .feel-layer-saves    .feel-layer-accent { background: rgb(var(--c-neutral)); }
-
   /* ─────────────────────────────────────────────────────────
      Breakdowns + verdicts
      ───────────────────────────────────────────────────────── */
@@ -397,23 +387,24 @@
   }
   .view-toggle {
     display: inline-flex; padding: 2px;
+    position: relative;
     background: rgb(var(--c-sunken));
     border: 1px solid rgb(var(--c-line));
     border-radius: 999px;
   }
+  /* Slim padding — keep the sliding indicator inset to match the 2px track */
+  .view-toggle .segmented-indicator { top: 2px; bottom: 2px; }
   .view-toggle-btn {
     font-family: 'Hanken Grotesk', sans-serif; font-size: 10px;
     padding: 4px 12px; border-radius: 999px;
     background: transparent; color: rgb(var(--c-ink-muted));
     border: none; cursor: pointer;
+    position: relative; z-index: 1;
     letter-spacing: 0.08em; text-transform: uppercase; font-weight: 600;
-    transition: all 160ms ease;
+    transition: color 160ms ease;
   }
   .view-toggle-btn:hover { color: rgb(var(--c-ink-soft)); }
-  .view-toggle-btn.active {
-    background: rgb(var(--c-surface)); color: rgb(var(--c-accent));
-    box-shadow: 0 1px 2px rgb(20 18 16 / 0.06);
-  }
+  .view-toggle-btn.active { color: rgb(var(--c-accent)); }
   /* ─────────────────────────────────────────────────────────
      Save UI — folders + players
      ───────────────────────────────────────────────────────── */
@@ -457,6 +448,32 @@
     padding: 5px 10px; font-size: 10px;
   }
   .delete-btn:hover { background: rgb(var(--c-loss) / 0.10); }
+
+  /* Role/archetype picker — reveals only when a player name is entered */
+  #roleSelection {
+    display: grid;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    transition:
+      grid-template-rows 380ms cubic-bezier(0.32, 0.72, 0.24, 1),
+      opacity            260ms cubic-bezier(0.32, 0.72, 0.24, 1);
+  }
+  #roleSelection.visible {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+  .role-selection-inner {
+    overflow: hidden;
+    min-height: 0;
+    transform: translateY(-6px);
+    transition: transform 380ms cubic-bezier(0.32, 0.72, 0.24, 1);
+  }
+  #roleSelection.visible .role-selection-inner {
+    transform: translateY(0);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #roleSelection, .role-selection-inner { transition: none; }
+  }
 
   .role-chips { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 8px; }
   .chips-label { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
@@ -506,7 +523,9 @@
     transition: all 160ms ease;
   }
   .folder-delete-btn:hover { color: rgb(var(--c-loss)); }
-  .folder-contents { padding: 4px 0 4px 18px; }
+  /* Left padding is the per-level indent — it compounds with nesting so every
+     folder's contents (players + subfolders alike) sit one clear step in. */
+  .folder-contents { padding: 4px 0 4px 48px; }
   /* (open/close animation handled below via max-height + JS) */
   .saved-player {
     display: flex; align-items: center; gap: 8px;
@@ -551,21 +570,6 @@
   }
 
   .io-row { display: flex; gap: 8px; }
-  .io-textarea {
-    width: 100%; min-height: 120px;
-    background: rgb(var(--c-sunken)); border: 1px solid rgb(var(--c-line));
-    border-radius: 8px; padding: 10px 12px;
-    font-family: 'IBM Plex Mono', monospace; font-size: 11px;
-    color: rgb(var(--c-ink)); resize: vertical;
-  }
-  .io-textarea:focus {
-    outline: none; border-color: rgb(var(--c-accent));
-    box-shadow: 0 0 0 3px rgb(var(--c-accent) / 0.12);
-  }
-  .io-panel-label {
-    font-size: 11px; color: rgb(var(--c-ink-muted));
-    margin-bottom: 6px;
-  }
 
   /* ─────────────────────────────────────────────────────────
      Compare table
@@ -1098,7 +1102,7 @@
   /* Accent glass — primary buttons + selected chips / toggles */
   html.dark :is(
     .save-btn, .role-chip.active,
-    .archetype-chip.primary, .view-toggle-btn.active
+    .archetype-chip.primary
   ) {
     background: color-mix(in srgb, rgb(var(--accent)) 26%, var(--glass-solid));
     border: 1px solid rgb(var(--accent));
@@ -1132,7 +1136,7 @@
   /* Hover — accent controls deepen their tint */
   html.dark :is(
     .save-btn, .role-chip.active,
-    .archetype-chip.primary, .view-toggle-btn.active
+    .archetype-chip.primary
   ):hover {
     background: color-mix(in srgb, rgb(var(--accent)) 34%, var(--glass-solid));
     border-color: rgb(var(--accent));
@@ -1208,7 +1212,9 @@
      ───────────────────────────────────────────────────────── */
   .unified-card > section + section,
   .unified-card > section + .secondary-stack,
-  .secondary-stack > section + section {
+  .secondary-stack > .feel-saves-group + .compare-squad-group,
+  .feel-saves-group > section + section,
+  .compare-squad-group > section + section {
     /* Mobile: replicate previous space-y-5 between separate cards */
     margin-top: 1.25rem;
   }
@@ -1254,7 +1260,9 @@
     /* Replace per-card spacing with hairline dividers */
     .unified-card > section + section,
     .unified-card > section + .secondary-stack,
-    .secondary-stack > section + section {
+    .secondary-stack > .feel-saves-group + .compare-squad-group,
+    .feel-saves-group > section + section,
+    .compare-squad-group > section + section {
       margin-top: 1.75rem;
       padding-top: 1.75rem;
       border-top: 1px solid rgb(var(--c-line));
@@ -1269,7 +1277,9 @@
     .unified-card { padding: 2.25rem 2.5rem; }
     .unified-card > section + section,
     .unified-card > section + .secondary-stack,
-    .secondary-stack > section + section {
+    .secondary-stack > .feel-saves-group + .compare-squad-group,
+    .feel-saves-group > section + section,
+    .compare-squad-group > section + section {
       margin-top: 2.25rem;
       padding-top: 2.25rem;
     }
@@ -1332,9 +1342,10 @@
   }
 
   /* ─────────────────────────────────────────────────────────
-     XL-split — at very wide viewports, split the unified card
-     into two primary columns: Section 01 (left), Sections 02-05
-     (right). Header/footer keep their own widths.
+     XL-split — at wide viewports, split the unified card into
+     two columns: Section 01 (left); Effective Feel + Saves +
+     Compare + Squad stacked (right). Header/footer keep their
+     own widths.
      ───────────────────────────────────────────────────────── */
   @media (min-width: 1440px) {
     .feel-shell { max-width: 1800px; }
@@ -1344,24 +1355,47 @@
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       column-gap: 2.5rem;
       padding: 2.5rem;
+      align-items: start;
     }
-    /* Each top-level child becomes its own column — no row dividers */
+    /* Two side-by-side columns — shed the dividers carried while stacked */
     .unified-card > section.card,
-    .unified-card > section.compare-card,
     .unified-card > .secondary-stack {
       margin-top: 0;
       padding-top: 0;
       border-top: 0;
     }
-    /* Right column: stack sections 02-05 vertically with hairlines */
-    .secondary-stack > section + section {
-      margin-top: 2.25rem;
-      padding-top: 2.25rem;
-      border-top: 1px solid rgb(var(--c-line));
-    }
     /* Left column has room for the full 3-col stats grid at this width */
     .stats-input-grid {
       grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  /* ─────────────────────────────────────────────────────────
+     3-column split — on very wide displays there's room to give
+     Compare + Squad their own right-hand column instead of
+     stacking them beneath the Effective Feel / Saves column.
+     ───────────────────────────────────────────────────────── */
+  @media (min-width: 2000px) {
+    .feel-shell { max-width: 2400px; }
+
+    .unified-card {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .unified-card > section.card { grid-column: 1; }
+    /* The right block spans two tracks and splits them into its own
+       two columns — Effective Feel + Saves | Compare + Squad */
+    .unified-card > .secondary-stack {
+      grid-column: 2 / 4;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      column-gap: 2.5rem;
+      align-items: start;
+    }
+    /* Side-by-side now — drop the divider carried in stacked mode */
+    .secondary-stack > .compare-squad-group {
+      margin-top: 0;
+      padding-top: 0;
+      border-top: 0;
     }
   }
 
@@ -1477,7 +1511,7 @@
 
   /* ── Playstyle / Chemistry tiles — keep tile structure, align active styling ── */
   .ps-btn { border-radius: 10px !important; }
-  .ps-btn:hover { border-color: rgb(var(--accent) / 0.55) !important; }
+  .ps-btn:hover { border-color: rgb(255 255 255 / 0.55) !important; }
   html.dark .ps-btn:hover { background: var(--glass-solid); }
   .ps-btn.active {
     border-color: rgb(var(--accent)) !important;
@@ -1573,12 +1607,7 @@
   .stat-bar-effective.tier-cyan,
   .compare-bar.tier-cyan    { background: var(--tier-cyan);    box-shadow: 0 0 8px color-mix(in srgb, var(--tier-cyan) 55%, transparent); }
 
-  /* ── Feel-layer / radar / squad-lb category dots — unified to accent ── */
-  .feel-layer-movement  .feel-layer-accent,
-  .feel-layer-passing   .feel-layer-accent,
-  .feel-layer-defending .feel-layer-accent,
-  .feel-layer-shooting  .feel-layer-accent,
-  .feel-layer-saves     .feel-layer-accent { background: rgb(var(--accent)) !important; }
+  /* ── Radar / squad-lb category dots — unified to accent ── */
   .radar-card.layer-movement  .radar-title-dot,
   .radar-card.layer-passing   .radar-title-dot,
   .radar-card.layer-defending .radar-title-dot,
