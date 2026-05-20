@@ -141,6 +141,49 @@
     span.insertBefore(document.createTextNode(text), span.firstChild);
   }
 
+  // Playstyle tile icons — keyed by the base data-ps. `base` art shows in the
+  // off/on states, `plus` art (gold) shows once the tile cycles to plus.
+  const PS_ICONS = {
+    quickstep:        { base: 'Quickstep.png',           plus: 'Quickstep Plus.png' },
+    rapid:            { base: 'Rapid.png',               plus: 'Rapid Plus.png' },
+    technical:        { base: 'Technical.png',           plus: 'Technical plus.png' },
+    first_touch:      { base: 'First Touch.png',         plus: 'First Touch plus.png' },
+    trickster:        { base: 'Trickster.png',           plus: 'Trickster Plus.png' },
+    enforcer:         { base: 'Enforcer.png',            plus: 'Enforcer plus.png' },
+    bruiser:          { base: 'Bruiser.png',             plus: 'Bruiser Plus.png' },
+    press_proven:     { base: 'Press Proven.png',        plus: 'Press Proven plus.png' },
+    relentless:       { base: 'Relentless.png',          plus: 'Relentless Plus.png' },
+    aerial:           { base: 'Aerial Fortress.png',     plus: 'Aerial Fortress Plus.png' },
+    incisive:         { base: 'Incisive Pass.png',       plus: 'Incisive Pass plus.png' },
+    pinged:           { base: 'Pinged Pass.png',         plus: 'Pinged Pass Plus.png' },
+    long_ball:        { base: 'Long Ball.png',           plus: 'Long Ball Plus.png' },
+    whipped:          { base: 'Whipped Pass.png',        plus: 'Whipped Pass plus.png' },
+    tiki_taka:        { base: 'Tiki Taka.png',           plus: 'Tiki Taka Plus.png' },
+    outside_foot:     { base: 'Inventive.png',           plus: 'Inventive Plus.png' },
+    intercept_ps:     { base: 'Intercept.png',           plus: 'Intercept Plus.png' },
+    block:            { base: 'Block.png',               plus: 'Block plus.png' },
+    jockey:           { base: 'Jockey.png',              plus: 'Jockey plus.png' },
+    anticipate:       { base: 'Anticipate.png',          plus: 'Anticipate plus.png' },
+    slide_tackle_ps:  { base: 'Slide Tackle.png',        plus: 'Slide Tackle plus.png' },
+    finesse:          { base: 'Finess Shot.png',         plus: 'Finess Shot plus.png' },
+    power_shot:       { base: 'powershot.png',           plus: 'powershot plus.png' },
+    chip_shot:        { base: 'chipshot.png',            plus: 'chipshot plus.png' },
+    dead_ball:        { base: 'Deadball.png',            plus: 'Deadball plus.png' },
+    first_time:       { base: 'Acrobatic.png',           plus: 'Acrobatic plus.png' },
+    low_driven:       { base: 'Low Driven shot.png',     plus: 'Low Driven shot plus.png' },
+    game_changer:     { base: 'Gamechanger (Flair).png', plus: 'Gamechanger (Flair) plus.png' },
+    precision_header: { base: 'precisionheader.png',     plus: 'precisionheader plus.png' },
+  };
+
+  function _addPsIcon(btn, variant, file) {
+    const img = document.createElement('img');
+    img.className = 'ps-icon ps-icon-' + variant;
+    img.src = encodeURI('assets/' + file);
+    img.alt = '';
+    img.setAttribute('aria-hidden', 'true');
+    btn.appendChild(img);
+  }
+
   // On boot: walk every .ps-btn pair, fold the plus button's labels onto the
   // base button's dataset, hide the plus button, swap onclick → cyclePS.
   // Idempotent (safe to call more than once).
@@ -168,6 +211,16 @@
       base.dataset.psPlus     = plus.dataset.ps;
       base.dataset.state      = 'off';
       base.setAttribute('onclick', 'cyclePS(this)');
+
+      // Inject the playstyle icon onto the visible base tile. The base art is
+      // shown in off/on; the gold art is swapped in via the .ps-plus class.
+      const icons = PS_ICONS[base.dataset.ps];
+      if (icons && !base.querySelector('.ps-icon')) {
+        if (icons.base) _addPsIcon(base, 'base', icons.base);
+        if (icons.plus) _addPsIcon(base, 'plus', icons.plus);
+        if (icons.base || icons.plus) base.classList.add('has-ps-icon');
+      }
+
       plus.style.display = 'none';
       plus.setAttribute('aria-hidden', 'true');
     });
@@ -338,19 +391,13 @@
     return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
   }
 
-  // Diverging heat: per-column scale, anchored at column median, capped at 99.
-  // Values >99 get the overflow color (signals "off the charts").
-  function squadHeatBg(v, cs) {
-    if (v > 99) return { bg: 'rgb(var(--c-overflow) / 0.85)', overflow: true };
-    if (cs.max99 === cs.min) return { bg: 'rgb(var(--c-line) / 0.25)' };
-    if (v >= cs.median) {
-      const span = Math.max(1, cs.max99 - cs.median);
-      const t = Math.min(1, (v - cs.median) / span);
-      return { bg: `rgb(var(--c-gain) / ${(0.06 + t * 0.55).toFixed(2)})` };
-    }
-    const span = Math.max(1, cs.median - cs.min);
-    const t = Math.min(1, (cs.median - v) / span);
-    return { bg: `rgb(var(--c-loss) / ${(0.06 + t * 0.50).toFixed(2)})` };
+  // Absolute 4-tier heat — magenta <85 · amber 85-99 · green 100-114 ·
+  // cyan 115+. Matches the Effective Feel Stats colours for a consistent read.
+  function squadTier(v) {
+    if (v >= 115) return 'cyan';
+    if (v >= 100) return 'green';
+    if (v >= 85)  return 'amber';
+    return 'magenta';
   }
 
   function renderSquad() {
@@ -402,17 +449,6 @@
           activeColumns.push({ kind: 'sub', layer, key: s.key, label: s.label });
         });
       }
-    });
-
-    // Per-column stats — min/median/max99 across all visible (filtered) rows.
-    const colStats = {};
-    activeColumns.forEach(col => {
-      const vs = filtered.map(p => Math.min(99, +(p[col.key] || 0))).sort((a, b) => a - b);
-      colStats[col.key] = {
-        min: vs[0],
-        median: vs[Math.floor(vs.length / 2)],
-        max99: vs[vs.length - 1],
-      };
     });
 
     // Top-3 ranks per visible column (across all filtered rows, regardless of group).
@@ -481,12 +517,10 @@
           body += `<td class="squad-lb-cell${col.kind === 'sub' ? ' is-substat squad-lb-substat' : ''}"><span class="squad-lb-num muted">—</span></td>`;
           return;
         }
-        const heat = squadHeatBg(v, colStats[col.key]);
         const rank = ranks[col.key][id];
         const rankBadge = rank ? `<span class="squad-lb-rank rank-${rank}">${rank}</span>` : '';
         const subClass = col.kind === 'sub' ? ' is-substat squad-lb-substat' : '';
-        const overflowClass = heat.overflow ? ' is-overflow' : '';
-        body += `<td class="squad-lb-cell${subClass}${overflowClass}" style="background:${heat.bg};">
+        body += `<td class="squad-lb-cell${subClass} tier-${squadTier(v)}">
           ${rankBadge}<span class="squad-lb-num">${Math.round(v)}</span>
         </td>`;
       });
@@ -501,7 +535,7 @@
         const all = filtered.map(p => +(p[col.key] || 0));
         const v = fn(all);
         const subClass = col.kind === 'sub' ? ' is-substat squad-lb-substat' : '';
-        r += `<td class="squad-lb-cell${subClass}"><span class="squad-lb-num">${Math.round(v)}</span></td>`;
+        r += `<td class="squad-lb-cell${subClass} tier-${squadTier(v)}"><span class="squad-lb-num">${Math.round(v)}</span></td>`;
       });
       r += '</tr>';
       return r;
@@ -1629,8 +1663,6 @@
 
     const maxVal = 120;
     const colCount = filled.length + 1;
-    const multi = filled.length >= 3;
-    const midBar = multi ? 'rgb(var(--c-line-strong))' : 'var(--neutral)';
 
     const rows = stats.map(s => {
       if (s.group) {
@@ -1646,11 +1678,12 @@
           const isWin = !allClose && v === max;
           const isLose = !allClose && v === min;
           const cls = isWin ? 'winner' : isLose ? 'loser' : 'draw';
-          const barCol = isWin ? 'var(--gain)' : isLose ? 'var(--loss)' : midBar;
+          // Pairwise tiers: ahead → green, behind → magenta, within 3 pts → amber.
+          const tierCls = isWin ? 'tier-green' : isLose ? 'tier-magenta' : 'tier-amber';
           const w = Math.min(100, Math.round((v / maxVal) * 100));
           return `<td>
             <span class="${cls}">${v}</span>
-            <div class="compare-bar-wrap"><div class="compare-bar" style="width:${w}%;background:${barCol}"></div></div>
+            <div class="compare-bar-wrap"><div class="compare-bar ${tierCls}" style="width:${w}%"></div></div>
           </td>`;
         }).join('')}
       </tr>`;

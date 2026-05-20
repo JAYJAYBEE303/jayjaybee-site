@@ -205,29 +205,30 @@
     return 'var(--loss)';
   }
 
-  function effColor(eff) {
-    if (eff >= 115) return 'var(--overflow)';
-    if (eff >= 100) return 'var(--neutral)';
-    if (eff >= 85)  return '#E4953C';
-    return 'var(--loss)';
+  /* Four-tier semantic progression — magenta <85 · amber 85-99 ·
+     green 100-114 · cyan 115+. Shared by every effective feel bar. */
+  function statTier(v) {
+    if (v >= 115) return 'cyan';
+    if (v >= 100) return 'green';
+    if (v >= 85)  return 'amber';
+    return 'magenta';
   }
 
-  function sprintColor(eff) {
-    if (eff >= 110) return 'var(--overflow)';
-    if (eff >= 100) return 'var(--neutral)';
-    if (eff >= 85)  return '#E4953C';
-    return 'var(--loss)';
+  // Apply the matching tier class to a bar element — background + glow
+  // are defined in CSS (.stat-bar-effective.tier-*).
+  function setBarTier(bar, v) {
+    if (!bar) return;
+    bar.classList.remove('tier-magenta', 'tier-amber', 'tier-green', 'tier-cyan');
+    bar.classList.add('tier-' + statTier(v));
   }
+
+  function effColor(eff)      { return `var(--tier-${statTier(eff)})`; }
+  function sprintColor(eff)   { return `var(--tier-${statTier(eff)})`; }
 
   const SPRINT_CAP = 120;
   const TENACITY_CAP = 130;
 
-  function tenacityColor(eff) {
-    if (eff >= 115) return 'var(--overflow)';
-    if (eff >= 100) return 'var(--neutral)';
-    if (eff >= 85)  return '#E4953C';
-    return 'var(--loss)';
-  }
+  function tenacityColor(eff) { return `var(--tier-${statTier(eff)})`; }
 
   function animateNumber(el, target, color) {
     const current = parseInt(el.textContent) || 0;
@@ -248,18 +249,12 @@
   const BAR_VISUAL_MAX = 120; // All stat bars visually fill on a 0-120 scale for consistency
 
   function updateRow(prefix, base, eff, delta, neutralColor, isSprint, isTenacity) {
-    document.getElementById(`num${prefix}Base`).textContent = base;
     animateNumber(document.getElementById(`num${prefix}Eff`), eff, isSprint ? sprintColor(eff) : isTenacity ? tenacityColor(eff) : effColor(eff));
     document.getElementById(`bar${prefix}Base`).style.width = `${Math.min(100,(base/BAR_VISUAL_MAX)*100)}%`;
 
     const effBar = document.getElementById(`bar${prefix}Eff`);
-    effBar.style.width      = `${Math.min(100,(eff/BAR_VISUAL_MAX)*100)}%`;
-    effBar.style.background = isSprint ? sprintColor(eff) : isTenacity ? tenacityColor(eff) : effColor(eff);
-
-    const dEl = document.getElementById(`delta${prefix}`);
-    dEl.textContent  = delta > 0 ? `+${delta}` : delta < 0 ? `${delta}` : '±0';
-    dEl.className    = `delta ${delta > 0 ? 'pos' : delta < 0 ? 'neg' : 'zero'}`;
-    // colour set by animateNumber
+    effBar.style.width = `${Math.min(100,(eff/BAR_VISUAL_MAX)*100)}%`;
+    setBarTier(effBar, eff);
   }
 
   function updateSlip(slip) {
@@ -267,10 +262,8 @@
     const bar = document.getElementById('barSlipEff');
     animateNumber(el, slip, effColor(slip));
     bar.style.width = `${Math.max(0, Math.min(100, (slip / BAR_VISUAL_MAX) * 100))}%`;
-    bar.style.background = effColor(slip);
-    document.getElementById('numSlipBase').textContent = '—';
+    setBarTier(bar, slip);
     document.getElementById('barSlipBase').style.width = '0%';
-    document.getElementById('deltaSlip').textContent = '';
   }
 
   function renderSlipBreakdown(effG, heightCm, effT, techBonus, buildBonus, total) {
@@ -455,7 +448,7 @@
     const capped = Math.max(0, Math.min(150, Math.round(eff)));
     animateNumber(numEl, capped, effColor(capped));
     effBar.style.width = `${Math.min(100, (capped / BAR_VISUAL_MAX) * 100)}%`;
-    effBar.style.background = effColor(capped);
+    setBarTier(effBar, capped);
     if (baseBar) baseBar.style.width = '0%';
   }
 

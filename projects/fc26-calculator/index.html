@@ -37,15 +37,21 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400;1,6..72,500&family=Inter+Tight:wght@300;400;500;600&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500;1,600&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
-<link rel="stylesheet" href="tokens.css">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="tokens.css?v=19">
+<link rel="stylesheet" href="style.css?v=20">
 </head>
 <body class="min-h-screen relative">
 
-<!-- Three-layer background: html bg → .bg-field glow → ::after noise -->
-<div class="bg-field" aria-hidden="true"></div>
+<!-- Atmosphere background — graphite canvas, drifting spotlights, texture -->
+<div class="orb-field" aria-hidden="true">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+  <div class="orb orb-4"></div>
+</div>
+<div class="atmosphere-veil" aria-hidden="true"></div>
 
 <!-- ─────────────────────────────────────── HEADER ─────────────────────────────────────── -->
 <header class="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 sm:pt-12 pb-6">
@@ -502,9 +508,7 @@
             <div class="stat-bar-base" id="barAccelBase"></div>
             <div class="stat-bar-effective" id="barAccelEff"></div>
           </div>
-          <span class="stat-base-num" id="numAccelBase">80</span>
           <span class="stat-effective-num" id="numAccelEff">80</span>
-          <span class="delta zero" id="deltaAccel">±0</span>
         </div>
         <div class="stat-row">
           <span class="stat-label">Sprint Speed</span>
@@ -512,9 +516,7 @@
             <div class="stat-bar-base" id="barSprintBase"></div>
             <div class="stat-bar-effective" id="barSprintEff"></div>
           </div>
-          <span class="stat-base-num" id="numSprintBase">80</span>
           <span class="stat-effective-num" id="numSprintEff">80</span>
-          <span class="delta zero" id="deltaSprint">±0</span>
         </div>
         <div class="stat-row">
           <span class="stat-label">Agility</span>
@@ -522,9 +524,7 @@
             <div class="stat-bar-base" id="barAgilityBase"></div>
             <div class="stat-bar-effective" id="barAgilityEff"></div>
           </div>
-          <span class="stat-base-num" id="numAgilityBase">80</span>
           <span class="stat-effective-num" id="numAgilityEff">80</span>
-          <span class="delta zero" id="deltaAgility">±0</span>
         </div>
         <div class="stat-row">
           <span class="stat-label tenacity-label">Tenacity</span>
@@ -532,9 +532,7 @@
             <div class="stat-bar-base" id="barTenacityBase"></div>
             <div class="stat-bar-effective" id="barTenacityEff"></div>
           </div>
-          <span class="stat-base-num" id="numTenacityBase">75</span>
           <span class="stat-effective-num" id="numTenacityEff">75</span>
-          <span class="delta zero" id="deltaTenacity">±0</span>
         </div>
         <div class="stat-row">
           <span class="stat-label">Slipperiness</span>
@@ -542,9 +540,7 @@
             <div class="stat-bar-base" id="barSlipBase"></div>
             <div class="stat-bar-effective" id="barSlipEff"></div>
           </div>
-          <span class="stat-base-num" id="numSlipBase">—</span>
           <span class="stat-effective-num" id="numSlipEff">—</span>
-          <span class="delta zero" id="deltaSlip"></span>
         </div>
 
         <div class="collapsible-toggle" onclick="toggleBreakdown()">
@@ -888,9 +884,9 @@
   </div>
 </footer>
 
-<script src="animations.js"></script>
-<script src="calculator.js"></script>
-<script src="ui.js?v=9"></script>
+<script src="animations.js?v=10"></script>
+<script src="calculator.js?v=13"></script>
+<script src="ui.js?v=12"></script>
 
 
 </body>

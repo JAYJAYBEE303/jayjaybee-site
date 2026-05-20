@@ -23,23 +23,23 @@
     --c-warn:        209 168 102;   /* dusty gold */
     --c-neutral:     130 178 158;   /* dusty sage */
     --c-overflow:    240 165 120;   /* peach hi */
-    /* Slot identity — distinct pastels for compare/squad views */
-    --slot-1:        111 149 201;   /* dusty blue */
-    --slot-2:        232 145 105;   /* peach */
-    --slot-3:        161 132 198;   /* dusty lavender */
-    --slot-4:        215 119 127;   /* dusty rose */
-    --slot-5:        130 178 158;   /* sage */
-    --slot-6:        209 168 102;   /* gold */
+    /* Slot identity — vibrant tier-derived hues for compare/squad views */
+    --slot-1:        252 60 122;    /* magenta */
+    --slot-2:        0 200 214;     /* cyan */
+    --slot-3:        236 150 0;     /* amber */
+    --slot-4:        82 154 255;    /* blue */
+    --slot-5:        56 200 110;    /* green */
+    --slot-6:        198 92 236;    /* violet */
   }
   html.dark {
     --c-canvas:       15  15  18;   /* neutral charcoal #0F0F12 */
     --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='640' height='640'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.48 0.56' numOctaves='4' stitchTiles='stitch' seed='23'/><feColorMatrix values='0 0 0 0 0.88  0 0 0 0 0.89  0 0 0 0 0.92  0.65 0 0 0 -0.48'/><feGaussianBlur stdDeviation='1.0'/></filter><rect width='100%25' height='100%25' filter='url(%23g)'/></svg>");
     --c-surface:      26  26  30;   /* neutral charcoal glass #1A1A1E */
     --c-sunken:       10  10  12;   /* deeper neutral #0A0A0C */
-    --c-ink:         236 240 244;
-    --c-ink-soft:    203 213 225;
-    --c-ink-muted:   148 163 184;
-    --c-ink-faint:   100 116 139;
+    --c-ink:         243 240 235;   /* warm off-white */
+    --c-ink-soft:    220 214 205;   /* warm light grey */
+    --c-ink-muted:   176 167 155;   /* warm mid grey */
+    --c-ink-faint:   130 121 109;   /* warm dark grey */
     --c-line:         38  40  46;
     --c-line-strong:  55  58  66;
     --c-accent:      252 60 122;    /* hot magenta — ported from tokens.css --accent (≈ oklch 0.72 0.24 5) */
@@ -48,12 +48,13 @@
     --c-warn:        240 204 147;   /* soft buttercream */
     --c-neutral:     181 218 203;   /* soft mint */
     --c-overflow:    255 208 168;   /* light peach */
-    --slot-1:        167 199 231;   /* sky */
-    --slot-2:        251 200 164;   /* peach */
-    --slot-3:        200 181 224;   /* lavender */
-    --slot-4:        240 170 176;   /* rose */
-    --slot-5:        181 218 203;   /* mint */
-    --slot-6:        240 204 147;   /* buttercream */
+    /* Slot identity — vibrant tier-derived hues for compare/squad views */
+    --slot-1:        252 80 138;    /* magenta */
+    --slot-2:        38 219 232;    /* cyan */
+    --slot-3:        255 176 32;    /* amber */
+    --slot-4:        108 170 255;   /* blue */
+    --slot-5:        74 224 134;    /* green */
+    --slot-6:        216 122 248;   /* violet */
   }
 
   /* Legacy CSS variable aliases — used by inline styles in original JS.
@@ -103,10 +104,10 @@
     position: relative;
   }
   @media print { body { background-image: none; } }
-  /* Display headers — site serif */
+  /* Display headers — Inter Tight (replaces the former serif) */
   h1, h2, .display, .hero-title, .hero-eyebrow, .section-eyebrow, .text-display,
   .font-display {
-    font-family: 'Newsreader', 'Charter', 'Iowan Old Style', Georgia, 'Times New Roman', serif !important;
+    font-family: 'Inter Tight', -apple-system, BlinkMacSystemFont, system-ui, sans-serif !important;
     font-style: normal !important;
     font-optical-sizing: auto;
     letter-spacing: -0.015em;
@@ -215,6 +216,9 @@
     background: rgb(var(--c-surface));
     border-radius: 10px; padding: 10px 12px;
     cursor: pointer; user-select: none;
+    box-shadow:
+      0 1px 0 0 rgb(255 255 255 / 0.6) inset,
+      0 5px 14px -5px rgb(0 0 0 / 0.16);
     transition: all 180ms ease;
   }
   .ps-btn:hover { border-color: rgb(var(--c-line-strong)); transform: translateY(-1px); }
@@ -267,7 +271,7 @@
      ───────────────────────────────────────────────────────── */
   .stat-row {
     display: grid;
-    grid-template-columns: 110px 1fr 36px 36px 38px;
+    grid-template-columns: 110px 1fr 36px;
     align-items: center; gap: 10px;
     padding: 8px 0;
   }
@@ -494,9 +498,12 @@
   .folder-name-text { font-size: 13px; font-weight: 500; color: rgb(var(--c-ink)); }
   .folder-count { font-size: 10px; color: rgb(var(--c-ink-muted)); margin-left: 4px; }
   .folder-delete-btn {
-    background: transparent; border: none; cursor: pointer;
-    color: rgb(var(--c-ink-faint)); font-size: 12px; padding: 4px 6px;
-    transition: color 160ms ease;
+    background: transparent; border: 1px solid rgb(var(--c-line));
+    color: rgb(var(--c-ink-muted));
+    width: 20px; height: 20px; border-radius: 999px;
+    font-size: 14px; line-height: 1; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: all 160ms ease;
   }
   .folder-delete-btn:hover { color: rgb(var(--c-loss)); }
   .folder-contents { padding: 4px 0 4px 18px; }
@@ -620,9 +627,9 @@
     font-family: 'Hanken Grotesk', sans-serif; font-size: 12px;
   }
   .compare-table td:not(.stat-col) { text-align: center; }
-  .winner { color: rgb(var(--c-gain)); font-weight: 600; }
-  .loser  { color: rgb(var(--c-loss)); }
-  .draw   { color: rgb(var(--c-ink-muted)); }
+  .winner { color: var(--tier-green); font-weight: 600; }
+  .loser  { color: var(--tier-magenta); }
+  .draw   { color: var(--tier-amber); }
   .compare-bar-wrap {
     margin-top: 4px; height: 4px;
     background: rgb(var(--c-sunken));
@@ -854,72 +861,6 @@
   }
 
   /* ─────────────────────────────────────────────────────────
-     Orb stage — fixed, clipped, slowly drifting
-     ───────────────────────────────────────────────────────── */
-  .orb-stage {
-    position: fixed;
-    inset: 0;
-    overflow: hidden;
-    pointer-events: none;
-    z-index: 0;
-  }
-  .orb {
-    position: absolute;
-    border-radius: 999px;
-    will-change: transform, opacity;
-    opacity: 0;
-    animation: orb-fade-in 1800ms cubic-bezier(0.32, 0.72, 0.24, 1) 200ms forwards;
-  }
-  .orb-a {
-    width: clamp(520px, 55vw, 1100px);
-    height: clamp(520px, 55vw, 1100px);
-    top: -18%; left: -12%;
-    background: rgb(var(--c-accent));
-    filter: blur(110px);
-    --orb-target-opacity: 0.32;
-  }
-  .orb-b {
-    width: clamp(420px, 48vw, 950px);
-    height: clamp(420px, 48vw, 950px);
-    top: 18vh; right: -14%;
-    background: rgb(var(--c-warn));
-    filter: blur(120px);
-    --orb-target-opacity: 0.22;
-  }
-  .orb-c {
-    width: clamp(380px, 42vw, 850px);
-    height: clamp(380px, 42vw, 850px);
-    bottom: -15%; left: 22%;
-    background: rgb(var(--c-neutral));
-    filter: blur(130px);
-    --orb-target-opacity: 0.16;
-  }
-  html.dark .orb-a { --orb-target-opacity: 0.22; }
-  html.dark .orb-b { --orb-target-opacity: 0.16; }
-  html.dark .orb-c { --orb-target-opacity: 0.12; }
-
-
-  @keyframes orb-fade-in {
-    to { opacity: var(--orb-target-opacity); }
-  }
-  /* Continuous drift — composed onto the fade-in via a wrapping animation */
-  .orb-a { animation: orb-fade-in 1800ms cubic-bezier(0.32, 0.72, 0.24, 1) 200ms forwards, drift-a 22s ease-in-out 2s infinite alternate; }
-  .orb-b { animation: orb-fade-in 1800ms cubic-bezier(0.32, 0.72, 0.24, 1) 350ms forwards, drift-b 28s ease-in-out 2s infinite alternate; }
-  .orb-c { animation: orb-fade-in 1800ms cubic-bezier(0.32, 0.72, 0.24, 1) 500ms forwards, drift-c 32s ease-in-out 2s infinite alternate; }
-  @keyframes drift-a {
-    from { transform: translate3d(0, 0, 0) scale(1); }
-    to   { transform: translate3d(40px, 30px, 0) scale(1.06); }
-  }
-  @keyframes drift-b {
-    from { transform: translate3d(0, 0, 0) scale(1); }
-    to   { transform: translate3d(-30px, -50px, 0) scale(1.08); }
-  }
-  @keyframes drift-c {
-    from { transform: translate3d(0, 0, 0) scale(1); }
-    to   { transform: translate3d(50px, -40px, 0) scale(1.04); }
-  }
-
-  /* ─────────────────────────────────────────────────────────
      Smooth collapsibles — height-aware via JS-set max-height
      The JS sets max-height to scrollHeight on open, 0 on close.
      ───────────────────────────────────────────────────────── */
@@ -1090,6 +1031,125 @@
   }
   .squad-lb-cell.is-substat { min-width: 44px; }
   .squad-lb-cell.is-overflow { color: rgb(var(--c-surface)); }
+  /* Absolute 4-tier heat — consistent with the effective feel stat colours. */
+  .squad-lb-cell.tier-magenta { background: color-mix(in srgb, var(--tier-magenta) 38%, transparent); }
+  .squad-lb-cell.tier-amber   { background: color-mix(in srgb, var(--tier-amber) 38%, transparent); }
+  .squad-lb-cell.tier-green   { background: color-mix(in srgb, var(--tier-green) 38%, transparent); }
+  .squad-lb-cell.tier-cyan    { background: color-mix(in srgb, var(--tier-cyan) 38%, transparent); }
+
+  /* ════════════════════════════════════════════════════════════
+     Unified glass controls — every button, input, select and chip
+     in the Saves / Compare / Squad sections gets the raised glass
+     "solid object" feel of a playstyle tile. (dark mode)
+     ════════════════════════════════════════════════════════════ */
+
+  /* Neutral glass surface — resting buttons, inputs, selects, chips */
+  html.dark :is(
+    .export-btn, .import-btn, .load-btn, .delete-btn, .folder-delete-btn,
+    .squad-lb-expand, .info-btn, .compare-slot-remove,
+    .name-input, .folder-select, .io-textarea,
+    .role-chip, .archetype-chip
+  ) {
+    background: var(--glass-thick);
+    border: 1px solid var(--glass-stroke-outer);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    box-shadow:
+      0 1px 0 0 color-mix(in srgb, white 30%, transparent) inset,
+      0 -1px 0 0 color-mix(in srgb, black 20%, transparent) inset,
+      0 8px 24px -8px rgba(0,0,0,0.4);
+  }
+
+  /* Text fields read darker than the buttons — clearly "type here" surfaces.
+     Dropdowns keep the lighter button glass; only typed-into fields darken. */
+  html.dark :is(.name-input, .io-textarea) {
+    background: rgb(0 0 0 / 0.25);
+  }
+
+  /* Open dropdown option list — light panel + black text for readability */
+  html.dark .folder-select option,
+  html.dark .folder-select optgroup {
+    background-color: #f4f5f7;
+    color: #000;
+  }
+
+  /* Section 01 stat inputs — replicate the save-config text fields exactly:
+     same glass texture, dark fill, border, shadow and typeface. */
+  html.dark .stat-input input {
+    background: rgb(0 0 0 / 0.25);
+    border: 1px solid var(--glass-stroke-outer);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    box-shadow:
+      0 1px 0 0 color-mix(in srgb, white 30%, transparent) inset,
+      0 -1px 0 0 color-mix(in srgb, black 20%, transparent) inset,
+      0 8px 24px -8px rgba(0,0,0,0.4);
+    font-family: 'Hanken Grotesk', system-ui, sans-serif !important;
+    font-size: 12px;
+  }
+  html.dark .stat-input input:focus {
+    outline: none;
+    border-color: rgb(var(--accent)) !important;
+    box-shadow:
+      0 1px 0 0 color-mix(in srgb, white 30%, transparent) inset,
+      0 0 0 3px rgb(var(--accent) / 0.20) !important;
+  }
+
+  /* Accent glass — primary buttons + selected chips / toggles */
+  html.dark :is(
+    .save-btn, .role-chip.active,
+    .archetype-chip.primary, .view-toggle-btn.active
+  ) {
+    background: color-mix(in srgb, rgb(var(--accent)) 26%, var(--glass-solid));
+    border: 1px solid rgb(var(--accent));
+    color: rgb(var(--accent));
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    box-shadow:
+      0 1px 0 0 color-mix(in srgb, white 30%, transparent) inset,
+      0 -1px 0 0 color-mix(in srgb, black 20%, transparent) inset,
+      0 0 0 1px rgb(var(--accent) / 0.45),
+      0 8px 24px -8px rgba(0,0,0,0.4);
+  }
+
+  /* Secondary archetype — softer accent glass */
+  html.dark .archetype-chip.secondary {
+    background: color-mix(in srgb, rgb(var(--accent)) 14%, var(--glass-thick));
+    border: 1px solid rgb(var(--accent) / 0.55);
+    color: rgb(var(--accent));
+  }
+
+  /* Hover — neutral controls lift to brighter glass */
+  html.dark :is(
+    .export-btn, .import-btn, .load-btn, .delete-btn, .folder-delete-btn,
+    .squad-lb-expand, .info-btn, .compare-slot-remove,
+    .role-chip, .archetype-chip
+  ):hover {
+    background: var(--glass-solid);
+    border-color: var(--glass-stroke-outer);
+  }
+
+  /* Hover — accent controls deepen their tint */
+  html.dark :is(
+    .save-btn, .role-chip.active,
+    .archetype-chip.primary, .view-toggle-btn.active
+  ):hover {
+    background: color-mix(in srgb, rgb(var(--accent)) 34%, var(--glass-solid));
+    border-color: rgb(var(--accent));
+  }
+  html.dark .archetype-chip.secondary:hover {
+    background: color-mix(in srgb, rgb(var(--accent)) 22%, var(--glass-thick));
+    border-color: rgb(var(--accent) / 0.55);
+  }
+
+  /* Focus — accent ring over the glass for text fields */
+  html.dark :is(.name-input, .folder-select, .io-textarea):focus {
+    outline: none;
+    border-color: rgb(var(--accent));
+    box-shadow:
+      0 1px 0 0 color-mix(in srgb, white 30%, transparent) inset,
+      0 0 0 3px rgb(var(--accent) / 0.20);
+  }
   .squad-lb-num { font-size: 11.5px; color: rgb(var(--c-ink)); font-weight: 500; }
   .squad-lb-cell.is-overflow .squad-lb-num { color: rgb(var(--c-surface)); font-weight: 700; }
   .squad-lb-num.muted { color: rgb(var(--c-ink-faint)); font-weight: 400; }
@@ -1316,7 +1376,6 @@
     }
     .card-enter { opacity: 1; transform: none; filter: none; }
     .hero-line { opacity: 1; transform: none; }
-    .orb { animation: none !important; opacity: var(--orb-target-opacity); }
   }
 
   /* ─────────────────────────────────────────────────────────
@@ -1324,9 +1383,6 @@
      Tokens come from tokens.css. This block ports the visual
      language onto existing markup.
      ───────────────────────────────────────────────────────── */
-
-  /* Old AMF1 ambient orbs — retired in favour of .bg-field */
-  .orb-stage { display: none !important; }
 
   /* Section marker — small left accent bar, replaces the AMF1 lime stripe */
   .section-marker {
@@ -1422,6 +1478,7 @@
   /* ── Playstyle / Chemistry tiles — keep tile structure, align active styling ── */
   .ps-btn { border-radius: 10px !important; }
   .ps-btn:hover { border-color: rgb(var(--accent) / 0.55) !important; }
+  html.dark .ps-btn:hover { background: var(--glass-solid); }
   .ps-btn.active {
     border-color: rgb(var(--accent)) !important;
     background: rgb(var(--accent) / 0.12) !important;
@@ -1429,10 +1486,26 @@
       0 0 0 1px rgb(var(--accent) / 0.35),
       0 4px 10px -4px rgb(var(--accent) / 0.40) !important;
   }
-  html.dark .ps-btn { background: rgb(255 255 255 / 0.025); border-color: var(--glass-stroke-outer); }
+  html.dark .ps-btn {
+    background: var(--glass-thick);
+    border-color: var(--glass-stroke-outer);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    box-shadow:
+      0 1px 0 0 color-mix(in srgb, white 30%, transparent) inset,
+      0 -1px 0 0 color-mix(in srgb, black 20%, transparent) inset,
+      0 8px 24px -8px rgba(0,0,0,0.4);
+  }
   html.dark .ps-btn.active {
-    background: rgb(var(--accent) / 0.16) !important;
+    /* Light tinted glass — keeps the raised feel of the unselected state
+       instead of darkening to a flat colour wash. */
+    background: color-mix(in srgb, rgb(var(--accent)) 26%, var(--glass-solid)) !important;
     border-color: rgb(var(--accent)) !important;
+    box-shadow:
+      0 1px 0 0 color-mix(in srgb, white 30%, transparent) inset,
+      0 -1px 0 0 color-mix(in srgb, black 20%, transparent) inset,
+      0 0 0 1px rgb(var(--accent) / 0.45),
+      0 8px 24px -8px rgba(0,0,0,0.4) !important;
   }
   .ps-btn.active .ps-name { color: rgb(var(--accent)) !important; }
 
@@ -1449,9 +1522,13 @@
       0 0 32px -6px rgb(var(--accent-plus) / 0.45) !important;
   }
   html.dark .ps-btn.ps-plus {
-    background: rgb(var(--accent-plus) / 0.20) !important;
+    /* Light gold-tinted glass — same raised glass as the unselected state,
+       with the gold ring + bloom layered on top (glow unchanged). */
+    background: color-mix(in srgb, rgb(var(--accent-plus)) 30%, var(--glass-solid)) !important;
     border-color: rgb(var(--accent-plus)) !important;
     box-shadow:
+      0 1px 0 0 color-mix(in srgb, white 30%, transparent) inset,
+      0 -1px 0 0 color-mix(in srgb, black 20%, transparent) inset,
       0 0 0 1.5px rgb(var(--accent-plus)),
       0 0 16px -2px rgb(var(--accent-plus) / 0.65),
       0 0 36px -6px rgb(var(--accent-plus) / 0.55) !important;
@@ -1466,8 +1543,35 @@
     color: rgb(var(--accent-plus) / 0.85) !important;
   }
 
-  /* ── Stat bars — pure accent ── */
-  .stat-bar-effective { background: rgb(var(--accent)) !important; box-shadow: 0 0 8px rgb(var(--accent) / 0.45); }
+  /* ── Playstyle tile icons — base art in off/on, gold art in plus ── */
+  .ps-btn.has-ps-icon {
+    position: relative;
+    padding-right: 48px;
+  }
+  .ps-icon {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 30px;
+    height: 30px;
+    object-fit: contain;
+    pointer-events: none;
+  }
+  .ps-icon-plus { display: none; }
+  .ps-btn.ps-plus .ps-icon-base { display: none; }
+  .ps-btn.ps-plus .ps-icon-plus { display: block; }
+
+  /* ── Semantic stat tiers — magenta <85 · amber 85-99 · green 100-114 ·
+     cyan 115+. Applied to effective feel stat bars + compare-players bars. ── */
+  .stat-bar-effective.tier-magenta,
+  .compare-bar.tier-magenta { background: var(--tier-magenta); box-shadow: 0 0 8px color-mix(in srgb, var(--tier-magenta) 55%, transparent); }
+  .stat-bar-effective.tier-amber,
+  .compare-bar.tier-amber   { background: var(--tier-amber);   box-shadow: 0 0 8px color-mix(in srgb, var(--tier-amber) 55%, transparent); }
+  .stat-bar-effective.tier-green,
+  .compare-bar.tier-green   { background: var(--tier-green);   box-shadow: 0 0 8px color-mix(in srgb, var(--tier-green) 55%, transparent); }
+  .stat-bar-effective.tier-cyan,
+  .compare-bar.tier-cyan    { background: var(--tier-cyan);    box-shadow: 0 0 8px color-mix(in srgb, var(--tier-cyan) 55%, transparent); }
 
   /* ── Feel-layer / radar / squad-lb category dots — unified to accent ── */
   .feel-layer-movement  .feel-layer-accent,

@@ -18,14 +18,19 @@
   --accent-plus:       255 200 80;       /* warm gold, ≈ oklch(0.83 0.16 80) */
   --accent-plus-glow:  rgb(255 200 80 / 0.55);
 
-  /* ── Background layers ────────────────────────────────── */
+  /* ── Background base ──────────────────────────────────── */
   --bg-base:           #0a0a0f;
-  --bg-glow-color:     220 40 110;       /* deeper magenta, harmonises with --accent */
-  --bg-glow-opacity:   0.16;
-  --bg-noise-opacity:  0.03;
+
+  /* ── Semantic stat tiers ──────────────────────────────────
+     Four-tier progression ported verbatim from the Glass design
+     system. Drives the effective feel stat bars + compare bars. */
+  --tier-magenta:  oklch(0.72 0.24 5);     /* sub-85    */
+  --tier-amber:    oklch(0.80 0.18 75);    /* 85 – 99   */
+  --tier-green:    oklch(0.80 0.18 150);   /* 100 – 114 */
+  --tier-cyan:     oklch(0.78 0.16 200);   /* 115+      */
 
   /* ── Type ─────────────────────────────────────────────── */
-  --font-display: "Newsreader", "Charter", "Iowan Old Style", Georgia, serif;
+  --font-display: "Inter Tight", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   --font-ui:      "Inter Tight", "Hanken Grotesk", -apple-system, system-ui, sans-serif;
   --font-mono:    "JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace;
 
@@ -79,10 +84,10 @@
    layers below are scoped to html.dark so light mode keeps its paper look. */
 
 /* ============================================================
-   THREE-LAYER BACKGROUND (dark mode only)
-   1. html background → solid base (#0a0a0f)
-   2. .bg-field      → fixed radial purple glow, top-right
-   3. .bg-field::after → fine SVG noise overlay
+   ATMOSPHERE BACKGROUND (dark mode only)
+   Ported verbatim from the Glass design system reference —
+   neutral graphite canvas, drifting spotlights, linen texture
+   + film grain. Light mode keeps its existing paper look.
    ============================================================ */
 html.dark { background: var(--bg-base); }
 
@@ -92,28 +97,148 @@ html.dark body {
   background-image: none;
 }
 
-.bg-field {
+.orb-field {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+/* Deep graphite with the faintest warm undertone. Top vignette
+   suggests light spilling from above. */
+html.dark .orb-field {
+  background:
+    radial-gradient(ellipse 70% 55% at 50% -8%,
+      oklch(0.24 0.006 75) 0%,
+      transparent 60%),
+    radial-gradient(ellipse 60% 70% at 100% 110%,
+      oklch(0.16 0.004 260) 0%,
+      transparent 55%),
+    linear-gradient(178deg,
+      oklch(0.165 0.004 75) 0%,
+      oklch(0.118 0.004 75) 55%,
+      oklch(0.095 0.005 70) 100%);
+}
+
+/* Spotlights — large soft pools of warm/cool light. Very low
+   chroma so the canvas stays neutral. They drift slowly to
+   create movement without ever feeling "colorful". */
+html.dark .orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(110px);
+  will-change: transform, opacity;
+  mix-blend-mode: screen;
+}
+/* Warm tungsten — top-left, the dominant key light */
+html.dark .orb-1 {
+  width: 880px; height: 880px;
+  background: radial-gradient(circle,
+    oklch(0.78 0.025 75) 0%,
+    oklch(0.5 0.02 75) 40%,
+    transparent 70%);
+  top: -260px; left: -220px;
+  opacity: 0.55;
+  animation: drift-1 38s cubic-bezier(0.16, 1, 0.3, 1) infinite alternate,
+             breathe-1 14s ease-in-out infinite;
+}
+/* Cool moonlight — right side, secondary fill */
+html.dark .orb-2 {
+  width: 760px; height: 760px;
+  background: radial-gradient(circle,
+    oklch(0.72 0.02 240) 0%,
+    oklch(0.45 0.015 240) 40%,
+    transparent 70%);
+  top: 22vh; right: -240px;
+  opacity: 0.32;
+  animation: drift-2 46s cubic-bezier(0.16, 1, 0.3, 1) infinite alternate,
+             breathe-2 18s ease-in-out infinite;
+}
+/* Warm bottom-center pool — like a floor lamp */
+html.dark .orb-3 {
+  width: 700px; height: 700px;
+  background: radial-gradient(circle,
+    oklch(0.74 0.022 60) 0%,
+    oklch(0.48 0.018 60) 38%,
+    transparent 68%);
+  bottom: -260px; left: 32vw;
+  opacity: 0.4;
+  animation: drift-3 34s cubic-bezier(0.16, 1, 0.3, 1) infinite alternate,
+             breathe-1 22s ease-in-out infinite;
+}
+/* Very faint neutral haze — center mid */
+html.dark .orb-4 {
+  width: 600px; height: 600px;
+  background: radial-gradient(circle,
+    oklch(0.7 0.005 80) 0%,
+    oklch(0.4 0.003 80) 45%,
+    transparent 72%);
+  top: 42vh; left: 18vw;
+  opacity: 0.22;
+  animation: drift-4 52s cubic-bezier(0.16, 1, 0.3, 1) infinite alternate,
+             breathe-2 26s ease-in-out infinite;
+}
+
+@keyframes drift-1 { from { transform: translate(0,0) scale(1); } to { transform: translate(160px, 200px) scale(1.12); } }
+@keyframes drift-2 { from { transform: translate(0,0) scale(1); } to { transform: translate(-180px, 140px) scale(1.08); } }
+@keyframes drift-3 { from { transform: translate(0,0) scale(1); } to { transform: translate(100px, -180px) scale(1.15); } }
+@keyframes drift-4 { from { transform: translate(0,0) scale(1); } to { transform: translate(220px, -120px) scale(0.96); } }
+@keyframes breathe-1 { 0%,100% { opacity: var(--o, 0.5); } 50% { opacity: calc(var(--o, 0.5) * 1.25); } }
+@keyframes breathe-2 { 0%,100% { opacity: var(--o, 0.3); } 50% { opacity: calc(var(--o, 0.3) * 0.7); } }
+
+/* Layer 1: COARSE PLASTER — large blotchy luminance variation.
+   This is what makes the surface feel like a wall, not a screen. */
+html.dark .orb-field::before {
+  content: "";
+  position: absolute; inset: -20px;
+  background-image:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='800' height='800'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.012' numOctaves='3' seed='4' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.28 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"),
+    repeating-linear-gradient(
+      91deg,
+      rgba(255,255,255,0.018) 0px,
+      rgba(255,255,255,0.018) 1px,
+      transparent 1px,
+      transparent 3px),
+    repeating-linear-gradient(
+      1deg,
+      rgba(0,0,0,0.04) 0px,
+      rgba(0,0,0,0.04) 1px,
+      transparent 1px,
+      transparent 4px);
+  background-size: 100% 100%, auto, auto;
+  opacity: 0.85;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+}
+
+/* Layer 2: FINE GRAIN — the always-present photographic noise
+   that sells the "real material" feeling at any zoom. */
+html.dark .orb-field::after {
+  content: "";
+  position: absolute; inset: 0;
+  background-image:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.78' numOctaves='2' stitchTiles='stitch' seed='2'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.32 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='380' height='380'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.32' numOctaves='2' stitchTiles='stitch' seed='7'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.34 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  opacity: 1;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+}
+
+/* Layer 3: DUST & VIGNETTE — depth at the edges + a few stray
+   "specks" you'd see on a real surface. */
+.atmosphere-veil {
   position: fixed;
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  overflow: hidden;
 }
-html.dark .bg-field {
-  background: radial-gradient(
-    1000px 1000px at 88% 12%,
-    rgb(var(--bg-glow-color) / var(--bg-glow-opacity)) 0%,
-    rgb(var(--bg-glow-color) / calc(var(--bg-glow-opacity) * 0.55)) 35%,
-    rgb(var(--bg-glow-color) / 0) 70%
-  );
-}
-html.dark .bg-field::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
-  opacity: var(--bg-noise-opacity);
+html.dark .atmosphere-veil {
+  background:
+    radial-gradient(ellipse 110% 90% at 50% 50%,
+      transparent 50%,
+      rgba(0,0,0,0.35) 100%),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='560' height='560'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='1.6' numOctaves='1' stitchTiles='stitch' seed='9'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.12 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  mix-blend-mode: overlay;
 }
 
 /* ============================================================
@@ -220,11 +345,14 @@ html.dark .segmented-rail {
 }
 .segmented-indicator.ready { opacity: 1; }
 html.dark .segmented-indicator {
-  background: rgb(var(--accent) / 0.22);
+  /* Light tinted glass + inset highlights + drop shadow — same raised,
+     solid-object feel as a toggled playstyle tile. */
+  background: color-mix(in srgb, rgb(var(--accent)) 26%, var(--glass-solid));
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.12),
-    0 0 0 1px rgb(var(--accent) / 0.55),
-    0 8px 18px -8px rgb(var(--accent) / 0.45);
+    0 1px 0 0 color-mix(in srgb, white 30%, transparent) inset,
+    0 -1px 0 0 color-mix(in srgb, black 20%, transparent) inset,
+    0 0 0 1px rgb(var(--accent) / 0.45),
+    0 8px 24px -8px rgba(0,0,0,0.4);
 }
 
 .segmented-rail .option-btn.slim {
@@ -244,9 +372,9 @@ html.dark .segmented-indicator {
   color: rgb(var(--c-ink)) !important;
   background: transparent !important;
 }
-/* Active button is text-only — the indicator IS the visible pill */
+/* Active button — accent text, matching a toggled playstyle tile. */
 .segmented-rail .option-btn.slim.active {
-  color: rgb(var(--c-ink)) !important;
+  color: rgb(var(--accent)) !important;
   background: transparent !important;
   box-shadow: none !important;
 }
