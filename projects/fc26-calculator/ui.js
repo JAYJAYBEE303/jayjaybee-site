@@ -331,7 +331,11 @@
     squadOpen = !squadOpen;
     document.getElementById('squadBody').classList.toggle('open', squadOpen);
     document.getElementById('squadChevron').classList.toggle('open', squadOpen);
-    if (squadOpen) renderSquad();
+    if (squadOpen) {
+      // Default the archetype filter to Assassin whenever the table opens.
+      document.getElementById('squadFilterArch').value = 'Assassin';
+      renderSquad();
+    }
   }
 
   // Squad leaderboard config — composites are equal-weighted averages of each
@@ -402,6 +406,12 @@
     return 'magenta';
   }
 
+  // Gauge fill % — maps the meaningful 30–135 stat range across the track.
+  function sqBarPct(v) {
+    if (!v) return 0;
+    return Math.max(4, Math.min(100, Math.round((v - 30) / 105 * 100)));
+  }
+
   function renderSquad() {
     const data = loadData();
     const allPlayers = [];
@@ -437,119 +447,133 @@
       return;
     }
 
-    // Stamp composite fields onto each player so they're sortable like any other key.
+    // Composite scores — stamped on each player so they sort like any other key.
     filtered.forEach(p => {
       SQUAD_LAYERS.forEach(l => { p['_' + l.key] = squadComposite(p, l.key); });
     });
 
-    // Active columns in render order — composites + (optionally) their subs inline.
-    const activeColumns = [];
-    SQUAD_LAYERS.forEach(layer => {
-      activeColumns.push({ kind: 'composite', layer, key: '_' + layer.key, label: layer.label });
-      if (squadExpanded[layer.key]) {
-        layer.subs.forEach(s => {
-          activeColumns.push({ kind: 'sub', layer, key: s.key, label: s.label });
-        });
-      }
-    });
-
-    // Top-3 ranks per visible column (across all filtered rows, regardless of group).
+    // Top-3 per layer composite, across all filtered players.
     const ranks = {};
-    activeColumns.forEach(col => {
-      const ranked = [...filtered]
-        .map(p => ({ id: p.folderName + '|' + p.name, v: +(p[col.key] || 0) }))
-        .sort((a, b) => b.v - a.v);
-      ranks[col.key] = {};
-      ranked.slice(0, 3).forEach((r, i) => { ranks[col.key][r.id] = i + 1; });
+    SQUAD_LAYERS.forEach(layer => {
+      const key = '_' + layer.key;
+      ranks[key] = {};
+      [...filtered]
+        .map(p => ({ id: p.folder + '|' + p.name, v: +(p[key] || 0) }))
+        .filter(r => r.v)
+        .sort((a, b) => b.v - a.v)
+        .slice(0, 3)
+        .forEach((r, i) => { ranks[key][r.id] = i + 1; });
     });
 
-    // Sort filtered list (sticky across re-renders via squadSort).
-    const sortKey = squadSort.key;
+    // Sort (sticky across re-renders via squadSort).
     const dir = squadSort.dir === 'asc' ? 1 : -1;
-    if (sortKey === '_name') {
+    if (squadSort.key === '_name') {
       filtered.sort((a, b) => a.name.localeCompare(b.name) * dir);
     } else {
-      filtered.sort((a, b) => ((+(a[sortKey] || 0)) - (+(b[sortKey] || 0))) * dir);
+      filtered.sort((a, b) => ((+(a[squadSort.key] || 0)) - (+(b[squadSort.key] || 0))) * dir);
     }
 
     const buildLabels = { very_lean: 'V.Lean', lean: 'Lean', normal: 'Avg', stocky: 'Stocky', very_stocky: 'V.Stocky' };
-    const sortInd = (key) => squadSort.key === key ? (squadSort.dir === 'desc' ? ' ▾' : ' ▴') : '';
-    const sortClass = (key) => squadSort.key === key ? ' is-sorted' : '';
+    const sortInd = key => squadSort.key === key
+      ? `<span class="sq-sort-ind">${squadSort.dir === 'desc' ? '▾' : '▴'}</span>` : '';
+    const sortCls = key => squadSort.key === key ? ' is-sorted' : '';
 
-    // Header
-    let header = `<tr class="squad-lb-header">
-      <th class="squad-lb-name-col" onclick="squadSortBy('_name')">
-        <span class="squad-lb-col-label${sortClass('_name')}">Player${sortInd('_name')}</span>
-      </th>`;
-    activeColumns.forEach(col => {
-      if (col.kind === 'composite') {
-        const open = squadExpanded[col.layer.key];
-        header += `<th class="squad-lb-col layer-${col.layer.key}${open ? ' is-expanded' : ''}">
-          <span class="squad-lb-col-label${sortClass(col.key)}" onclick="squadSortBy('${col.key}')">${esc(col.label)}${sortInd(col.key)}</span>
-          <button class="squad-lb-expand" type="button" onclick="squadToggleExpand('${col.layer.key}')" aria-label="${open ? 'Collapse' : 'Expand'} ${esc(col.label)}">${open ? '−' : '+'}</button>
-        </th>`;
-      } else {
-        header += `<th class="squad-lb-col squad-lb-substat squad-lb-substat-h${sortClass(col.key)}" onclick="squadSortBy('${col.key}')">${esc(col.label)}${sortInd(col.key)}</th>`;
-      }
+    // Shared column template — position · identity · 4 layer gauges.
+    const layerCols = SQUAD_LAYERS
+      .map(l => squadExpanded[l.key] ? 'minmax(300px, 2.4fr)' : 'minmax(126px, 1fr)')
+      .join(' ');
+    const cols = `46px minmax(188px, 1.45fr) ${layerCols}`;
+    const minW = 46 + 188 + SQUAD_LAYERS.reduce((w, l) => w + (squadExpanded[l.key] ? 300 : 126), 0)
+      + (5 * 12) + 28;
+
+    // Header strip
+    let head = `<div class="sq-head">
+      <div class="sq-h-pos">#</div>
+      <div class="sq-h-id sq-sortable${sortCls('_name')}" onclick="squadSortBy('_name')">Player ${sortInd('_name')}</div>`;
+    SQUAD_LAYERS.forEach(layer => {
+      const key = '_' + layer.key;
+      const open = squadExpanded[layer.key];
+      head += `<div class="sq-h-stat">
+        <span class="sq-h-label sq-sortable${sortCls(key)}" onclick="squadSortBy('${key}')">${esc(layer.label)} ${sortInd(key)}</span>
+        <button class="sq-expand${open ? ' is-on' : ''}" type="button" onclick="squadToggleExpand('${layer.key}')" aria-label="${open ? 'Collapse' : 'Expand'} ${esc(layer.label)}">${open ? '–' : '+'}</button>
+      </div>`;
     });
-    header += '</tr>';
+    head += '</div>';
 
-    // Body — sorted rows, no role groups
-    let body = '';
-    filtered.forEach(p => {
-      const id = p.folderName + '|' + p.name;
+    // One stat gauge — rank pip slot · telemetry bar · value.
+    const gauge = (v, tier, rank) => {
+      const pip = rank ? `<span class="sq-rank r${rank}">${rank}</span>` : '';
+      return `<div class="sq-gauge">
+        <span class="sq-rank-slot">${pip}</span>
+        <span class="sq-bar"><span class="sq-fill tier-${tier}" style="width:${sqBarPct(v)}%"></span></span>
+        <span class="sq-val${v ? ' tier-' + tier : ' muted'}">${v ? Math.round(v) : '—'}</span>
+      </div>`;
+    };
+
+    // Player rows
+    let rows = '';
+    filtered.forEach((p, i) => {
+      const id = p.folder + '|' + p.name;
       const rs = (p.roles && p.roles.length ? p.roles : (p.role ? [p.role] : [])).join(' · ');
       const h = p.state?.heightCm ? cmToFtIn(p.state.heightCm) : '—';
       const build = buildLabels[p.state?.buildType] || '—';
       const arch = [p.archetypePrimary, p.archetypeSecondary].filter(Boolean).join(' / ');
 
-      body += `<tr class="squad-lb-row">
-        <td class="squad-lb-name">
-          <div class="squad-lb-name-main">${esc(p.name)}</div>
-          <div class="squad-lb-name-sub">
-            ${rs ? `<span class="squad-lb-roles">${esc(rs)}</span>` : ''}
-            ${arch ? `<span class="squad-lb-arch">${esc(arch)}</span>` : ''}
-            <span>${esc(h)} · ${esc(build)}</span>
-          </div>
-        </td>`;
-
-      activeColumns.forEach(col => {
-        const v = +(p[col.key] || 0);
-        if (!v) {
-          body += `<td class="squad-lb-cell${col.kind === 'sub' ? ' is-substat squad-lb-substat' : ''}"><span class="squad-lb-num muted">—</span></td>`;
-          return;
+      let cells = '';
+      SQUAD_LAYERS.forEach(layer => {
+        const key = '_' + layer.key;
+        const v = +(p[key] || 0);
+        const open = squadExpanded[layer.key];
+        let subs = '';
+        if (open) {
+          subs = '<div class="sq-subs">' + layer.subs.map(s => {
+            const sv = +(p[s.key] || 0);
+            const st = squadTier(sv);
+            return `<div class="sq-sub">
+              <span class="sq-sub-l">${esc(s.label)}</span>
+              <span class="sq-sub-bar"><span class="sq-sub-fill tier-${st}" style="width:${sqBarPct(sv)}%"></span></span>
+              <span class="sq-sub-v${sv ? ' tier-' + st : ' muted'}">${sv ? Math.round(sv) : '—'}</span>
+            </div>`;
+          }).join('') + '</div>';
         }
-        const rank = ranks[col.key][id];
-        const rankBadge = rank ? `<span class="squad-lb-rank rank-${rank}">${rank}</span>` : '';
-        const subClass = col.kind === 'sub' ? ' is-substat squad-lb-substat' : '';
-        body += `<td class="squad-lb-cell${subClass} tier-${squadTier(v)}">
-          ${rankBadge}<span class="squad-lb-num">${Math.round(v)}</span>
-        </td>`;
+        cells += `<div class="sq-stat${open ? ' is-expanded' : ''}">${gauge(v, squadTier(v), ranks[key][id])}${subs}</div>`;
       });
-      body += '</tr>';
+
+      rows += `<div class="sq-row">
+        <div class="sq-pos${i < 3 ? ' p' + (i + 1) : ''}">${i + 1}</div>
+        <div class="sq-id">
+          <div class="sq-name">${esc(p.name)}</div>
+          <div class="sq-meta">
+            ${rs ? `<span class="sq-roles">${esc(rs)}</span>` : ''}
+            ${arch ? `<span class="sq-arch">${esc(arch)}</span>` : ''}
+            <span class="sq-phys">${esc(h)} · ${esc(build)}</span>
+          </div>
+        </div>
+        ${cells}
+      </div>`;
     });
 
-    // Footer — median + max across all visible rows.
-    const median = (arr) => { const s = [...arr].sort((a,b)=>a-b); return s[Math.floor(s.length/2)]; };
-    const footRow = (label, fn) => {
-      let r = `<tr class="squad-lb-foot"><td class="squad-lb-foot-label">${label}</td>`;
-      activeColumns.forEach(col => {
-        const all = filtered.map(p => +(p[col.key] || 0));
-        const v = fn(all);
-        const subClass = col.kind === 'sub' ? ' is-substat squad-lb-substat' : '';
-        r += `<td class="squad-lb-cell${subClass} tier-${squadTier(v)}"><span class="squad-lb-num">${Math.round(v)}</span></td>`;
-      });
-      r += '</tr>';
-      return r;
+    // Summary strip — median + peak across all visible players.
+    const median = arr => {
+      const s = arr.filter(x => x).sort((a, b) => a - b);
+      return s.length ? s[Math.floor(s.length / 2)] : 0;
     };
-    const footer = footRow('Median', median) + footRow('Max', a => Math.max(...a));
+    const summary = (label, fn) => {
+      let r = `<div class="sq-foot"><div class="sq-foot-label">${label}</div>`;
+      SQUAD_LAYERS.forEach(layer => {
+        const v = Math.round(fn(filtered.map(p => +(p['_' + layer.key] || 0))));
+        const tier = squadTier(v);
+        r += `<div class="sq-foot-stat">
+          <span class="sq-bar"><span class="sq-fill tier-${tier}" style="width:${sqBarPct(v)}%"></span></span>
+          <span class="sq-val${v ? ' tier-' + tier : ' muted'}">${v || '—'}</span>
+        </div>`;
+      });
+      return r + '</div>';
+    };
+    const foot = summary('Median', median) + summary('Peak', a => Math.max(0, ...a));
 
-    el.innerHTML = `<div class="squad-lb-wrap">
-      <table class="squad-lb-table">
-        <thead>${header}</thead>
-        <tbody>${body}</tbody>
-        <tfoot>${footer}</tfoot>
-      </table>
+    el.innerHTML = `<div class="sq-inner" style="--sq-cols:${cols}; min-width:${minW}px;">
+      ${head}${rows}${foot}
     </div>`;
   }
   // ── END SQUAD VIEW ──
@@ -2097,7 +2121,7 @@
 
   // On the 3-column layout, Compare + Squad get their own column — open them
   // by default so it isn't just two empty headers taking up the space.
-  if (window.matchMedia('(min-width: 2000px)').matches) {
+  if (window.matchMedia('(min-width: 2440px)').matches) {
     toggleCompare();
     toggleSquad();
   }
