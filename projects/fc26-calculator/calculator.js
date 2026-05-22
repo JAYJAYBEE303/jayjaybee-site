@@ -23,6 +23,20 @@
 
   function clamp(v) { return Math.max(1, Math.min(MAX_VAL, v)); }
 
+  /* ── Memoised element lookup ──────────────────────────────────
+     calculate() resolves ~100 element ids per run. The stat-row,
+     input and bar nodes are static for the life of the page, so
+     caching the references keeps that churn off the hot path.
+     A disconnected node falls back to a fresh lookup. */
+  const _elCache = Object.create(null);
+  function $id(id) {
+    const cached = _elCache[id];
+    if (cached && cached.isConnected) return cached;
+    const e = document.getElementById(id);
+    if (e) _elCache[id] = e;
+    return e;
+  }
+
   // ═══════════════════════════════════════════════════════════════
   // CHEMISTRY STYLE BOOSTS — sourced from FC26 official values.
   // Each key maps an input id to a point bonus applied on top of the entered value.
@@ -66,14 +80,14 @@
   }
 
   function calculate() {
-    const baseAccel    = Math.min(99, (+document.getElementById('baseAccel').value   || 0) + chemBoost('accel'));
-    const baseSprint   = Math.min(99, (+document.getElementById('baseSprint').value  || 0) + chemBoost('sprint'));
-    const baseAgility  = Math.min(99, (+document.getElementById('baseAgility').value || 0) + chemBoost('agility'));
+    const baseAccel    = Math.min(99, (+$id('baseAccel').value   || 0) + chemBoost('accel'));
+    const baseSprint   = Math.min(99, (+$id('baseSprint').value  || 0) + chemBoost('sprint'));
+    const baseAgility  = Math.min(99, (+$id('baseAgility').value || 0) + chemBoost('agility'));
     const baseTenacity = 75;
-    const heightCm     = +document.getElementById('heightCm').value     || DEFAULT_HEIGHT;
-    const weight       = +document.getElementById('weight').value       || DEFAULT_WEIGHT;
-    const strength     = Math.min(99, (+document.getElementById('strength').value    || DEFAULT_STR) + chemBoost('strength'));
-    const balance      = Math.min(99, (+document.getElementById('balance').value     || DEFAULT_BAL) + chemBoost('balance'));
+    const heightCm     = +$id('heightCm').value     || DEFAULT_HEIGHT;
+    const weight       = +$id('weight').value       || DEFAULT_WEIGHT;
+    const strength     = Math.min(99, (+$id('strength').value    || DEFAULT_STR) + chemBoost('strength'));
+    const balance      = Math.min(99, (+$id('balance').value     || DEFAULT_BAL) + chemBoost('balance'));
 
     let dA = 0, dS = 0, dG = 0, dT = 0;
     let breakdown = [];
@@ -231,44 +245,58 @@
 
   function tenacityColor(eff) { return `var(--tier-${statTier(eff)})`; }
 
+  /* ── Shared number-tween ticker ───────────────────────────────
+     Every effective-stat readout used to spawn its own rAF chain
+     (~21 concurrent loops per calculate). One ticker now advances
+     them all and writes every textContent inside a single frame —
+     no interleaved layout reads, far less rAF/closure overhead. */
+  const _numAnims = new Map();
+  let _numRAF = 0;
+  function _numTick() {
+    _numRAF = 0;
+    for (const [el, a] of _numAnims) {
+      a.step++;
+      a.val += a.inc;
+      el.textContent = Math.round(a.step < a.steps ? a.val : a.target);
+      if (a.step >= a.steps) _numAnims.delete(el);
+    }
+    if (_numAnims.size) _numRAF = requestAnimationFrame(_numTick);
+  }
   function animateNumber(el, target, color) {
-    const current = parseInt(el.textContent) || 0;
+    if (!el) return;
     el.style.color = color;
-    if (current === target) return;
-    const steps = Math.min(Math.abs(target - current), 16);
-    const increment = (target - current) / steps;
-    let step = 0, val = current;
-    const tick = () => {
-      step++;
-      val += increment;
-      el.textContent = Math.round(step < steps ? val : target);
-      if (step < steps) requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
+    const current = parseInt(el.textContent) || 0;
+    if (current === target) { _numAnims.delete(el); return; }
+    const steps = Math.min(Math.abs(target - current), 16) || 1;
+    _numAnims.set(el, {
+      val: current, target, step: 0, steps,
+      inc: (target - current) / steps,
+    });
+    if (!_numRAF) _numRAF = requestAnimationFrame(_numTick);
   }
 
   const BAR_VISUAL_MAX = 120; // All stat bars visually fill on a 0-120 scale for consistency
 
   function updateRow(prefix, base, eff, delta, neutralColor, isSprint, isTenacity) {
-    animateNumber(document.getElementById(`num${prefix}Eff`), eff, isSprint ? sprintColor(eff) : isTenacity ? tenacityColor(eff) : effColor(eff));
-    document.getElementById(`bar${prefix}Base`).style.width = `${Math.min(100,(base/BAR_VISUAL_MAX)*100)}%`;
+    animateNumber($id(`num${prefix}Eff`), eff, isSprint ? sprintColor(eff) : isTenacity ? tenacityColor(eff) : effColor(eff));
+    $id(`bar${prefix}Base`).style.width = `${Math.min(100,(base/BAR_VISUAL_MAX)*100)}%`;
 
-    const effBar = document.getElementById(`bar${prefix}Eff`);
+    const effBar = $id(`bar${prefix}Eff`);
     effBar.style.width = `${Math.min(100,(eff/BAR_VISUAL_MAX)*100)}%`;
     setBarTier(effBar, eff);
   }
 
   function updateSlip(slip) {
-    const el = document.getElementById('numSlipEff');
-    const bar = document.getElementById('barSlipEff');
+    const el = $id('numSlipEff');
+    const bar = $id('barSlipEff');
     animateNumber(el, slip, effColor(slip));
     bar.style.width = `${Math.max(0, Math.min(100, (slip / BAR_VISUAL_MAX) * 100))}%`;
     setBarTier(bar, slip);
-    document.getElementById('barSlipBase').style.width = '0%';
+    $id('barSlipBase').style.width = '0%';
   }
 
   function renderSlipBreakdown(effG, heightCm, effT, techBonus, buildBonus, total) {
-    const el = document.getElementById('slipBreakdownList');
+    const el = $id('slipBreakdownList');
     const items = [];
 
     const baseSlip = 180 + (effG - heightCm);
@@ -300,7 +328,7 @@
   }
 
   function renderBreakdown(items) {
-    const el = document.getElementById('breakdownList');
+    const el = $id('breakdownList');
     const active = items.filter(i => i.a||i.s||i.g||i.t||i.note);
     if (!active.length) {
       el.innerHTML = '<div class="breakdown-item"><span style="color:var(--muted);font-size:0.68rem;">No modifiers — all stats at face value</span></div>';
@@ -326,7 +354,7 @@
   // into one row), the redundant "→ Stat" suffix is dropped (the chip already labels
   // its target), and chips are formatted as integers when the rounded value is exact.
   function renderExtBreakdown(listId, items, statDefs) {
-    const el = document.getElementById(listId);
+    const el = $id(listId);
     if (!el) return;
     const active = items.filter(i => i.note || i.isBase || statDefs.some(s => i[s.key]));
     if (!active.length) {
@@ -424,7 +452,7 @@
     if (activePS.has('rapid_plus') && type==='lengthy') lines.push('Rapid+ on lengthy — top end amplified further, almost impossible to catch once moving.');
     if (activePS.has('enforcer_plus') && strength > 80) lines.push('Enforcer+ with high strength — physical resistance unlocked, dominant in all contact situations.');
 
-    document.getElementById('verdictText').textContent = lines.join(' ');
+    $id('verdictText').textContent = lines.join(' ');
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -434,7 +462,7 @@
 
   const EXT_DEFAULT = 70;
   function ext(id) {
-    const el = document.getElementById(id);
+    const el = $id(id);
     const base = el ? (+el.value || EXT_DEFAULT) : EXT_DEFAULT;
     // Extended stat ids pass through chemBoost directly; chem keys match input ids
     return Math.min(99, base + chemBoost(id));
@@ -442,9 +470,9 @@
 
   // Helper: update a sub-stat bar (used by all three layers)
   function updateSubRow(prefix, eff) {
-    const effBar = document.getElementById(`bar${prefix}Eff`);
-    const baseBar = document.getElementById(`bar${prefix}Base`);
-    const numEl = document.getElementById(`num${prefix}Eff`);
+    const effBar = $id(`bar${prefix}Eff`);
+    const baseBar = $id(`bar${prefix}Base`);
+    const numEl = $id(`num${prefix}Eff`);
     if (!effBar || !numEl) return;
     const capped = Math.max(0, Math.min(150, Math.round(eff)));
     animateNumber(numEl, capped, effColor(capped));
@@ -574,7 +602,7 @@
     if (sp - tb > 25) lines.push('Short-game specialist — struggles to break lines.');
     if (cr >= 120) lines.push('Whipped deliveries land consistently on target.');
 
-    document.getElementById('passingVerdictText').textContent =
+    $id('passingVerdictText').textContent =
       lines.length ? lines.join(' ') : 'Passing profile is broadly average.';
   }
 
@@ -589,8 +617,8 @@
     const jumping = ext('jumping');
     const composure = ext('composure');
     const reactions = ext('reactions');
-    const strength = Math.min(99, (+document.getElementById('strength').value || DEFAULT_STR) + chemBoost('strength'));
-    const balance  = Math.min(99, (+document.getElementById('balance').value  || DEFAULT_BAL) + chemBoost('balance'));
+    const strength = Math.min(99, (+$id('strength').value || DEFAULT_STR) + chemBoost('strength'));
+    const balance  = Math.min(99, (+$id('balance').value  || DEFAULT_BAL) + chemBoost('balance'));
 
     let tk = standTackle;
     let pos = defAwareness;
@@ -775,7 +803,7 @@
     if (slide >= 115)         lines.push('Elite slide-tackler — times recoveries with precision.');
     else if (slide < 70)      lines.push('Mistimes slide tackles — liable to give away dangerous fouls.');
 
-    document.getElementById('defendingVerdictText').textContent =
+    $id('defendingVerdictText').textContent =
       lines.length ? lines.join(' ') : 'Defending profile is broadly average.';
   }
 
@@ -939,7 +967,7 @@
     if (fk >= 115)                    lines.push('Elite free-kick taker — a genuine set-piece threat.');
     else if (fk < 65)                 lines.push('Not a free-kick option — hand the ball to someone else.');
 
-    document.getElementById('shootingVerdictText').textContent =
+    $id('shootingVerdictText').textContent =
       lines.length ? lines.join(' ') : 'Shooting profile is broadly average.';
   }
 

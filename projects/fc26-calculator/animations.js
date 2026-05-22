@@ -74,9 +74,11 @@
      ─────────────────────────────────────────────────────────── */
   const cards = document.querySelectorAll('section.card-enter');
   if (REDUCED_MOTION) {
-    cards.forEach(c => c.classList.add('is-visible'));
+    cards.forEach(c => { c.classList.add('is-visible'); c.style.willChange = 'auto'; });
   } else {
     let revealedCount = 0;
+    let settledCount = 0;
+    const totalCards = cards.length;
     const reveal = new IntersectionObserver((entries) => {
       // Sort entries top-down so stagger order is visually correct
       entries
@@ -85,8 +87,16 @@
         .forEach(e => {
           const delay = Math.min(revealedCount * 90, 360);
           revealedCount++;
-          setTimeout(() => e.target.classList.add('is-visible'), delay);
-          reveal.unobserve(e.target);
+          const target = e.target;
+          setTimeout(() => {
+            target.classList.add('is-visible');
+            // Reveal is one-shot — drop the compositor hint once the
+            // transition has finished so the layer can be released.
+            setTimeout(() => { target.style.willChange = 'auto'; }, 820);
+          }, delay);
+          reveal.unobserve(target);
+          // Stop observing entirely once every card has fired.
+          if (++settledCount >= totalCards) reveal.disconnect();
         });
     }, { rootMargin: '0px 0px -8% 0px', threshold: 0.06 });
     cards.forEach(c => reveal.observe(c));
@@ -94,26 +104,58 @@
 
   /* ── 3. Number flash — pulse stat values when they update ──
      We watch the effective stat / sub-stat / delta numbers for text
-     changes and add a brief .flash class to celebrate the update.
+     changes and pulse them to celebrate the update.
+
+     The previous implementation gave every readout its own
+     MutationObserver and, on each mutation, did
+     `remove(class) → void offsetHeight → add(class)` to restart the
+     CSS animation. Because the numbers tween over ~16 frames, that
+     fired ~16× per number per calculate, and each `offsetHeight`
+     read is a *synchronous forced reflow* — ~300+ per calculate.
+
+     Now: ONE observer for all readouts; the pulse runs through the
+     Web Animations API (no class churn, no forced reflow); and a
+     leading-edge cooldown collapses the whole tween burst into a
+     single clean pulse instead of 16 restarts.
      ─────────────────────────────────────────────────────────── */
   if (!REDUCED_MOTION) {
-    const flashTargets = document.querySelectorAll(
-      '.stat-effective-num, .sub-stat-num, .delta'
-    );
-    flashTargets.forEach(el => {
-      let last = el.textContent;
-      const pulse = () => {
-        el.classList.remove('flash');
-        void el.offsetHeight;
-        el.classList.add('flash');
-      };
-      new MutationObserver(() => {
-        if (el.textContent !== last) {
-          last = el.textContent;
-          pulse();
+    const FLASH_MS = 540;
+    const FLASH_KEYFRAMES = [
+      { transform: 'translateY(0)',    filter: 'brightness(1)' },
+      { transform: 'translateY(-2px)', filter: 'brightness(1.3)', offset: 0.35 },
+      { transform: 'translateY(0)',    filter: 'brightness(1)' },
+    ];
+    const FLASH_OPTS = { duration: FLASH_MS, easing: 'cubic-bezier(0.32, 0.72, 0.24, 1)' };
+    const flashLast = new WeakMap();
+    const flashCooldown = new WeakMap();
+
+    const flashEl = (el) => {
+      const now = performance.now();
+      if (now < (flashCooldown.get(el) || 0)) return;   // mid-burst — skip
+      flashCooldown.set(el, now + FLASH_MS);
+      // WAAPI restart is layout-free; no class toggle, no offsetHeight.
+      el.animate(FLASH_KEYFRAMES, FLASH_OPTS);
+    };
+
+    const flashObserver = new MutationObserver((records) => {
+      const seen = new Set();
+      for (const r of records) {
+        const el = r.target.nodeType === 3 ? r.target.parentNode : r.target;
+        if (!el || seen.has(el)) continue;
+        seen.add(el);
+        const txt = el.textContent;
+        if (flashLast.get(el) !== txt) {
+          flashLast.set(el, txt);
+          flashEl(el);
         }
-      }).observe(el, { childList: true, characterData: true, subtree: true });
+      }
     });
+
+    document.querySelectorAll('.stat-effective-num, .sub-stat-num, .delta')
+      .forEach(el => {
+        flashLast.set(el, el.textContent);
+        flashObserver.observe(el, { childList: true, characterData: true, subtree: true });
+      });
   }
 
   /* ── 4. Tactile haptics on button press (if available) ──────

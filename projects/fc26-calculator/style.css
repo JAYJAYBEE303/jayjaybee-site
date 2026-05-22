@@ -89,11 +89,11 @@
     min-height: 100%;
   }
   body {
+    /* The paper grain used to live here as `background-attachment:
+       fixed`, which forces a full-viewport background repaint on
+       every scroll frame. It now rides the fixed `.orb-field`
+       layer instead (see below) — same look, composited scroll. */
     background-color: rgb(var(--c-canvas));
-    background-image: var(--grain);
-    background-repeat: repeat;
-    background-size: 640px 640px;
-    background-attachment: fixed;
     color: rgb(var(--c-ink));
     font-family: 'Hanken Grotesk', -apple-system, 'Helvetica Neue', Arial, sans-serif;
     font-weight: 400;
@@ -103,7 +103,15 @@
     min-height: 100dvh;
     position: relative;
   }
-  @media print { body { background-image: none; } }
+  /* Light-mode paper grain — painted onto the fixed atmosphere
+     layer so the compositor scrolls it without any repaint.
+     (Dark mode draws its own gradient + noise on .orb-field.) */
+  html:not(.dark) .orb-field {
+    background-image: var(--grain);
+    background-repeat: repeat;
+    background-size: 640px 640px;
+  }
+  @media print { .orb-field, .atmosphere-veil { display: none; } }
   /* Display headers — Inter Tight (replaces the former serif) */
   h1, h2, .display, .hero-title, .hero-eyebrow, .section-eyebrow, .text-display,
   .font-display {
@@ -195,7 +203,8 @@
     padding: 8px 10px; border-radius: 8px;
     font-size: 12px; font-weight: 500; text-align: center;
     cursor: pointer; user-select: none;
-    transition: all 180ms ease;
+    transition: color 180ms ease, background-color 180ms ease,
+                border-color 180ms ease, box-shadow 180ms ease;
     line-height: 1.2;
   }
   .option-btn:hover { border-color: rgb(var(--c-line-strong)); color: rgb(var(--c-ink)); }
@@ -219,7 +228,8 @@
     box-shadow:
       0 1px 0 0 rgb(255 255 255 / 0.6) inset,
       0 5px 14px -5px rgb(0 0 0 / 0.16);
-    transition: all 180ms ease;
+    transition: border-color 180ms ease, background-color 180ms ease,
+                box-shadow 180ms ease, transform 180ms ease;
   }
   .ps-btn:hover { border-color: rgb(var(--c-line-strong)); transform: translateY(-1px); }
   .ps-btn.active {
@@ -425,7 +435,8 @@
     border-radius: 8px; padding: 8px 12px;
     font-size: 11px; font-weight: 600; letter-spacing: 0.04em;
     cursor: pointer; border: 1px solid transparent;
-    transition: all 160ms ease;
+    transition: background-color 160ms ease, border-color 160ms ease,
+                color 160ms ease, filter 160ms ease;
     font-family: 'Hanken Grotesk', sans-serif;
     white-space: nowrap;
   }
@@ -483,7 +494,8 @@
     background: rgb(var(--c-sunken)); color: rgb(var(--c-ink-muted));
     border: 1px solid rgb(var(--c-line));
     cursor: pointer; user-select: none;
-    transition: all 160ms ease; letter-spacing: 0.04em; font-weight: 500;
+    transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+    letter-spacing: 0.04em; font-weight: 500;
   }
   .role-chip:hover, .archetype-chip:hover { border-color: rgb(var(--c-line-strong)); }
   .role-chip.active {
@@ -524,8 +536,10 @@
   }
   .folder-delete-btn:hover { color: rgb(var(--c-loss)); }
   /* Left padding is the per-level indent — it compounds with nesting so every
-     folder's contents (players + subfolders alike) sit one clear step in. */
-  .folder-contents { padding: 4px 0 4px 48px; }
+     folder's contents (players + subfolders alike) sit one clear step in.
+     It lives on the inner wrapper so the outer clip can collapse to a true
+     0 height (padding on the clip itself can't compress). */
+  .folder-contents-inner { padding: 4px 0 4px 48px; }
   /* (open/close animation handled below via max-height + JS) */
   .saved-player {
     display: flex; align-items: center; gap: 8px;
@@ -880,13 +894,35 @@
   .collapsible-body.open {
     opacity: 1;
   }
+  /* Folder open/close — the squad-table style: a fade paired with a glide.
+     .folder-contents is the height clip (max-height driven by animations.js);
+     .folder-contents-inner carries the fade. The resting rules hold the
+     *close* timing (fade the contents out, then glide the height shut); the
+     .open rules hold the *open* timing (glide the height open, then fade the
+     contents in) — each the reverse of the other. */
   .folder-contents {
     overflow: hidden;
     max-height: 0;
-    transition: max-height 360ms cubic-bezier(0.32, 0.72, 0.24, 1);
+    transition: max-height 300ms cubic-bezier(0.32, 0.72, 0.24, 1) 140ms;
   }
   .folder-contents.open {
     /* JS sets max-height to scrollHeight */
+    transition: max-height 340ms cubic-bezier(0.32, 0.72, 0.24, 1);
+  }
+  .folder-contents-inner {
+    opacity: 0;
+    transition: opacity 160ms ease;
+  }
+  .folder-contents.open .folder-contents-inner {
+    opacity: 1;
+    transition: opacity 280ms ease 120ms;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .folder-contents, .folder-contents.open,
+    .folder-contents-inner, .folder-contents.open .folder-contents-inner {
+      transition-duration: 1ms;
+      transition-delay: 0ms;
+    }
   }
 
   /* Number flash — when stat values update */
@@ -902,19 +938,16 @@
   /* ─────────────────────────────────────────────────────────
      Micro-interactions — tactile press feedback, hover lift
      ───────────────────────────────────────────────────────── */
-  .ps-btn,
-  .option-btn,
-  .role-chip,
-  .archetype-chip,
-  .save-btn,
-  .export-btn,
-  .import-btn,
-  .load-btn,
-  .delete-btn,
-  .info-btn,
-  #themeToggle {
-    transform: translateZ(0);  /* promote to layer for crisp anims */
-  }
+  /* NOTE: a `transform: translateZ(0)` rule used to live here to
+     "promote to layer for crisp anims". It forced ~170 controls
+     (every playstyle tile, chip, button and all ~103 info-buttons)
+     onto their own GPU compositor layer permanently — which the
+     compositor must then maintain at idle and re-assemble on every
+     scroll frame. That was the real cause of the elevated idle CPU
+     and the scroll judder (worst over the control-dense Section 01).
+     Removed: the brief :active press below animates `transform`, and
+     the browser promotes a layer on-demand for the duration of that
+     animation only. No permanent promotion is needed. */
   .ps-btn:active,
   .option-btn:active,
   .role-chip:active,
@@ -973,24 +1006,33 @@
       0 16px 44px -18px rgb(0 0 0 / 0.62);
   }
 
-  /* Header strip — sort controls, no table chrome */
+  /* Header strip — sort controls, no table chrome.
+     Column spacing lives in each cell's padding-left (not grid `gap`) so a
+     collapsed 0fr track contributes zero width during the focus animation. */
   .sq-head {
     display: grid;
     grid-template-columns: var(--sq-cols);
     align-items: end;
-    gap: 12px;
     padding: 11px 14px 8px;
     font-size: 9px; font-weight: 700; text-transform: uppercase;
     letter-spacing: 0.16em; color: rgb(var(--c-ink-faint));
     border-bottom: 1px solid rgb(var(--c-line));
     box-shadow: 0 1px 0 rgb(255 255 255 / 0.55);
+    transition: grid-template-columns 340ms cubic-bezier(0.4, 0, 0.2, 1);
   }
   html.dark .sq-head {
     border-bottom-color: rgb(0 0 0 / 0.36);
     box-shadow: 0 1px 0 rgb(255 255 255 / 0.06);
   }
   .sq-h-pos { text-align: center; }
-  .sq-h-stat { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .sq-h-id { padding-left: 12px; }
+  .sq-h-stat {
+    display: flex; align-items: center; justify-content: space-between; gap: 6px;
+    padding-left: 12px;
+    overflow: hidden;
+    transition: opacity 170ms ease 340ms,
+                padding-left 340ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
   .sq-h-label {
     padding-bottom: 4px;
     border-bottom: 1.5px solid rgb(var(--accent) / 0.6);
@@ -1024,9 +1066,9 @@
     display: grid;
     grid-template-columns: var(--sq-cols);
     align-items: center;
-    gap: 12px;
     padding: 10px 14px;
-    transition: background 160ms ease;
+    transition: background 160ms ease,
+                grid-template-columns 340ms cubic-bezier(0.4, 0, 0.2, 1);
   }
   /* Chiselled-groove divider between records — shadow line then highlight */
   .sq-row + .sq-row {
@@ -1064,7 +1106,7 @@
   }
 
   /* Identity */
-  .sq-id { min-width: 0; }
+  .sq-id { min-width: 0; padding-left: 12px; }
   .sq-name {
     font-size: 13px; font-weight: 600; color: rgb(var(--c-ink));
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -1078,9 +1120,15 @@
   .sq-arch  { color: rgb(var(--c-warn)); font-style: italic; }
 
   /* Stat gauge */
-  .sq-stat { min-width: 0; }
+  .sq-stat {
+    min-width: 0;
+    padding-left: 12px;
+    overflow: hidden;
+    transition: opacity 170ms ease 340ms,
+                padding-left 340ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
   .sq-gauge { display: flex; align-items: center; gap: 7px; }
-  .sq-stat.is-expanded .sq-gauge { max-width: 240px; }
+  .sq-stat.is-focused .sq-gauge { max-width: 240px; }
   .sq-rank-slot { flex-shrink: 0; width: 13px; display: flex; }
   .sq-rank {
     width: 13px; height: 13px; line-height: 13px; text-align: center;
@@ -1109,13 +1157,24 @@
   }
   .sq-val.muted, .sq-sub-v.muted { color: rgb(var(--c-ink-faint)); font-weight: 400; }
 
-  /* Expanded sub-stat telemetry */
-  .sq-subs {
+  /* Expanded sub-stat telemetry — three nested layers:
+       .sq-subs-wrap  height animator (grid-template-rows 0fr → 1fr)
+       .sq-subs       the overflow clip — MUST stay padding/border-free,
+                      or its box can't compress to 0 in the 0fr track
+       .sq-subs-grid  the actual content: divider, padding, column grid */
+  .sq-subs-wrap {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    transition: grid-template-rows 220ms ease, opacity 160ms ease;
+  }
+  .sq-subs { min-height: 0; overflow: hidden; }
+  .sq-subs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     gap: 4px 16px;
     margin-top: 9px;
-    padding-top: 8px;
+    padding-top: 9px;
     border-top: 1px dashed rgb(var(--c-line) / 0.9);
   }
   .sq-sub { display: flex; align-items: center; gap: 6px; }
@@ -1163,9 +1222,9 @@
     display: grid;
     grid-template-columns: var(--sq-cols);
     align-items: center;
-    gap: 12px;
     padding: 9px 14px;
     background: rgb(var(--c-sunken) / 0.55);
+    transition: grid-template-columns 340ms cubic-bezier(0.4, 0, 0.2, 1);
   }
   /* Chiselled divider above the summary block + between Median / Peak */
   .sq-row + .sq-foot,
@@ -1183,8 +1242,61 @@
     font-size: 9px; font-weight: 700; text-transform: uppercase;
     letter-spacing: 0.16em; color: rgb(var(--c-ink-muted));
   }
-  .sq-foot-stat { display: flex; align-items: center; gap: 7px; min-width: 0; }
+  .sq-foot-stat {
+    display: flex; align-items: center; gap: 7px; min-width: 0;
+    padding-left: 12px;
+    overflow: hidden;
+    transition: opacity 170ms ease 340ms,
+                padding-left 340ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
   .sq-foot-stat .sq-bar { max-width: 160px; }
+
+  /* ── Focus-mode animation ───────────────────────────────────────
+     Expanding a layer hides the others and stretches its column to
+     fill the table. The sequence — fade the others out, glide the
+     column open, then reveal the sub-stats — is driven purely by
+     transition timing: the resting rules above carry the *collapse*
+     (reverse) timing; the .has-focus rules below carry the *expand*
+     timing (a delay that waits for the prior phase to finish). */
+  .sq-inner.has-focus .sq-head,
+  .sq-inner.has-focus .sq-row,
+  .sq-inner.has-focus .sq-foot {
+    transition: grid-template-columns 340ms cubic-bezier(0.4, 0, 0.2, 1) 170ms;
+  }
+  .sq-inner.has-focus .sq-row {
+    transition: background 160ms ease,
+                grid-template-columns 340ms cubic-bezier(0.4, 0, 0.2, 1) 170ms;
+  }
+  .sq-inner.has-focus .sq-h-stat:not(.is-focused),
+  .sq-inner.has-focus .sq-stat:not(.is-focused),
+  .sq-inner.has-focus .sq-foot-stat:not(.is-focused) {
+    opacity: 0;
+    padding-left: 0;
+    pointer-events: none;
+    transition: opacity 170ms ease,
+                padding-left 340ms cubic-bezier(0.4, 0, 0.2, 1) 170ms;
+  }
+  .sq-inner.has-focus .sq-stat.is-focused .sq-subs-wrap {
+    grid-template-rows: 1fr;
+    opacity: 1;
+    transition: grid-template-rows 260ms ease 510ms,
+                opacity 240ms ease 510ms;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sq-head, .sq-row, .sq-foot,
+    .sq-h-stat, .sq-stat, .sq-foot-stat, .sq-subs-wrap,
+    .sq-inner.has-focus .sq-head,
+    .sq-inner.has-focus .sq-row,
+    .sq-inner.has-focus .sq-foot,
+    .sq-inner.has-focus .sq-h-stat:not(.is-focused),
+    .sq-inner.has-focus .sq-stat:not(.is-focused),
+    .sq-inner.has-focus .sq-foot-stat:not(.is-focused),
+    .sq-inner.has-focus .sq-stat.is-focused .sq-subs-wrap {
+      transition-duration: 1ms;
+      transition-delay: 0ms;
+    }
+  }
 
   /* ════════════════════════════════════════════════════════════
      Unified glass controls — every button, input, select and chip
@@ -1199,10 +1311,12 @@
     .name-input, .folder-select, .io-textarea,
     .role-chip, .archetype-chip
   ) {
+    /* backdrop-filter removed — see "PERFORMANCE: backdrop-filter"
+       note below. These controls sit on the already-frosted
+       .unified-card, so their own blur was a redundant second
+       pass; the translucent fill still shows the frost through. */
     background: var(--glass-thick);
     border: 1px solid var(--glass-stroke-outer);
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
     box-shadow:
       0 1px 0 0 color-mix(in srgb, white 30%, transparent) inset,
       0 -1px 0 0 color-mix(in srgb, black 20%, transparent) inset,
@@ -1227,8 +1341,6 @@
   html.dark .stat-input input {
     background: rgb(0 0 0 / 0.25);
     border: 1px solid var(--glass-stroke-outer);
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
     box-shadow:
       0 1px 0 0 color-mix(in srgb, white 30%, transparent) inset,
       0 -1px 0 0 color-mix(in srgb, black 20%, transparent) inset,
@@ -1252,8 +1364,6 @@
     background: color-mix(in srgb, rgb(var(--accent)) 26%, var(--glass-solid));
     border: 1px solid rgb(var(--accent));
     color: rgb(var(--accent));
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
     box-shadow:
       0 1px 0 0 color-mix(in srgb, white 30%, transparent) inset,
       0 -1px 0 0 color-mix(in srgb, black 20%, transparent) inset,
@@ -1638,8 +1748,6 @@
   html.dark .ps-btn {
     background: var(--glass-thick);
     border-color: var(--glass-stroke-outer);
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
     box-shadow:
       0 1px 0 0 color-mix(in srgb, white 30%, transparent) inset,
       0 -1px 0 0 color-mix(in srgb, black 20%, transparent) inset,
@@ -1743,8 +1851,6 @@
     color: rgb(var(--c-ink));
     background: rgb(255 255 255 / 0.06);
     border: 1px solid var(--glass-stroke-outer);
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
     transition: background 220ms ease, transform 160ms cubic-bezier(0.34, 1.4, 0.4, 1), border-color 220ms ease;
     cursor: pointer;
     line-height: 1;
@@ -1780,3 +1886,71 @@
   /* Wordmark / hero — adopt design-system display weight in dark mode */
   html.dark h1.font-display { font-weight: 300; letter-spacing: -0.03em; }
   html.dark h1.font-display .italic { font-weight: 300; }
+
+  /* ════════════════════════════════════════════════════════════
+     PERFORMANCE — layout/paint containment
+     ────────────────────────────────────────────────────────────
+     `contain: layout` turns each repeated block into its own
+     layout boundary: a change inside one row/card/tile no longer
+     forces the browser to re-run layout for its siblings or walk
+     back up the tree. It is purely a rendering hint — geometry,
+     paint output and behaviour are unchanged, and (unlike
+     `contain: size` / `content-visibility`) it does NOT affect the
+     scrollHeight the collapsible animations measure.
+
+     `paint` is only added to `.stat-bar-wrap`, which already clips
+     its overflow — so nothing visible is ever cropped.
+
+     NOTE: `content-visibility: auto` is deliberately NOT used here.
+     Almost every list/section sits inside a collapsible whose open
+     animation measures `scrollHeight`; content-visibility reports
+     an intrinsic placeholder size for offscreen content, which
+     would corrupt those measurements and break the open/close
+     animation. Containment delivers the invalidation-scoping win
+     without that hazard.
+     ════════════════════════════════════════════════════════════ */
+  .card,
+  .compare-card,
+  .feel-layer-card,
+  .stat-row,
+  .sub-stat-row,
+  .breakdown-item,
+  .ps-btn,
+  .option-btn,
+  .saved-player,
+  .folder-group,
+  .sq-row,
+  .radar-card,
+  .compare-slot,
+  .collapsible-body,
+  .folder-contents,
+  .unified-card {
+    contain: layout;
+  }
+  .stat-bar-wrap { contain: layout paint; }
+
+  /* Singleton info overlay — promote so show/hide composites cleanly */
+  .info-bubble { will-change: opacity, transform; }
+
+  /* ════════════════════════════════════════════════════════════
+     PERFORMANCE — backdrop-filter
+     ────────────────────────────────────────────────────────────
+     Dark mode previously gave ~215 interior controls (playstyle
+     tiles, inputs, chips, info buttons, save/folder controls,
+     segmented rails, theme toggle) their own `backdrop-filter`.
+     Every one is a separate GPU blur pass: the compositor cannot
+     cheaply cache that many stacked filter layers (idle CPU stays
+     high), and scrolling slides them all across the fixed
+     atmosphere so each re-blurs every frame (dropped scroll FPS).
+
+     They have been removed. Those controls sit ON the
+     `.unified-card`, which is itself a heavy frosted surface
+     (`backdrop-filter: blur(28px)`) — so a per-control blur was a
+     second blur of an already-smooth backdrop, visually redundant.
+     The controls keep their translucent fills, borders and inset
+     highlights, so they still read as glass.
+
+     `backdrop-filter` is intentionally KEPT on `.unified-card`
+     (and the mobile `.card`) — that single frosted panel is the
+     core of the visual language and one blur pass is cheap.
+     ════════════════════════════════════════════════════════════ */

@@ -59,9 +59,22 @@
     return `${ft}'${inch}"`;
   }
 
+  /* Coalesce calculate() to at most one run per animation frame.
+     Typing fires an `input` event for every keystroke; without this
+     each one synchronously drives the entire stat pipeline (movement
+     + passing + defending + shooting + breakdown rebuilds). A single
+     frame of latency is imperceptible while removing the bulk of the
+     redundant recalculation when a value changes rapidly. */
+  let _calcScheduled = false;
+  function scheduleCalculate() {
+    if (_calcScheduled) return;
+    _calcScheduled = true;
+    requestAnimationFrame(() => { _calcScheduled = false; calculate(); });
+  }
+
   document.getElementById('heightCm').addEventListener('input', function() {
     document.getElementById('heightDisplay').textContent = cmToFtIn(+this.value);
-    calculate();
+    scheduleCalculate();
   });
   document.getElementById('heightDisplay').textContent = cmToFtIn(DEFAULT_HEIGHT);
 
@@ -73,7 +86,7 @@
    'composure','reactions','ballControl','dribbling','stamina']
     .forEach(id => {
       const el = document.getElementById(id);
-      if (el) el.addEventListener('input', calculate);
+      if (el) el.addEventListener('input', scheduleCalculate);
     });
 
   function selectAccel(el) {
@@ -105,7 +118,10 @@
     if (!indicator || !active) return;
     const rRail = rail.getBoundingClientRect();
     const rBtn = active.getBoundingClientRect();
-    indicator.style.left = (rBtn.left - rRail.left) + 'px';
+    // Slide via `transform` (compositor-only) rather than `left`
+    // (layout). Width is set directly — for the equal-column rails
+    // it never changes between selections, so nothing animates it.
+    indicator.style.transform = `translateX(${rBtn.left - rRail.left}px)`;
     indicator.style.width = rBtn.width + 'px';
     indicator.classList.add('ready');
   }
@@ -123,9 +139,17 @@
     });
   }
 
+  // rAF-throttle resize — the raw event fires dozens of times a
+  // second while dragging, each call reading two getBoundingClientRect
+  // per rail. Collapse the burst to one repositioning pass per frame.
+  let _resizeRAF = 0;
   window.addEventListener('resize', () => {
-    document.querySelectorAll('.segmented-rail, .view-toggle').forEach(positionSegmentedIndicator);
-  });
+    if (_resizeRAF) return;
+    _resizeRAF = requestAnimationFrame(() => {
+      _resizeRAF = 0;
+      document.querySelectorAll('.segmented-rail, .view-toggle').forEach(positionSegmentedIndicator);
+    });
+  }, { passive: true });
 
   /* ── Tri-state playstyle buttons ─────────────────────────────────────────
      Each playstyle "pair" (e.g. quickstep + quickstep_plus) collapses into a
@@ -375,7 +399,9 @@
 
   // Persisted across re-renders. Default sort: Movement composite, descending.
   let squadSort = { key: '_movement', dir: 'desc' };
-  const squadExpanded = { movement: false, passing: false, defending: false, shooting: false };
+  // The single layer currently expanded to full-width focus, or null. Only
+  // one expands at a time — its column takes the space the others vacate.
+  let squadFocus = null;
 
   function squadSortBy(key) {
     if (squadSort.key === key) {
@@ -387,8 +413,44 @@
   }
 
   function squadToggleExpand(layerKey) {
-    squadExpanded[layerKey] = !squadExpanded[layerKey];
-    renderSquad();
+    squadFocus = squadFocus === layerKey ? null : layerKey;
+    // Mutate the live table rather than re-rendering — the existing nodes
+    // are what the CSS transitions (fade · glide · reveal) animate.
+    applySquadFocus();
+  }
+
+  // Grid-column template. All six tracks always render so a focus change is
+  // animatable; focus mode just starves the non-focused layers to 0fr while
+  // the chosen one stretches to fill the space they vacate.
+  function squadColsTemplate() {
+    const layers = SQUAD_LAYERS.map(l => {
+      if (!squadFocus)            return 'minmax(126px, 1fr)';
+      return l.key === squadFocus ? 'minmax(280px, 3fr)' : 'minmax(0px, 0fr)';
+    }).join(' ');
+    return `46px minmax(188px, 1.45fr) ${layers}`;
+  }
+  function squadMinWidth() {
+    return 46 + 188 + (squadFocus ? 280 : SQUAD_LAYERS.length * 126) + 28;
+  }
+
+  // Reflect squadFocus onto the live table. CSS owns the timing: resting
+  // rules carry the collapse (reverse) timing, .has-focus rules the expand
+  // timing — so this only has to flip classes and the column template.
+  function applySquadFocus() {
+    const inner = document.querySelector('#squadGrid .sq-inner');
+    if (!inner) return;
+    inner.style.setProperty('--sq-cols', squadColsTemplate());
+    inner.style.minWidth = squadMinWidth() + 'px';
+    inner.classList.toggle('has-focus', !!squadFocus);
+    inner.querySelectorAll('.sq-h-stat, .sq-stat, .sq-foot-stat').forEach(el => {
+      el.classList.toggle('is-focused', !!squadFocus && el.dataset.layer === squadFocus);
+    });
+    inner.querySelectorAll('.sq-expand').forEach(btn => {
+      const on = !!squadFocus && btn.dataset.layer === squadFocus;
+      btn.textContent = on ? '–' : '+';
+      btn.classList.toggle('is-on', on);
+      btn.setAttribute('aria-label', (on ? 'Collapse ' : 'Expand ') + (btn.dataset.label || ''));
+    });
   }
 
   function squadComposite(p, layerKey) {
@@ -478,13 +540,10 @@
       ? `<span class="sq-sort-ind">${squadSort.dir === 'desc' ? '▾' : '▴'}</span>` : '';
     const sortCls = key => squadSort.key === key ? ' is-sorted' : '';
 
-    // Shared column template — position · identity · 4 layer gauges.
-    const layerCols = SQUAD_LAYERS
-      .map(l => squadExpanded[l.key] ? 'minmax(300px, 2.4fr)' : 'minmax(126px, 1fr)')
-      .join(' ');
-    const cols = `46px minmax(188px, 1.45fr) ${layerCols}`;
-    const minW = 46 + 188 + SQUAD_LAYERS.reduce((w, l) => w + (squadExpanded[l.key] ? 300 : 126), 0)
-      + (5 * 12) + 28;
+    // Column template + min-width — see squadColsTemplate(). All six tracks
+    // always render so the focus transition can animate between layouts.
+    const cols = squadColsTemplate();
+    const minW = squadMinWidth();
 
     // Header strip
     let head = `<div class="sq-head">
@@ -492,10 +551,10 @@
       <div class="sq-h-id sq-sortable${sortCls('_name')}" onclick="squadSortBy('_name')">Player ${sortInd('_name')}</div>`;
     SQUAD_LAYERS.forEach(layer => {
       const key = '_' + layer.key;
-      const open = squadExpanded[layer.key];
-      head += `<div class="sq-h-stat">
+      const open = squadFocus === layer.key;
+      head += `<div class="sq-h-stat${open ? ' is-focused' : ''}" data-layer="${layer.key}">
         <span class="sq-h-label sq-sortable${sortCls(key)}" onclick="squadSortBy('${key}')">${esc(layer.label)} ${sortInd(key)}</span>
-        <button class="sq-expand${open ? ' is-on' : ''}" type="button" onclick="squadToggleExpand('${layer.key}')" aria-label="${open ? 'Collapse' : 'Expand'} ${esc(layer.label)}">${open ? '–' : '+'}</button>
+        <button class="sq-expand${open ? ' is-on' : ''}" type="button" data-layer="${layer.key}" data-label="${esc(layer.label)}" onclick="squadToggleExpand('${layer.key}')" aria-label="${open ? 'Collapse' : 'Expand'} ${esc(layer.label)}">${open ? '–' : '+'}</button>
       </div>`;
     });
     head += '</div>';
@@ -523,20 +582,20 @@
       SQUAD_LAYERS.forEach(layer => {
         const key = '_' + layer.key;
         const v = +(p[key] || 0);
-        const open = squadExpanded[layer.key];
-        let subs = '';
-        if (open) {
-          subs = '<div class="sq-subs">' + layer.subs.map(s => {
-            const sv = +(p[s.key] || 0);
-            const st = squadTier(sv);
-            return `<div class="sq-sub">
-              <span class="sq-sub-l">${esc(s.label)}</span>
-              <span class="sq-sub-bar"><span class="sq-sub-fill tier-${st}" style="width:${sqBarPct(sv)}%"></span></span>
-              <span class="sq-sub-v${sv ? ' tier-' + st : ' muted'}">${sv ? Math.round(sv) : '—'}</span>
-            </div>`;
-          }).join('') + '</div>';
-        }
-        cells += `<div class="sq-stat${open ? ' is-expanded' : ''}">${gauge(v, squadTier(v), ranks[key][id])}${subs}</div>`;
+        const open = squadFocus === layer.key;
+        // Sub-stats render for every layer always — they're kept collapsed by
+        // CSS (.sq-subs-wrap at 0fr) so the reveal can animate without a
+        // re-render when a layer is focused.
+        const subItems = layer.subs.map(s => {
+          const sv = +(p[s.key] || 0);
+          const st = squadTier(sv);
+          return `<div class="sq-sub">
+            <span class="sq-sub-l">${esc(s.label)}</span>
+            <span class="sq-sub-bar"><span class="sq-sub-fill tier-${st}" style="width:${sqBarPct(sv)}%"></span></span>
+            <span class="sq-sub-v${sv ? ' tier-' + st : ' muted'}">${sv ? Math.round(sv) : '—'}</span>
+          </div>`;
+        }).join('');
+        cells += `<div class="sq-stat${open ? ' is-focused' : ''}" data-layer="${layer.key}">${gauge(v, squadTier(v), ranks[key][id])}<div class="sq-subs-wrap"><div class="sq-subs"><div class="sq-subs-grid">${subItems}</div></div></div></div>`;
       });
 
       rows += `<div class="sq-row">
@@ -563,7 +622,8 @@
       SQUAD_LAYERS.forEach(layer => {
         const v = Math.round(fn(filtered.map(p => +(p['_' + layer.key] || 0))));
         const tier = squadTier(v);
-        r += `<div class="sq-foot-stat">
+        const open = squadFocus === layer.key;
+        r += `<div class="sq-foot-stat${open ? ' is-focused' : ''}" data-layer="${layer.key}">
           <span class="sq-bar"><span class="sq-fill tier-${tier}" style="width:${sqBarPct(v)}%"></span></span>
           <span class="sq-val${v ? ' tier-' + tier : ' muted'}">${v || '—'}</span>
         </div>`;
@@ -572,7 +632,7 @@
     };
     const foot = summary('Median', median) + summary('Peak', a => Math.max(0, ...a));
 
-    el.innerHTML = `<div class="sq-inner" style="--sq-cols:${cols}; min-width:${minW}px;">
+    el.innerHTML = `<div class="sq-inner${squadFocus ? ' has-focus' : ''}" style="--sq-cols:${cols}; min-width:${minW}px;">
       ${head}${rows}${foot}
     </div>`;
   }
@@ -901,13 +961,27 @@
     const parent = findParentFolder(data.folders, id);
     const siblings = parent ? (parent.subfolders || []) : data.folders;
 
-    // Close all siblings at this level only
+    // Accordion — only one folder open per level
     siblings.forEach(f => f.open = false);
-
-    // Toggle this folder
     folder.open = !wasOpen;
     persistData(data);
-    renderAll();
+
+    // Animate in place: flip .open on the existing nodes so the CSS
+    // fade + glide runs. A full renderAll() would rebuild the DOM and the
+    // folders would snap open/closed with no transition.
+    const list = document.getElementById('savedPlayersList');
+    if (!list) { renderAll(); return; }
+    siblings.forEach(sib => {
+      const grp = list.querySelector(`.folder-group[data-folder-id="${sib.id}"]`);
+      if (grp) setFolderOpen(grp, sib.open);
+    });
+  }
+
+  function setFolderOpen(grp, open) {
+    const contents = grp.querySelector(':scope > .folder-contents');
+    const chevron  = grp.querySelector(':scope > .folder-header .folder-chevron');
+    if (contents) contents.classList.toggle('open', open);
+    if (chevron)  chevron.classList.toggle('open', open);
   }
 
   function updateRoleSelectionVisibility() {
@@ -1044,7 +1118,7 @@
     const totalCount = folder.players.length + (folder.subfolders || []).reduce((acc, sf) => acc + allFolders([sf]).reduce((a, f) => a + f.players.length, 0), 0);
 
     return `
-      <div class="folder-group"
+      <div class="folder-group" data-folder-id="${esc(folder.id)}"
         ondragstart="onFolderDragStart(event,'${esc(folder.id)}')"
         ondragover="onFolderDragOver(event)"
         ondragleave="onFolderDragLeave(event)"
@@ -1059,7 +1133,7 @@
           </div>
           <button class="folder-delete-btn" onclick="event.stopPropagation();deleteFolder('${esc(folder.id)}')">✕</button>
         </div>
-        <div class="folder-contents ${folder.open ? 'open' : ''}">${playersHtml}${subHtml}</div>
+        <div class="folder-contents ${folder.open ? 'open' : ''}"><div class="folder-contents-inner">${playersHtml}${subHtml}</div></div>
       </div>`;
   }
 
@@ -1501,6 +1575,7 @@
     const sx = firstRect.width / last.width;
     const sy = firstRect.height / last.height;
     el.style.transformOrigin = 'top left';
+    el.style.willChange = 'transform';
     el.style.transition = 'none';
     el.style.transform = `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`;
     void el.offsetWidth; // force reflow so the inverted transform paints first
@@ -1511,6 +1586,7 @@
       el.style.transition = '';
       el.style.transform = '';
       el.style.transformOrigin = '';
+      el.style.willChange = '';
       el.removeEventListener('transitionend', cleanup);
     };
     el.addEventListener('transitionend', cleanup);

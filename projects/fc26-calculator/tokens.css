@@ -121,13 +121,16 @@ html.dark .orb-field {
 }
 
 /* Spotlights — large soft pools of warm/cool light. Very low
-   chroma so the canvas stays neutral. They drift slowly to
-   create movement without ever feeling "colorful". */
+   chroma so the canvas stays neutral.
+   Held STATIC (no drift/breathe): a perpetually animating
+   backdrop forces every backdrop-filter surface above it to
+   re-blur on every frame, even while idle. Frozen, the whole
+   atmosphere (gradient + orbs + noise) caches as a single
+   bitmap and the page does zero repainting at rest. */
 html.dark .orb {
   position: absolute;
   border-radius: 50%;
   filter: blur(110px);
-  will-change: transform, opacity;
   mix-blend-mode: screen;
 }
 /* Warm tungsten — top-left, the dominant key light */
@@ -139,8 +142,6 @@ html.dark .orb-1 {
     transparent 70%);
   top: -260px; left: -220px;
   opacity: 0.55;
-  animation: drift-1 38s cubic-bezier(0.16, 1, 0.3, 1) infinite alternate,
-             breathe-1 14s ease-in-out infinite;
 }
 /* Cool moonlight — right side, secondary fill */
 html.dark .orb-2 {
@@ -151,8 +152,6 @@ html.dark .orb-2 {
     transparent 70%);
   top: 22vh; right: -240px;
   opacity: 0.32;
-  animation: drift-2 46s cubic-bezier(0.16, 1, 0.3, 1) infinite alternate,
-             breathe-2 18s ease-in-out infinite;
 }
 /* Warm bottom-center pool — like a floor lamp */
 html.dark .orb-3 {
@@ -163,8 +162,6 @@ html.dark .orb-3 {
     transparent 68%);
   bottom: -260px; left: 32vw;
   opacity: 0.4;
-  animation: drift-3 34s cubic-bezier(0.16, 1, 0.3, 1) infinite alternate,
-             breathe-1 22s ease-in-out infinite;
 }
 /* Very faint neutral haze — center mid */
 html.dark .orb-4 {
@@ -175,16 +172,10 @@ html.dark .orb-4 {
     transparent 72%);
   top: 42vh; left: 18vw;
   opacity: 0.22;
-  animation: drift-4 52s cubic-bezier(0.16, 1, 0.3, 1) infinite alternate,
-             breathe-2 26s ease-in-out infinite;
 }
 
-@keyframes drift-1 { from { transform: translate(0,0) scale(1); } to { transform: translate(160px, 200px) scale(1.12); } }
-@keyframes drift-2 { from { transform: translate(0,0) scale(1); } to { transform: translate(-180px, 140px) scale(1.08); } }
-@keyframes drift-3 { from { transform: translate(0,0) scale(1); } to { transform: translate(100px, -180px) scale(1.15); } }
-@keyframes drift-4 { from { transform: translate(0,0) scale(1); } to { transform: translate(220px, -120px) scale(0.96); } }
-@keyframes breathe-1 { 0%,100% { opacity: var(--o, 0.5); } 50% { opacity: calc(var(--o, 0.5) * 1.25); } }
-@keyframes breathe-2 { 0%,100% { opacity: var(--o, 0.3); } 50% { opacity: calc(var(--o, 0.3) * 0.7); } }
+/* drift-* / breathe-* keyframes removed — the orbs are now static
+   so the atmosphere composites to a single cached layer. */
 
 /* Layer 1: COARSE PLASTER — large blotchy luminance variation.
    This is what makes the surface feel like a wall, not a screen. */
@@ -317,9 +308,10 @@ html.dark .glass-thin {
   box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.25);
 }
 html.dark .segmented-rail {
+  /* backdrop-filter removed for performance — the rail sits on the
+     already-frosted .unified-card, so its own blur was redundant. */
   background: rgb(0 0 0 / 0.32);
   border-color: var(--glass-stroke-outer);
-  backdrop-filter: blur(12px);
 }
 
 /* The floating indicator — animated via JS-set left/width.
@@ -336,8 +328,13 @@ html.dark .segmented-rail {
     inset 0 1px 0 rgb(var(--accent) / 0.45),
     0 1px 0 rgb(0 0 0 / 0.25),
     0 0 0 1px rgb(var(--accent) / 0.42);
+  /* Slide on the compositor — `transform` instead of `left`. The
+     equal-column rails keep a constant width, so width never
+     animates there; the 2-button view-toggle is the only place
+     `width` transitions, and that is a rare discrete click. */
+  will-change: transform;
   transition:
-    left 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 320ms cubic-bezier(0.22, 1, 0.36, 1),
     width 320ms cubic-bezier(0.22, 1, 0.36, 1);
   pointer-events: none;
   z-index: 0;
