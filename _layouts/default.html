@@ -82,7 +82,7 @@
     })();
   </script>
 
-  <link rel="stylesheet" href="/assets/css/global.css?v=46" />
+  <link rel="stylesheet" href="/assets/css/global.css?v=47" />
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -210,37 +210,43 @@
             </svg>
           </button>
 
-          <input
-            id="site-search-input"
-            type="text"
-            class="search__input"
-            placeholder="Looking for a specific quality?"
-            aria-label="Search the site"
-            autocomplete="off"
-            spellcheck="false"
-            data-search-input
-          >
+          <!-- search__panel: transparent on desktop (display: contents),
+               collapses to zero height on mobile via grid 0fr/1fr trick. -->
+          <div class="search__panel">
 
-          <!-- Match-count + prev/next arrows. Populated by search.js
-               after each search runs; hidden when the input is empty
-               or before the first search. -->
-          <div class="search__count" data-search-count hidden>
-            <span class="search__count-text" data-search-count-text aria-live="polite">No mentions found</span>
-            <button type="button" class="search__nav" data-search-prev aria-label="Previous match" disabled>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6 L9 12 L15 18"></path></svg>
-            </button>
-            <button type="button" class="search__nav" data-search-next aria-label="Next match" disabled>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6 L15 12 L9 18"></path></svg>
-            </button>
-          </div>
+            <input
+              id="site-search-input"
+              type="text"
+              class="search__input"
+              placeholder="Looking for a specific quality?"
+              aria-label="Search the site"
+              autocomplete="off"
+              spellcheck="false"
+              data-search-input
+            >
 
-          <div class="search__chips" role="listbox" aria-label="Suggested searches">
-            <button type="button" class="chip" data-search-chip>Conflict Management</button>
-            <button type="button" class="chip" data-search-chip>Powershell</button>
-            <button type="button" class="chip" data-search-chip>JAMF</button>
-            <button type="button" class="chip" data-search-chip>Networking</button>
-            <button type="button" class="chip" data-search-chip>Leadership</button>
-          </div>
+            <!-- Match-count + prev/next arrows. Populated by search.js
+                 after each search runs; hidden when the input is empty
+                 or before the first search. -->
+            <div class="search__count" data-search-count hidden>
+              <span class="search__count-text" data-search-count-text aria-live="polite">No mentions found</span>
+              <button type="button" class="search__nav" data-search-prev aria-label="Previous match" disabled>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6 L9 12 L15 18"></path></svg>
+              </button>
+              <button type="button" class="search__nav" data-search-next aria-label="Next match" disabled>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6 L15 12 L9 18"></path></svg>
+              </button>
+            </div>
+
+            <div class="search__chips" role="listbox" aria-label="Suggested searches">
+              <button type="button" class="chip" data-search-chip>Conflict Management</button>
+              <button type="button" class="chip" data-search-chip>Powershell</button>
+              <button type="button" class="chip" data-search-chip>JAMF</button>
+              <button type="button" class="chip" data-search-chip>Networking</button>
+              <button type="button" class="chip" data-search-chip>Leadership</button>
+            </div>
+
+          </div><!-- /.search__panel -->
         </div>
 
       </div>

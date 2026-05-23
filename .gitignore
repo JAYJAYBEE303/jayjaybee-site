@@ -11,23 +11,38 @@ vendor/
 # OS junk
 Thumbs.db
 .DS_Store
+desktop.ini
+~$*
 *.tmp
 
 # Project notes not for the public site
 SKILL.md
-New 2.docx
 Portrait 1.png
 Portrait 2.png
 Portrait 3.png
 
-# Large binaries — GitHub rejects files over 100 MB
-   *.potx
-   *.pptx
-   *.psd
-   *.mp4
-   *.mov
-   *.zip
+# Work documents — never part of a public portfolio site
+*.docx
+*.xlsx
+*.xls
+*.csv
 
-   # AMF1 work content — must never end up public
-   *AMF1*
-   *Aston*
+# All PDFs blocked except the one public file
+*.pdf
+!files/CV.pdf
+
+# Bundler / editor
+.bundle/
+.vscode/
+
+# Large binaries — GitHub rejects files over 100 MB
+*.potx
+*.pptx
+*.psd
+*.mp4
+*.mov
+*.zip
+
+# AMF1 work content — must never end up public
+*AMF1*
+*Aston*

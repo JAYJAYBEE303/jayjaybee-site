@@ -666,50 +666,70 @@ mark.search-hit.active {
   border-bottom-color: var(--accent);
 }
 
-/* Mobile (<640px): the icon stays in the nav row, but on tap the
-   input expands to fill the line below it. Chips and count stack
-   beneath the input instead of overlaying it.
+/* search__panel — transparent wrapper on desktop so nothing changes
+   above the mobile breakpoint. Children participate in .search's layout
+   exactly as before (absolute-positioned input, chips, count). */
+.search__panel { display: contents; }
 
-   The search now lives as a flex sibling of .site-nav inside
-   .site-header__row; giving it width: 100% forces it to wrap onto
-   its own line under the link row. */
+/* Mobile (<640px): grid-based collapse so the panel glides open/shut
+   to exact content height with no slack or jank.
+
+   Architecture:
+   — .search becomes a CSS grid with one row; grid-template-rows animates
+     0fr → 1fr (collapsed → open). The single grid item (.search__panel)
+     has overflow: hidden + min-height: 0 so the grid clipping works.
+   — .search__icon escapes the grid via position: absolute and anchors to
+     .site-header__row (position: relative), sitting flush top-right so it
+     visually aligns with the nav link row. A static-parent's overflow:hidden
+     does NOT clip absolutely-positioned descendants, so the icon is never
+     clipped during the collapse.
+   — row-gap on .site-header__row is zeroed so the collapsed (0-height)
+     search row adds no space below the nav links. */
 @media (max-width: 40rem) {
-  /* Switch to a flex column so the icon can right-align via
-     align-self, and the input/count/chips stack naturally beneath. */
+  /* Zero out the row-gap so the collapsed panel row contributes no height */
+  .site-header__row { row-gap: 0; }
+
+  /* .search becomes the collapsible grid container */
   .site-header__row > .search,
   .search {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    position: relative;
+    display: grid;
+    grid-template-rows: 0fr;
+    position: static;
     width: 100%;
+    transition: grid-template-rows var(--dur-3) var(--ease);
   }
-  .search__icon { align-self: flex-end; }
+  .search.is-open { grid-template-rows: 1fr; }
 
-  /* Input flows below the icon row, height/max-width collapse to 0
-     when closed so it doesn't take a row of its own. */
+  /* Panel is the single grid item — clipped at the grid boundary while
+     collapsing. display: contents is overridden here to a real block. */
+  .search__panel {
+    display: block;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  /* Icon floats to the top-right of .site-header__row, aligning it with
+     the nav link row. Absolutely positioned children of a static parent are
+     not clipped by that parent's overflow, so this is safe. */
+  .search__icon {
+    position: absolute;
+    top: 6px;
+    right: 0;
+  }
+
+  /* Input/count/chips are now static inside the panel — no collapsed
+     tricks needed since the panel itself handles collapse. */
   .search__input {
     position: static;
     transform: none;
     display: block;
     width: 100%;
-    max-width: 0;
-    height: 0;
-    margin: 0;
-    padding: 0;
-    overflow: hidden;
-  }
-  .search.is-open .search__input {
-    width: 100%;
     max-width: 100%;
     height: auto;
-    margin-top: var(--space-3);
+    margin: var(--space-3) 0 0;
     padding: var(--space-2) var(--space-4);
+    overflow: visible;
   }
-
-  /* Count + arrows / chips stack beneath the input instead of overlaying.
-     Count text aligns left so it doesn't feel orphaned at the viewport
-     edge on small screens. */
   .search__count,
   .search__chips {
     position: static;
@@ -723,6 +743,7 @@ mark.search-hit.active {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .search,
   .search__input,
   .search__chips,
   .search__count,

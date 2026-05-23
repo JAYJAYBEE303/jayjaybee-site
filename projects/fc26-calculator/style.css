@@ -1672,9 +1672,10 @@
       0 4px 16px -4px rgb(0 0 0 / 0.35) !important;
   }
 
-  /* Inner section panels (Section 01/02/03) — no container; the outer
+  /* Inner section panels (Section 01–05) — no container; the outer
      .unified-card is the only visible surface. Padding/margin preserved. */
-  section.card {
+  section.card,
+  section.compare-card {
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
