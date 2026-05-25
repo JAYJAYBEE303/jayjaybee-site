@@ -10,6 +10,58 @@
 </head>
 <body>
   <noscript>Gaffer IQ requires JavaScript.</noscript>
+
+  <div class="app-shell">
+
+    <header class="app-nav">
+      <div class="app-nav__brand">
+        <span class="app-nav__logo">⚡</span>
+        <span class="app-nav__title">Gaffer IQ</span>
+      </div>
+
+      <nav class="module-nav" aria-label="Module navigation">
+        <a class="module-nav__item is-active" href="#matchup">Matchup</a>
+        <a class="module-nav__item module-nav__item--inactive" href="#ranker" aria-disabled="true" tabindex="-1">Ranker</a>
+        <a class="module-nav__item module-nav__item--inactive" href="#dashboard" aria-disabled="true" tabindex="-1">Dashboard</a>
+        <a class="module-nav__item module-nav__item--inactive" href="#planner" aria-disabled="true" tabindex="-1">Planner</a>
+      </nav>
+
+      <div class="horizon-switcher" role="group" aria-label="Planning horizon">
+        <button class="horizon-switcher__btn is-active" data-horizon="GW1" type="button">This GW</button>
+        <button class="horizon-switcher__btn" data-horizon="GW3" type="button">Next 3 GWs</button>
+        <button class="horizon-switcher__btn" data-horizon="GW6" type="button">Next 6 GWs</button>
+      </div>
+    </header>
+
+    <main class="app-main">
+
+      <div id="app-error-banner" class="app-error-banner" hidden>
+        <span id="app-error-text"></span>
+        <button class="app-error-banner__retry" id="app-error-retry" type="button">Retry</button>
+      </div>
+
+      <section class="module-view is-active" data-module="matchup" aria-label="Matchup Analyser">
+        <div class="matchup-controls"></div>
+        <div class="matchup-grid">
+          <div class="app-status">Loading FPL data…</div>
+        </div>
+      </section>
+
+      <section class="module-view" data-module="ranker" aria-label="Player Ranker">
+        <p class="coming-soon">Player Ranker — coming in Phase 2.</p>
+      </section>
+
+      <section class="module-view" data-module="dashboard" aria-label="GW Dashboard">
+        <p class="coming-soon">GW Decision Dashboard — coming in Phase 2.</p>
+      </section>
+
+      <section class="module-view" data-module="planner" aria-label="Transfer Planner">
+        <p class="coming-soon">Transfer Planner — coming in Phase 2.</p>
+      </section>
+
+    </main>
+  </div>
+
   <script type="module" src="js/main.js"></script>
 </body>
 </html>

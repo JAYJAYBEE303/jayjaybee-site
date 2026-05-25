@@ -1,5 +1,434 @@
 /* Gaffer IQ — components.css
-   Reusable component styles: cards, tables, badges, score pills.
-   All values use design tokens from base.css via var(--…). */
+   Reusable component styles: matchup card, score pill, breakdown bars,
+   confidence indicator, counter-matchup pairings, fixture picker.
+   BEM-lite per CONVENTIONS.md §5.1. All values via var(--…) from base.css.
+   Band modifier classes (--great, --good, --neutral, --tough, --brutal) map
+   directly from CompositeScore.band — see CONVENTIONS.md §5.2. */
 
-/* TODO(phase-1): matchup card, ranker table, score pill, confidence badge */
+/* ═══════════════════════════════════════════════════════════════════════════
+   FIXTURE PICKER
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.matchup-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.fixture-picker__label {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+.fixture-picker {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-sans);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  min-width: 220px;
+  transition: border-color 0.15s;
+}
+
+.fixture-picker:hover {
+  border-color: var(--color-muted);
+}
+
+.fixture-picker:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-color: var(--color-accent);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MATCHUP GRID — two-column layout for home/away cards
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.matchup-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-6);
+  align-items: start;
+}
+
+@media (max-width: 800px) {
+  .matchup-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.matchup-status {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: var(--color-muted);
+  padding: var(--space-8) 0;
+  font-size: var(--font-size-md);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MATCHUP CARD
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.matchup-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  /* Band-specific left accent applied by modifier below */
+  border-left-width: 3px;
+  border-left-style: solid;
+  border-left-color: var(--color-border);
+}
+
+.matchup-card--great   { border-left-color: var(--band-great); }
+.matchup-card--good    { border-left-color: var(--band-good); }
+.matchup-card--neutral { border-left-color: var(--band-neutral); }
+.matchup-card--tough   { border-left-color: var(--band-tough); }
+.matchup-card--brutal  { border-left-color: var(--band-brutal); }
+
+/* Low-confidence cards get a hatched overlay so the provisional nature is
+   immediately visible without hiding the data — see ARCHITECTURE.md §11. */
+.matchup-card--provisional {
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 6px,
+    rgba(255, 255, 255, 0.02) 6px,
+    rgba(255, 255, 255, 0.02) 12px
+  );
+}
+
+.matchup-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-6) var(--space-3);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.matchup-card__team {
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.matchup-card__venue {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-muted);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 2px var(--space-2);
+}
+
+/* ─── Score row: pill + FDR + confidence ─────────────────────────────────── */
+
+.matchup-card__score-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-6);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SCORE PILL — main composite score display
+   Band modifiers key off CompositeScore.band (CONVENTIONS.md §5.2).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.score-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  min-width: 76px;
+  flex-shrink: 0;
+}
+
+.score-pill--great   { background: var(--band-great-bg);   border-color: var(--band-great);   color: var(--band-great); }
+.score-pill--good    { background: var(--band-good-bg);    border-color: var(--band-good);    color: var(--band-good); }
+.score-pill--neutral { background: var(--band-neutral-bg); border-color: var(--band-neutral); color: var(--band-neutral); }
+.score-pill--tough   { background: var(--band-tough-bg);   border-color: var(--band-tough);   color: var(--band-tough); }
+.score-pill--brutal  { background: var(--band-brutal-bg);  border-color: var(--band-brutal);  color: var(--band-brutal); }
+
+/* Provisional: muted + hatched — score still shown, never hidden */
+.score-pill--provisional {
+  opacity: 0.6;
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 4px,
+    rgba(255, 255, 255, 0.05) 4px,
+    rgba(255, 255, 255, 0.05) 8px
+  );
+}
+
+.score-pill__value {
+  font-size: var(--font-size-2xl);
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.score-pill__band {
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-top: 2px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SCORE CHIP — compact inline score used in counter-matchup pairings
+   Same band modifiers, no double-line layout.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.score-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+  min-width: 32px;
+  flex-shrink: 0;
+}
+
+.score-chip--great   { background: var(--band-great-bg);   color: var(--band-great); }
+.score-chip--good    { background: var(--band-good-bg);    color: var(--band-good); }
+.score-chip--neutral { background: var(--band-neutral-bg); color: var(--band-neutral); }
+.score-chip--tough   { background: var(--band-tough-bg);   color: var(--band-tough); }
+.score-chip--brutal  { background: var(--band-brutal-bg);  color: var(--band-brutal); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FDR COMPARISON — official FPL 1–5 rating shown alongside Gaffer IQ score
+   FDR direction: 1 = very easy, 5 = very hard (opposite to Gaffer IQ).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.fdr-comparison {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 52px;
+}
+
+.fdr-comparison__label {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.fdr-comparison__value {
+  font-size: var(--font-size-xl);
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  /* FDR 1=easy→great colour, 5=hard→brutal colour (inverted vs Gaffer IQ) */
+}
+
+.fdr-comparison__value[data-fdr="1"] { color: var(--band-great); }
+.fdr-comparison__value[data-fdr="2"] { color: var(--band-good); }
+.fdr-comparison__value[data-fdr="3"] { color: var(--band-neutral); }
+.fdr-comparison__value[data-fdr="4"] { color: var(--band-tough); }
+.fdr-comparison__value[data-fdr="5"] { color: var(--band-brutal); }
+
+.fdr-comparison__scale {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  line-height: 1;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CONFIDENCE INDICATOR
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.confidence-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 60px;
+  margin-left: auto;
+}
+
+.confidence-indicator__label {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.confidence-indicator__value {
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+}
+
+/* Low confidence: provisional indicator in caution colour */
+.confidence-indicator--low .confidence-indicator__value {
+  color: var(--band-tough);
+}
+
+.confidence-indicator--low .confidence-indicator__label::after {
+  content: ' ⚠';
+  font-style: normal;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SCORE BREAKDOWN SECTION
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.matchup-card__breakdown,
+.matchup-card__counter {
+  padding: var(--space-4) var(--space-6);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.matchup-card__counter {
+  border-bottom: none;
+}
+
+.matchup-card__section-title {
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-muted);
+  margin-bottom: var(--space-3);
+}
+
+/* ─── Breakdown row: label | bar | value | weight | est? ─────────────────── */
+
+.breakdown-row {
+  display: grid;
+  grid-template-columns: 9.5rem 1fr 2.4rem 2.4rem auto;
+  gap: var(--space-2);
+  align-items: center;
+  padding: var(--space-1) 0;
+}
+
+.breakdown-row__label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.breakdown-row__bar-wrap {
+  background: var(--color-surface-raised);
+  border-radius: var(--radius-sm);
+  height: 6px;
+  overflow: hidden;
+}
+
+.breakdown-row__bar {
+  height: 100%;
+  border-radius: var(--radius-sm);
+  transition: width 0.3s ease;
+  /* Colour keyed by band modifier below */
+  background: var(--color-muted);
+}
+
+.breakdown-row__bar--great   { background: var(--band-great); }
+.breakdown-row__bar--good    { background: var(--band-good); }
+.breakdown-row__bar--neutral { background: var(--band-neutral); }
+.breakdown-row__bar--tough   { background: var(--band-tough); }
+.breakdown-row__bar--brutal  { background: var(--band-brutal); }
+
+.breakdown-row__value {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+  text-align: right;
+}
+
+.breakdown-row__weight {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.breakdown-row__est {
+  font-size: var(--font-size-xs);
+  color: var(--band-tough);
+  font-weight: 700;
+  cursor: default;
+  width: 12px;
+  text-align: center;
+}
+
+/* Estimated rows: label muted, slight visual distinction */
+.breakdown-row--estimated .breakdown-row__label {
+  color: var(--color-muted);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   COUNTER-MATCHUP PAIRINGS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.counter-pairing {
+  display: grid;
+  grid-template-columns: 8rem auto 1fr auto;
+  gap: var(--space-2);
+  align-items: center;
+  padding: var(--space-2) 0;
+}
+
+.counter-pairing + .counter-pairing {
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.counter-pairing__label {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+/* .counter-pairing__score uses .score-chip classes */
+
+.counter-pairing__detail {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+  padding-left: var(--space-2);
+}
+
+.counter-pairing__est {
+  font-size: var(--font-size-xs);
+  color: var(--band-tough);
+  font-weight: 700;
+  cursor: default;
+  text-align: right;
+}
+
+/* Estimated pairings: slightly muted */
+.counter-pairing--estimated .counter-pairing__label {
+  color: var(--color-muted);
+}

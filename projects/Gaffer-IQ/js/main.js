@@ -1,9 +1,9 @@
 /**
  * js/main.js
  * Layer: entry point. Bootstrap only — kicks off the initial data load,
- * subscribes to store events, and (Phase 1C+) reads URL hash to pick the
- * active view and wires the nav and horizon switcher. Contains no
- * analytical logic and no per-module rendering — delegates to modules.
+ * subscribes to store events, reads URL hash to pick the active view,
+ * wires the nav and horizon switcher, and delegates all rendering to modules.
+ * Contains no analytical logic and no per-module rendering.
  * See ARCHITECTURE.md §4 for the module loading strategy.
  */
 
@@ -17,10 +17,12 @@ import { calcTeamForm, calcPlayerForm } from './engine/form.js';
 import { calcStyleProfile, calcStyleClash } from './engine/style.js';
 import { calcCounterMatchup } from './engine/counter.js';
 
-// TODO(phase-1c): import './modules/matchup.js';
-// TODO(phase-2):  import './modules/ranker.js';
-// TODO(phase-2):  import './modules/dashboard.js';
-// TODO(phase-2):  import './modules/planner.js';
+import { initMatchup } from './modules/matchup.js';
+// TODO(phase-2): import { initRanker }    from './modules/ranker.js';
+// TODO(phase-2): import { initDashboard } from './modules/dashboard.js';
+// TODO(phase-2): import { initPlanner }   from './modules/planner.js';
+
+// ─── Data loading ─────────────────────────────────────────────────────────────
 
 /**
  * Fetches bootstrap + fixtures in parallel, normalises into the internal
@@ -45,15 +47,29 @@ async function loadInitialData({ force = false } = {}) {
     store.setSeason(season);
     store.markDataReady();
   } catch (err) {
-    // Wrap unknown throwables so listeners always receive an ApiError.
     const apiErr = err instanceof ApiError ? err : new ApiError(String(err?.message ?? err));
     store.setError(apiErr);
   }
 }
 
-// Dev visibility — confirms the pipeline works without needing the UI.
-// These logs are part of the Phase 1A bring-up; they'll quiet down once
-// real modules render data from the store in Phase 1C.
+// ─── Error banner ─────────────────────────────────────────────────────────────
+
+const errorBanner = document.getElementById('app-error-banner');
+const errorText   = document.getElementById('app-error-text');
+
+store.subscribe('data:error', (err) => {
+  console.error('[Gaffer IQ] data:error —', err);
+  if (errorText)   errorText.textContent = `Failed to load FPL data: ${err.message || err}. `;
+  if (errorBanner) errorBanner.hidden = false;
+});
+
+document.getElementById('app-error-retry')?.addEventListener('click', () => {
+  if (errorBanner) errorBanner.hidden = true;
+  store.clearCache();
+  loadInitialData({ force: true });
+});
+
+// Dev visibility — confirms the pipeline works.
 store.subscribe('data:ready', () => {
   const teams    = store.getTeams();
   const players  = store.getPlayers();
@@ -64,42 +80,80 @@ store.subscribe('data:ready', () => {
   );
 });
 
-store.subscribe('data:error', (err) => {
-  console.error('[Gaffer IQ] data:error —', err);
+// ─── Horizon switcher ─────────────────────────────────────────────────────────
+
+const horizonBtns = document.querySelectorAll('.horizon-switcher__btn');
+
+// Set initial active state from store (store defaults to 'GW1', HTML marks GW1 active;
+// this keeps them in sync if the store default ever changes).
+const initialHorizon = store.getActiveHorizon();
+horizonBtns.forEach(btn => {
+  btn.classList.toggle('is-active', btn.dataset.horizon === initialHorizon);
 });
 
-// Phase 1A dev affordance: expose the store on window so the exit-criterion
-// console check (`__store.getTeams()`, `__store.getPlayers()`, etc.) works
-// directly in DevTools. Remove or gate behind a debug flag once modules
-// in Phase 1C+ render from the store.
+horizonBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    store.setActiveHorizon(btn.dataset.horizon);
+    horizonBtns.forEach(b => b.classList.toggle('is-active', b === btn));
+  });
+});
+
+// ─── Hash-based routing ───────────────────────────────────────────────────────
+
+const moduleSections = document.querySelectorAll('.module-view');
+const navItems       = document.querySelectorAll('.module-nav__item');
+
+function routeToHash() {
+  // Strip the leading '#'; default to 'matchup' if hash is absent or unknown.
+  const hash   = window.location.hash.slice(1) || 'matchup';
+  const target = document.querySelector(`[data-module="${hash}"]`) ? hash : 'matchup';
+
+  moduleSections.forEach(section => {
+    section.classList.toggle('is-active', section.dataset.module === target);
+  });
+  navItems.forEach(link => {
+    const module = link.getAttribute('href')?.slice(1);
+    link.classList.toggle('is-active', module === target);
+  });
+}
+
+window.addEventListener('hashchange', routeToHash);
+routeToHash();
+
+// ─── Module initialisation ────────────────────────────────────────────────────
+
+// Modules register their store subscriptions here, before loadInitialData() is
+// called, so they are in place when data:ready fires.
+initMatchup();
+// TODO(phase-2): initRanker();
+// TODO(phase-2): initDashboard();
+// TODO(phase-2): initPlanner();
+
+// ─── Dev affordances ─────────────────────────────────────────────────────────
+// Expose store + engine on window for the Phase 1A/1B console exit criteria.
+// Remove or gate behind a debug flag once Phase 2 modules render from the store.
+
 window.__store    = store;
 window.__horizons = HORIZONS;
 window.__refresh  = () => { store.clearCache(); loadInitialData({ force: true }); };
 
-// Phase 1B dev affordance: expose the engine functions so the §12 sanity
-// benchmark can be run from DevTools without manual ESM imports:
-//   const ctx = __engine.context();
-//   const f   = __store.getFixtures().find(x => !x.played);
-//   __engine.scoreFixture(__store.getTeam(f.homeTeamId), f, ctx);
-// Removed alongside __store once Phase 1C renders from the store directly.
 window.__engine = {
-  // Build a fresh context from the current season + cached player summaries.
   context() {
     const season = store.getSeason();
     if (!season) return null;
     return buildScoreContext(season, {
-      playerSummariesById: {}, // populated lazily in Phase 2 via fetchPlayerSummary
+      playerSummariesById: {},
       currentGw: store.getCurrentGw() ?? store.getNextGw() ?? 1,
     });
   },
-  // Top-level entry — fixture composite score.
   scoreFixture,
   buildScoreContext,
-  // Individual sub-metric helpers, handy for debugging odd composite values.
   calcBaseDifficulty, calcHomeAwaySplit, calcFixtureHistory,
   calcTeamForm, calcPlayerForm,
   calcStyleProfile, calcStyleClash,
   calcCounterMatchup,
 };
+
+// ─── Kick off ─────────────────────────────────────────────────────────────────
 
 loadInitialData();
