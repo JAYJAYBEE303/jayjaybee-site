@@ -2,11 +2,6 @@
   "framework": null,
   "buildCommand": null,
   "outputDirectory": ".",
-  "functions": {
-    "api/fpl.js": {
-      "runtime": "nodejs20.x"
-    }
-  },
   "headers": [
     {
       "source": "/css/(.*)",
