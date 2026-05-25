@@ -170,11 +170,21 @@ export function calcHomeAwaySplit(team, isHome, ctx) {
  */
 export function calcFixtureHistory(teamAId, teamBId, ctx) {
   const played = ctx.playedFixtures || [];
+
+  // Filter to meetings between A and B that have *numeric* scores. We guard
+  // against FPL fixtures flagged finished with null team_h_score/team_a_score
+  // (rescheduled / postponed games occasionally appear that way) — otherwise
+  // they'd silently inflate the denominator below and skew one side's ratio.
   const meetings = played
-    .filter(f =>
-      (f.homeTeamId === teamAId && f.awayTeamId === teamBId) ||
-      (f.homeTeamId === teamBId && f.awayTeamId === teamAId),
-    )
+    .filter(f => {
+      const isPair =
+        (f.homeTeamId === teamAId && f.awayTeamId === teamBId) ||
+        (f.homeTeamId === teamBId && f.awayTeamId === teamAId);
+      if (!isPair) return false;
+      const hg = f.result?.homeGoals;
+      const ag = f.result?.awayGoals;
+      return Number.isFinite(hg) && Number.isFinite(ag);
+    })
     .slice(-N_H2H);
 
   if (meetings.length < 2) {
@@ -184,13 +194,18 @@ export function calcFixtureHistory(teamAId, teamBId, ctx) {
     return { value: 50, estimated: true, meetings: meetings.length, pointsForA: 0 };
   }
 
+  // Perspective: pointsForA is the points teamA earned across these meetings.
+  // For each meeting we look up which side teamA was on, then compare *teamA's*
+  // goals against *teamB's* goals — never the reverse. This is symmetric:
+  // calling with (A,B) vs (B,A) yields each team's own points across the same
+  // set of fixtures (the slice is identical because the filter is symmetric).
   let pointsForA = 0;
   for (const f of meetings) {
-    if (!f.result) continue;
-    const aIsHome = f.homeTeamId === teamAId;
-    const aGoals = aIsHome ? f.result.homeGoals : f.result.awayGoals;
-    const bGoals = aIsHome ? f.result.awayGoals : f.result.homeGoals;
-    pointsForA += aGoals > bGoals ? 3 : aGoals === bGoals ? 1 : 0;
+    const aWasHome = f.homeTeamId === teamAId;
+    const goalsForA     = aWasHome ? f.result.homeGoals : f.result.awayGoals;
+    const goalsAgainstA = aWasHome ? f.result.awayGoals : f.result.homeGoals;
+    if (goalsForA > goalsAgainstA)      pointsForA += 3;
+    else if (goalsForA === goalsAgainstA) pointsForA += 1;
   }
   const ratio = pointsForA / (3 * meetings.length);
   return {

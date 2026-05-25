@@ -153,6 +153,14 @@
   margin-bottom: var(--space-4);
 }
 
+/* The HTML `hidden` attribute applies `display: none` via the user-agent
+   stylesheet, but the author rule above (`display: flex`) overrides it.
+   Restore the expected behaviour so the banner stays hidden until an error
+   actually fires. */
+.app-error-banner[hidden] {
+  display: none;
+}
+
 .app-error-banner__retry {
   background: none;
   border: 1px solid var(--band-brutal);
