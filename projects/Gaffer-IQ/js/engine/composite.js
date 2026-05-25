@@ -471,10 +471,38 @@ export function scorePlayer(player, horizon, ctx) {
     band:  bandFromValue(value),
     perGw: horizonResult.perGw,
     breakdown: {
-      form:    { value: formResult.value,    weight: PROJ_FORM,    estimated: formResult.estimated },
+      form: {
+        value:           formResult.value,
+        weight:          PROJ_FORM,
+        estimated:       formResult.estimated,
+        // minutesSecurity exposed here so callers (e.g. ranker) do not need to
+        // re-call calcPlayerForm — avoids doubling the work per player row.
+        minutesSecurity: formResult.minutesSecurity ?? null,
+      },
       fixture: { value: horizonResult.value, weight: PROJ_FIXTURE, estimated: false },
       counter: { value: counterEdge.value,   weight: PROJ_COUNTER, estimated: counterEdge.estimated },
     },
     valueScore: player.price > 0 ? value / player.price : 0,
   };
+}
+
+// ─── rankPlayers ──────────────────────────────────────────────────────────────
+
+/**
+ * Score every player over a horizon and return them sorted by projected value
+ * descending. Pure — no DOM, no network, no store access.
+ * Consumed by modules/ranker.js as the primary entry point for bulk scoring.
+ *
+ * @param {Player[]} players
+ * @param {{label: string, gws: number}} horizon
+ * @param {object} ctx  output of buildScoreContext
+ * @returns {{ player: Player, score: object }[]}  sorted descending by score.value
+ */
+export function rankPlayers(players, horizon, ctx) {
+  if (!Array.isArray(players) || !horizon || !ctx) {
+    throw new TypeError('rankPlayers: players, horizon, and ctx are required');
+  }
+  return players
+    .map(p => ({ player: p, score: scorePlayer(p, horizon, ctx) }))
+    .sort((a, b) => b.score.value - a.score.value);
 }

@@ -18,7 +18,7 @@ import { calcStyleProfile, calcStyleClash } from './engine/style.js';
 import { calcCounterMatchup } from './engine/counter.js';
 
 import { initMatchup } from './modules/matchup.js';
-// TODO(phase-2): import { initRanker }    from './modules/ranker.js';
+import { initRanker }   from './modules/ranker.js';
 // TODO(phase-2): import { initDashboard } from './modules/dashboard.js';
 // TODO(phase-2): import { initPlanner }   from './modules/planner.js';
 
@@ -125,7 +125,7 @@ routeToHash();
 // Modules register their store subscriptions here, before loadInitialData() is
 // called, so they are in place when data:ready fires.
 initMatchup();
-// TODO(phase-2): initRanker();
+initRanker();
 // TODO(phase-2): initDashboard();
 // TODO(phase-2): initPlanner();
 

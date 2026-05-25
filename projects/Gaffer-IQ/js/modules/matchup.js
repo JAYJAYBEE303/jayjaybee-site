@@ -405,6 +405,22 @@ function onHorizonChanged() {
   }
 }
 
+/**
+ * Handle a player:selected event emitted by the Ranker (and any future module)
+ * when the user clicks a player row to drill into its matchup breakdown.
+ * Sets the selected fixture and re-renders — the picker is synced only when
+ * the relevant option is present (it may not be in off-season mode).
+ */
+function onPlayerSelected({ fixtureId }) {
+  if (!store.isFresh() || !fixtureId) return;
+  _selectedFixtureId = fixtureId;
+  const picker = _controls?.querySelector('.fixture-picker');
+  if (picker && picker.querySelector(`option[value="${fixtureId}"]`)) {
+    picker.value = String(fixtureId);
+  }
+  renderMatchup();
+}
+
 // ─── Public init ─────────────────────────────────────────────────────────────
 
 /**
@@ -419,6 +435,7 @@ export function initMatchup() {
 
   store.subscribe('data:ready',      onDataReady);
   store.subscribe('horizon:changed', onHorizonChanged);
+  store.subscribe('player:selected', onPlayerSelected);
 
   // Defensive: if data is already fresh (sessionStorage hydration) trigger now,
   // since data:ready was emitted before this subscription was registered.

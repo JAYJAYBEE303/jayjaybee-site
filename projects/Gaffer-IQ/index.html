@@ -21,7 +21,7 @@
 
       <nav class="module-nav" aria-label="Module navigation">
         <a class="module-nav__item is-active" href="#matchup">Matchup</a>
-        <a class="module-nav__item module-nav__item--inactive" href="#ranker" aria-disabled="true" tabindex="-1">Ranker</a>
+        <a class="module-nav__item" href="#ranker">Ranker</a>
         <a class="module-nav__item module-nav__item--inactive" href="#dashboard" aria-disabled="true" tabindex="-1">Dashboard</a>
         <a class="module-nav__item module-nav__item--inactive" href="#planner" aria-disabled="true" tabindex="-1">Planner</a>
       </nav>
@@ -48,7 +48,50 @@
       </section>
 
       <section class="module-view" data-module="ranker" aria-label="Player Ranker">
-        <p class="coming-soon">Player Ranker — coming in Phase 2.</p>
+
+        <div class="ranker-controls">
+          <div class="ranker-controls__pos-group" role="group" aria-label="Filter by position">
+            <button class="ranker-pos-btn is-active" data-pos="GKP" type="button">GKP</button>
+            <button class="ranker-pos-btn is-active" data-pos="DEF" type="button">DEF</button>
+            <button class="ranker-pos-btn is-active" data-pos="MID" type="button">MID</button>
+            <button class="ranker-pos-btn is-active" data-pos="FWD" type="button">FWD</button>
+          </div>
+
+          <div class="ranker-controls__select-wrap">
+            <label class="ranker-controls__label" for="ranker-price">Price</label>
+            <select class="ranker-select" id="ranker-price">
+              <option value="all">All prices</option>
+              <option value="budget">≤ £5.0m</option>
+              <option value="mid">£5.1m – £8.0m</option>
+              <option value="premium">£8.1m – £10.0m</option>
+              <option value="elite">≥ £10.1m</option>
+            </select>
+          </div>
+
+          <div class="ranker-controls__select-wrap">
+            <label class="ranker-controls__label" for="ranker-team">Team</label>
+            <select class="ranker-select" id="ranker-team">
+              <option value="all">All teams</option>
+            </select>
+          </div>
+
+          <button class="ranker-toggle-btn" id="ranker-vs-toggle"
+                  type="button" aria-pressed="false">Show £/pt</button>
+        </div>
+
+        <div class="ranker-loading" id="ranker-loading" hidden>
+          <span class="ranker-loading__text">Computing rankings…</span>
+        </div>
+
+        <div class="ranker-table-wrap">
+          <table class="ranker-table">
+            <thead id="ranker-thead"></thead>
+            <tbody id="ranker-tbody">
+              <tr><td class="ranker-table__empty" colspan="7">Loading FPL data…</td></tr>
+            </tbody>
+          </table>
+        </div>
+
       </section>
 
       <section class="module-view" data-module="dashboard" aria-label="GW Dashboard">
