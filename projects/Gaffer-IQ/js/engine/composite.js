@@ -1,24 +1,22 @@
 /**
  * js/engine/composite.js
  * Layer: engine (pure). No DOM, no network, no store mutation.
- * Combines every sub-metric into the composite matchup score (CompositeScore).
- * See FEATURE_ENGINE.md §8. This is the top of the engine call chain — modules
- * call scoreFixture, never the individual calc* functions, so every displayed
- * score travels with its breakdown for explainability (ARCHITECTURE.md §8).
- * Output: 0–100, higher = better fixture for the team being scored.
- *
- * Phase 1B implements scoreFixture only. scoreOverHorizon and scorePlayer
- * (FEATURE_ENGINE.md §9, §10) land in Phase 2A — see ROADMAP.md.
+ * Combines every sub-metric into the composite matchup score (CompositeScore),
+ * and aggregates across horizon windows (scoreOverHorizon) and per player
+ * (scorePlayer). See FEATURE_ENGINE.md §8, §9, §10.
+ * Output: 0–100, higher = better fixture/run/player form. Direction: higher = better.
  */
 
 import {
   WEIGHTS, BANDS, CONFIDENCE_FLOOR, LEAGUE_AVG_STRENGTH,
+  HORIZON_DECAY, AGG_METHOD, W_MEAN, W_MIN, BLANK_GW_VALUE,
+  PROJ_FORM, PROJ_FIXTURE, PROJ_COUNTER,
 } from '../config.js';
 import { clamp } from '../util.js';
 import {
   calcBaseDifficulty, calcHomeAwaySplit, calcFixtureHistory,
 } from './fixtures.js';
-import { calcTeamForm }      from './form.js';
+import { calcTeamForm, calcPlayerForm } from './form.js';
 import { calcStyleClash }    from './style.js';
 import { calcCounterMatchup } from './counter.js';
 
@@ -205,5 +203,278 @@ export function scoreFixture(team, fixture, ctx) {
         pointsForA: history.pointsForA,
       },
     },
+  };
+}
+
+// ─── §9  Horizon aggregation ──────────────────────────────────────────────────
+
+/**
+ * Internal: collect fixtures for `team` whose GW falls in `gwSet`.
+ * Returns Map<gw, Fixture[]>. Double GWs produce two entries under the same key.
+ */
+function fixturesForTeamInWindow(team, gwSet, ctx) {
+  const byGw = new Map();
+  for (const f of ctx.fixtures) {
+    if (f.gw === null) continue;
+    if (!gwSet.has(f.gw)) continue;
+    if (f.homeTeamId !== team.id && f.awayTeamId !== team.id) continue;
+    const list = byGw.get(f.gw) ?? [];
+    list.push(f);
+    byGw.set(f.gw, list);
+  }
+  return byGw;
+}
+
+/**
+ * Internal: position-specific counter-matchup edge for a player, aggregated
+ * over the horizon window with the same GW-distance decay as scoreOverHorizon.
+ * Blank GWs contribute BLANK_GW_VALUE so the weighting stays consistent.
+ *
+ *  FWD     → fwdVsCb pairing (striker vs centre-backs)
+ *  MID     → mean(wideMidVsFb, camVsCbMid)
+ *  DEF/GKP → 100 − opponent's counter score (how well this defence resists)
+ *
+ * See FEATURE_ENGINE.md §10 (playerCounterEdge).
+ */
+function calcPlayerCounterEdge(player, gwWindow, teamFixturesByGw, ctx) {
+  const team = ctx.teamsById[player.teamId];
+  if (!team) return { value: 50, estimated: true };
+
+  let wSum   = 0;
+  let wTotal = 0;
+  let anyEstimated = false;
+
+  for (let i = 0; i < gwWindow.length; i++) {
+    const gw       = gwWindow[i];
+    const w        = Math.pow(HORIZON_DECAY, i);
+    const fixtures = teamFixturesByGw.get(gw) ?? [];
+
+    if (fixtures.length === 0) {
+      // MODEL: blank GW counts the same penalty as in scoreOverHorizon.
+      wSum   += BLANK_GW_VALUE * w;
+      wTotal += w;
+      continue;
+    }
+
+    for (const f of fixtures) {
+      const isHome   = f.homeTeamId === team.id;
+      const oppId    = isHome ? f.awayTeamId : f.homeTeamId;
+      const opponent = ctx.teamsById[oppId];
+      if (!opponent) { wSum += 50 * w; wTotal += w; continue; }
+
+      let edgeValue;
+      let estimated = false;
+
+      if (player.position === 'FWD') {
+        const cm  = calcCounterMatchup(team, opponent, ctx);
+        edgeValue = cm.pairings.fwdVsCb?.value ?? 50;
+        estimated = cm.pairings.fwdVsCb?.estimated ?? true;
+      } else if (player.position === 'MID') {
+        const cm  = calcCounterMatchup(team, opponent, ctx);
+        const wm  = cm.pairings.wideMidVsFb?.value ?? 50;
+        const cam = cm.pairings.camVsCbMid?.value  ?? 50;
+        edgeValue = (wm + cam) / 2;
+        estimated = (cm.pairings.wideMidVsFb?.estimated ?? true)
+                 || (cm.pairings.camVsCbMid?.estimated  ?? true);
+      } else {
+        // DEF/GKP: invert opponent's attack score — higher = their attack is weak vs this defence.
+        // MODEL: a defender's counter edge is determined by how poorly the opponent attacks.
+        const oppCm = calcCounterMatchup(opponent, team, ctx);
+        edgeValue   = 100 - oppCm.value;
+        estimated   = oppCm.estimated;
+      }
+
+      if (estimated) anyEstimated = true;
+      wSum   += edgeValue * w;
+      wTotal += w;
+    }
+  }
+
+  return {
+    value:     wTotal === 0 ? 50 : clamp(0, 100, wSum / wTotal),
+    estimated: anyEstimated || wTotal === 0,
+  };
+}
+
+/**
+ * Aggregate a team's composite scores across a horizon window.
+ * Handles blank GWs (no fixture → BLANK_GW_VALUE, never silently skipped) and
+ * double GWs (both fixtures scored and included, naturally boosting the score).
+ * Applies HORIZON_DECAY weighting and AGG_METHOD blending from config.
+ *
+ * Pure: no DOM, no fetch, no store mutation — all inputs are parameters.
+ *
+ * @param {Team}   team
+ * @param {{label: string, gws: number}} horizon  e.g. HORIZONS.GW3
+ * @param {object} ctx   output of buildScoreContext
+ * @returns {object}  CompositeScore shape + perGw strip
+ *   value: 0–100, higher = better fixture run for `team`. Direction: higher = better.
+ *   perGw: [{gw, value, band, opponent, venue, isBlank}] one entry per scored slot;
+ *     DGWs produce two entries for the same gw, blanks one with isBlank: true.
+ *   See FEATURE_ENGINE.md §9.
+ */
+export function scoreOverHorizon(team, horizon, ctx) {
+  if (!team || !horizon || !ctx || !ctx.teamsById) {
+    throw new TypeError('scoreOverHorizon: team, horizon, and ctx are required');
+  }
+
+  const numGws   = horizon.gws;
+  const startGw  = ctx.currentGw;
+  const gwWindow = Array.from({ length: numGws }, (_, i) => startGw + i);
+  const gwSet    = new Set(gwWindow);
+
+  const teamFixturesByGw = fixturesForTeamInWindow(team, gwSet, ctx);
+
+  const entries = [];  // { gwOffset, value, fixtureScore | null }
+  const perGw   = [];  // public per-GW strip array
+
+  for (let i = 0; i < gwWindow.length; i++) {
+    const gw       = gwWindow[i];
+    const gwOffset = i;  // 0 = nearest, matches HORIZON_DECAY exponent
+    const fixtures = teamFixturesByGw.get(gw) ?? [];
+
+    if (fixtures.length === 0) {
+      // MODEL: blank GW — BLANK_GW_VALUE (40) reflects zero return for assets;
+      // mildly bad rather than neutral, never silently skipped. FEATURE_ENGINE.md §9.
+      entries.push({ gwOffset, value: BLANK_GW_VALUE, fixtureScore: null });
+      perGw.push({
+        gw, value: BLANK_GW_VALUE, band: bandFromValue(BLANK_GW_VALUE),
+        opponent: null, venue: null, isBlank: true,
+      });
+    } else {
+      for (const f of fixtures) {
+        const score  = scoreFixture(team, f, ctx);
+        const isHome = f.homeTeamId === team.id;
+        const oppId  = isHome ? f.awayTeamId : f.homeTeamId;
+        const opp    = ctx.teamsById[oppId];
+        entries.push({ gwOffset, value: score.value, fixtureScore: score });
+        perGw.push({
+          gw,
+          value:    score.value,
+          band:     score.band,
+          opponent: opp?.shortName ?? null,
+          venue:    isHome ? 'H' : 'A',
+          isBlank:  false,
+        });
+      }
+    }
+  }
+
+  if (entries.length === 0) {
+    return {
+      value: 50, band: bandFromValue(50), confidence: 1, provisional: false, perGw: [],
+      breakdown: { aggregateMean: 50, aggregateMin: 50, aggMethod: AGG_METHOD, numGws, numBlanks: 0 },
+    };
+  }
+
+  // Weighted mean with GW-distance decay; nearer GWs have more weight.
+  let wSum   = 0;
+  let wTotal = 0;
+  let minVal = 100;
+
+  for (const e of entries) {
+    const w = Math.pow(HORIZON_DECAY, e.gwOffset);
+    wSum   += e.value * w;
+    wTotal += w;
+    if (e.value < minVal) minVal = e.value;
+  }
+
+  const aggregateMean = wTotal === 0 ? 50 : wSum / wTotal;
+  const aggregateMin  = minVal;
+
+  let rawValue;
+  if (AGG_METHOD === 'mean') {
+    rawValue = aggregateMean;
+  } else if (AGG_METHOD === 'min') {
+    rawValue = aggregateMin;
+  } else {
+    // 'blend' (default): rewards a good run but punishes a single brutal fixture.
+    // W_MIN * aggregateMin surfaces fixture traps hiding in a green sequence.
+    rawValue = (W_MEAN * aggregateMean) + (W_MIN * aggregateMin);
+  }
+
+  const value = clamp(0, 100, rawValue);
+
+  const scoredEntries = entries.filter(e => e.fixtureScore !== null);
+  const avgConfidence = scoredEntries.length === 0 ? 0.5
+    : scoredEntries.reduce((s, e) => s + (e.fixtureScore.confidence ?? 0), 0) / scoredEntries.length;
+  const numBlanks = entries.length - scoredEntries.length;
+
+  return {
+    value,
+    band:        bandFromValue(value),
+    confidence:  avgConfidence,
+    provisional: avgConfidence < CONFIDENCE_FLOOR,
+    perGw,
+    breakdown: {
+      aggregateMean,
+      aggregateMin,
+      aggMethod:  AGG_METHOD,
+      numGws,
+      numBlanks,
+    },
+  };
+}
+
+// ─── §10  Player projection ───────────────────────────────────────────────────
+
+/**
+ * Player projection over a horizon: blends player form, team fixture quality,
+ * and position-specific counter-matchup edge. See FEATURE_ENGINE.md §10.
+ *
+ * @param {Player}  player
+ * @param {{label: string, gws: number}} horizon
+ * @param {object}  ctx   output of buildScoreContext
+ * @returns {{ value: number, band: string, perGw: Array, breakdown: object, valueScore: number }}
+ *   value: 0–100, higher = better projected value. Direction: higher = better.
+ *   valueScore: value / price — points-per-million proxy for budget-aware ranking.
+ *   See FEATURE_ENGINE.md §10.
+ */
+export function scorePlayer(player, horizon, ctx) {
+  if (!player || !horizon || !ctx) {
+    throw new TypeError('scorePlayer: player, horizon, and ctx are required');
+  }
+
+  const team = ctx.teamsById[player.teamId];
+  if (!team) {
+    return {
+      value: 50, band: bandFromValue(50), perGw: [],
+      breakdown: {
+        form:    { value: 50, weight: PROJ_FORM,    estimated: true },
+        fixture: { value: 50, weight: PROJ_FIXTURE, estimated: true },
+        counter: { value: 50, weight: PROJ_COUNTER, estimated: true },
+      },
+      valueScore: player.price > 0 ? 50 / player.price : 0,
+    };
+  }
+
+  const formResult    = calcPlayerForm(player, ctx);
+  const horizonResult = scoreOverHorizon(team, horizon, ctx);
+
+  // Re-derive the same window used by scoreOverHorizon so the counter edge is consistent.
+  const numGws   = horizon.gws;
+  const startGw  = ctx.currentGw;
+  const gwWindow = Array.from({ length: numGws }, (_, i) => startGw + i);
+  const gwSet    = new Set(gwWindow);
+  const teamFixturesByGw = fixturesForTeamInWindow(team, gwSet, ctx);
+
+  const counterEdge = calcPlayerCounterEdge(player, gwWindow, teamFixturesByGw, ctx);
+
+  const value = clamp(0, 100,
+    (PROJ_FORM    * formResult.value)
+  + (PROJ_FIXTURE * horizonResult.value)
+  + (PROJ_COUNTER * counterEdge.value),
+  );
+
+  return {
+    value,
+    band:  bandFromValue(value),
+    perGw: horizonResult.perGw,
+    breakdown: {
+      form:    { value: formResult.value,    weight: PROJ_FORM,    estimated: formResult.estimated },
+      fixture: { value: horizonResult.value, weight: PROJ_FIXTURE, estimated: false },
+      counter: { value: counterEdge.value,   weight: PROJ_COUNTER, estimated: counterEdge.estimated },
+    },
+    valueScore: player.price > 0 ? value / player.price : 0,
   };
 }

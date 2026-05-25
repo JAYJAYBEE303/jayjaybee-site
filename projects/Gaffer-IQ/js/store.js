@@ -57,6 +57,7 @@ function getEvents()                  { return state.season?.events ?? []; }
 function getCurrentGw()               { return state.season?.currentGw ?? null; }
 function getNextGw()                  { return state.season?.nextGw ?? null; }
 function getPlayerSummary(playerId)   { return state.playerSummaries[playerId] ?? null; }
+function getAllPlayerSummaries()       { return state.playerSummaries; }
 function getActiveHorizon()           { return state.activeHorizon; }
 function getError()                   { return state.lastError; }
 function getLastRefreshAt()           { return state.lastRefreshAt; }
@@ -123,7 +124,7 @@ export const store = {
   subscribe, emit,
   getSeason, getTeams, getTeam, getPlayers, getPlayer,
   getFixtures, getFixture, getPositions, getEvents,
-  getCurrentGw, getNextGw, getPlayerSummary,
+  getCurrentGw, getNextGw, getPlayerSummary, getAllPlayerSummaries,
   getActiveHorizon, getError, getLastRefreshAt, isFresh,
   setSeason, setPlayerSummary, setActiveHorizon, setError, markDataReady,
   clearCache,

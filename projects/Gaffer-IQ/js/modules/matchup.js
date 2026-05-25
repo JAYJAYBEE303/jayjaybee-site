@@ -11,8 +11,8 @@
  */
 
 import { store } from '../store.js';
-import { BANDS } from '../config.js';
-import { buildScoreContext, scoreFixture } from '../engine/composite.js';
+import { BANDS, HORIZONS } from '../config.js';
+import { buildScoreContext, scoreFixture, scoreOverHorizon } from '../engine/composite.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -72,14 +72,14 @@ function bandFromValue(v) {
 
 /**
  * Build a fresh score context from the current store state.
- * Phase 1: player summaries empty — counter-matchup uses strength-prior fallback.
- * TODO(phase-2): pass playerSummariesById from store for full player form data.
+ * Passes all cached player summaries so calcPlayerForm uses real per-GW data
+ * for any player whose element-summary has been lazily loaded.
  */
 function buildCtx() {
   const season = store.getSeason();
   if (!season) return null;
   return buildScoreContext(season, {
-    playerSummariesById: {},
+    playerSummariesById: store.getAllPlayerSummaries(),
     currentGw: store.getCurrentGw() ?? store.getNextGw() ?? 1,
   });
 }
@@ -167,6 +167,8 @@ function renderPicker(fixtures, { descending = false } = {}) {
 
 /**
  * Score the selected fixture for both teams and render two side-by-side cards.
+ * Each card shows the single-fixture breakdown plus the team's horizon aggregate
+ * strip (perGw coloured cells) so the horizon switcher produces visible updates.
  * All scoring delegated to engine/composite.js — no metric logic here.
  */
 function renderMatchup() {
@@ -189,15 +191,20 @@ function renderMatchup() {
     return;
   }
 
-  const homeScore = scoreFixture(homeTeam, fixture, ctx);
-  const awayScore = scoreFixture(awayTeam, fixture, ctx);
+  const horizonKey = store.getActiveHorizon();
+  const horizon    = HORIZONS[horizonKey] ?? HORIZONS.GW1;
+
+  const homeScore        = scoreFixture(homeTeam, fixture, ctx);
+  const awayScore        = scoreFixture(awayTeam, fixture, ctx);
+  const homeHorizonScore = scoreOverHorizon(homeTeam, horizon, ctx);
+  const awayHorizonScore = scoreOverHorizon(awayTeam, horizon, ctx);
 
   _grid.innerHTML = '';
   _grid.appendChild(
-    buildCard(homeTeam, 'Home', homeScore, fixture.fplDifficulty.home),
+    buildCard(homeTeam, 'Home', homeScore, fixture.fplDifficulty.home, homeHorizonScore, horizon),
   );
   _grid.appendChild(
-    buildCard(awayTeam, 'Away', awayScore, fixture.fplDifficulty.away),
+    buildCard(awayTeam, 'Away', awayScore, fixture.fplDifficulty.away, awayHorizonScore, horizon),
   );
 }
 
@@ -206,19 +213,40 @@ function showStatus(msg) {
   _grid.innerHTML = `<p class="matchup-status">${esc(msg)}</p>`;
 }
 
+// ─── Build: perGw horizon strip ───────────────────────────────────────────────
+
+/**
+ * Build a row of coloured cells, one per scoreOverHorizon perGw entry.
+ * Blank GWs render as '–' with a neutral colour; DGWs produce two adjacent cells.
+ */
+function buildPerGwStrip(perGw) {
+  if (!perGw || perGw.length === 0) return '';
+  const cells = perGw.map(entry => {
+    const bandClass = entry.isBlank ? 'neutral' : entry.band;
+    const label = entry.isBlank
+      ? `GW${entry.gw} (blank)`
+      : `GW${entry.gw} ${entry.opponent ?? ''} (${entry.venue ?? ''}) — ${Math.round(entry.value)}`;
+    const display = entry.isBlank ? '–' : Math.round(entry.value);
+    return `<div class="pgw-cell pgw-cell--${esc(bandClass)}" title="${esc(label)}">${esc(String(display))}</div>`;
+  }).join('');
+  return `<div class="pgw-strip">${cells}</div>`;
+}
+
 // ─── Build: matchup card ──────────────────────────────────────────────────────
 
 /**
  * Build and return a <article> DOM node for one team's side of the matchup.
- * Receives a CompositeScore (from scoreFixture) and the official FPL FDR (1–5).
+ * Shows: single-fixture CompositeScore breakdown + horizon aggregate strip.
  *
  * @param {Team}           team
  * @param {'Home'|'Away'}  venue
- * @param {CompositeScore} score
- * @param {number}         fdr   official FPL difficulty rating 1–5
+ * @param {CompositeScore} score         from scoreFixture — single fixture detail
+ * @param {number}         fdr           official FPL difficulty rating 1–5
+ * @param {object}         horizonScore  from scoreOverHorizon — multi-GW aggregate
+ * @param {{label:string, gws:number}} horizon  active horizon config
  * @returns {HTMLElement}
  */
-function buildCard(team, venue, score, fdr) {
+function buildCard(team, venue, score, fdr, horizonScore, horizon) {
   const card = document.createElement('article');
   card.className = `matchup-card matchup-card--${score.band}`;
   if (score.provisional) card.classList.add('matchup-card--provisional');
@@ -226,6 +254,23 @@ function buildCard(team, venue, score, fdr) {
   const provisionalClass = score.provisional ? ' score-pill--provisional' : '';
   const confLowClass     = score.provisional ? ' confidence-indicator--low' : '';
   const confPct          = Math.round(score.confidence * 100);
+
+  // Horizon section: show aggregate score + perGw strip when horizon > GW1.
+  const showHorizonSection = horizonScore && horizon && horizon.gws > 1;
+  const horizonBand        = horizonScore?.band ?? 'neutral';
+  const horizonValue       = horizonScore ? Math.round(horizonScore.value) : '—';
+  const horizonSection     = showHorizonSection
+    ? `
+    <div class="matchup-card__horizon">
+      <h3 class="matchup-card__section-title">${esc(horizon.label)} Outlook</h3>
+      <div class="horizon-summary">
+        <span class="score-chip score-chip--${esc(horizonBand)} horizon-summary__score">${horizonValue}</span>
+        <span class="horizon-summary__label">${esc(horizonBand)}</span>
+      </div>
+      ${buildPerGwStrip(horizonScore.perGw)}
+    </div>
+    `
+    : '';
 
   card.innerHTML = `
     <header class="matchup-card__header">
@@ -258,6 +303,8 @@ function buildCard(team, venue, score, fdr) {
       <h3 class="matchup-card__section-title">Counter-Matchup Pairings</h3>
       ${buildCounterPairings(score.breakdown.counterMatchup.pairings)}
     </div>
+
+    ${horizonSection}
   `;
 
   return card;
@@ -351,9 +398,8 @@ function onDataReady() {
 }
 
 function onHorizonChanged() {
-  // Phase 1: scoreFixture doesn't use the horizon — single fixture always shown.
-  // Re-render so the UI reacts to the event; Phase 2A swaps in scoreOverHorizon.
-  // TODO(phase-2): replace renderMatchup() with a horizon-aware aggregate call.
+  // Re-render with the new horizon: renderMatchup now calls scoreOverHorizon
+  // so the horizon aggregate score and perGw strip update on every switch.
   if (store.isFresh() && _selectedFixtureId) {
     renderMatchup();
   }

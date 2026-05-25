@@ -9,9 +9,9 @@
 
 import { HORIZONS } from './config.js';
 import { store } from './store.js';
-import { fetchBootstrap, fetchFixtures, ApiError } from './api.js';
-import { normaliseSeason } from './engine/normalise.js';
-import { buildScoreContext, scoreFixture } from './engine/composite.js';
+import { fetchBootstrap, fetchFixtures, fetchPlayerSummary, ApiError } from './api.js';
+import { normaliseSeason, normalisePlayerSummary } from './engine/normalise.js';
+import { buildScoreContext, scoreFixture, scoreOverHorizon, scorePlayer } from './engine/composite.js';
 import { calcBaseDifficulty, calcHomeAwaySplit, calcFixtureHistory } from './engine/fixtures.js';
 import { calcTeamForm, calcPlayerForm } from './engine/form.js';
 import { calcStyleProfile, calcStyleClash } from './engine/style.js';
@@ -129,25 +129,46 @@ initMatchup();
 // TODO(phase-2): initDashboard();
 // TODO(phase-2): initPlanner();
 
+// ─── Lazy player-summary loader ───────────────────────────────────────────────
+
+/**
+ * Fetch a player summary on demand, cache it in the store, and return it.
+ * Returns the cached summary immediately if already loaded. Never bulk-fetches.
+ * See ARCHITECTURE.md §6 (lazy loading) and FEATURE_ENGINE.md §7.1.
+ *
+ * @param {number} playerId
+ * @returns {Promise<PlayerSummary>}  normalised summary, cached in store
+ */
+async function loadPlayerSummary(playerId) {
+  const cached = store.getPlayerSummary(playerId);
+  if (cached) return cached;
+  const raw     = await fetchPlayerSummary(playerId);
+  const summary = normalisePlayerSummary(raw);
+  store.setPlayerSummary(playerId, summary);
+  return summary;
+}
+
 // ─── Dev affordances ─────────────────────────────────────────────────────────
-// Expose store + engine on window for the Phase 1A/1B console exit criteria.
-// Remove or gate behind a debug flag once Phase 2 modules render from the store.
+// Expose store + engine on window for console exit-criterion verification.
 
 window.__store    = store;
 window.__horizons = HORIZONS;
 window.__refresh  = () => { store.clearCache(); loadInitialData({ force: true }); };
 
 window.__engine = {
-  context() {
+  context(gwOverride) {
     const season = store.getSeason();
     if (!season) return null;
     return buildScoreContext(season, {
-      playerSummariesById: {},
-      currentGw: store.getCurrentGw() ?? store.getNextGw() ?? 1,
+      playerSummariesById: store.getAllPlayerSummaries(),
+      currentGw: gwOverride ?? store.getCurrentGw() ?? store.getNextGw() ?? 1,
     });
   },
   scoreFixture,
+  scoreOverHorizon,
+  scorePlayer,
   buildScoreContext,
+  loadPlayerSummary,
   calcBaseDifficulty, calcHomeAwaySplit, calcFixtureHistory,
   calcTeamForm, calcPlayerForm,
   calcStyleProfile, calcStyleClash,

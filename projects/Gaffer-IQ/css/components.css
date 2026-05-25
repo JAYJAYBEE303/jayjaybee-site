@@ -302,12 +302,15 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 .matchup-card__breakdown,
-.matchup-card__counter {
+.matchup-card__counter,
+.matchup-card__horizon {
   padding: var(--space-4) var(--space-6);
   border-bottom: 1px solid var(--color-border-subtle);
 }
 
-.matchup-card__counter {
+/* Last visible section has no bottom border */
+.matchup-card__counter:last-child,
+.matchup-card__horizon:last-child {
   border-bottom: none;
 }
 
@@ -432,3 +435,54 @@
 .counter-pairing--estimated .counter-pairing__label {
   color: var(--color-muted);
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   HORIZON OUTLOOK SECTION — scoreOverHorizon perGw strip + aggregate
+   Appears in the matchup card when the active horizon is GW3 or GW6.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.horizon-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.horizon-summary__score {
+  font-size: var(--font-size-md);
+  min-width: 36px;
+}
+
+.horizon-summary__label {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+  text-transform: capitalize;
+}
+
+/* ─── perGw fixture strip ─────────────────────────────────────────────────── */
+
+.pgw-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.pgw-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  cursor: default;
+  border: 1px solid transparent;
+}
+
+.pgw-cell--great   { background: var(--band-great-bg);   color: var(--band-great);   border-color: var(--band-great); }
+.pgw-cell--good    { background: var(--band-good-bg);    color: var(--band-good);    border-color: var(--band-good); }
+.pgw-cell--neutral { background: var(--band-neutral-bg); color: var(--band-neutral); border-color: var(--band-neutral); }
+.pgw-cell--tough   { background: var(--band-tough-bg);   color: var(--band-tough);   border-color: var(--band-tough); }
+.pgw-cell--brutal  { background: var(--band-brutal-bg);  color: var(--band-brutal);  border-color: var(--band-brutal); }
