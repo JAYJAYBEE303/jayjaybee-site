@@ -90,9 +90,23 @@ function getUpcomingFixtures() {
 }
 
 /**
- * Group a fixture array by GW. Returns [{ gw, fixtures }, …] sorted ascending.
+ * Off-season fallback: the most recent `limit` played fixtures, GW descending.
+ * Used when no upcoming fixtures exist (e.g. between seasons).
  */
-function groupByGw(fixtures) {
+function getRecentPlayedFixtures(limit = 20) {
+  return store.getFixtures()
+    .filter(f => f.played && f.gw !== null)
+    .sort((a, b) => b.gw - a.gw || (b.kickoff || '').localeCompare(a.kickoff || ''))
+    .slice(0, limit);
+}
+
+/**
+ * Group a fixture array by GW.
+ * @param {Fixture[]} fixtures
+ * @param {{ descending?: boolean }} [opts]  descending=true for off-season played list
+ * @returns {{ gw: number, fixtures: Fixture[] }[]}
+ */
+function groupByGw(fixtures, { descending = false } = {}) {
   const map = new Map();
   for (const f of fixtures) {
     const list = map.get(f.gw) ?? [];
@@ -100,18 +114,19 @@ function groupByGw(fixtures) {
     map.set(f.gw, list);
   }
   return Array.from(map.entries())
-    .sort(([a], [b]) => a - b)
+    .sort(([a], [b]) => descending ? b - a : a - b)
     .map(([gw, fixturesInGw]) => ({ gw, fixtures: fixturesInGw }));
 }
 
 // ─── Render: fixture picker ───────────────────────────────────────────────────
 
 /**
- * Populate the .matchup-controls bar with a labelled <select> containing all
- * upcoming fixtures grouped by GW. Re-builds the picker on data refresh so the
- * list always reflects the live fixture schedule.
+ * Populate the .matchup-controls bar with a labelled <select> containing
+ * fixtures grouped by GW. Re-builds the picker on data refresh.
+ * @param {Fixture[]} fixtures
+ * @param {{ descending?: boolean }} [opts]
  */
-function renderPicker(upcoming) {
+function renderPicker(fixtures, { descending = false } = {}) {
   _controls.innerHTML = '';
 
   const label = document.createElement('label');
@@ -123,7 +138,7 @@ function renderPicker(upcoming) {
   select.id = 'fixture-picker';
   select.className = 'fixture-picker';
 
-  for (const { gw, fixtures: gwFixtures } of groupByGw(upcoming)) {
+  for (const { gw, fixtures: gwFixtures } of groupByGw(fixtures, { descending })) {
     const optgroup = document.createElement('optgroup');
     optgroup.label = `Gameweek ${gw}`;
     for (const f of gwFixtures) {
@@ -313,16 +328,25 @@ function buildCounterPairings(pairings) {
 // ─── Event handlers ───────────────────────────────────────────────────────────
 
 function onDataReady() {
-  const upcoming = getUpcomingFixtures();
-  if (upcoming.length === 0) {
-    showStatus('No upcoming fixtures found.');
+  let fixtures = getUpcomingFixtures();
+  let descending = false;
+
+  if (fixtures.length === 0) {
+    // Off-season fallback: no unplayed fixtures exist, show recent played ones.
+    fixtures = getRecentPlayedFixtures(20);
+    descending = true;
+  }
+
+  if (fixtures.length === 0) {
+    showStatus('No fixtures found.');
     return;
   }
-  // Default to the first upcoming fixture if none selected yet or stale id.
+
+  // Default to the first fixture in the list (nearest upcoming, or most recent played).
   if (!_selectedFixtureId || !store.getFixture(_selectedFixtureId)) {
-    _selectedFixtureId = upcoming[0].id;
+    _selectedFixtureId = fixtures[0].id;
   }
-  renderPicker(upcoming);
+  renderPicker(fixtures, { descending });
   renderMatchup();
 }
 
