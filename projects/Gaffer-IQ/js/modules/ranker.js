@@ -455,7 +455,15 @@ export function initRanker() {
   store.subscribe('data:ready',      onDataReady);
   store.subscribe('horizon:changed', onHorizonChanged);
 
-  // If the store was already hydrated from sessionStorage before this module
-  // initialised, data:ready fired before our subscription — trigger manually.
-  if (store.isFresh()) onDataReady();
+  // If the store already has data (hydrated from sessionStorage, or data:ready
+  // fired before this module registered its subscription), render right now
+  // rather than waiting for an event that won't fire again.
+  // onDataReady() uses setTimeout(0) to yield a paint frame for data refreshes
+  // triggered mid-session; here we skip that deferral and render synchronously
+  // so the table appears immediately on first load.
+  if (store.isFresh()) {
+    populateTeamFilter();
+    rebuildRows();
+    renderTable();
+  }
 }
