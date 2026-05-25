@@ -1,70 +1,88 @@
 /**
  * api/fpl.js
  * Layer: serverless (Node.js). CORS proxy for the FPL API.
- * Validates the requested path against a strict allowlist, then fetches and
- * forwards the JSON response. Contains no analytical logic.
- * See ARCHITECTURE.md §5 for the full specification and allowlist rationale.
+ * Validates the requested path against a strict allowlist (anchored regex),
+ * defensively normalises input, then fetches and forwards the JSON response
+ * with CORS and per-endpoint Cache-Control headers. Contains no analytical logic.
+ * See ARCHITECTURE.md §5 for the full specification and rationale.
  */
 
+// ─── Allowlist ──────────────────────────────────────────────────────────────
+// Every entry must match the incoming `path` exactly (anchored ^…$).
+// `cache` is the Cache-Control header applied to a successful forward, tuned
+// per endpoint per ARCHITECTURE.md §6 (static data caches longer, live never).
 const ALLOWED_PATTERNS = [
-  /^bootstrap-static\/$/,
-  /^fixtures\/$/,
-  /^fixtures\/\?event=\d{1,2}$/,
-  /^element-summary\/\d{1,4}\/$/,
-  /^event\/\d{1,2}\/live\/$/,
+  { name: 'bootstrap',     pattern: /^bootstrap-static\/$/,           cache: 'public, s-maxage=300, stale-while-revalidate=600'   },
+  { name: 'fixtures',      pattern: /^fixtures\/$/,                   cache: 'public, s-maxage=600, stale-while-revalidate=3600'  },
+  { name: 'fixturesByGw',  pattern: /^fixtures\/\?event=\d{1,2}$/,    cache: 'public, s-maxage=600, stale-while-revalidate=3600'  },
+  { name: 'playerSummary', pattern: /^element-summary\/\d{1,4}\/$/,   cache: 'public, s-maxage=300, stale-while-revalidate=600'   },
+  { name: 'live',          pattern: /^event\/\d{1,2}\/live\/$/,       cache: 'no-store, max-age=0'                                },
 ];
 
-const FPL_BASE = 'https://fantasy.premierleague.com/api/';
+const FPL_BASE  = 'https://fantasy.premierleague.com/api/';
+const USER_AGENT = 'Gaffer-IQ/0.1 (personal tool; contact via GitHub)';
+
+function sendError(res, status, error, upstream = null) {
+  res.status(status).json({ error, upstream });
+}
 
 export default async function handler(req, res) {
+  // CORS — permissive for a personal tool; tighten to the deployment origin later.
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Vary', 'Origin');
+
   if (req.method !== 'GET') {
-    res.status(405).json({ error: 'Method not allowed' });
-    return;
+    return sendError(res, 405, 'Method not allowed');
   }
 
+  // Parse query without depending on Vercel-specific req.query helpers.
+  // searchParams.get() URL-decodes the value automatically.
   const url = new URL(req.url, 'http://localhost');
-  const raw = url.searchParams.get('path');
+  const path = url.searchParams.get('path');
 
-  if (!raw) {
-    res.status(400).json({ error: 'Missing path parameter' });
-    return;
+  if (!path) {
+    return sendError(res, 400, 'Missing path parameter');
   }
 
-  let path;
-  try {
-    path = decodeURIComponent(raw);
-  } catch {
-    res.status(400).json({ error: 'Invalid path encoding' });
-    return;
-  }
-
-  // Reject anything that looks like an escape attempt before pattern-matching.
-  // The proxy only ever builds `${FPL_BASE}${path}` — never a full URL from input.
+  // Defensive normalisation BEFORE the allowlist check (ARCHITECTURE.md §5
+  // step 2). The proxy only ever builds `${FPL_BASE}${path}` — never a full
+  // URL from input. These checks make sure `path` is a path fragment, not a
+  // smuggled host or escape.
   if (
     path.includes('..') ||
     path.startsWith('/') ||
-    /^https?:/.test(path) ||
-    path.startsWith('//')
+    path.startsWith('//') ||
+    /^https?:/i.test(path) ||
+    /\\/.test(path)
   ) {
-    res.status(400).json({ error: 'Invalid path' });
-    return;
+    return sendError(res, 400, 'Invalid path');
   }
 
-  const allowed = ALLOWED_PATTERNS.some(re => re.test(path));
-  if (!allowed) {
-    res.status(400).json({ error: 'Path not in allowlist' });
-    return;
+  const match = ALLOWED_PATTERNS.find(({ pattern }) => pattern.test(path));
+  if (!match) {
+    return sendError(res, 400, 'Path not in allowlist');
   }
 
+  let upstream;
   try {
-    const upstream = await fetch(`${FPL_BASE}${path}`, {
-      headers: { 'User-Agent': 'Gaffer-IQ/0.1 (personal tool; contact via GitHub)' },
+    upstream = await fetch(`${FPL_BASE}${path}`, {
+      headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
     });
-    const data = await upstream.json();
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
-    res.status(upstream.status).json(data);
   } catch (err) {
-    res.status(502).json({ error: 'Upstream fetch failed', detail: err.message });
+    return sendError(res, 502, `Upstream fetch failed: ${err.message}`, null);
   }
+
+  if (!upstream.ok) {
+    return sendError(res, upstream.status, 'Upstream returned non-OK', upstream.status);
+  }
+
+  let data;
+  try {
+    data = await upstream.json();
+  } catch (err) {
+    return sendError(res, 502, `Upstream returned non-JSON: ${err.message}`, upstream.status);
+  }
+
+  res.setHeader('Cache-Control', match.cache);
+  res.status(200).json(data);
 }
