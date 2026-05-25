@@ -64,6 +64,15 @@ export const STYLE_RULES = [
   { axisA: 'tempo',            axisB: 'tempo',            sign: -1, magnitude: 10 },
 ];
 
+// Anchors used to normalise the three Phase-1 style-profile axes from raw
+// per-game values to 0–100. Tuned to typical PL distributions; replaced with
+// real xG/pressing data in Phase 3 (FEATURE_ENGINE.md §6).
+export const STYLE_ANCHORS = {
+  attackDirectness: { min: 0.5, max: 2.5 },   // goals-for per game
+  defensiveHeight:  { min: 0.0, max: 0.5 },   // clean-sheet rate
+  tempo:            { min: 1.5, max: 3.5 },   // total goals per game (for + against)
+};
+
 // ─── §7.1  Player form ────────────────────────────────────────────────────────
 
 // Rolling window (gameweeks) for player form.
@@ -78,6 +87,24 @@ export const W_UNDERLYING = 0.2;   // xG+xA underlying overlay
 // MODEL: a player who might not play is near-useless in FPL regardless of form.
 export const AVAIL_PENALTY = 0.4;
 
+// Position-relative anchors for normalising per-90 returns inside calcPlayerForm.
+// MODEL: rough PL distributions — Phase 3 replaces these with position-relative
+// league percentiles once xG/role data lands.
+export const PLAYER_PER90_ANCHORS = {
+  attack:  { min: 2, max: 10 },   // FWD/MID per-90 points: ~2 = poor, ~10 = elite
+  defence: { min: 1, max:  7 },   // DEF/GKP per-90 points
+};
+
+// Position-relative anchors for the (xG + xA) per-90 overlay inside calcPlayerForm.
+export const PLAYER_XG_ANCHORS = {
+  attack:  { min: 0.1, max: 1.2 },
+  defence: { min: 0.0, max: 0.5 },
+};
+
+// Season length in gameweeks. Used as the denominator in season-level fallbacks
+// (e.g. minutesSecurity when per-GW history isn't loaded yet).
+export const SEASON_GWS = 38;
+
 // ─── §7.2  Position counter-matchup ──────────────────────────────────────────
 
 // Scales the pairingEdge (form gap between attacking and defensive unit) into
@@ -90,6 +117,13 @@ export const PAIRING_WEIGHTS = {
   wideMidVsFb: 0.6,   // wide mids / wingers vs full-backs
   camVsCbMid:  0.4,   // central attacking mids vs CBs + defensive mids
 };
+
+// Anchors for the counter-matchup fallback used when player-level form is missing
+// (no element-summary loaded yet). Maps (team-A attack − team-B defence) from the
+// FPL strength priors to a 0–100 pairing score, centred so the league-average gap
+// lands near 50. Same scale family as EDGE_MIN/EDGE_MAX but tighter (strength
+// priors compress for the average-team attack-vs-defence spread).
+export const COUNTER_FALLBACK_EDGE = { min: -300, max: 300 };
 
 // ─── §8  Composite matchup score ─────────────────────────────────────────────
 
