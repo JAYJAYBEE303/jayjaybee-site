@@ -1,0 +1,5 @@
+/* Gaffer IQ — components.css
+   Reusable component styles: cards, tables, badges, score pills.
+   All values use design tokens from base.css via var(--…). */
+
+/* TODO(phase-1): matchup card, ranker table, score pill, confidence badge */

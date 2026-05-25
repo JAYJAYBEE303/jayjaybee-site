@@ -1,0 +1,9 @@
+{
+  "name": "gaffer-iq",
+  "version": "0.1.0",
+  "description": "Personal FPL fixture analysis and player projection tool.",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  }
+}
