@@ -11,7 +11,7 @@ import { HORIZONS } from './config.js';
 import { store } from './store.js';
 import { fetchBootstrap, fetchFixtures, fetchPlayerSummary, ApiError } from './api.js';
 import { normaliseSeason, normalisePlayerSummary } from './engine/normalise.js';
-import { buildScoreContext, scoreFixture, scoreOverHorizon, scorePlayer } from './engine/composite.js';
+import { buildScoreContext, scoreFixture, scoreOverHorizon, scorePlayer, rankPlayers } from './engine/composite.js';
 import { calcBaseDifficulty, calcHomeAwaySplit, calcFixtureHistory } from './engine/fixtures.js';
 import { calcTeamForm, calcPlayerForm } from './engine/form.js';
 import { calcStyleProfile, calcStyleClash } from './engine/style.js';
@@ -167,6 +167,7 @@ window.__engine = {
   scoreFixture,
   scoreOverHorizon,
   scorePlayer,
+  rankPlayers,
   buildScoreContext,
   loadPlayerSummary,
   calcBaseDifficulty, calcHomeAwaySplit, calcFixtureHistory,
