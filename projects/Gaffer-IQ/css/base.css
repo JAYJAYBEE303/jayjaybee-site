@@ -9,6 +9,10 @@
   padding: 0;
 }
 
+/* Ensure the HTML `hidden` attribute wins even when an element has an
+   explicit display property (e.g. display:flex on .ranker-loading). */
+[hidden] { display: none !important; }
+
 :root {
   /* --- Colour palette ---------------------------------------------------- */
   --color-bg:             #0d1117;
