@@ -372,11 +372,12 @@ export function scoreOverHorizon(team, horizon, ctx) {
         entries.push({ gwOffset, value: score.value, fixtureScore: score });
         perGw.push({
           gw,
-          value:    score.value,
-          band:     score.band,
-          opponent: opp?.shortName ?? null,
-          venue:    isHome ? 'H' : 'A',
-          isBlank:  false,
+          value:       score.value,
+          band:        score.band,
+          opponent:    opp?.shortName ?? null,
+          venue:       isHome ? 'H' : 'A',
+          isBlank:     false,
+          provisional: score.provisional,
         });
       }
     }

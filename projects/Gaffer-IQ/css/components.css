@@ -176,6 +176,21 @@
   );
 }
 
+/* Estimated: low-confidence score — dashed border + ~ prefix, never hidden.
+   Combined with a band modifier: score-pill--good score-pill--estimated.
+   See ARCHITECTURE.md §11, FEATURE_ENGINE.md §8.3. */
+.score-pill--estimated {
+  border-style: var(--estimated-border-style);
+  opacity: 0.82;
+}
+.score-pill--estimated .score-pill__value::before {
+  content: '~';
+  font-size: 0.6em;
+  vertical-align: super;
+  opacity: 0.7;
+  margin-right: 1px;
+}
+
 .score-pill__value {
   font-size: var(--font-size-2xl);
   font-weight: 800;
@@ -215,6 +230,18 @@
 .score-chip--neutral { background: var(--band-neutral-bg); color: var(--band-neutral); }
 .score-chip--tough   { background: var(--band-tough-bg);   color: var(--band-tough); }
 .score-chip--brutal  { background: var(--band-brutal-bg);  color: var(--band-brutal); }
+
+/* Estimated compact chip — dashed border in the band's own colour, ~ prefix. */
+.score-chip--estimated {
+  border: 1px var(--estimated-border-style) currentColor;
+  opacity: 0.82;
+}
+.score-chip--estimated::before {
+  content: '~';
+  font-size: 0.7em;
+  opacity: 0.7;
+  margin-right: 1px;
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    FDR COMPARISON — official FPL 1–5 rating shown alongside Gaffer IQ score
@@ -362,6 +389,18 @@
 .breakdown-row__bar--tough   { background: var(--band-tough); }
 .breakdown-row__bar--brutal  { background: var(--band-brutal); }
 
+/* Estimated sub-metric bar: reduced opacity + striped overlay (the "dashed" fill). */
+.breakdown-row__bar--estimated {
+  opacity: 0.55;
+  background-image: repeating-linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0)    0px,
+    rgba(255, 255, 255, 0)    4px,
+    rgba(255, 255, 255, 0.2)  4px,
+    rgba(255, 255, 255, 0.2)  8px
+  );
+}
+
 .breakdown-row__value {
   font-size: var(--font-size-sm);
   font-weight: 600;
@@ -486,6 +525,12 @@
 .pgw-cell--neutral { background: var(--band-neutral-bg); color: var(--band-neutral); border-color: var(--band-neutral); }
 .pgw-cell--tough   { background: var(--band-tough-bg);   color: var(--band-tough);   border-color: var(--band-tough); }
 .pgw-cell--brutal  { background: var(--band-brutal-bg);  color: var(--band-brutal);  border-color: var(--band-brutal); }
+
+/* Estimated fixture cell — dashed border, reduced opacity. */
+.pgw-cell--estimated {
+  border-style: var(--estimated-border-style);
+  opacity: 0.7;
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    PLAYER RANKER — controls, table, badges, fixture strip
@@ -1273,10 +1318,10 @@
   color: var(--band-brutal);
 }
 
-/* Low Confidence — neutral/muted (estimated score) */
+/* Low Confidence — uses --color-estimated so all estimated indicators share one token */
 .dash-flag--confidence {
-  background: var(--band-neutral-bg);
-  color: var(--band-neutral);
+  background: rgba(122, 131, 144, 0.12);
+  color: var(--color-estimated);
 }
 
 /* Availability Doubt — red/brutal band */
@@ -1592,6 +1637,17 @@
 
 .planner-delta--gain { color: var(--band-good); }
 .planner-delta--loss { color: var(--band-brutal); }
+
+/* Estimated delta: underlying projections have low confidence. */
+.planner-delta--estimated {
+  opacity: 0.7;
+}
+.planner-delta--estimated::before {
+  content: '~';
+  font-size: 0.75em;
+  opacity: 0.7;
+  margin-right: 1px;
+}
 
 .planner-delta--sm {
   font-size: var(--font-size-sm);

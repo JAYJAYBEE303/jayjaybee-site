@@ -74,6 +74,15 @@ function esc(str) {
     .replace(/"/g,  '&quot;');
 }
 
+/**
+ * True when a scorePlayer result has at least one estimated sub-metric.
+ * scorePlayer does not expose a single confidence number, so we check the
+ * breakdown directly. Used to add score-chip--estimated where appropriate.
+ */
+function isScoreEstimated(score) {
+  return Boolean(score?.breakdown?.form?.estimated || score?.breakdown?.counter?.estimated);
+}
+
 function buildCtx() {
   const season = store.getSeason();
   if (!season) return null;
@@ -384,8 +393,9 @@ function renderSquadPanel() {
     for (const player of playersInPos) {
       const score = _scores.get(player.id);
       const team  = store.getTeam(player.teamId);
+      const estClass = score && isScoreEstimated(score) ? ' score-chip--estimated' : '';
       const chip  = score
-        ? `<span class="score-chip score-chip--${esc(score.band)}">${Math.round(score.value)}</span>`
+        ? `<span class="score-chip score-chip--${esc(score.band)}${estClass}">${Math.round(score.value)}</span>`
         : '';
       slots.push(`
         <div class="dash-squad-slot dash-squad-slot--filled">
@@ -507,7 +517,7 @@ function renderCaptainBlock(entry) {
             ${esc(player.name)}${statusMark}${team ? `<span class="dash-captain__team">${esc(team.shortName)}</span>` : ''}
           </div>
         </div>
-        <span class="score-chip score-chip--${esc(score.band)}" style="margin-left:auto">${Math.round(score.value)}</span>
+        <span class="score-chip score-chip--${esc(score.band)}${isScoreEstimated(score) ? ' score-chip--estimated' : ''}" style="margin-left:auto">${Math.round(score.value)}</span>
       </div>
       ${flagsHtml}
       <div class="dash-captain__breakdown">${bars}</div>
@@ -536,7 +546,7 @@ function renderPlayerRow(entry, captainId) {
       </span>
       <span class="dash-player-row__team">${team ? esc(team.shortName) : '—'}</span>
       <span class="dash-player-row__score">
-        <span class="score-chip score-chip--${esc(score.band)}">${Math.round(score.value)}</span>
+        <span class="score-chip score-chip--${esc(score.band)}${isScoreEstimated(score) ? ' score-chip--estimated' : ''}">${Math.round(score.value)}</span>
       </span>
       ${flags.length ? `<span class="dash-player-row__flags">${buildFlagChips(flags)}</span>` : ''}
     </div>

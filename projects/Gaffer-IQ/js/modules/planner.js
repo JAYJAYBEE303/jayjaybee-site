@@ -87,6 +87,14 @@ function esc(str) {
     .replace(/"/g,  '&quot;');
 }
 
+/**
+ * True when a scorePlayer result has at least one estimated sub-metric.
+ * Used to apply score-chip--estimated and planner-delta--estimated.
+ */
+function isScoreEstimated(score) {
+  return Boolean(score?.breakdown?.form?.estimated || score?.breakdown?.counter?.estimated);
+}
+
 /** Build the engine scoring context from the current store state. */
 function buildCtx() {
   const season = store.getSeason();
@@ -343,7 +351,7 @@ function renderPlayerProjection(player, score, team, direction) {
           </div>
         </div>
       </div>
-      <span class="score-chip score-chip--${esc(score?.band ?? 'neutral')}">${Math.round(score?.value ?? 0)}</span>
+      <span class="score-chip score-chip--${esc(score?.band ?? 'neutral')}${isScoreEstimated(score) ? ' score-chip--estimated' : ''}">${Math.round(score?.value ?? 0)}</span>
     </div>
   `.trim();
 }
@@ -355,19 +363,20 @@ function renderPlayerProjection(player, score, team, direction) {
  */
 function renderTransferCard(swap) {
   const { outPlayer, inPlayer, outScore, inScore, delta, priceDiff, isHit } = swap;
-  const outTeam   = store.getTeam(outPlayer.teamId);
-  const inTeam    = store.getTeam(inPlayer.teamId);
-  const dSign     = delta >= 0 ? '+' : '';
-  const cSign     = priceDiff >= 0 ? '+' : '';
-  const remaining = (_budget - priceDiff).toFixed(1);
-  const hitBadge  = isHit
+  const outTeam    = store.getTeam(outPlayer.teamId);
+  const inTeam     = store.getTeam(inPlayer.teamId);
+  const dSign      = delta >= 0 ? '+' : '';
+  const cSign      = priceDiff >= 0 ? '+' : '';
+  const remaining  = (_budget - priceDiff).toFixed(1);
+  const deltaEst   = isScoreEstimated(inScore) || isScoreEstimated(outScore) ? ' planner-delta--estimated' : '';
+  const hitBadge   = isHit
     ? `<span class="planner-hit-badge">HIT −${HIT_PENALTY}pts</span>`
     : '';
 
   return `
     <div class="planner-transfer-card">
       <div class="planner-transfer-card__header">
-        <span class="planner-delta planner-delta--${delta >= 0 ? 'gain' : 'loss'}">${dSign}${delta.toFixed(1)}</span>
+        <span class="planner-delta planner-delta--${delta >= 0 ? 'gain' : 'loss'}${deltaEst}">${dSign}${delta.toFixed(1)}</span>
         <span class="planner-cost-diff">${cSign}£${Math.abs(priceDiff).toFixed(1)}m</span>
         <span class="planner-budget-remaining">£${remaining}m left</span>
         ${hitBadge}
@@ -389,11 +398,16 @@ function renderTransferCard(swap) {
  */
 function renderTwoSwapCard(twoSwap) {
   const { swap1, swap2, combinedDelta, isHit } = twoSwap;
-  const dSign     = combinedDelta >= 0 ? '+' : '';
-  const combCost  = swap1.priceDiff + swap2.priceDiff;
-  const cSign     = combCost >= 0 ? '+' : '';
-  const remaining = (_budget - combCost).toFixed(1);
-  const hitBadge  = isHit
+  const dSign      = combinedDelta >= 0 ? '+' : '';
+  const combCost   = swap1.priceDiff + swap2.priceDiff;
+  const cSign      = combCost >= 0 ? '+' : '';
+  const remaining  = (_budget - combCost).toFixed(1);
+  const anyEst     = isScoreEstimated(swap1.inScore) || isScoreEstimated(swap1.outScore) ||
+                     isScoreEstimated(swap2.inScore) || isScoreEstimated(swap2.outScore);
+  const combEst    = anyEst ? ' planner-delta--estimated' : '';
+  const s1Est      = (isScoreEstimated(swap1.inScore) || isScoreEstimated(swap1.outScore)) ? ' planner-delta--estimated' : '';
+  const s2Est      = (isScoreEstimated(swap2.inScore) || isScoreEstimated(swap2.outScore)) ? ' planner-delta--estimated' : '';
+  const hitBadge   = isHit
     ? `<span class="planner-hit-badge">HIT −${HIT_PENALTY}pts applied</span>`
     : '';
 
@@ -401,7 +415,7 @@ function renderTwoSwapCard(twoSwap) {
     <div class="planner-transfer-card planner-transfer-card--double">
       <div class="planner-transfer-card__header planner-transfer-card__header--double">
         <span class="planner-section-label">Combined</span>
-        <span class="planner-delta planner-delta--${combinedDelta >= 0 ? 'gain' : 'loss'}">${dSign}${combinedDelta.toFixed(1)}</span>
+        <span class="planner-delta planner-delta--${combinedDelta >= 0 ? 'gain' : 'loss'}${combEst}">${dSign}${combinedDelta.toFixed(1)}</span>
         <span class="planner-cost-diff">${cSign}£${Math.abs(combCost).toFixed(1)}m</span>
         <span class="planner-budget-remaining">£${remaining}m left</span>
         ${hitBadge}
@@ -414,7 +428,7 @@ function renderTwoSwapCard(twoSwap) {
           ${renderPlayerProjection(swap1.inPlayer, swap1.inScore, store.getTeam(swap1.inPlayer.teamId), 'in')}
         </div>
         <div class="planner-transfer-card__swap-meta">
-          <span class="planner-delta planner-delta--${swap1.delta >= 0 ? 'gain' : 'loss'} planner-delta--sm">
+          <span class="planner-delta planner-delta--${swap1.delta >= 0 ? 'gain' : 'loss'} planner-delta--sm${s1Est}">
             ${swap1.delta >= 0 ? '+' : ''}${swap1.delta.toFixed(1)}
           </span>
           <span class="planner-cost-diff planner-cost-diff--sm">
@@ -429,7 +443,7 @@ function renderTwoSwapCard(twoSwap) {
           ${renderPlayerProjection(swap2.inPlayer, swap2.inScore, store.getTeam(swap2.inPlayer.teamId), 'in')}
         </div>
         <div class="planner-transfer-card__swap-meta">
-          <span class="planner-delta planner-delta--${swap2.delta >= 0 ? 'gain' : 'loss'} planner-delta--sm">
+          <span class="planner-delta planner-delta--${swap2.delta >= 0 ? 'gain' : 'loss'} planner-delta--sm${s2Est}">
             ${swap2.delta >= 0 ? '+' : ''}${swap2.delta.toFixed(1)}
           </span>
           <span class="planner-cost-diff planner-cost-diff--sm">

@@ -252,7 +252,7 @@ function buildCard(team, venue, score, fdr, horizonScore, horizon) {
   card.className = `matchup-card matchup-card--${score.band}`;
   if (score.provisional) card.classList.add('matchup-card--provisional');
 
-  const provisionalClass = score.provisional ? ' score-pill--provisional' : '';
+  const provisionalClass = score.provisional ? ' score-pill--estimated' : '';
   const confLowClass     = score.provisional ? ' confidence-indicator--low' : '';
   const confPct          = Math.round(score.confidence * 100);
 
@@ -327,13 +327,14 @@ function buildBreakdownRows(breakdown) {
     const estMark = m.estimated
       ? '<span class="breakdown-row__est" title="Estimated — limited data">~</span>'
       : '';
-    const rowClass = m.estimated ? ' breakdown-row--estimated' : '';
+    const rowClass   = m.estimated ? ' breakdown-row--estimated' : '';
+    const barEstClass = m.estimated ? ' breakdown-row__bar--estimated' : '';
 
     return `
       <div class="breakdown-row${rowClass}">
         <span class="breakdown-row__label">${esc(METRIC_LABELS[key])}</span>
         <div class="breakdown-row__bar-wrap">
-          <div class="breakdown-row__bar breakdown-row__bar--${barBand}" style="width:${val}%"></div>
+          <div class="breakdown-row__bar breakdown-row__bar--${barBand}${barEstClass}" style="width:${val}%"></div>
         </div>
         <span class="breakdown-row__value">${val}</span>
         <span class="breakdown-row__weight">${pct}%</span>

@@ -62,6 +62,11 @@
   --radius-md: 8px;
   --radius-lg: 12px;
 
+  /* --- Estimated / provisional score tokens -------------------------------- */
+  /* Used everywhere a score's confidence is below CONFIDENCE_FLOOR.          */
+  --color-estimated:        #7a8390;   /* muted, slightly desaturated neutral */
+  --estimated-border-style: dashed;    /* applied as border-style for estimated indicators */
+
   /* --- Position badge colours (ranker, dashboard, planner) --------------- */
   --pos-gkp: #f0c040;   /* golden yellow */
   --pos-def: #58a6ff;   /* sky blue  */

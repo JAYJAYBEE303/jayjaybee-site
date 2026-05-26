@@ -64,6 +64,16 @@ function esc(str) {
     .replace(/"/g, '&quot;');
 }
 
+/**
+ * True when a scorePlayer result has at least one estimated sub-metric,
+ * signalling that the projected score should render with the estimated treatment.
+ * Uses the breakdown rather than a top-level confidence field because scorePlayer
+ * does not currently compute a single confidence number.
+ */
+function isScoreEstimated(score) {
+  return Boolean(score?.breakdown?.form?.estimated || score?.breakdown?.counter?.estimated);
+}
+
 function buildCtx() {
   const season = store.getSeason();
   if (!season) return null;
@@ -161,9 +171,10 @@ function buildFixtureStrip(perGw) {
     const band    = entry.isBlank ? 'neutral' : entry.band;
     const tooltip = entry.isBlank
       ? `GW${entry.gw} (blank)`
-      : `GW${entry.gw} ${entry.opponent ?? ''} (${entry.venue ?? ''}) — ${Math.round(entry.value)}`;
-    const label   = entry.isBlank ? '–' : (entry.opponent ?? '?');
-    return `<span class="pgw-cell pgw-cell--${esc(band)}" title="${esc(tooltip)}">${esc(label)}</span>`;
+      : `GW${entry.gw} ${entry.opponent ?? ''} (${entry.venue ?? ''}) — ${Math.round(entry.value)}${entry.provisional ? ' ~est' : ''}`;
+    const label      = entry.isBlank ? '–' : (entry.opponent ?? '?');
+    const estClass   = (!entry.isBlank && entry.provisional) ? ' pgw-cell--estimated' : '';
+    return `<span class="pgw-cell pgw-cell--${esc(band)}${estClass}" title="${esc(tooltip)}">${esc(label)}</span>`;
   }).join('');
   return `<span class="ranker-fixtures">${cells}</span>`;
 }
@@ -177,11 +188,12 @@ function buildRow({ player, team, score }) {
   const statusMark = player.status !== 'available'
     ? `<span class="ranker-status-badge" title="${esc(player.statusNote || player.status)}">!</span>`
     : '';
-  const ms      = score.breakdown?.form?.minutesSecurity ?? 0;
-  const lvl     = minSecLevel(ms);
-  const dispVal = _showVs
+  const ms       = score.breakdown?.form?.minutesSecurity ?? 0;
+  const lvl      = minSecLevel(ms);
+  const dispVal  = _showVs
     ? score.valueScore.toFixed(2)
     : String(Math.round(score.value));
+  const estClass = isScoreEstimated(score) ? ' score-chip--estimated' : '';
 
   return `
     <tr class="ranker-table__row" data-player-id="${player.id}"
@@ -200,7 +212,7 @@ function buildRow({ player, team, score }) {
         £${esc(player.price.toFixed(1))}
       </td>
       <td class="ranker-table__td ranker-table__td--value">
-        <span class="score-chip score-chip--${esc(score.band)}">${esc(dispVal)}</span>
+        <span class="score-chip score-chip--${esc(score.band)}${estClass}">${esc(dispVal)}</span>
       </td>
       <td class="ranker-table__td ranker-table__td--fixtures">
         ${buildFixtureStrip(score.perGw)}
