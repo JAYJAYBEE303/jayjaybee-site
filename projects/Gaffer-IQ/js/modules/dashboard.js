@@ -583,8 +583,8 @@ function afterSquadChange() {
   renderSquadPanel();
   renderDecisions();
   // Clear search so the user isn't looking at stale results.
-  if (_searchInput)   _searchInput.value = '';
-  if (_searchResults) _searchResults.hidden = true;
+  if (_searchInput) _searchInput.value = '';
+  hideResults();
 }
 
 // ─── Event handlers ───────────────────────────────────────────────────────────
@@ -600,14 +600,12 @@ function onSearchFocus() {
 
 function onSearchBlur() {
   // Delay so a mousedown on a result item fires before the list hides.
-  setTimeout(() => {
-    if (_searchResults) _searchResults.hidden = true;
-  }, 150);
+  setTimeout(hideResults, 150);
 }
 
 function onSearchKeydown(e) {
   if (e.key === 'Escape') {
-    if (_searchResults) _searchResults.hidden = true;
+    hideResults();
     _searchInput?.blur();
   }
 }
@@ -685,7 +683,7 @@ export function initDashboard() {
         btn.classList.add('is-active');
       }
       // Re-render the dropdown if it is currently visible.
-      if (!_searchResults?.hidden) renderSearchResults();
+      if (_searchResults?.classList.contains('is-open')) renderSearchResults();
     });
   });
 
