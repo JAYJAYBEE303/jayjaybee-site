@@ -14,6 +14,11 @@ const SS_KEY_SEASON = 'gaffer-iq:season:v1';
 const state = {
   season: null,         // see engine/normalise.js → normaliseSeason output
   playerSummaries: {},  // playerId → normalised PlayerSummary
+  // Phase 3A — Understat (external xG). leagueXg is the league/EPL payload
+  // (teamsData/datesData/playersData) shared by every engine call; teamXg
+  // is a per-team lazy cache keyed by Understat slug.
+  leagueXg: null,
+  teamXg: {},
   activeHorizon: 'GW1',
   lastError: null,
   lastRefreshAt: null,
@@ -58,6 +63,8 @@ function getCurrentGw()               { return state.season?.currentGw ?? null; 
 function getNextGw()                  { return state.season?.nextGw ?? null; }
 function getPlayerSummary(playerId)   { return state.playerSummaries[playerId] ?? null; }
 function getAllPlayerSummaries()       { return state.playerSummaries; }
+function getLeagueXg()                { return state.leagueXg; }
+function getTeamXg(teamSlug)          { return state.teamXg[teamSlug] ?? null; }
 function getActiveHorizon()           { return state.activeHorizon; }
 function getError()                   { return state.lastError; }
 function getLastRefreshAt()           { return state.lastRefreshAt; }
@@ -81,6 +88,14 @@ function setPlayerSummary(playerId, summary) {
   state.playerSummaries[playerId] = summary;
 }
 
+function setLeagueXg(data) {
+  state.leagueXg = data;
+}
+
+function setTeamXg(teamSlug, data) {
+  state.teamXg[teamSlug] = data;
+}
+
 function setActiveHorizon(key) {
   if (state.activeHorizon === key) return;
   state.activeHorizon = key;
@@ -99,6 +114,8 @@ function markDataReady() {
 function clearCache() {
   state.season = null;
   state.playerSummaries = {};
+  state.leagueXg = null;
+  state.teamXg = {};
   state.lastRefreshAt = null;
   state.lastError = null;
   try { sessionStorage.removeItem(SS_KEY_SEASON); } catch { /* non-fatal */ }
@@ -125,7 +142,9 @@ export const store = {
   getSeason, getTeams, getTeam, getPlayers, getPlayer,
   getFixtures, getFixture, getPositions, getEvents,
   getCurrentGw, getNextGw, getPlayerSummary, getAllPlayerSummaries,
+  getLeagueXg, getTeamXg,
   getActiveHorizon, getError, getLastRefreshAt, isFresh,
-  setSeason, setPlayerSummary, setActiveHorizon, setError, markDataReady,
+  setSeason, setPlayerSummary, setLeagueXg, setTeamXg,
+  setActiveHorizon, setError, markDataReady,
   clearCache,
 };

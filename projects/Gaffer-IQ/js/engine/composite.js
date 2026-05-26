@@ -16,8 +16,8 @@ import { clamp } from '../util.js';
 import {
   calcBaseDifficulty, calcHomeAwaySplit, calcFixtureHistory,
 } from './fixtures.js';
-import { calcTeamForm, calcPlayerForm } from './form.js';
-import { calcStyleClash }    from './style.js';
+import { calcTeamForm, calcPlayerForm, buildUnderstatPlayerLookup } from './form.js';
+import { calcStyleClash, buildXgProfilesByTeamId } from './style.js';
 import { calcCounterMatchup } from './counter.js';
 
 /**
@@ -28,6 +28,7 @@ import { calcCounterMatchup } from './counter.js';
  * @param {Season} season   output of normaliseSeason
  * @param {object} [opts]
  * @param {object} [opts.playerSummariesById]  playerId → PlayerSummary (may be partial)
+ * @param {object} [opts.leagueXg]             Understat league/EPL payload (Phase 3A); null when unavailable
  * @param {number} [opts.currentGw]            override; defaults to season.currentGw, then nextGw, then 1
  * @returns {object} ctx consumed by calcBase/HomeAway/Form/Style/Counter/FixtureHistory.
  *
@@ -37,6 +38,7 @@ import { calcCounterMatchup } from './counter.js';
  *     fixtures:            Fixture[]                       (passthrough, sorted)
  *     playedFixtures:      Fixture[]                       (derived: f.played && f.result)
  *     playerSummariesById: Object<playerId, PlayerSummary> (passthrough, possibly {})
+ *     leagueXg:            object | null                   (passthrough — Phase 3A)
  *     currentGw:           number
  *     leagueAvgStrength:   number  (mean of team.strength.overall across the league)
  */
@@ -59,12 +61,32 @@ export function buildScoreContext(season, opts = {}) {
     ? overallStrengths.reduce((a, b) => a + b, 0) / overallStrengths.length
     : LEAGUE_AVG_STRENGTH;
 
+  // Phase 3A: precompute the league-wide xG-based style profile lookup once
+  // so calcStyleProfile doesn't repeat min-max normalisation per fixture. Pure
+  // — returns null when Understat data is unavailable, in which case style.js
+  // falls back to its Phase 1 proxies.
+  const leagueXg = opts.leagueXg ?? null;
+  const xgProfilesByTeamId = leagueXg
+    ? buildXgProfilesByTeamId(leagueXg, season.teamsById)
+    : null;
+  // Phase 3A: build the Understat playersData lookup once per ctx so
+  // calcPlayerForm gets an O(1) name match instead of an O(N) scan per player.
+  const understatPlayersByName = leagueXg
+    ? buildUnderstatPlayerLookup(leagueXg)
+    : null;
+
   return {
     teamsById:           season.teamsById,
     playersByTeamId,
     fixtures:            season.fixtures || [],
     playedFixtures,
     playerSummariesById: opts.playerSummariesById || {},
+    // Phase 3A — Understat league payload (null when fetch failed or not yet
+    // loaded). style.js and form.js consult it for real xG inputs and fall
+    // back to FPL-derived proxies when absent.
+    leagueXg,
+    xgProfilesByTeamId,
+    understatPlayersByName,
     currentGw:           opts.currentGw ?? season.currentGw ?? season.nextGw ?? 1,
     leagueAvgStrength,
   };

@@ -129,12 +129,16 @@ export const COUNTER_FALLBACK_EDGE = { min: -300, max: 300 };
 
 // Weights for all sub-metrics. Must sum to 1.00.
 // See FEATURE_ENGINE.md §8.1 for the rationale behind each weight.
+// MODEL: styleClash weight raised from 0.07 to 0.12 — now backed by real
+// Understat xG data (Phase 3A). baseDifficulty reduced from 0.30 to 0.25
+// to compensate, keeping the total at 1.00 and leaving the dependable floor
+// still the largest single weight.
 export const WEIGHTS = {
-  baseDifficulty: 0.30,   // strength priors — always available, the dependable floor
+  baseDifficulty: 0.25,   // strength priors — always available, the dependable floor
   counterMatchup: 0.25,   // the signature metric — position form mismatches
   teamForm:       0.20,   // recent trajectory, opponent-quality adjusted
   homeAway:       0.15,   // venue performance this season
-  styleClash:     0.07,   // stylistic interaction (proxied in Phase 1; raise in Phase 3)
+  styleClash:     0.12,   // stylistic interaction — Understat xG-backed (Phase 3A)
   history:        0.03,   // H2H nudge — deliberately tiny; data is thin and weakly predictive
 };
 
@@ -192,3 +196,42 @@ export const PROJ_COUNTER = 0.20;   // player's position counter-matchup edge
 
 // Proxy endpoint the frontend calls; the function forwards to FPL_BASE server-side.
 export const PROXY_BASE = '/api/fpl';
+
+// ─── Phase 3A — Understat (external xG) ──────────────────────────────────────
+
+// Understat season slug to fetch single-team pages against. The proxy validates
+// this against /^\d{4}$/ so any change here must remain four digits.
+export const UNDERSTAT_SEASON = '2024';
+
+// FPL team id → Understat URL slug. Understat slugs use underscores for spaces
+// and the club's *full* name (e.g. 'Manchester_City', not 'Man City'). The id
+// ordering follows FPL's alphabetical-by-full-name convention for 2024-25.
+// MODEL: matching Understat → FPL by slug rather than free-text title avoids
+// fuzzy-match failures around clubs whose FPL short name differs from their
+// Understat title (Spurs ↔ Tottenham, Man Utd ↔ Manchester_United, etc.).
+export const UNDERSTAT_TEAM_SLUGS = {
+   1: 'Arsenal',
+   2: 'Aston_Villa',
+   3: 'Bournemouth',
+   4: 'Brentford',
+   5: 'Brighton',
+   6: 'Chelsea',
+   7: 'Crystal_Palace',
+   8: 'Everton',
+   9: 'Fulham',
+  10: 'Ipswich',
+  11: 'Leicester',
+  12: 'Liverpool',
+  13: 'Manchester_City',
+  14: 'Manchester_United',
+  15: 'Newcastle_United',
+  16: 'Nottingham_Forest',
+  17: 'Southampton',
+  18: 'Tottenham',
+  19: 'West_Ham',
+  20: 'Wolverhampton_Wanderers',
+};
+
+// Cache TTL for the league-level Understat payload, in milliseconds.
+// Understat refreshes daily at most; 1h is a safe ceiling for a session.
+export const XG_TTL_MS = 60 * 60 * 1000;

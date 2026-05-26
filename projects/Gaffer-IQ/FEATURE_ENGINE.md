@@ -211,19 +211,19 @@ This is where everything combines into the single 0–100 number (per team, per 
 ### 8.1 Default weights (`config.js → WEIGHTS`)
 ```
 WEIGHTS = {
-  baseDifficulty:  0.30,   // strength priors — the dependable floor
+  baseDifficulty:  0.25,   // strength priors — the dependable floor
   counterMatchup:  0.25,   // the signature metric — position form mismatches
   teamForm:        0.20,   // recent trajectory, opponent-adjusted
   homeAway:        0.15,   // venue performance this season
-  styleClash:      0.07,   // stylistic interaction (speculative in Phase 1)
+  styleClash:      0.12,   // stylistic interaction — Understat xG-backed (Phase 3A)
   history:         0.03    // H2H nudge (thin data, low trust)
 }   // sums to 1.00
 ```
 Rationale for the ordering:
-- **Base difficulty highest (0.30):** always available, robust, the thing the FPL app gets roughly right. Gaffer IQ refines rather than discards it.
-- **Counter-matchup second (0.25):** the core differentiator and the most actionable for player picks, but data-dependent, so not allowed to dominate.
+- **Base difficulty (0.25) and counter-matchup (0.25):** the joint floor of the model — always available, robust strength priors plus the signature position-form mismatch metric. Base difficulty was 0.30 in Phase 1 and reduced to 0.25 in Phase 3A to free room for the now-evidenced style weight.
 - **Form (0.20)** and **home/away (0.15):** strong, well-evidenced signals.
-- **Style (0.07)** and **history (0.03):** deliberately small while they rely on proxies/thin data. Raise style's weight in Phase 3 when real xG/pressing data backs it.
+- **Style (0.12):** raised from 0.07 to 0.12 in Phase 3A once real Understat xG / xGA replaced the Phase 1 goals/clean-sheet proxies. Still modest because style interactions are genuinely noisy, but no longer speculative.
+- **History (0.03):** deliberately small — H2H data is thin and football H2H is weakly predictive.
 
 ### 8.2 Combination
 ```
@@ -260,11 +260,11 @@ CompositeScore = {
   band: 'good',
   confidence: 0.82,
   breakdown: {
-    baseDifficulty: { value: 68, weight: 0.30, estimated: false },
+    baseDifficulty: { value: 68, weight: 0.25, estimated: false },
     counterMatchup: { value: 81, weight: 0.25, estimated: false },
     teamForm:       { value: 70, weight: 0.20, estimated: false },
     homeAway:       { value: 75, weight: 0.15, estimated: false },
-    styleClash:     { value: 55, weight: 0.07, estimated: true  },
+    styleClash:     { value: 55, weight: 0.12, estimated: false },
     history:        { value: 50, weight: 0.03, estimated: true  }
   }
 }

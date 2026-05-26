@@ -163,28 +163,90 @@ function anchorsFor(mode) {
 }
 
 /**
+ * Build the Understat playersData lookup keyed by lowercased full name.
+ * Pure helper invoked once per ctx by buildScoreContext so calcPlayerForm
+ * never pays an O(N) scan per player. Returns null when Understat is absent.
+ *
+ * MODEL: name-based matching is best-effort — Understat names usually match
+ * FPL `fullName` exactly for EPL regulars, but accents, suffixes (Jr.) and
+ * cup/loan moves can mismatch. Any miss simply falls back to the FPL overlay.
+ */
+export function buildUnderstatPlayerLookup(leagueXg) {
+  if (!leagueXg || !Array.isArray(leagueXg.playersData)) return null;
+  const map = {};
+  for (const p of leagueXg.playersData) {
+    if (!p || !p.player_name) continue;
+    const key = p.player_name.toLowerCase().trim();
+    if (key && !(key in map)) map[key] = p;   // first occurrence wins
+  }
+  return Object.keys(map).length === 0 ? null : map;
+}
+
+/**
+ * Internal: per-90 (xG + xA) for a player from Understat, or null when no
+ * lookup is loaded or the player isn't matched.
+ */
+function understatXgPer90(player, ctx) {
+  const lookup = ctx.understatPlayersByName;
+  if (!lookup) return null;
+  const key = (player.fullName || '').toLowerCase().trim();
+  if (!key) return null;
+  const up = lookup[key];
+  if (!up) return null;
+  const upMin = parseFloat(up.time);
+  if (!(upMin > 0)) return null;
+  const upXg = parseFloat(up.xG) || 0;
+  const upXa = parseFloat(up.xA) || 0;
+  return (upXg + upXa) / (upMin / 90);
+}
+
+/**
  * Internal fallback: when no element-summary history is loaded for this
  * player, score off season totals so the ranker still has something to sort.
  * Flagged estimated so confidence drops everywhere this player is consumed.
+ *
+ * Phase 3A: even in this fallback we use Understat's season per-90 xG when
+ * available — it's strictly better than the neutral-50 placeholder we used
+ * before. `xgEstimated` still tracks the underlying-numbers provenance.
  */
-function fallbackPlayerForm(player, mode) {
+function fallbackPlayerForm(player, mode, ctx) {
   const minutes = player.totals.minutes || 0;
   const points  = player.totals.points  || 0;
   const per90 = safeDiv(points, minutes / 90, 0);
 
-  const { per90: per90A } = anchorsFor(mode);
+  const { per90: per90A, xg: xgA } = anchorsFor(mode);
   const per90Norm = normaliseLinear(per90, per90A.min, per90A.max);
 
   // MODEL: without per-GW data we proxy minutesSecurity by season minutes / a
   // full season's max (SEASON_GWS * 90). Crude — flagged estimated below.
   const minutesSecurity = clamp(0, 1, safeDiv(minutes, SEASON_GWS * 90, 0));
 
-  // No underlying-numbers read available in the season-totals fallback, so the
-  // xG overlay term contributes neutral 50; this avoids re-weighting the rest.
+  const upXg = understatXgPer90(player, ctx);
+  let xgOverlay;
+  let xgNorm;
+  let xgSource;
+  let xgEstimated;
+  if (upXg !== null) {
+    // MODEL: using Understat xG — season per-90 underlying. Sharper than the
+    // FPL totals fallback even before any element-summary loads.
+    xgOverlay = upXg;
+    xgNorm = normaliseLinear(upXg, xgA.min, xgA.max);
+    xgSource = 'understat';
+    xgEstimated = false;
+  } else {
+    // MODEL: using FPL proxy (no Understat data) — no per-GW history and no
+    // Understat overlay either, so the underlying term contributes neutral 50
+    // to avoid silently re-weighting the rest.
+    xgOverlay = 0;
+    xgNorm = 50;
+    xgSource = 'fpl';
+    xgEstimated = true;
+  }
+
   let value =
       (W_RETURNS    * per90Norm)
     + (W_MINUTES    * minutesSecurity * 100)
-    + (W_UNDERLYING * 50);
+    + (W_UNDERLYING * xgNorm);
 
   if (player.status !== 'available') value *= AVAIL_PENALTY;
 
@@ -192,7 +254,9 @@ function fallbackPlayerForm(player, mode) {
     value: clamp(0, 100, value),
     per90,
     minutesSecurity,
-    xgOverlay: 0,
+    xgOverlay,
+    xgSource,
+    xgEstimated,
   };
 }
 
@@ -202,10 +266,16 @@ function fallbackPlayerForm(player, mode) {
  * and keepers (see `mode` below). Availability penalty applied when the
  * player isn't flagged as `available` in the FPL data.
  *
+ * Phase 3A: when ctx.understatPlayersByName has a match the xG overlay is
+ * driven by Understat's season per-90 (xG + xA), strictly improving on the
+ * FPL element-summary numbers. Otherwise we fall back to FPL-exposed xG and
+ * flag `xgEstimated: true` in the breakdown.
+ *
  * @param {Player} player
  * @param {object} ctx  must contain { playerSummariesById: object }
  * @returns {{value: number, per90: number, minutesSecurity: number,
- *            xgOverlay: number, estimated: boolean, mode: 'attack'|'defence'}}
+ *            xgOverlay: number, xgSource: 'understat'|'fpl', xgEstimated: boolean,
+ *            estimated: boolean, mode: 'attack'|'defence'}}
  *   value: 0–100, higher = better player form. Direction: higher = better.
  *   See FEATURE_ENGINE.md §7.1.
  */
@@ -221,7 +291,7 @@ export function calcPlayerForm(player, ctx) {
   if (!history || history.length === 0) {
     // No per-GW history loaded → fall back to season totals. Flagged estimated
     // so every downstream score that depends on this player loses confidence.
-    return { ...fallbackPlayerForm(player, mode), estimated: true, mode };
+    return { ...fallbackPlayerForm(player, mode, ctx), estimated: true, mode };
   }
 
   const window = history.slice(-PLAYER_FORM_GWS);
@@ -233,16 +303,35 @@ export function calcPlayerForm(player, ctx) {
   if (minutes === 0) {
     // Player on the pitch for zero minutes across the window — treat as the
     // season fallback. Flagged estimated.
-    return { ...fallbackPlayerForm(player, mode), estimated: true, mode };
+    return { ...fallbackPlayerForm(player, mode, ctx), estimated: true, mode };
   }
 
   const per90Pts  = safeDiv(points, minutes / 90, 0);
-  const xgOverlay = safeDiv(xgSum,  minutes / 90, 0);
   const minutesSecurity = clamp(0, 1, safeDiv(minutes, 90 * games, 0));
 
   const { per90: per90A, xg: xgA } = anchorsFor(mode);
-  const per90Norm = normaliseLinear(per90Pts,  per90A.min, per90A.max);
-  const xgNorm    = normaliseLinear(xgOverlay, xgA.min,    xgA.max);
+  const per90Norm = normaliseLinear(per90Pts, per90A.min, per90A.max);
+
+  // Phase 3A: prefer Understat's season per-90 (xG + xA) when available; fall
+  // back to the FPL element-summary window otherwise.
+  const upXg = understatXgPer90(player, ctx);
+  let xgOverlay;
+  let xgSource;
+  let xgEstimated;
+  if (upXg !== null) {
+    // MODEL: using Understat xG — supplements the FPL window with the season
+    // underlying read. Same formula (W_UNDERLYING term), better input.
+    xgOverlay = upXg;
+    xgSource = 'understat';
+    xgEstimated = false;
+  } else {
+    // MODEL: using FPL proxy (no Understat data) — FPL-exposed element-summary
+    // xG/xA over the same window. Flag estimated:true on the breakdown.
+    xgOverlay = safeDiv(xgSum, minutes / 90, 0);
+    xgSource = 'fpl';
+    xgEstimated = true;
+  }
+  const xgNorm = normaliseLinear(xgOverlay, xgA.min, xgA.max);
 
   let value =
       (W_RETURNS    * per90Norm)
@@ -259,6 +348,8 @@ export function calcPlayerForm(player, ctx) {
     per90: per90Pts,
     minutesSecurity,
     xgOverlay,
+    xgSource,
+    xgEstimated,
     estimated: false,
     mode,
   };

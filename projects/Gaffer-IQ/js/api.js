@@ -7,7 +7,7 @@
  * See ARCHITECTURE.md §5 (proxy) and §6 (fetch strategy), CONVENTIONS.md §9.
  */
 
-import { PROXY_BASE } from './config.js';
+import { PROXY_BASE, UNDERSTAT_SEASON } from './config.js';
 
 /**
  * Typed error for any failure originating in the data layer.
@@ -24,13 +24,17 @@ export class ApiError extends Error {
 }
 
 /**
- * Calls the proxy with the given FPL path fragment and returns parsed JSON.
- * @param {string} path  e.g. 'bootstrap-static/', 'element-summary/123/'
+ * Calls the proxy with the given path fragment and returns parsed JSON.
+ * @param {string} path     e.g. 'bootstrap-static/', 'element-summary/123/', 'league/EPL'
+ * @param {string} [source] proxy upstream identifier — omit for the default FPL API,
+ *                          'understat' to hit the Understat allowlist (Phase 3A).
  * @returns {Promise<object>}  the upstream JSON
  * @throws {ApiError}  on network, proxy, or upstream failure
  */
-async function callProxy(path) {
-  const url = `${PROXY_BASE}?path=${encodeURIComponent(path)}`;
+async function callProxy(path, source) {
+  const qs = new URLSearchParams({ path });
+  if (source) qs.set('source', source);
+  const url = `${PROXY_BASE}?${qs.toString()}`;
 
   let response;
   try {
@@ -91,4 +95,29 @@ export async function fetchPlayerSummary(playerId) {
     throw new ApiError(`Invalid playerId: ${playerId}`, { path: 'element-summary' });
   }
   return callProxy(`element-summary/${playerId}/`);
+}
+
+// ─── Phase 3A — Understat (external xG) ──────────────────────────────────────
+
+/**
+ * Fetches the Understat league page for the EPL. The proxy extracts the
+ * embedded JSON blocks (typically `teamsData`, `datesData`, `playersData`)
+ * and returns them keyed by variable name.
+ *
+ * @returns {Promise<object>}  e.g. { teamsData: {...}, datesData: [...], playersData: [...] }
+ */
+export async function fetchLeagueXg() {
+  return callProxy('league/EPL', 'understat');
+}
+
+/**
+ * Fetches a single team's Understat season page (per-match xG / xGA / shots).
+ * @param {string} teamSlug  Understat URL slug (e.g. 'Arsenal', 'Manchester_City')
+ * @returns {Promise<object>}  embedded JSON blocks for that team's season
+ */
+export async function fetchTeamXg(teamSlug) {
+  if (typeof teamSlug !== 'string' || !/^[A-Za-z_]+$/.test(teamSlug)) {
+    throw new ApiError(`Invalid Understat teamSlug: ${teamSlug}`, { path: 'understat-team' });
+  }
+  return callProxy(`team/${teamSlug}/${UNDERSTAT_SEASON}`, 'understat');
 }

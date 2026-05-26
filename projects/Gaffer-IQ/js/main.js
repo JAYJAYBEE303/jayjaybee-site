@@ -9,7 +9,10 @@
 
 import { HORIZONS } from './config.js';
 import { store } from './store.js';
-import { fetchBootstrap, fetchFixtures, fetchPlayerSummary, ApiError } from './api.js';
+import {
+  fetchBootstrap, fetchFixtures, fetchPlayerSummary,
+  fetchLeagueXg, fetchTeamXg, ApiError,
+} from './api.js';
 import { normaliseSeason, normalisePlayerSummary } from './engine/normalise.js';
 import { buildScoreContext, scoreFixture, scoreOverHorizon, scorePlayer, rankPlayers } from './engine/composite.js';
 import { calcBaseDifficulty, calcHomeAwaySplit, calcFixtureHistory } from './engine/fixtures.js';
@@ -39,12 +42,31 @@ async function loadInitialData({ force = false } = {}) {
     return;
   }
   try {
-    const [rawBootstrap, rawFixtures] = await Promise.all([
+    // Phase 3A: league-wide xG is one HTTP call and enriches the whole model,
+    // so it loads alongside bootstrap/fixtures rather than lazily. Wrapped in
+    // Promise.allSettled so an Understat outage doesn't break the FPL pipeline
+    // — engine functions degrade to Phase 1 proxies when leagueXg is null.
+    const [bootstrapRes, fixturesRes, leagueXgRes] = await Promise.allSettled([
       fetchBootstrap(),
       fetchFixtures(),
+      fetchLeagueXg(),
     ]);
-    const season = normaliseSeason(rawBootstrap, rawFixtures);
+
+    if (bootstrapRes.status !== 'fulfilled') throw bootstrapRes.reason;
+    if (fixturesRes.status  !== 'fulfilled') throw fixturesRes.reason;
+
+    const season = normaliseSeason(bootstrapRes.value, fixturesRes.value);
     store.setSeason(season);
+
+    if (leagueXgRes.status === 'fulfilled') {
+      store.setLeagueXg(leagueXgRes.value);
+    } else {
+      // MODEL: Understat is supplementary — log and continue. style.js + form.js
+      // fall back to Phase 1 proxies and flag estimated:true on the breakdown.
+      console.warn('[Gaffer IQ] Understat league xG unavailable — falling back to FPL proxies.',
+        leagueXgRes.reason?.message ?? leagueXgRes.reason);
+    }
+
     store.markDataReady();
   } catch (err) {
     const apiErr = err instanceof ApiError ? err : new ApiError(String(err?.message ?? err));
@@ -161,6 +183,7 @@ window.__engine = {
     if (!season) return null;
     return buildScoreContext(season, {
       playerSummariesById: store.getAllPlayerSummaries(),
+      leagueXg: store.getLeagueXg(),
       currentGw: gwOverride ?? store.getCurrentGw() ?? store.getNextGw() ?? 1,
     });
   },
