@@ -249,60 +249,111 @@ function buildFlagChips(flags) {
   ).join('');
 }
 
+// ─── Search results visibility helpers ───────────────────────────────────────
+
+/**
+ * Show the results dropdown.
+ * Uses a CSS class rather than the `hidden` attribute so there is no conflict
+ * with the `[hidden] { display: none !important; }` rule in base.css.
+ */
+function showResults() {
+  if (!_searchResults) return;
+  _searchResults.classList.add('is-open');
+}
+
+/** Hide the results dropdown. */
+function hideResults() {
+  if (!_searchResults) return;
+  _searchResults.classList.remove('is-open');
+}
+
 // ─── Render: search results dropdown ─────────────────────────────────────────
 
 function renderSearchResults() {
-  if (!_searchResults || !_searchInput) return;
+  // Guard: DOM refs must be present. Warn once so the console makes it obvious.
+  if (!_searchResults) {
+    console.warn('[dashboard] renderSearchResults: _searchResults is null — check #dash-search-results in HTML');
+    return;
+  }
+  if (!_searchInput) {
+    console.warn('[dashboard] renderSearchResults: _searchInput is null — check #dash-search-input in HTML');
+    return;
+  }
 
   const query = _searchInput.value.trim().toLowerCase();
 
   if (query.length < 2) {
     _searchResults.innerHTML = '';
-    _searchResults.hidden = true;
+    hideResults();
     return;
   }
 
-  const results = store.getPlayers()
-    .filter(p => {
-      if (!_searchPosSet.has(p.position)) return false;
-      return (
-        p.name.toLowerCase().includes(query) ||
-        (p.fullName ?? '').toLowerCase().includes(query)
-      );
-    })
-    .slice(0, 12);
+  // Read player list from the store at call time — store.getPlayers() may return
+  // an empty array if called before data:ready, but since the event listener fires
+  // only when the user types, data should already be loaded by then.
+  const allPlayers = store.getPlayers();
+  if (allPlayers.length === 0) {
+    _searchResults.innerHTML =
+      `<li class="dash-search-results__empty">Player data not yet loaded — please wait a moment.</li>`;
+    showResults();
+    return;
+  }
+
+  let results;
+  try {
+    results = allPlayers
+      .filter(p => {
+        if (!_searchPosSet.has(p.position)) return false;
+        const name     = (p.name     ?? '').toLowerCase();
+        const fullName = (p.fullName ?? '').toLowerCase();
+        return name.includes(query) || fullName.includes(query);
+      })
+      .slice(0, 12);
+  } catch (err) {
+    console.error('[dashboard] renderSearchResults: filter threw —', err);
+    hideResults();
+    return;
+  }
 
   if (results.length === 0) {
     _searchResults.innerHTML =
       `<li class="dash-search-results__empty">No players found.</li>`;
-    _searchResults.hidden = false;
+    showResults();
     return;
   }
 
-  _searchResults.innerHTML = results.map(p => {
-    const team         = store.getTeam(p.teamId);
-    const inSquad      = isInSquad(p.id);
-    const posSlotsFull = squadCountByPos(p.position) >= SQUAD_LIMITS[p.position];
-    const squadFull    = _squad.length >= SQUAD_TOTAL;
-    const disabled     = inSquad || posSlotsFull || squadFull;
-    const reason       = inSquad      ? 'Already in squad'
-                       : posSlotsFull ? `${p.position} slots full`
-                       : squadFull    ? 'Squad full'
-                       : '';
+  try {
+    _searchResults.innerHTML = results.map(p => {
+      const team         = store.getTeam(p.teamId);
+      const inSquad      = isInSquad(p.id);
+      const posSlotsFull = squadCountByPos(p.position) >= SQUAD_LIMITS[p.position];
+      const squadFull    = _squad.length >= SQUAD_TOTAL;
+      const disabled     = inSquad || posSlotsFull || squadFull;
+      const reason       = inSquad      ? 'Already in squad'
+                         : posSlotsFull ? `${p.position} slots full`
+                         : squadFull    ? 'Squad full'
+                         : '';
+      const price = (typeof p.price === 'number' && !isNaN(p.price))
+        ? p.price.toFixed(1) : '?.?';
 
-    return `
-      <li class="dash-search-results__item${disabled ? ' dash-search-results__item--disabled' : ''}"
-          data-player-id="${p.id}"
-          role="option"
-          aria-disabled="${disabled}"
-          title="${disabled ? esc(reason) : esc(p.fullName ?? p.name)}">
-        <span class="dash-search-results__name">${esc(p.name)}</span>
-        <span class="dash-search-results__meta">${team ? esc(team.shortName) : '—'} · ${esc(p.position)} · £${p.price.toFixed(1)}m</span>
-      </li>
-    `.trim();
-  }).join('');
+      return `
+        <li class="dash-search-results__item${disabled ? ' dash-search-results__item--disabled' : ''}"
+            data-player-id="${p.id}"
+            role="option"
+            aria-disabled="${disabled}"
+            title="${disabled ? esc(reason) : esc(p.fullName ?? p.name ?? '')}">
+          <span class="dash-search-results__name">${esc(p.name ?? '?')}</span>
+          <span class="dash-search-results__meta">${team ? esc(team.shortName) : '—'} · ${esc(p.position ?? '?')} · £${price}m</span>
+        </li>
+      `.trim();
+    }).join('');
+  } catch (err) {
+    console.error('[dashboard] renderSearchResults: innerHTML build threw —', err);
+    hideResults();
+    return;
+  }
 
-  _searchResults.hidden = false;
+  showResults();
 }
 
 // ─── Render: squad slots ──────────────────────────────────────────────────────

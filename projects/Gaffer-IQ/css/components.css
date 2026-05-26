@@ -861,6 +861,7 @@
 /* ─── Search results dropdown ────────────────────────────────────────────── */
 
 .dash-search-results {
+  display: none; /* shown by JS adding .is-open */
   position: absolute;
   top: calc(100% + var(--space-1));
   left: 0;
@@ -876,6 +877,10 @@
   z-index: 200;
   list-style: none;
   padding: var(--space-1) 0;
+}
+
+.dash-search-results.is-open {
+  display: block;
 }
 
 .dash-search-results__item {
