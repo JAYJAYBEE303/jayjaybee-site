@@ -20,10 +20,11 @@ import { calcTeamForm, calcPlayerForm } from './engine/form.js';
 import { calcStyleProfile, calcStyleClash } from './engine/style.js';
 import { calcCounterMatchup } from './engine/counter.js';
 
-import { initMatchup }   from './modules/matchup.js';
-import { initRanker }    from './modules/ranker.js';
-import { initDashboard } from './modules/dashboard.js';
-import { initPlanner }   from './modules/planner.js';
+import { initMatchup }      from './modules/matchup.js';
+import { initRanker }       from './modules/ranker.js';
+import { initDashboard }    from './modules/dashboard.js';
+import { initPlanner }      from './modules/planner.js';
+import { initCalibration }  from './calibration.js';
 
 // ─── Data loading ─────────────────────────────────────────────────────────────
 
@@ -150,6 +151,7 @@ initMatchup();
 initRanker();
 initDashboard();
 initPlanner();
+initCalibration();
 
 // ─── Lazy player-summary loader ───────────────────────────────────────────────
 
