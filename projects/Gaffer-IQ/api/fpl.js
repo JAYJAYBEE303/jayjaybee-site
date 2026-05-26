@@ -20,7 +20,7 @@ const ALLOWED_PATTERNS = [
 ];
 
 const FPL_BASE  = 'https://fantasy.premierleague.com/api/';
-const USER_AGENT = 'Gaffer-IQ/0.1 (personal tool; contact via GitHub)';
+const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
 
 function sendError(res, status, error, upstream = null) {
   res.status(status).json({ error, upstream });
