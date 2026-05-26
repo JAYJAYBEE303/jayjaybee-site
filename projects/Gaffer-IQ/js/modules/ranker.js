@@ -129,8 +129,21 @@ function getNextFixtureForTeam(teamId) {
  * after all chunks complete and the run is confirmed non-stale.
  */
 async function rebuildRowsChunked() {
-  const computeId  = ++_computeId;
-  const ctx        = buildCtx();
+  const computeId = ++_computeId;
+
+  // Show the progress banner and yield one macrotask tick before snapshotting
+  // ctx. This matches the single-tick deferral the old synchronous rebuildRows
+  // had via its outer setTimeout(0) wrapper. The yield lets any microtasks
+  // queued alongside data:ready (e.g. leagueXg resolving, sessionStorage
+  // hydration completing) settle into the store before we freeze ctx, preventing
+  // false estimated flags from a stale snapshot.
+  _tbody.innerHTML = `<tr><td class="ranker-table__empty" colspan="7">Ranking players…</td></tr>`;
+  if (_loading) _loading.classList.add('is-visible');
+  await new Promise(resolve => setTimeout(resolve, 0));
+
+  if (computeId !== _computeId) return;
+
+  const ctx = buildCtx();
   if (!ctx) return;
 
   const horizonKey = store.getActiveHorizon();
@@ -140,10 +153,9 @@ async function rebuildRowsChunked() {
   const pending    = [];
 
   _tbody.innerHTML = `<tr><td class="ranker-table__empty" colspan="7">Ranking players… (0 / ${total})</td></tr>`;
-  if (_loading) _loading.classList.add('is-visible');
 
   for (let i = 0; i < total; i += RANKER_CHUNK_SIZE) {
-    // Yield so the browser can paint the current progress text before scoring.
+    // Yield between chunks so the browser can paint progress and process input.
     await new Promise(resolve => setTimeout(resolve, 0));
 
     if (computeId !== _computeId) return;
