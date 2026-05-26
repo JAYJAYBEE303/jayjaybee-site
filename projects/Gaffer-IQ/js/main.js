@@ -17,10 +17,10 @@ import { calcTeamForm, calcPlayerForm } from './engine/form.js';
 import { calcStyleProfile, calcStyleClash } from './engine/style.js';
 import { calcCounterMatchup } from './engine/counter.js';
 
-import { initMatchup } from './modules/matchup.js';
-import { initRanker }   from './modules/ranker.js';
-// TODO(phase-2): import { initDashboard } from './modules/dashboard.js';
-// TODO(phase-2): import { initPlanner }   from './modules/planner.js';
+import { initMatchup }   from './modules/matchup.js';
+import { initRanker }    from './modules/ranker.js';
+import { initDashboard } from './modules/dashboard.js';
+// TODO(phase-3): import { initPlanner }   from './modules/planner.js';
 
 // ─── Data loading ─────────────────────────────────────────────────────────────
 
@@ -126,8 +126,8 @@ routeToHash();
 // called, so they are in place when data:ready fires.
 initMatchup();
 initRanker();
-// TODO(phase-2): initDashboard();
-// TODO(phase-2): initPlanner();
+initDashboard();
+// TODO(phase-3): initPlanner();
 
 // ─── Lazy player-summary loader ───────────────────────────────────────────────
 

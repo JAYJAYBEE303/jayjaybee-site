@@ -22,7 +22,7 @@
       <nav class="module-nav" aria-label="Module navigation">
         <a class="module-nav__item is-active" href="#matchup">Matchup</a>
         <a class="module-nav__item" href="#ranker">Ranker</a>
-        <a class="module-nav__item module-nav__item--inactive" href="#dashboard" aria-disabled="true" tabindex="-1">Dashboard</a>
+        <a class="module-nav__item" href="#dashboard">Dashboard</a>
         <a class="module-nav__item module-nav__item--inactive" href="#planner" aria-disabled="true" tabindex="-1">Planner</a>
       </nav>
 
@@ -95,7 +95,44 @@
       </section>
 
       <section class="module-view" data-module="dashboard" aria-label="GW Dashboard">
-        <p class="coming-soon">GW Decision Dashboard — coming in Phase 2.</p>
+
+        <!-- Controls bar: player search + position pills + squad tally -->
+        <div class="dash-controls">
+          <div class="dash-search-wrap">
+            <label class="dash-search-label" for="dash-search-input">Add player</label>
+            <div class="dash-search-combo">
+              <input class="dash-search-input" id="dash-search-input"
+                     type="text" placeholder="Search by name…"
+                     autocomplete="off"
+                     aria-autocomplete="list" aria-controls="dash-search-results">
+              <ul class="dash-search-results" id="dash-search-results"
+                  role="listbox" hidden></ul>
+            </div>
+          </div>
+
+          <div class="dash-pos-filter" role="group" aria-label="Filter search by position">
+            <button class="dash-pos-btn is-active" data-pos="GKP" type="button">GKP</button>
+            <button class="dash-pos-btn is-active" data-pos="DEF" type="button">DEF</button>
+            <button class="dash-pos-btn is-active" data-pos="MID" type="button">MID</button>
+            <button class="dash-pos-btn is-active" data-pos="FWD" type="button">FWD</button>
+          </div>
+
+          <p class="dash-squad-tally" id="dash-squad-tally">0 / 15 players selected</p>
+        </div>
+
+        <!-- Two-column shell: squad panel (left) + decisions panel (right) -->
+        <div class="dash-shell">
+
+          <aside class="dash-squad-panel" aria-label="My squad">
+            <div id="dash-squad-slots"></div>
+          </aside>
+
+          <section class="dash-decisions" id="dash-decisions" aria-label="GW recommendations">
+            <p class="dash-decisions__hint">Add 15 players to see GW recommendations.</p>
+          </section>
+
+        </div>
+
       </section>
 
       <section class="module-view" data-module="planner" aria-label="Transfer Planner">
