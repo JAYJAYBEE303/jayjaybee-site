@@ -48,7 +48,13 @@ let _searchPosSet = new Set(['GKP', 'DEF', 'MID', 'FWD']);
 /** True once data:ready has fired at least once. */
 let _dataReady = false;
 
-// ─── DOM refs (populated in initDashboard) ────────────────────────────────────
+/**
+ * True once wireDom() has successfully cached DOM refs and attached listeners.
+ * Guards against double-wiring if data:ready fires more than once.
+ */
+let _domWired = false;
+
+// ─── DOM refs (populated in wireDom, called from onDataReady) ────────────────
 
 let _root          = null;
 let _searchInput   = null;
@@ -632,38 +638,38 @@ function onSquadSlotsClick(e) {
   removePlayer(Number(btn.dataset.removeId));
 }
 
-function onDataReady() {
-  _dataReady = true;
-  scoreSquad();
-  renderSquadPanel();
-  renderDecisions();
-}
-
-// ─── Public init ─────────────────────────────────────────────────────────────
-
 /**
- * Initialise the GW Decision Dashboard module. Called once from main.js on
- * bootstrap, before loadInitialData(). Caches DOM refs, wires events,
- * restores squad from sessionStorage, and registers the data:ready subscription.
+ * Cache all DOM refs and attach all event listeners. Called once from
+ * onDataReady() — guaranteed to run after the browser has fully parsed the
+ * document (module scripts are deferred, and data:ready only fires after the
+ * fetch resolves). The _domWired guard prevents double-wiring if data:ready
+ * fires more than once (e.g. after a manual refresh via __refresh()).
  */
-export function initDashboard() {
+function wireDom() {
+  if (_domWired) return;
+
+  // Use getElementById directly — does not depend on _root being non-null.
   _root          = document.querySelector('[data-module="dashboard"]');
-  _searchInput   = _root?.querySelector('#dash-search-input');
-  _searchResults = _root?.querySelector('#dash-search-results');
-  _squadSlots    = _root?.querySelector('#dash-squad-slots');
-  _decisions     = _root?.querySelector('#dash-decisions');
-  _tally         = _root?.querySelector('#dash-squad-tally');
+  _searchInput   = document.getElementById('dash-search-input');
+  _searchResults = document.getElementById('dash-search-results');
+  _squadSlots    = document.getElementById('dash-squad-slots');
+  _decisions     = document.getElementById('dash-decisions');
+  _tally         = document.getElementById('dash-squad-tally');
 
   if (!_root) {
     console.warn('[dashboard] data-module="dashboard" section not found in DOM');
     return;
   }
+  if (!_searchInput) {
+    console.warn('[dashboard] #dash-search-input not found in DOM');
+    return;
+  }
 
   // ── Search events ────────────────────────────────────────────────────────
-  _searchInput?.addEventListener('input',   onSearchInput);
-  _searchInput?.addEventListener('focus',   onSearchFocus);
-  _searchInput?.addEventListener('blur',    onSearchBlur);
-  _searchInput?.addEventListener('keydown', onSearchKeydown);
+  _searchInput.addEventListener('input',   onSearchInput);
+  _searchInput.addEventListener('focus',   onSearchFocus);
+  _searchInput.addEventListener('blur',    onSearchBlur);
+  _searchInput.addEventListener('keydown', onSearchKeydown);
 
   // ── Results dropdown — mousedown fires before the blur event ─────────────
   _searchResults?.addEventListener('mousedown', onResultsMousedown);
@@ -690,22 +696,38 @@ export function initDashboard() {
   // ── Squad slots — click delegation for remove buttons ────────────────────
   _squadSlots?.addEventListener('click', onSquadSlotsClick);
 
-  // ── Store subscription ───────────────────────────────────────────────────
-  store.subscribe('data:ready', onDataReady);
-
-  // ── Restore squad from sessionStorage ───────────────────────────────────
+  // ── Restore squad from sessionStorage and render the shell ───────────────
   loadSquad();
-
-  // Render the (possibly pre-populated) squad skeleton immediately.
   renderSquadPanel();
   renderDecisions();
 
-  // If data is already in the store (hydrated from sessionStorage on reload),
-  // score and render without waiting for data:ready to re-fire.
+  _domWired = true;
+  console.log('[dashboard] DOM wired — search input listener attached');
+}
+
+function onDataReady() {
+  wireDom();          // no-op after first call
+  _dataReady = true;
+  scoreSquad();
+  renderSquadPanel();
+  renderDecisions();
+}
+
+// ─── Public init ─────────────────────────────────────────────────────────────
+
+/**
+ * Initialise the GW Decision Dashboard module. Called once from main.js on
+ * bootstrap, before loadInitialData(). Registers the data:ready subscription
+ * so the module is ready to receive the event whenever the fetch completes.
+ * All DOM wiring is deferred to wireDom(), called from onDataReady(), so that
+ * getElementById calls are guaranteed to find live elements.
+ */
+export function initDashboard() {
+  store.subscribe('data:ready', onDataReady);
+
+  // If the store is already hydrated from sessionStorage, data:ready won't
+  // fire again — wire the DOM and render immediately.
   if (store.isFresh()) {
-    _dataReady = true;
-    scoreSquad();
-    renderSquadPanel();
-    renderDecisions();
+    onDataReady();
   }
 }
