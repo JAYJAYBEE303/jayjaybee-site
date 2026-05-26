@@ -77,6 +77,14 @@ export function normalisePlayer(raw) {
       xA:          parseFloat(raw.expected_assists) || 0,
       cleanSheets: raw.clean_sheets || 0,
     },
+    // FPL ICT index components (season totals as decimal strings upstream).
+    // Used by engine/counter.js → classifyRole to refine raw element_type
+    // groupings into roles (CB vs FB, DM vs CM vs WM, ST vs SS).
+    ict: {
+      influence:  parseFloat(raw.influence)  || 0,
+      creativity: parseFloat(raw.creativity) || 0,
+      threat:     parseFloat(raw.threat)     || 0,
+    },
     history: null,   // populated lazily by normalisePlayerSummary
     form:    null,   // filled by engine/form.js
   };

@@ -112,10 +112,41 @@ export const SEASON_GWS = 38;
 export const COUNTER_SENSITIVITY = 1.0;
 
 // Relative importance of each position pairing; normalised inside engine/counter.js.
+// Used as the FALLBACK grouping (element_type only) when ICT data is missing for
+// either side — engine flags the result estimated:true in that case.
 export const PAIRING_WEIGHTS = {
   fwdVsCb:     1.0,   // strikers vs centre-backs — primary scoring threat
   wideMidVsFb: 0.6,   // wide mids / wingers vs full-backs
   camVsCbMid:  0.4,   // central attacking mids vs CBs + defensive mids
+};
+
+// Phase 3C refinement: role-based pairings, used by calcCounterMatchup whenever
+// classifyRole succeeds (ICT data present). See FEATURE_ENGINE.md §7.2 and
+// engine/counter.js. Weights mirror PAIRING_WEIGHTS' ordering of importance:
+// the central scoring threat (ST/SS vs CB) carries the largest weight, the wide
+// matchup is secondary, and the central-creative-vs-shield interaction is the
+// smallest of the three.
+export const ROLE_PAIRING_WEIGHTS = {
+  stVsCb:    1.0,   // ST / SS (forwards) vs CBs — primary scoring threat
+  wmVsFb:    0.6,   // wide MIDs / wingers vs full-backs — wide matchup
+  cmVsCbDm:  0.5,   // CM / SS (central creative) vs CBs + defensive MIDs
+};
+
+// Classification thresholds for classifyRole(player) in engine/counter.js.
+// MODEL: ratios of a player's own ICT components are season-stable; absolute
+// totals grow through the season. Thresholds tuned to PL distributions — see
+// FEATURE_ENGINE.md §7.2.
+export const ROLE_CLASSIFY_THRESHOLDS = {
+  // DEF: a fullback shows higher threat share than a centre-back because
+  // FBs get into the final third and produce shots/crosses.
+  defThreatShare: 0.30,
+  // MID: a high threat share marks a wide attacker / SS-style mid.
+  midWmThreatShare: 0.40,
+  // MID: a DM is influence-led with low creativity (defensive/recovery work).
+  midDmInfluenceShare: 0.40,
+  midDmCreativityShareMax: 0.30,
+  // FWD: a deep-lying forward / SS shows a higher creativity share than a pure ST.
+  fwdSsCreativityShare: 0.30,
 };
 
 // Anchors for the counter-matchup fallback used when player-level form is missing
