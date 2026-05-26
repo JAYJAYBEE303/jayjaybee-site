@@ -23,7 +23,7 @@
         <a class="module-nav__item is-active" href="#matchup">Matchup</a>
         <a class="module-nav__item" href="#ranker">Ranker</a>
         <a class="module-nav__item" href="#dashboard">Dashboard</a>
-        <a class="module-nav__item module-nav__item--inactive" href="#planner" aria-disabled="true" tabindex="-1">Planner</a>
+        <a class="module-nav__item" href="#planner">Planner</a>
       </nav>
 
       <div class="horizon-switcher" role="group" aria-label="Planning horizon">
@@ -136,7 +136,68 @@
       </section>
 
       <section class="module-view" data-module="planner" aria-label="Transfer Planner">
-        <p class="coming-soon">Transfer Planner — coming in Phase 2.</p>
+
+        <!-- Controls bar: search + position filter + budget + free transfers + hit toggle -->
+        <div class="planner-controls">
+
+          <div class="dash-search-wrap">
+            <label class="dash-search-label" for="planner-search-input">Add player</label>
+            <div class="dash-search-combo">
+              <input class="dash-search-input" id="planner-search-input"
+                     type="text" placeholder="Search by name…"
+                     autocomplete="off"
+                     aria-autocomplete="list" aria-controls="planner-search-results">
+              <ul class="dash-search-results" id="planner-search-results"
+                  role="listbox"></ul>
+            </div>
+          </div>
+
+          <div class="dash-pos-filter" role="group" aria-label="Filter search by position">
+            <button class="planner-pos-btn is-active" data-pos="GKP" type="button">GKP</button>
+            <button class="planner-pos-btn is-active" data-pos="DEF" type="button">DEF</button>
+            <button class="planner-pos-btn is-active" data-pos="MID" type="button">MID</button>
+            <button class="planner-pos-btn is-active" data-pos="FWD" type="button">FWD</button>
+          </div>
+
+          <div class="planner-budget-wrap">
+            <label class="planner-label" for="planner-budget">Budget (£m)</label>
+            <input class="planner-budget-input" id="planner-budget"
+                   type="number" min="0" max="200" step="0.1" value="0"
+                   placeholder="0.0">
+          </div>
+
+          <div class="planner-ft-wrap">
+            <span class="planner-label" id="planner-ft-label">Free transfers</span>
+            <div class="planner-ft-btns" role="group" aria-labelledby="planner-ft-label">
+              <button class="planner-ft-btn is-active" data-ft="1" type="button">1</button>
+              <button class="planner-ft-btn" data-ft="2" type="button">2</button>
+            </div>
+          </div>
+
+          <div class="planner-hit-wrap">
+            <label class="planner-label" for="planner-hit-toggle">Allow hit (−4 pts)</label>
+            <button class="planner-hit-toggle" id="planner-hit-toggle"
+                    type="button" aria-pressed="false">Off</button>
+          </div>
+
+          <p class="dash-squad-tally" id="planner-squad-tally">0 / 15 players selected</p>
+
+        </div>
+
+        <!-- Two-column shell: squad panel (left) + recommendations (right) -->
+        <div class="planner-shell">
+
+          <aside class="dash-squad-panel" aria-label="My squad">
+            <div id="planner-squad-slots"></div>
+          </aside>
+
+          <section class="planner-recommendations" id="planner-recommendations"
+                   aria-label="Transfer recommendations">
+            <p class="planner-hint">Add 15 players to see transfer recommendations.</p>
+          </section>
+
+        </div>
+
       </section>
 
     </main>

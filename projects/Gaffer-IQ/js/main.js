@@ -20,7 +20,7 @@ import { calcCounterMatchup } from './engine/counter.js';
 import { initMatchup }   from './modules/matchup.js';
 import { initRanker }    from './modules/ranker.js';
 import { initDashboard } from './modules/dashboard.js';
-// TODO(phase-3): import { initPlanner }   from './modules/planner.js';
+import { initPlanner }   from './modules/planner.js';
 
 // ─── Data loading ─────────────────────────────────────────────────────────────
 
@@ -127,7 +127,7 @@ routeToHash();
 initMatchup();
 initRanker();
 initDashboard();
-// TODO(phase-3): initPlanner();
+initPlanner();
 
 // ─── Lazy player-summary loader ───────────────────────────────────────────────
 
