@@ -343,20 +343,20 @@ function onDataReady() {
   // synchronously scores all ~700 players. The setTimeout(0) yields one
   // frame, letting "Computing rankings…" appear before the blocking work.
   _tbody.innerHTML = `<tr><td class="ranker-table__empty" colspan="7">Computing rankings…</td></tr>`;
-  if (_loading) _loading.hidden = false;
+  if (_loading) _loading.classList.add('is-visible');
   setTimeout(() => {
     rebuildRows();
-    if (_loading) _loading.hidden = true;
+    if (_loading) _loading.classList.remove('is-visible');
     renderTable();
   }, 0);
 }
 
 function onHorizonChanged() {
   if (!store.isFresh()) return;
-  if (_loading) _loading.hidden = false;
+  if (_loading) _loading.classList.add('is-visible');
   setTimeout(() => {
     rebuildRows();
-    if (_loading) _loading.hidden = true;
+    if (_loading) _loading.classList.remove('is-visible');
     renderTable();
   }, 0);
 }

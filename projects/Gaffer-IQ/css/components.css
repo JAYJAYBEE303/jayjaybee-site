@@ -600,13 +600,17 @@
 /* ─── Loading state ─────────────────────────────────────────────────────── */
 
 .ranker-loading {
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
   padding: var(--space-3) 0;
   color: var(--color-muted);
   font-size: var(--font-size-sm);
+}
+
+.ranker-loading.is-visible {
+  display: flex;
 }
 
 /* Simple animated ellipsis via CSS so no JS is needed */
