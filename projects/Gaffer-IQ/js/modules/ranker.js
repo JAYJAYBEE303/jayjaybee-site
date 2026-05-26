@@ -12,8 +12,8 @@
  */
 
 import { store } from '../store.js';
-import { HORIZONS } from '../config.js';
-import { buildScoreContext, rankPlayers } from '../engine/composite.js';
+import { HORIZONS, RANKER_CHUNK_SIZE } from '../config.js';
+import { buildScoreContext, scorePlayer } from '../engine/composite.js';
 import { fetchPlayerSummary } from '../api.js';
 import { normalisePlayerSummary } from '../engine/normalise.js';
 
@@ -40,6 +40,10 @@ let _vsToggle    = null;
 // Scored rows rebuilt on data:ready or horizon:changed; cached so filter and
 // sort changes do not re-invoke the engine.
 let _rows = [];
+
+// Incremented on every new ranking run; each async chunk checks its captured
+// value still matches before continuing, cancelling stale in-flight runs.
+let _computeId = 0;
 
 // Active filter / sort / display state.
 let _activePosSet    = new Set(['GKP', 'DEF', 'MID', 'FWD']);
@@ -115,22 +119,55 @@ function getNextFixtureForTeam(teamId) {
 // ─── Build: scored rows ───────────────────────────────────────────────────────
 
 /**
- * Score all players over `horizon` and return row objects sorted descending
- * by projected value. Calls rankPlayers (engine) for all analytical work.
- * minutesSecurity is taken from scorePlayer's breakdown.form (already computed
- * inside rankPlayers) so calcPlayerForm is not called a second time per player.
+ * Score all players over `horizon` in chunks of RANKER_CHUNK_SIZE, yielding
+ * back to the browser between chunks so the UI stays responsive. Shows a live
+ * progress indicator while working. Any in-flight run whose `computeId` no
+ * longer matches `_computeId` is silently abandoned — this happens when the
+ * user changes the horizon or data refreshes mid-compute.
  *
- * @param {Player[]} players
- * @param {object}   horizon  e.g. HORIZONS.GW3
- * @param {object}   ctx      output of buildScoreContext
- * @returns {Array<{ player: Player, team: Team|null, score: object }>}
+ * Never renders partial results: `_rows` and `renderTable()` are only touched
+ * after all chunks complete and the run is confirmed non-stale.
  */
-function buildRankerRows(players, horizon, ctx) {
-  return rankPlayers(players, horizon, ctx).map(({ player, score }) => ({
-    player,
-    team:  store.getTeam(player.teamId),
-    score,
-  }));
+async function rebuildRowsChunked() {
+  const computeId  = ++_computeId;
+  const ctx        = buildCtx();
+  if (!ctx) return;
+
+  const horizonKey = store.getActiveHorizon();
+  const horizon    = HORIZONS[horizonKey] ?? HORIZONS.GW1;
+  const players    = store.getPlayers();
+  const total      = players.length;
+  const pending    = [];
+
+  _tbody.innerHTML = `<tr><td class="ranker-table__empty" colspan="7">Ranking players… (0 / ${total})</td></tr>`;
+  if (_loading) _loading.classList.add('is-visible');
+
+  for (let i = 0; i < total; i += RANKER_CHUNK_SIZE) {
+    // Yield so the browser can paint the current progress text before scoring.
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    if (computeId !== _computeId) return;
+
+    const end = Math.min(i + RANKER_CHUNK_SIZE, total);
+    for (let j = i; j < end; j++) {
+      const player = players[j];
+      const score  = scorePlayer(player, horizon, ctx);
+      pending.push({ player, team: store.getTeam(player.teamId), score });
+    }
+
+    _tbody.innerHTML = `<tr><td class="ranker-table__empty" colspan="7">Ranking players… (${end} / ${total})</td></tr>`;
+  }
+
+  // Final stale-check before committing — a horizon change could have fired
+  // during the last chunk's execution.
+  if (computeId !== _computeId) return;
+
+  // Sort descending by value, matching rankPlayers ordering.
+  pending.sort((a, b) => b.score.value - a.score.value);
+  _rows = pending;
+
+  if (_loading) _loading.classList.remove('is-visible');
+  renderTable();
 }
 
 // ─── Filter and sort ──────────────────────────────────────────────────────────
@@ -341,37 +378,14 @@ async function onPlayerClick(playerId) {
   window.location.hash = 'matchup';
 }
 
-/** Rebuild `_rows` from the engine; called on data:ready and horizon:changed. */
-function rebuildRows() {
-  const ctx = buildCtx();
-  if (!ctx) return;
-  const horizonKey = store.getActiveHorizon();
-  const horizon    = HORIZONS[horizonKey] ?? HORIZONS.GW1;
-  _rows = buildRankerRows(store.getPlayers(), horizon, ctx);
-}
-
 function onDataReady() {
   populateTeamFilter();
-  // Show computing state first so the browser can paint before the engine
-  // synchronously scores all ~700 players. The setTimeout(0) yields one
-  // frame, letting "Computing rankings…" appear before the blocking work.
-  _tbody.innerHTML = `<tr><td class="ranker-table__empty" colspan="7">Computing rankings…</td></tr>`;
-  if (_loading) _loading.classList.add('is-visible');
-  setTimeout(() => {
-    rebuildRows();
-    if (_loading) _loading.classList.remove('is-visible');
-    renderTable();
-  }, 0);
+  rebuildRowsChunked();
 }
 
 function onHorizonChanged() {
   if (!store.isFresh()) return;
-  if (_loading) _loading.classList.add('is-visible');
-  setTimeout(() => {
-    rebuildRows();
-    if (_loading) _loading.classList.remove('is-visible');
-    renderTable();
-  }, 0);
+  rebuildRowsChunked();
 }
 
 /** Fill the team <select> with all teams sorted alphabetically. */
@@ -476,7 +490,6 @@ export function initRanker() {
   // so the table appears immediately on first load.
   if (store.isFresh()) {
     populateTeamFilter();
-    rebuildRows();
-    renderTable();
+    rebuildRowsChunked();
   }
 }

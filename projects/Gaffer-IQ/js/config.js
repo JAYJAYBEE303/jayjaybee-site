@@ -223,6 +223,13 @@ export const PROJ_FORM    = 0.45;   // player's own form and availability
 export const PROJ_FIXTURE = 0.35;   // team's horizon fixture score
 export const PROJ_COUNTER = 0.20;   // player's position counter-matchup edge
 
+// ─── §11  Player Ranker performance ──────────────────────────────────────────
+
+// Number of players scored per setTimeout(fn, 0) chunk in the async ranker.
+// Lower = more yields (smoother UI, slower total); higher = fewer yields (faster).
+// 700 players at 50/chunk = 14 chunks ≈ 14 yielded frames.
+export const RANKER_CHUNK_SIZE = 50;
+
 // ─── API / proxy ──────────────────────────────────────────────────────────────
 
 // Proxy endpoint the frontend calls; the function forwards to FPL_BASE server-side.
