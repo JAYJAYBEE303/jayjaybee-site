@@ -40,7 +40,7 @@ async function callProxy(path, source) {
   try {
     response = await fetch(url, { headers: { Accept: 'application/json' } });
   } catch (err) {
-    throw new ApiError(`Network failure calling ${path}: ${err.message}`, {
+    throw new ApiError(`Network failure reaching proxy for ${path}: ${err.message}`, {
       upstreamStatus: null,
       path,
     });
@@ -51,37 +51,56 @@ async function callProxy(path, source) {
   try {
     body = await response.json();
   } catch {
-    throw new ApiError(`Non-JSON response from proxy for ${path}`, {
-      upstreamStatus: response.status,
-      path,
-    });
+    throw new ApiError(
+      `Proxy returned non-JSON for ${path} (HTTP ${response.status})`,
+      { upstreamStatus: response.status, path },
+    );
   }
 
   if (!response.ok) {
     const detail = body?.error ?? response.statusText;
-    throw new ApiError(`Proxy ${response.status} for ${path}: ${detail}`, {
-      upstreamStatus: body?.upstream ?? response.status,
-      path,
-    });
+    const upstream = body?.upstream ?? response.status;
+    throw new ApiError(
+      `Proxy ${response.status} — ${detail}`,
+      { upstreamStatus: upstream, path },
+    );
   }
 
   return body;
 }
 
+// ─── FPL endpoints ────────────────────────────────────────────────────────────
+
 /**
  * Fetches the FPL bootstrap-static payload (teams, players, events, types).
  * @returns {Promise<object>}  raw bootstrap-static JSON
+ * @throws {ApiError}  with message "Failed to load bootstrap data: …"
  */
 export async function fetchBootstrap() {
-  return callProxy('bootstrap-static/');
+  try {
+    return await callProxy('bootstrap-static/');
+  } catch (err) {
+    throw new ApiError(
+      `Failed to load bootstrap data: ${err.message}`,
+      { upstreamStatus: err.upstreamStatus ?? null, path: 'bootstrap-static/' },
+    );
+  }
 }
 
 /**
  * Fetches the season's full fixture list.
  * @returns {Promise<object[]>}  raw fixtures array
+ * @throws {ApiError}  with message "Failed to load fixtures: …"
  */
 export async function fetchFixtures() {
-  return callProxy('fixtures/');
+  try {
+    return await callProxy('fixtures/');
+  } catch (err) {
+    throw new ApiError(
+      `Failed to load fixtures: ${err.message}`,
+      { upstreamStatus: err.upstreamStatus ?? null, path: 'fixtures/' },
+    );
+  }
 }
 
 /**
@@ -89,15 +108,26 @@ export async function fetchFixtures() {
  * Called lazily — never bulk-fetch all ~700 players' summaries (ARCHITECTURE.md §6).
  * @param {number} playerId  FPL element id (positive integer, 1–4 digits)
  * @returns {Promise<object>}  raw element-summary JSON
+ * @throws {ApiError}  with message "Failed to load player <id> data: …"
  */
 export async function fetchPlayerSummary(playerId) {
   if (!Number.isInteger(playerId) || playerId <= 0) {
     throw new ApiError(`Invalid playerId: ${playerId}`, { path: 'element-summary' });
   }
-  return callProxy(`element-summary/${playerId}/`);
+  try {
+    return await callProxy(`element-summary/${playerId}/`);
+  } catch (err) {
+    throw new ApiError(
+      `Failed to load player ${playerId} data: ${err.message}`,
+      { upstreamStatus: err.upstreamStatus ?? null, path: `element-summary/${playerId}/` },
+    );
+  }
 }
 
 // ─── Phase 3A — Understat (external xG) ──────────────────────────────────────
+// Failures here are NON-FATAL — callers use Promise.allSettled and continue
+// with FPL-only data when these fail. See main.js loadInitialData() and
+// ROADMAP.md §3A. Do not call store.setError() for Understat failures.
 
 /**
  * Fetches the Understat league page for the EPL. The proxy extracts the
@@ -105,19 +135,35 @@ export async function fetchPlayerSummary(playerId) {
  * and returns them keyed by variable name.
  *
  * @returns {Promise<object>}  e.g. { teamsData: {...}, datesData: [...], playersData: [...] }
+ * @throws {ApiError}  with message "Understat league xG unavailable: …"
  */
 export async function fetchLeagueXg() {
-  return callProxy('league/EPL', 'understat');
+  try {
+    return await callProxy('league/EPL', 'understat');
+  } catch (err) {
+    throw new ApiError(
+      `Understat league xG unavailable: ${err.message}`,
+      { upstreamStatus: err.upstreamStatus ?? null, path: 'league/EPL' },
+    );
+  }
 }
 
 /**
  * Fetches a single team's Understat season page (per-match xG / xGA / shots).
  * @param {string} teamSlug  Understat URL slug (e.g. 'Arsenal', 'Manchester_City')
  * @returns {Promise<object>}  embedded JSON blocks for that team's season
+ * @throws {ApiError}  with message "Understat team xG unavailable for <slug>: …"
  */
 export async function fetchTeamXg(teamSlug) {
   if (typeof teamSlug !== 'string' || !/^[A-Za-z_]+$/.test(teamSlug)) {
     throw new ApiError(`Invalid Understat teamSlug: ${teamSlug}`, { path: 'understat-team' });
   }
-  return callProxy(`team/${teamSlug}/${UNDERSTAT_SEASON}`, 'understat');
+  try {
+    return await callProxy(`team/${teamSlug}/${UNDERSTAT_SEASON}`, 'understat');
+  } catch (err) {
+    throw new ApiError(
+      `Understat team xG unavailable for ${teamSlug}: ${err.message}`,
+      { upstreamStatus: err.upstreamStatus ?? null, path: `team/${teamSlug}/${UNDERSTAT_SEASON}` },
+    );
+  }
 }

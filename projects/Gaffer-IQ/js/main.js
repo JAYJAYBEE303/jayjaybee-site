@@ -62,14 +62,18 @@ async function loadInitialData({ force = false } = {}) {
     if (leagueXgRes.status === 'fulfilled') {
       store.setLeagueXg(leagueXgRes.value);
     } else {
-      // MODEL: Understat is supplementary — log and continue. style.js + form.js
-      // fall back to Phase 1 proxies and flag estimated:true on the breakdown.
+      // MODEL: Understat is supplementary — log and continue with FPL-only data.
+      // style.js + form.js fall back to Phase 1 proxies and flag estimated:true
+      // on the breakdown. A failed Understat fetch must never block the main load.
+      // ROADMAP.md §3A — this path is intentionally non-fatal; no store.setError().
       console.warn('[Gaffer IQ] Understat league xG unavailable — falling back to FPL proxies.',
         leagueXgRes.reason?.message ?? leagueXgRes.reason);
     }
 
     store.markDataReady();
   } catch (err) {
+    // store.setError() clears season state before emitting — the store is left
+    // cleanly empty, not partially populated (CONVENTIONS.md §9, store.js §setError).
     const apiErr = err instanceof ApiError ? err : new ApiError(String(err?.message ?? err));
     store.setError(apiErr);
   }
@@ -81,13 +85,22 @@ const errorBanner = document.getElementById('app-error-banner');
 const errorText   = document.getElementById('app-error-text');
 
 store.subscribe('data:error', (err) => {
+  // err is a full ApiError — show its message directly. The message already
+  // includes the endpoint name and upstream status (e.g. "Failed to load
+  // bootstrap data: Proxy 403 — FPL API rate limited"). CONVENTIONS.md §9.
   console.error('[Gaffer IQ] data:error —', err);
-  if (errorText)   errorText.textContent = `Failed to load FPL data: ${err.message || err}. `;
+  if (errorText)   errorText.textContent = err.message || String(err);
   if (errorBanner) errorBanner.hidden = false;
 });
 
-document.getElementById('app-error-retry')?.addEventListener('click', () => {
+// Hide the banner after a successful retry so the UI resets cleanly.
+store.subscribe('data:ready', () => {
   if (errorBanner) errorBanner.hidden = true;
+});
+
+document.getElementById('app-error-retry')?.addEventListener('click', () => {
+  // Re-trigger the full data fetch sequence. clearCache() first so force:true
+  // starts from a clean slate, not a stale sessionStorage snapshot.
   store.clearCache();
   loadInitialData({ force: true });
 });

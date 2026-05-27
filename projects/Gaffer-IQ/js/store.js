@@ -103,6 +103,14 @@ function setActiveHorizon(key) {
 }
 
 function setError(err) {
+  // Clear season state before emitting — the store must never be left in a
+  // half-initialised state where a stale session is still visible alongside
+  // an active error. Player summaries are retained: they are lazily loaded
+  // and will be re-fetched on demand after a successful reload.
+  state.season = null;
+  state.leagueXg = null;
+  state.lastRefreshAt = null;
+  try { sessionStorage.removeItem(SS_KEY_SEASON); } catch { /* non-fatal */ }
   state.lastError = err;
   emit('data:error', err);
 }
