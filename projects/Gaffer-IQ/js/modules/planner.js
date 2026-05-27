@@ -10,8 +10,9 @@
  */
 
 import { store } from '../store.js';
-import { HORIZONS } from '../config.js';
+import { HORIZONS, PRICE_BUY_NOW_CONFIDENCE, PRICE_BUY_NOW_SCORE_MIN } from '../config.js';
 import { buildScoreContext, scorePlayer } from '../engine/composite.js';
+import { calcPriceChangeRisk } from '../engine/prices.js';
 import {
   scoreWildcardTiming, scoreFreeHitTiming,
   scoreBenchBoostTiming, scoreTripleCaptainTiming,
@@ -428,6 +429,41 @@ function renderPlayerProjection(player, score, team, direction) {
 }
 
 /**
+ * Build a price change warning snippet for a transfer-in player.
+ * Returns an empty string when there is no meaningful signal.
+ * @param {Player} player  the player being transferred in
+ * @param {object} score   scorePlayer output for the inPlayer
+ * @returns {string}  HTML string (may be empty)
+ */
+function buildPriceChangeWarning(player, score) {
+  const risk = calcPriceChangeRisk(player);
+  if (risk.confidence === 0) return '';
+
+  const pct  = Math.round(risk.confidence * 100);
+  const isBuyNow = risk.direction === 'rise'
+    && risk.confidence >= PRICE_BUY_NOW_CONFIDENCE
+    && (score?.value ?? 0) >= PRICE_BUY_NOW_SCORE_MIN;
+  const isFallWarning = risk.direction === 'fall' && risk.confidence >= 0.3;
+
+  if (!isBuyNow && !isFallWarning && risk.direction !== 'rise') return '';
+
+  if (isBuyNow) {
+    return `<div class="planner-price-warning planner-price-warning--buy-now" title="${esc(risk.reasoning)}">
+      ↑ Buy now — price likely to rise (${pct}% confidence)
+    </div>`.trim();
+  }
+  if (risk.direction === 'rise') {
+    return `<div class="planner-price-warning planner-price-warning--rise" title="${esc(risk.reasoning)}">
+      ↑ Price may rise soon (${pct}% confidence)
+    </div>`.trim();
+  }
+  // fall warning
+  return `<div class="planner-price-warning planner-price-warning--fall" title="${esc(risk.reasoning)}">
+    ↓ Price may fall — consider alternatives (${pct}% confidence)
+  </div>`.trim();
+}
+
+/**
  * Render a single transfer recommendation card.
  * @param {SwapObj} swap
  * @returns {string}  HTML string
@@ -443,6 +479,7 @@ function renderTransferCard(swap) {
   const hitBadge   = isHit
     ? `<span class="planner-hit-badge">HIT −${HIT_PENALTY}pts</span>`
     : '';
+  const priceWarning = buildPriceChangeWarning(inPlayer, inScore);
 
   return `
     <div class="planner-transfer-card">
@@ -457,6 +494,7 @@ function renderTransferCard(swap) {
         <div class="planner-transfer-card__arrow" aria-hidden="true">→</div>
         ${renderPlayerProjection(inPlayer, inScore, inTeam, 'in')}
       </div>
+      ${priceWarning ? `<div class="planner-transfer-card__price-footer">${priceWarning}</div>` : ''}
     </div>
   `.trim();
 }

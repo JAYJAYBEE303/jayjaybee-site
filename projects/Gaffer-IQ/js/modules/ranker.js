@@ -16,6 +16,7 @@ import { HORIZONS, RANKER_CHUNK_SIZE } from '../config.js';
 import { buildScoreContext, scorePlayer } from '../engine/composite.js';
 import { fetchPlayerSummary } from '../api.js';
 import { normalisePlayerSummary } from '../engine/normalise.js';
+import { calcPriceChangeRisk } from '../engine/prices.js';
 
 // ─── Minutes-security display thresholds ─────────────────────────────────────
 // Maps 0–1 minutesSecurity (from scorePlayer breakdown.form) onto a human
@@ -30,12 +31,13 @@ const MIN_SEC_LEVELS = [
 
 // ─── Module-level state ───────────────────────────────────────────────────────
 
-let _thead       = null;
-let _tbody       = null;
-let _loading     = null;
-let _teamSelect  = null;
-let _priceSelect = null;
-let _vsToggle    = null;
+let _thead              = null;
+let _tbody              = null;
+let _loading            = null;
+let _teamSelect         = null;
+let _priceSelect        = null;
+let _vsToggle           = null;
+let _priceChangeToggle  = null;
 
 // Scored rows rebuilt on data:ready or horizon:changed; cached so filter and
 // sort changes do not re-invoke the engine.
@@ -52,6 +54,7 @@ let _activeTeamId    = 'all';
 let _sortBy          = 'value';    // 'value' | 'valueScore' | 'price'
 let _sortDesc        = true;
 let _showVs          = false;      // false = projected value; true = £/pt (valueScore)
+let _showPriceChange = false;      // true = show price change indicator column
 
 // In-flight lazy loads keyed by playerId so concurrent clicks on the same
 // player share one Promise and never fire duplicate network requests.
@@ -137,7 +140,7 @@ async function rebuildRowsChunked() {
   // queued alongside data:ready (e.g. leagueXg resolving, sessionStorage
   // hydration completing) settle into the store before we freeze ctx, preventing
   // false estimated flags from a stale snapshot.
-  _tbody.innerHTML = `<tr><td class="ranker-table__empty" colspan="7">Ranking players…</td></tr>`;
+  _tbody.innerHTML = `<tr><td class="ranker-table__empty" colspan="${colCount()}">Ranking players…</td></tr>`;
   if (_loading) _loading.classList.add('is-visible');
   await new Promise(resolve => setTimeout(resolve, 0));
 
@@ -152,7 +155,7 @@ async function rebuildRowsChunked() {
   const total      = players.length;
   const pending    = [];
 
-  _tbody.innerHTML = `<tr><td class="ranker-table__empty" colspan="7">Ranking players… (0 / ${total})</td></tr>`;
+  _tbody.innerHTML = `<tr><td class="ranker-table__empty" colspan="${colCount()}">Ranking players… (0 / ${total})</td></tr>`;
 
   for (let i = 0; i < total; i += RANKER_CHUNK_SIZE) {
     // Yield between chunks so the browser can paint progress and process input.
@@ -167,7 +170,7 @@ async function rebuildRowsChunked() {
       pending.push({ player, team: store.getTeam(player.teamId), score });
     }
 
-    _tbody.innerHTML = `<tr><td class="ranker-table__empty" colspan="7">Ranking players… (${end} / ${total})</td></tr>`;
+    _tbody.innerHTML = `<tr><td class="ranker-table__empty" colspan="${colCount()}">Ranking players… (${end} / ${total})</td></tr>`;
   }
 
   // Final stale-check before committing — a horizon change could have fired
@@ -269,8 +272,40 @@ function buildRow({ player, team, score }) {
       <td class="ranker-table__td ranker-table__td--min">
         <span class="ranker-min-badge ranker-min-badge--${esc(lvl.band)}">${esc(lvl.label)}</span>
       </td>
+      ${_showPriceChange ? buildPriceChangeCell(player) : ''}
     </tr>
   `.trim();
+}
+
+// ─── Price change helpers ─────────────────────────────────────────────────────
+
+/** Dynamic column count: 7 base + 1 when the price change column is visible. */
+function colCount() {
+  return _showPriceChange ? 8 : 7;
+}
+
+/**
+ * Build the price change <td> for one player row.
+ * ↑ (green) = likely rise, ↓ (red) = likely fall, — = stable / no signal.
+ * Confidence is shown on hover via the title attribute.
+ * @param {Player} player
+ * @returns {string} HTML <td> string
+ */
+function buildPriceChangeCell(player) {
+  const risk = calcPriceChangeRisk(player);
+  if (risk.direction === 'stable' || risk.confidence === 0) {
+    return `<td class="ranker-table__td ranker-table__td--price-change">
+      <span class="ranker-price-change ranker-price-change--stable" title="No price move predicted">—</span>
+    </td>`.trim();
+  }
+  const isRise = risk.direction === 'rise';
+  const pct    = Math.round(risk.confidence * 100);
+  const arrow  = isRise ? '↑' : '↓';
+  const mod    = isRise ? 'rise' : 'fall';
+  const title  = `${isRise ? 'Likely rise' : 'Likely fall'} (${pct}% confidence) — ${esc(risk.reasoning)}`;
+  return `<td class="ranker-table__td ranker-table__td--price-change">
+    <span class="ranker-price-change ranker-price-change--${mod}" title="${title}">${arrow} ${pct}%</span>
+  </td>`.trim();
 }
 
 // ─── Render ───────────────────────────────────────────────────────────────────
@@ -302,6 +337,7 @@ function renderThead() {
       ${thSortable(valueLabel,  sortCol)}
       ${thStatic(horizon.label, 'fixtures')}
       ${thStatic('Min',         'min')}
+      ${_showPriceChange ? thStatic('£↑↓', 'price-change') : ''}
     </tr>
   `;
 }
@@ -315,7 +351,7 @@ function renderTable() {
   renderThead();
 
   if (_rows.length === 0) {
-    _tbody.innerHTML = `<tr><td class="ranker-table__empty" colspan="7">No player data loaded.</td></tr>`;
+    _tbody.innerHTML = `<tr><td class="ranker-table__empty" colspan="${colCount()}">No player data loaded.</td></tr>`;
     return;
   }
 
@@ -323,7 +359,7 @@ function renderTable() {
   const sorted   = applySort(filtered);
 
   if (sorted.length === 0) {
-    _tbody.innerHTML = `<tr><td class="ranker-table__empty" colspan="7">No players match the current filters.</td></tr>`;
+    _tbody.innerHTML = `<tr><td class="ranker-table__empty" colspan="${colCount()}">No players match the current filters.</td></tr>`;
     return;
   }
 
@@ -421,13 +457,14 @@ function populateTeamFilter() {
  * hydrated from sessionStorage.
  */
 export function initRanker() {
-  const root   = document.querySelector('[data-module="ranker"]');
-  _thead       = root.querySelector('#ranker-thead');
-  _tbody       = root.querySelector('#ranker-tbody');
-  _loading     = root.querySelector('#ranker-loading');
-  _teamSelect  = root.querySelector('#ranker-team');
-  _priceSelect = root.querySelector('#ranker-price');
-  _vsToggle    = root.querySelector('#ranker-vs-toggle');
+  const root          = document.querySelector('[data-module="ranker"]');
+  _thead              = root.querySelector('#ranker-thead');
+  _tbody              = root.querySelector('#ranker-tbody');
+  _loading            = root.querySelector('#ranker-loading');
+  _teamSelect         = root.querySelector('#ranker-team');
+  _priceSelect        = root.querySelector('#ranker-price');
+  _vsToggle           = root.querySelector('#ranker-vs-toggle');
+  _priceChangeToggle  = root.querySelector('#ranker-price-change-toggle');
 
   // ── Position filter toggle buttons ──────────────────────────────────────
   root.querySelectorAll('.ranker-pos-btn').forEach(btn => {
@@ -466,6 +503,14 @@ export function initRanker() {
     // Keep sort column aligned with the currently displayed metric.
     if (_showVs  && _sortBy === 'value')      _sortBy = 'valueScore';
     if (!_showVs && _sortBy === 'valueScore') _sortBy = 'value';
+    renderTable();
+  });
+
+  // ── Price change column toggle ────────────────────────────────────────────
+  _priceChangeToggle?.addEventListener('click', () => {
+    _showPriceChange = !_showPriceChange;
+    _priceChangeToggle.textContent = _showPriceChange ? 'Hide Price Changes' : 'Price Changes';
+    _priceChangeToggle.setAttribute('aria-pressed', String(_showPriceChange));
     renderTable();
   });
 

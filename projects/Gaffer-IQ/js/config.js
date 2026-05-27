@@ -307,3 +307,23 @@ export const UNDERSTAT_TEAM_SLUGS = {
 // Cache TTL for the league-level Understat payload, in milliseconds.
 // Understat refreshes daily at most; 1h is a safe ceiling for a session.
 export const XG_TTL_MS = 60 * 60 * 1000;
+
+// ─── Phase 4-4  Price change prediction ──────────────────────────────────────
+
+// Minimum combined in+out transfer activity this GW before the signal is trusted.
+// Below this threshold the engine returns direction:'stable' with zero confidence.
+// MODEL: very early in a GW (first hour) activity is too thin to read reliably.
+export const PRICE_MIN_ACTIVITY = 5000;
+
+// Total transfer activity at which confidence reaches its maximum (still gated
+// by how one-sided the net flow is). Typical busy GW peaks 100k–500k per player.
+export const PRICE_ACTIVITY_SCALE = 100000;
+
+// Minimum price-change confidence (0–1) for the "Buy now" flag in the planner.
+// Below this the signal is too weak to recommend urgency.
+export const PRICE_BUY_NOW_CONFIDENCE = 0.5;
+
+// Minimum player projection score (0–100) required alongside high price-rise
+// confidence for the "Buy now" badge. Guards against flagging a rising player
+// who has a brutal upcoming fixture run.
+export const PRICE_BUY_NOW_SCORE_MIN = 55;

@@ -85,6 +85,10 @@ export function normalisePlayer(raw) {
       creativity: parseFloat(raw.creativity) || 0,
       threat:     parseFloat(raw.threat)     || 0,
     },
+    // In-GW transfer counts — used by engine/prices.js for price change prediction.
+    // Phase 4-4: present in bootstrap-static.elements[]; zero-safe.
+    transfersInEvent:  raw.transfers_in_event  || 0,
+    transfersOutEvent: raw.transfers_out_event || 0,
     history: null,   // populated lazily by normalisePlayerSummary
     form:    null,   // filled by engine/form.js
   };
