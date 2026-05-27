@@ -415,6 +415,12 @@ export function calcIndividualDuels(teamA, teamB, ctx) {
     (defendersByRole[r] ||= []).push(e);
   }
 
+  // MODEL: distribute attackers across the defensive unit rather than dog-piling
+  // every WM onto the same FB. A defender becomes "taken" the moment it's picked
+  // as a primary opponent; subsequent attackers in the same role family prefer
+  // an untaken candidate. Reuse is only allowed when the candidate pool is
+  // exhausted (small unit — e.g. three CMs sharing two CBs).
+  const takenDefenderIds = new Set();
   const duels = [];
   for (const atk of xiA) {
     const atkRole = rolesA[atk.player.id];
@@ -427,11 +433,15 @@ export function calcIndividualDuels(teamA, teamB, ctx) {
       if (defendersByRole[r]) candidates.push(...defendersByRole[r]);
     }
     if (candidates.length === 0) continue;
-    // MODEL: most likely opponent = highest-minutes-security defender in the
-    // candidate role pool. A one-to-many mapping (e.g. one striker vs four
-    // CB+DMs) collapses to the single duel we trust most.
+    // Sort by minutes-security desc so the most-likely starters are preferred.
     candidates.sort((a, b) => b.form.minutesSecurity - a.form.minutesSecurity);
-    const def = candidates[0];
+    // MODEL: prefer an untaken defender; fall back to allowing reuse only when
+    // every candidate in the role pool has already been assigned. That keeps a
+    // 1-CB pool from blanking the second striker entirely while still spreading
+    // the load whenever the unit is large enough.
+    const def = candidates.find(c => !takenDefenderIds.has(c.player.id))
+             ?? candidates[0];
+    takenDefenderIds.add(def.player.id);
 
     const edge = atk.form.value - def.form.value;
     const duelScore = clamp(0, 100, 50 + edge * COUNTER_SENSITIVITY);
