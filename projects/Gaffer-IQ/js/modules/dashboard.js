@@ -899,6 +899,7 @@ function showImportStatus(msg, type) {
 function openImportPanel() {
   if (!_importPanel) return;
   _importPanel.hidden = false;
+  _importBtn?.classList.add('is-open');
   if (_importIdInput) {
     const saved = loadSavedTeamId();
     if (saved && !_importIdInput.value) _importIdInput.value = String(saved);
@@ -911,6 +912,7 @@ function openImportPanel() {
 function closeImportPanel() {
   if (!_importPanel) return;
   _importPanel.hidden = true;
+  _importBtn?.classList.remove('is-open');
   showImportStatus('', 'idle');
 }
 

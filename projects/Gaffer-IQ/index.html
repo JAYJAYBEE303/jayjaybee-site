@@ -123,11 +123,13 @@
                     title="Import your FPL squad by Team ID">Import FPL squad</button>
             <div class="squad-import-panel" id="dash-import-panel" hidden>
               <label class="squad-import-label" for="dash-import-id">FPL Team ID</label>
-              <input class="squad-import-input" id="dash-import-id"
-                     type="number" min="1" placeholder="e.g. 1234567"
-                     autocomplete="off">
-              <button class="squad-import-go" id="dash-import-go" type="button">Import</button>
-              <button class="squad-import-cancel" id="dash-import-cancel" type="button">Cancel</button>
+              <div class="squad-import-panel__row">
+                <input class="squad-import-input" id="dash-import-id"
+                       type="number" min="1" placeholder="e.g. 1234567"
+                       autocomplete="off">
+                <button class="squad-import-go" id="dash-import-go" type="button">Import</button>
+                <button class="squad-import-cancel" id="dash-import-cancel" type="button">Cancel</button>
+              </div>
               <p class="squad-import-status" id="dash-import-status" aria-live="polite"></p>
               <p class="squad-import-info"  id="dash-import-info"></p>
             </div>
@@ -202,11 +204,13 @@
                     title="Import your FPL squad by Team ID">Import FPL squad</button>
             <div class="squad-import-panel" id="planner-import-panel" hidden>
               <label class="squad-import-label" for="planner-import-id">FPL Team ID</label>
-              <input class="squad-import-input" id="planner-import-id"
-                     type="number" min="1" placeholder="e.g. 1234567"
-                     autocomplete="off">
-              <button class="squad-import-go" id="planner-import-go" type="button">Import</button>
-              <button class="squad-import-cancel" id="planner-import-cancel" type="button">Cancel</button>
+              <div class="squad-import-panel__row">
+                <input class="squad-import-input" id="planner-import-id"
+                       type="number" min="1" placeholder="e.g. 1234567"
+                       autocomplete="off">
+                <button class="squad-import-go" id="planner-import-go" type="button">Import</button>
+                <button class="squad-import-cancel" id="planner-import-cancel" type="button">Cancel</button>
+              </div>
               <p class="squad-import-status" id="planner-import-status" aria-live="polite"></p>
               <p class="squad-import-info"  id="planner-import-info"></p>
             </div>

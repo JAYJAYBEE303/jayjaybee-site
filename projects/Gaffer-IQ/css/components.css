@@ -2010,29 +2010,38 @@
    SQUAD IMPORT  (Phase 4-1)
    ═══════════════════════════════════════════════════════════════════════════ */
 
+/* Wrap is `position: relative` so the panel can be positioned absolutely below
+   the button without disrupting the flex controls bar layout. */
 .squad-import-wrap {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  align-self: flex-end;
 }
 
 .squad-import-btn {
-  background: var(--color-surface-raised);
+  background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  color: var(--color-text);
+  color: var(--color-muted);
   font-size: var(--font-size-sm);
   font-family: var(--font-sans);
-  font-weight: 600;
+  font-weight: 700;
   padding: var(--space-2) var(--space-3);
   cursor: pointer;
   white-space: nowrap;
-  transition: border-color 0.15s, background 0.15s;
+  transition: border-color 0.1s, color 0.1s, background 0.1s;
 }
 
 .squad-import-btn:hover {
+  border-color: var(--color-muted);
+  color: var(--color-text);
+}
+
+.squad-import-btn.is-open {
+  background: var(--color-accent-muted);
   border-color: var(--color-accent);
-  background: var(--color-surface);
+  color: var(--color-accent);
 }
 
 .squad-import-btn:focus-visible {
@@ -2040,15 +2049,29 @@
   outline-offset: 2px;
 }
 
+/* Panel drops down from the wrap as an overlay — does not affect controls bar height. */
 .squad-import-panel {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  right: 0;
+  z-index: 50;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  flex-direction: column;
   gap: var(--space-2);
   padding: var(--space-3);
+  min-width: 280px;
   background: var(--color-surface-raised);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+/* Row inside the panel: label + input + action buttons side by side */
+.squad-import-panel__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
 }
 
 .squad-import-label {
