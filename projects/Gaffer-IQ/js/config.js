@@ -223,6 +223,40 @@ export const PROJ_FORM    = 0.45;   // player's own form and availability
 export const PROJ_FIXTURE = 0.35;   // team's horizon fixture score
 export const PROJ_COUNTER = 0.20;   // player's position counter-matchup edge
 
+// ─── Phase 4-3  Chip planning ────────────────────────────────────────────────
+
+// How many candidate GWs ahead of currentGw to evaluate for each chip.
+// Higher = considers timing further out, but cost is roughly O(CHIP_PLAN_HORIZON
+// × teams × WC_WINDOW) scoreFixture calls (cached per (team, fixture)).
+export const CHIP_PLAN_HORIZON = 6;
+
+// Wildcard activation buys into the next WC_WINDOW GWs of fixtures.
+export const WC_WINDOW = 5;
+
+// Mean horizon score is averaged across the top WC_TOP_TEAMS strongest sides
+// when evaluating a Wildcard activation point — you wildcard *into* the
+// teams whose fixtures look best, not the league average.
+export const WC_TOP_TEAMS = 10;
+
+// Number of teams averaged when evaluating Free Hit "best one-week fixtures"
+// (smaller than WC_TOP_TEAMS — FH only fills one XI).
+export const FH_TOP_TEAMS = 6;
+
+// Points added to a Free Hit candidate GW's composite score per blanking team.
+// MODEL: a blank GW with ≥ FH_BLANK_THRESHOLD teams missing is normally the
+// canonical FH window; FH_BLANK_WEIGHT scales that signal alongside the
+// strong-fixture-availability signal so the engine can recommend FH for
+// either reason.
+export const FH_BLANK_WEIGHT = 4;
+
+// Threshold of blanking teams at which the engine reports a "blank GW"
+// rationale rather than a "strong-fixture" rationale.
+export const FH_BLANK_THRESHOLD = 6;
+
+// Threshold for "worth Bench Boosting" — number of bench DGWs the engine
+// considers a strong recommendation rather than a hold.
+export const BB_MIN_DOUBLES = 2;
+
 // ─── §11  Player Ranker performance ──────────────────────────────────────────
 
 // Number of players scored per setTimeout(fn, 0) chunk in the async ranker.

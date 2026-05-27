@@ -1586,6 +1586,128 @@
   }
 }
 
+/* ─── Right column wrapper (chips + recommendations stack) ───────────────── */
+
+.planner-right-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+}
+
+/* ─── Chip planner panel (Phase 4-3) ─────────────────────────────────────── */
+
+.planner-chips {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.planner-chips__hd {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.planner-chips__title {
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text);
+}
+
+.planner-chips__meta {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  margin-left: auto;
+}
+
+.planner-chips__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-3);
+}
+
+.planner-chip-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.planner-chip-card--used {
+  opacity: 0.45;
+  border-left-color: var(--color-border);
+}
+
+.planner-chip-card__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.planner-chip-card__name {
+  font-weight: 700;
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+
+.planner-chip-card__rec {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-accent);
+  margin-left: auto;
+}
+
+.planner-chip-card--used .planner-chip-card__rec {
+  color: var(--color-muted);
+  text-decoration: line-through;
+}
+
+.planner-chip-card__why {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  line-height: 1.4;
+  margin: 0;
+}
+
+.planner-chip-card__foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.planner-chip-card__used-toggle {
+  font-size: var(--font-size-xs);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 2px var(--space-2);
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.planner-chip-card__used-toggle[aria-pressed="true"] {
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  border-color: var(--color-border-subtle);
+}
+
+.planner-chip-card__hint {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  font-style: italic;
+}
+
 /* ─── Recommendations panel (right column) ───────────────────────────────── */
 
 .planner-recommendations {

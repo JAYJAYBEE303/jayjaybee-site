@@ -12,12 +12,36 @@
 import { store } from '../store.js';
 import { HORIZONS } from '../config.js';
 import { buildScoreContext, scorePlayer } from '../engine/composite.js';
+import {
+  scoreWildcardTiming, scoreFreeHitTiming,
+  scoreBenchBoostTiming, scoreTripleCaptainTiming,
+} from '../engine/chips.js';
 import { fetchAndMapSquad, loadSavedTeamId, saveTeamId, resolveImportGw } from '../squadImport.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 /** sessionStorage key for squad persistence. */
 const SS_KEY = 'gafferiq_squad_planner';
+
+/** localStorage key for chip-usage tracking (Phase 4-3). Persists across sessions
+ *  because chip usage is a season-long decision the user makes once per chip. */
+const CHIPS_USED_KEY = 'gafferiq_chips_used';
+
+/** Canonical chip identifiers. Order = render order in the chips panel. */
+const CHIP_IDS = ['wildcard', 'freehit', 'benchboost', 'triplecaptain'];
+
+/** Human labels for chips, keyed by chip id. */
+const CHIP_LABELS = {
+  wildcard:      'Wildcard',
+  freehit:       'Free Hit',
+  benchboost:    'Bench Boost',
+  triplecaptain: 'Triple Captain',
+};
+
+/** Number of squad players treated as bench for Bench Boost analysis.
+ *  MODEL: 4 = 1 GK + 3 outfield bench in FPL. The planner picks the four
+ *  lowest-projected squad members as a heuristic (no XI selection in scope). */
+const BENCH_SIZE = 4;
 
 /** Maximum players per position in a valid 15-man squad. */
 const SQUAD_LIMITS = { GKP: 2, DEF: 5, MID: 5, FWD: 3 };
@@ -65,6 +89,9 @@ let _allowExtraHit = false;
 /** Map<playerId, scorePlayer result> — rebuilt on squad/horizon changes. */
 let _scores = new Map();
 
+/** Set<chipId> of chips the user has marked as already used this season. */
+let _chipsUsed = new Set();
+
 /** Active position set for the search dropdown filter. */
 let _searchPosSet = new Set(['GKP', 'DEF', 'MID', 'FWD']);
 
@@ -87,6 +114,7 @@ let _tally           = null;
 let _budgetInput     = null;
 let _hitToggle       = null;
 let _recommendations = null;
+let _chipsPanel      = null;
 
 // Import panel refs (Phase 4-1)
 let _importBtn     = null;
@@ -128,6 +156,30 @@ function buildCtx() {
 /** Resolve the active horizon object from the store. */
 function getHorizon() {
   return HORIZONS[store.getActiveHorizon()] ?? HORIZONS.GW1;
+}
+
+// ─── Chip-usage persistence (Phase 4-3) ──────────────────────────────────────
+
+/**
+ * Load chip-used state from localStorage. Survives page reloads — chip usage
+ * is a season-long decision, not a session one. No FPL API endpoint reports
+ * chip usage without auth, so this is manually toggled per ROADMAP Phase 4-3.
+ */
+function loadChipsUsed() {
+  try {
+    const raw = localStorage.getItem(CHIPS_USED_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      _chipsUsed = new Set(parsed.filter(id => CHIP_IDS.includes(id)));
+    }
+  } catch { /* corrupt — ignore and start fresh */ }
+}
+
+function saveChipsUsed() {
+  try {
+    localStorage.setItem(CHIPS_USED_KEY, JSON.stringify([..._chipsUsed]));
+  } catch { /* quota exceeded — non-fatal */ }
 }
 
 // ─── Squad persistence ────────────────────────────────────────────────────────
@@ -659,12 +711,170 @@ function renderRecommendations() {
   _recommendations.innerHTML = parts.join('');
 }
 
+// ─── Render: chip planner (Phase 4-3) ────────────────────────────────────────
+
+/**
+ * Pick the four lowest-projected players from the current squad as the bench
+ * proxy for Bench Boost analysis. MODEL: the planner doesn't model an XI/bench
+ * split (out of scope), so we approximate by taking the players the engine
+ * itself rates lowest over the active horizon. Returns [] when scores are
+ * unavailable or the squad is empty.
+ */
+function pickBenchPlayerIds() {
+  if (_squad.length === 0) return [];
+  const ranked = _squad
+    .map(id => ({ id, value: _scores.get(id)?.value ?? 0 }))
+    .sort((a, b) => a.value - b.value);
+  return ranked.slice(0, BENCH_SIZE).map(r => r.id);
+}
+
+/**
+ * Pick the highest-projected player in the current squad as the Triple Captain
+ * candidate. Returns null when the squad is empty or no scores exist yet.
+ */
+function pickTcCandidate() {
+  let bestId = null;
+  let bestVal = -Infinity;
+  for (const id of _squad) {
+    const v = _scores.get(id)?.value;
+    if (typeof v === 'number' && v > bestVal) {
+      bestVal = v;
+      bestId  = id;
+    }
+  }
+  return bestId == null ? null : store.getPlayer(bestId);
+}
+
+/**
+ * Render a single chip card. The "Already used" toggle stays operable even on
+ * used chips so the user can mark/unmark; the recommendation strikethroughs
+ * and the card greys out via the --used modifier.
+ */
+function renderChipCard(chipId, rec) {
+  const used    = _chipsUsed.has(chipId);
+  const label   = CHIP_LABELS[chipId];
+  const recText = rec?.gw != null ? `GW${rec.gw}` : '—';
+  const why     = rec?.reasoning ?? 'Not enough data to recommend a GW yet.';
+  const toggleLabel = used ? 'Used' : 'Mark used';
+
+  return `
+    <div class="planner-chip-card${used ? ' planner-chip-card--used' : ''}"
+         data-chip-id="${esc(chipId)}">
+      <div class="planner-chip-card__head">
+        <span class="planner-chip-card__name">${esc(label)}</span>
+        <span class="planner-chip-card__rec">${esc(recText)}</span>
+      </div>
+      <p class="planner-chip-card__why">${esc(why)}</p>
+      <div class="planner-chip-card__foot">
+        <button class="planner-chip-card__used-toggle"
+                type="button"
+                data-chip-toggle="${esc(chipId)}"
+                aria-pressed="${used}">${esc(toggleLabel)}</button>
+        <span class="planner-chip-card__hint">advisory — see rationale above</span>
+      </div>
+    </div>
+  `.trim();
+}
+
+/**
+ * Compute and render all four chip recommendations. Pure-engine calls; the
+ * module only owns DOM. Always shows reasoning per ROADMAP rule "always show
+ * the reasoning" — when a chip can't be scored (e.g. empty squad for BB/TC)
+ * we still render the card with a hint, never hide it.
+ */
+function renderChipsPanel() {
+  if (!_chipsPanel) return;
+
+  if (!_dataReady) {
+    _chipsPanel.innerHTML = `<p class="planner-hint">Loading FPL data…</p>`;
+    return;
+  }
+
+  const ctx = buildCtx();
+  if (!ctx) {
+    _chipsPanel.innerHTML = `<p class="planner-hint">No data available yet.</p>`;
+    return;
+  }
+
+  const horizon = getHorizon();
+
+  // Wildcard and Free Hit are league-wide, evaluated regardless of squad.
+  let wcBest = null;
+  let fhRec  = null;
+  try {
+    const wcRanked = scoreWildcardTiming(horizon, ctx);
+    wcBest = wcRanked[0] ?? null;
+  } catch (err) {
+    console.warn('[planner] scoreWildcardTiming failed:', err?.message ?? err);
+  }
+  try {
+    fhRec = scoreFreeHitTiming(horizon, ctx);
+  } catch (err) {
+    console.warn('[planner] scoreFreeHitTiming failed:', err?.message ?? err);
+  }
+
+  // Bench Boost and Triple Captain depend on the user's squad.
+  const benchIds = pickBenchPlayerIds();
+  const tcPlayer = pickTcCandidate();
+
+  let bbRec = null;
+  let tcRec = null;
+  if (benchIds.length > 0) {
+    try {
+      bbRec = scoreBenchBoostTiming(horizon, { ...ctx, benchPlayerIds: benchIds });
+    } catch (err) {
+      console.warn('[planner] scoreBenchBoostTiming failed:', err?.message ?? err);
+    }
+  }
+  if (tcPlayer) {
+    try {
+      tcRec = scoreTripleCaptainTiming(tcPlayer, horizon, ctx);
+    } catch (err) {
+      console.warn('[planner] scoreTripleCaptainTiming failed:', err?.message ?? err);
+    }
+  }
+
+  const fallback = {
+    benchboost:    { reasoning: 'Add 15 players to your squad to evaluate Bench Boost timing.' },
+    triplecaptain: { reasoning: 'Add players to your squad to evaluate Triple Captain timing.' },
+  };
+
+  const recs = {
+    wildcard:      wcBest,
+    freehit:       fhRec,
+    benchboost:    bbRec ?? fallback.benchboost,
+    triplecaptain: tcRec ?? fallback.triplecaptain,
+  };
+
+  const cards = CHIP_IDS.map(id => renderChipCard(id, recs[id])).join('');
+
+  _chipsPanel.innerHTML = `
+    <div class="planner-chips__hd">
+      <span class="planner-chips__title">Chips</span>
+      <span class="planner-chips__meta">advisory · ${esc(horizon.label)}</span>
+    </div>
+    <div class="planner-chips__grid">${cards}</div>
+  `;
+}
+
+function onChipsClick(e) {
+  const btn = e.target.closest('[data-chip-toggle]');
+  if (!btn) return;
+  const chipId = btn.dataset.chipToggle;
+  if (!CHIP_IDS.includes(chipId)) return;
+  if (_chipsUsed.has(chipId)) _chipsUsed.delete(chipId);
+  else                        _chipsUsed.add(chipId);
+  saveChipsUsed();
+  renderChipsPanel();
+}
+
 // ─── After squad change ───────────────────────────────────────────────────────
 
 function afterSquadChange() {
   scoreSquad();
   renderSquadPanel();
   renderRecommendations();
+  renderChipsPanel();
   if (_searchInput) _searchInput.value = '';
   hideResults();
 }
@@ -858,6 +1068,7 @@ function wireDom() {
   _budgetInput     = document.getElementById('planner-budget');
   _hitToggle       = document.getElementById('planner-hit-toggle');
   _recommendations = document.getElementById('planner-recommendations');
+  _chipsPanel      = document.getElementById('planner-chips');
 
   if (!_root) {
     console.warn('[planner] data-module="planner" section not found in DOM');
@@ -903,6 +1114,10 @@ function wireDom() {
   // ── Hit toggle ────────────────────────────────────────────────────────────
   _hitToggle?.addEventListener('click', onHitToggle);
 
+  // ── Chip-used toggles (Phase 4-3) — delegated click ──────────────────────
+  _chipsPanel?.addEventListener('click', onChipsClick);
+  loadChipsUsed();
+
   // ── Squad import (Phase 4-1) ─────────────────────────────────────────────
   _importBtn     = document.getElementById('planner-import-btn');
   _importPanel   = document.getElementById('planner-import-panel');
@@ -935,14 +1150,17 @@ function onDataReady() {
   scoreSquad();
   renderSquadPanel();
   renderRecommendations();
+  renderChipsPanel();
 }
 
 function onHorizonChanged() {
   if (!_dataReady) return;
-  // Re-score squad against the new horizon and re-compute transfer recommendations.
+  // Re-score squad against the new horizon and re-compute transfer
+  // recommendations + chip timing (chips depend on the same fixture data).
   scoreSquad();
   renderSquadPanel();
   renderRecommendations();
+  renderChipsPanel();
 }
 
 // ─── Public init ─────────────────────────────────────────────────────────────
