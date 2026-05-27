@@ -19,6 +19,7 @@ import {
   ROLE_PAIRING_WEIGHTS,
   ROLE_CLASSIFY_THRESHOLDS,
   COUNTER_FALLBACK_EDGE,
+  BANDS,
 } from '../config.js';
 import { clamp, normaliseLinear } from '../util.js';
 import { calcPlayerForm } from './form.js';
@@ -298,4 +299,170 @@ export function calcCounterMatchup(teamA, teamB, ctx) {
     pairings,
     mode: useRoles ? 'role' : 'element',
   };
+}
+
+// ─── Phase 4-2: individual player-vs-player duels ────────────────────────────
+
+// MODEL: a baseline 4-4-2 used to pick a likely starting XI by minutes security
+// alone. Not formation-aware (no detection of 4-3-3 vs 3-5-2) — the goal is
+// to surface the eleven players most likely to be on the pitch, not to predict
+// the manager's exact shape. The duels module is supplementary and tolerates
+// the simplification; a fancier formation pick would be overfitting given the
+// data we have.
+const LIKELY_XI_FORMATION = { GKP: 1, DEF: 4, MID: 4, FWD: 2 };
+
+// MODEL: which defender role(s) each attacker role most likely duels with.
+// Mirrors the unit pairings used by calcCounterMatchup but applied per player:
+//   ST  → CB        out-and-out striker vs centre-back
+//   SS  → CB or DM  shadow striker drops between the lines — both apply
+//   WM  → FB        wide attacker vs the full-back on his flank
+//   CM  → CB or DM  central creator vs CBs and the shielding mid
+// DM / CB / FB / GKP omitted: those are defenders, not attackers initiating
+// the duel from the scoring side. They appear as defenders only.
+const DUEL_OPPONENT_ROLES = {
+  ST: ['CB'],
+  SS: ['CB', 'DM'],
+  WM: ['FB'],
+  CM: ['CB', 'DM'],
+};
+
+/** Map a 0–100 value to a band string using config thresholds. */
+function bandFromValue(v) {
+  if (v >= BANDS.great)   return 'great';
+  if (v >= BANDS.good)    return 'good';
+  if (v >= BANDS.neutral) return 'neutral';
+  if (v >= BANDS.tough)   return 'tough';
+  return 'brutal';
+}
+
+/**
+ * Internal: pick the likely starting XI for a team by ranking each position
+ * group by calcPlayerForm.minutesSecurity and slicing to LIKELY_XI_FORMATION.
+ * Returns entries paired with their full PlayerForm so downstream callers
+ * avoid recomputing it for the duel score.
+ */
+function buildLikelyXi(players, ctx) {
+  const byPos = { GKP: [], DEF: [], MID: [], FWD: [] };
+  for (const p of players || []) {
+    if (byPos[p.position]) {
+      byPos[p.position].push({ player: p, form: calcPlayerForm(p, ctx) });
+    }
+  }
+  const xi = [];
+  for (const pos of Object.keys(LIKELY_XI_FORMATION)) {
+    byPos[pos].sort((a, b) => b.form.minutesSecurity - a.form.minutesSecurity);
+    xi.push(...byPos[pos].slice(0, LIKELY_XI_FORMATION[pos]));
+  }
+  return xi;
+}
+
+/**
+ * Individual player-vs-player duels for team A's attackers against the likely
+ * defenders they will face in team B. Phase 4-2 evolution of calcCounterMatchup:
+ * instead of averaging across the whole position group, pair specific players
+ * (Salah vs the full-back nearest to him) and score that single duel.
+ *
+ * Likely XI: per-team, top N by minutesSecurity in the 1-4-4-2 baseline. Role
+ * classification re-uses Phase 3C's classifyRole on each XI player; players
+ * with no ICT signal are silently skipped (they wouldn't have a meaningful
+ * role read anyway).
+ *
+ * Duel score: same shape as the position-group pairing — clamp(50 + edge * COUNTER_SENSITIVITY).
+ * "Most interesting" = largest absolute form differential: a striker on fire
+ * vs a struggling CB is as worth surfacing as the inverse.
+ *
+ * MODEL: graceful degradation. When either team has no players loaded, or
+ * when no attacker XI player has both a classified role and a matching
+ * defender in the opposing XI, returns []. The Matchup Analyser falls back
+ * to the position-group counter pairings already on screen.
+ *
+ * @param {Team} teamA   attacker side — we want this team's attacking duels
+ * @param {Team} teamB   defender side
+ * @param {object} ctx   same context shape as calcCounterMatchup
+ * @returns {{attacker: object, defender: object, duelScore: number, band: string}[]}
+ *   top 5 duels by |attackerForm − defenderForm|, descending.
+ */
+export function calcIndividualDuels(teamA, teamB, ctx) {
+  const playersA = ctx.playersByTeamId?.[teamA.id] || [];
+  const playersB = ctx.playersByTeamId?.[teamB.id] || [];
+  if (playersA.length === 0 || playersB.length === 0) return [];
+
+  const xiA = buildLikelyXi(playersA, ctx);
+  const xiB = buildLikelyXi(playersB, ctx);
+
+  // Role-classify each XI player independently. Unlike calcCounterMatchup
+  // (which fails closed on the whole team), here we tolerate per-player gaps:
+  // a duel just isn't surfaced if its participants can't be classified.
+  const rolesA = {};
+  for (const e of xiA) {
+    const r = classifyRole(e.player);
+    if (r) rolesA[e.player.id] = r;
+  }
+  const rolesB = {};
+  for (const e of xiB) {
+    const r = classifyRole(e.player);
+    if (r) rolesB[e.player.id] = r;
+  }
+
+  // Index team B's defenders by role for O(1) candidate lookup per attacker.
+  // Each entry retains its PlayerForm so the duel pairing can prefer the
+  // higher-minutes-security candidate (the man more likely to actually be
+  // on the pitch).
+  const defendersByRole = {};
+  for (const e of xiB) {
+    const r = rolesB[e.player.id];
+    if (!r) continue;
+    (defendersByRole[r] ||= []).push(e);
+  }
+
+  const duels = [];
+  for (const atk of xiA) {
+    const atkRole = rolesA[atk.player.id];
+    if (!atkRole) continue;
+    const oppRoles = DUEL_OPPONENT_ROLES[atkRole];
+    if (!oppRoles) continue;
+
+    const candidates = [];
+    for (const r of oppRoles) {
+      if (defendersByRole[r]) candidates.push(...defendersByRole[r]);
+    }
+    if (candidates.length === 0) continue;
+    // MODEL: most likely opponent = highest-minutes-security defender in the
+    // candidate role pool. A one-to-many mapping (e.g. one striker vs four
+    // CB+DMs) collapses to the single duel we trust most.
+    candidates.sort((a, b) => b.form.minutesSecurity - a.form.minutesSecurity);
+    const def = candidates[0];
+
+    const edge = atk.form.value - def.form.value;
+    const duelScore = clamp(0, 100, 50 + edge * COUNTER_SENSITIVITY);
+
+    duels.push({
+      attacker: {
+        id:        atk.player.id,
+        name:      atk.player.name,
+        position:  atk.player.position,
+        role:      atkRole,
+        formValue: atk.form.value,
+      },
+      defender: {
+        id:        def.player.id,
+        name:      def.player.name,
+        position:  def.player.position,
+        role:      rolesB[def.player.id],
+        formValue: def.form.value,
+      },
+      duelScore,
+      band: bandFromValue(duelScore),
+    });
+  }
+
+  // MODEL: rank by absolute form differential — the most lopsided duels are
+  // the most decision-relevant whether they favour the attacker or the
+  // defender. A 60-vs-30 striker-favoured duel is no less interesting than a
+  // 30-vs-60 defender-favoured one.
+  duels.sort((x, y) =>
+    Math.abs(y.attacker.formValue - y.defender.formValue) -
+    Math.abs(x.attacker.formValue - x.defender.formValue));
+
+  return duels.slice(0, 5);
 }

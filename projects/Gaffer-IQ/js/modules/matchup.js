@@ -13,6 +13,7 @@
 import { store } from '../store.js';
 import { BANDS, HORIZONS } from '../config.js';
 import { buildScoreContext, scoreFixture, scoreOverHorizon } from '../engine/composite.js';
+import { calcIndividualDuels } from '../engine/counter.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -200,12 +201,19 @@ function renderMatchup() {
   const homeHorizonScore = scoreOverHorizon(homeTeam, horizon, ctx);
   const awayHorizonScore = scoreOverHorizon(awayTeam, horizon, ctx);
 
+  // Phase 4-2: per-team individual duels. Each call scores team A's attackers
+  // against team B's likely defenders — asymmetric, mirrors calcCounterMatchup.
+  // Returns [] when player summaries / ICT data aren't sufficient; buildCard
+  // simply omits the section in that case.
+  const homeDuels = calcIndividualDuels(homeTeam, awayTeam, ctx);
+  const awayDuels = calcIndividualDuels(awayTeam, homeTeam, ctx);
+
   _grid.innerHTML = '';
   _grid.appendChild(
-    buildCard(homeTeam, 'Home', homeScore, fixture.fplDifficulty.home, homeHorizonScore, horizon),
+    buildCard(homeTeam, 'Home', homeScore, fixture.fplDifficulty.home, homeHorizonScore, horizon, homeDuels),
   );
   _grid.appendChild(
-    buildCard(awayTeam, 'Away', awayScore, fixture.fplDifficulty.away, awayHorizonScore, horizon),
+    buildCard(awayTeam, 'Away', awayScore, fixture.fplDifficulty.away, awayHorizonScore, horizon, awayDuels),
   );
 }
 
@@ -237,7 +245,8 @@ function buildPerGwStrip(perGw) {
 
 /**
  * Build and return a <article> DOM node for one team's side of the matchup.
- * Shows: single-fixture CompositeScore breakdown + horizon aggregate strip.
+ * Shows: single-fixture CompositeScore breakdown + horizon aggregate strip
+ * + (Phase 4-2) collapsible individual duels section when available.
  *
  * @param {Team}           team
  * @param {'Home'|'Away'}  venue
@@ -245,9 +254,11 @@ function buildPerGwStrip(perGw) {
  * @param {number}         fdr           official FPL difficulty rating 1–5
  * @param {object}         horizonScore  from scoreOverHorizon — multi-GW aggregate
  * @param {{label:string, gws:number}} horizon  active horizon config
+ * @param {Array}          duels         from calcIndividualDuels — may be [] when
+ *                                       summaries / ICT data aren't loaded
  * @returns {HTMLElement}
  */
-function buildCard(team, venue, score, fdr, horizonScore, horizon) {
+function buildCard(team, venue, score, fdr, horizonScore, horizon, duels) {
   const card = document.createElement('article');
   card.className = `matchup-card matchup-card--${score.band}`;
   if (score.provisional) card.classList.add('matchup-card--provisional');
@@ -304,6 +315,8 @@ function buildCard(team, venue, score, fdr, horizonScore, horizon) {
       <h3 class="matchup-card__section-title">Counter-Matchup Pairings</h3>
       ${buildCounterPairings(score.breakdown.counterMatchup.pairings)}
     </div>
+
+    ${buildIndividualDuels(duels)}
 
     ${horizonSection}
   `;
@@ -372,6 +385,46 @@ function buildCounterPairings(pairings) {
       </div>
     `.trim();
   }).join('');
+}
+
+// ─── Build: individual duels (Phase 4-2) ─────────────────────────────────────
+
+/**
+ * Build a collapsible <details> block listing the top individual player-vs-player
+ * duels. Supplementary to the position-group pairings above — both render, the
+ * duels complement the aggregate read. Renders nothing when duels is empty
+ * (no summaries / no ICT data classification) so the section gracefully
+ * degrades to position-group only.
+ */
+function buildIndividualDuels(duels) {
+  if (!duels || duels.length === 0) return '';
+
+  const rows = duels.map(d => {
+    const atkForm = Math.round(d.attacker.formValue);
+    const defForm = Math.round(d.defender.formValue);
+    const score   = Math.round(d.duelScore);
+    return `
+      <div class="individual-duel">
+        <span class="individual-duel__attacker">
+          ${esc(d.attacker.name)}
+          <span class="individual-duel__form">${atkForm}</span>
+        </span>
+        <span class="individual-duel__vs">vs</span>
+        <span class="individual-duel__defender">
+          ${esc(d.defender.name)}
+          <span class="individual-duel__form">${defForm}</span>
+        </span>
+        <span class="score-chip score-chip--${esc(d.band)} individual-duel__score">${score}</span>
+      </div>
+    `.trim();
+  }).join('');
+
+  return `
+    <details class="matchup-card__duels">
+      <summary class="matchup-card__duels-summary">Individual Duels (top ${duels.length})</summary>
+      <div class="individual-duels">${rows}</div>
+    </details>
+  `;
 }
 
 // ─── Event handlers ───────────────────────────────────────────────────────────
