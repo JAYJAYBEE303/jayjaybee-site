@@ -1,13 +1,19 @@
 /**
  * js/api.js
  * Layer: data access. The ONLY file in the app that calls fetch().
- * Calls the Vercel proxy (/api/fpl?path=…) and returns parsed JSON.
+ * Calls the Vercel proxy (PROXY_BASE_URL?path=…) and returns parsed JSON.
  * Side effects: network I/O. No DOM, no store mutation.
  * Throws typed ApiError on any failure — callers translate to data:error events.
  * See ARCHITECTURE.md §5 (proxy) and §6 (fetch strategy), CONVENTIONS.md §9.
  */
 
-import { PROXY_BASE, UNDERSTAT_SEASON } from './config.js';
+import { UNDERSTAT_SEASON } from './config.js';
+
+// Absolute URL of the Vercel proxy function.
+// Using an absolute URL means the app can be embedded on any origin
+// (e.g. jayjaybee.com) without the relative path resolving against the
+// wrong host. Keep this in sync with the deployed Vercel project URL.
+const PROXY_BASE_URL = 'https://gaffer-iq-josh-bailey.vercel.app/api/fpl';
 
 /**
  * Typed error for any failure originating in the data layer.
@@ -34,7 +40,7 @@ export class ApiError extends Error {
 async function callProxy(path, source) {
   const qs = new URLSearchParams({ path });
   if (source) qs.set('source', source);
-  const url = `${PROXY_BASE}?${qs.toString()}`;
+  const url = `${PROXY_BASE_URL}?${qs.toString()}`;
 
   let response;
   try {
