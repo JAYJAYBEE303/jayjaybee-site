@@ -231,3 +231,103 @@
     padding: var(--space-4);
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MOBILE LAYOUT  ≤ 768px — Phase 4-5
+   All desktop rules above are completely untouched; this block is purely
+   additive. Overrides the 900px breakpoint where needed.
+   Test breakpoints: 375px (iPhone SE), 390px (iPhone 14), 768px (tablet).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+
+  /* ─── App shell ────────────────────────────────────────────────────────── */
+
+  /* Reserve space for the fixed bottom tab bar (56px) plus system safe-area
+     (home indicator on iPhone 14 etc.) so the last content row is never
+     hidden behind the tab bar. */
+  .app-main {
+    padding: var(--space-3);
+    padding-bottom: calc(56px + var(--space-4) + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* ─── Top nav — slimmed to brand + horizon switcher only ──────────────── */
+
+  /* The module nav is fixed to the bottom (see below), so it no longer takes
+     up space here. The app-nav becomes a single-row brand + switcher bar. */
+  .app-nav {
+    flex-wrap: wrap;
+    height: auto;
+    padding: var(--space-2) var(--space-3);
+    gap: var(--space-2);
+    align-items: center;
+  }
+
+  .app-nav__title {
+    font-size: var(--font-size-sm);
+  }
+
+  /* ─── Bottom tab bar — replaces the inline module nav ─────────────────── */
+
+  /* position:fixed removes the element from the app-nav flex flow, making the
+     app-nav naturally show only brand + horizon switcher. The tab bar sits
+     above the system home indicator via env(safe-area-inset-bottom). */
+  .module-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 200;
+    display: flex;
+    flex-direction: row;
+    order: unset;
+    width: 100%;
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+    border-bottom: none;
+    /* Push tabs above the iOS home indicator */
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .module-nav__item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    /* 56px total: 44px tap target + breathing room. */
+    height: 56px;
+    min-height: 44px;
+    padding: var(--space-1) var(--space-2);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    /* Active indicator moves from bottom underline to top accent bar. */
+    border-bottom: none;
+    border-top: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+  }
+
+  .module-nav__item.is-active {
+    color: var(--color-accent);
+    border-bottom-color: transparent;
+    border-top-color: var(--color-accent);
+  }
+
+  /* ─── Horizon switcher — full width below brand ────────────────────────── */
+
+  .horizon-switcher {
+    width: 100%;
+    margin-left: 0;
+    display: flex;
+    justify-content: stretch;
+  }
+
+  .horizon-switcher__btn {
+    flex: 1;
+    text-align: center;
+    /* 44px minimum tap target */
+    min-height: 44px;
+    padding: var(--space-2);
+    font-size: var(--font-size-xs);
+  }
+}

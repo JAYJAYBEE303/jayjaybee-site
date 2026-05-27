@@ -2359,3 +2359,378 @@
   color: var(--band-brutal);
   background: color-mix(in srgb, var(--band-brutal) 12%, transparent);
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MOBILE COMPONENTS  ≤ 768px — Phase 4-5
+   Purely additive overrides. Desktop rules are completely untouched.
+   No new hardcoded values — all tokens from base.css.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+
+  /* ─── Matchup Analyser ──────────────────────────────────────────────────── */
+
+  /* The matchup grid already collapses to single-column at 800px.
+     Below 768px we tighten the breakdown-row grid so the "Counter-Matchup"
+     label (9.5rem on desktop) doesn't overflow a 375px screen. */
+  .breakdown-row {
+    grid-template-columns: 7rem 1fr 2rem 2rem auto;
+  }
+
+  .breakdown-row__label {
+    font-size: var(--font-size-xs);
+  }
+
+  /* Counter-pairing: narrower label column on small screens */
+  .counter-pairing {
+    grid-template-columns: 6rem auto 1fr auto;
+  }
+
+  .counter-pairing__label {
+    font-size: var(--font-size-xs);
+  }
+
+  /* Tighten card padding */
+  .matchup-card__header,
+  .matchup-card__score-row,
+  .matchup-card__breakdown,
+  .matchup-card__counter,
+  .matchup-card__horizon {
+    padding-left: var(--space-3);
+    padding-right: var(--space-3);
+  }
+
+  /* Team name: step down one level so it fits beside the venue badge */
+  .matchup-card__team {
+    font-size: var(--font-size-md);
+  }
+
+  /* Score pill value: one step smaller so the pill fits in the card header */
+  .score-pill__value {
+    font-size: var(--font-size-xl);
+  }
+
+  /* Fixture picker: go full width inside the controls bar */
+  .matchup-controls {
+    flex-wrap: wrap;
+  }
+
+  .fixture-picker {
+    min-width: 0;
+    width: 100%;
+  }
+
+  /* ─── Player Ranker — table → card list ──────────────────────────────────
+     Each <tr> becomes a flex card. Specific <td> columns are hidden or
+     repositioned to show only the key stats: pos · name · price · value ·
+     fixture strip. The <thead> is visually hidden but kept for screen readers.
+     ─────────────────────────────────────────────────────────────────────── */
+
+  /* Unwrap the table from table layout so rows can be flex cards */
+  .ranker-table,
+  .ranker-table tbody {
+    display: block;
+    width: 100%;
+  }
+
+  /* Visually hide the column headers — screen readers still read them */
+  .ranker-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  /* Each row becomes a card */
+  .ranker-table__row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-2) var(--space-3);
+    margin-bottom: var(--space-2);
+    min-height: 44px;
+    /* Reset the desktop hover background so it doesn't fight the border */
+    transition: border-color 0.1s;
+  }
+
+  .ranker-table__row:hover {
+    background: var(--color-surface);
+    border-color: var(--color-muted);
+  }
+
+  /* All <td> reset from table-cell to inline-flex items */
+  .ranker-table__td {
+    display: inline-flex;
+    align-items: center;
+    padding: 0;
+    border-bottom: none;
+    vertical-align: unset;
+  }
+
+  /* Position badge: first in visual order */
+  .ranker-table__td--pos {
+    order: -1;
+    flex-shrink: 0;
+  }
+
+  /* Name: takes all remaining space on the first line */
+  .ranker-table__td--name {
+    flex: 1;
+    min-width: 0;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    /* Truncate very long names gracefully */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Team abbreviation: hidden — redundant with the fixture strip */
+  .ranker-table__td--team {
+    display: none;
+  }
+
+  /* Price: small muted text, stays on the first line */
+  .ranker-table__td--price {
+    font-size: var(--font-size-xs);
+    color: var(--color-muted);
+    white-space: nowrap;
+  }
+
+  /* Value chip: stays on first line */
+  .ranker-table__td--value {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  /* Fixture strip: wraps onto its own full-width second line */
+  .ranker-table__td--fixtures {
+    flex-basis: 100%;
+    order: 10;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    /* Remove the whitespace:nowrap set on desktop */
+    white-space: normal;
+  }
+
+  /* Minutes security badge: hidden on mobile — too much noise */
+  .ranker-table__td--min {
+    display: none;
+  }
+
+  /* Price-change cell: stays visible after the value chip */
+  .ranker-table__td--price-change {
+    flex-shrink: 0;
+    white-space: nowrap;
+    text-align: left;
+  }
+
+  /* Empty / loading state: block so colspan has no effect */
+  .ranker-table__td.ranker-table__empty,
+  .ranker-table__empty {
+    display: block;
+    width: 100%;
+    text-align: center;
+    padding: var(--space-6) var(--space-3);
+  }
+
+  /* Controls bar: tighten gaps, allow toggle buttons to wrap naturally */
+  .ranker-controls {
+    gap: var(--space-2);
+  }
+
+  /* Toggle buttons: remove the desktop auto left margin so they wrap inline */
+  .ranker-toggle-btn {
+    margin-left: 0;
+    min-height: 44px;
+    padding: var(--space-2) var(--space-3);
+  }
+
+  /* Select wrappers: let them grow to fill available width */
+  .ranker-controls__select-wrap {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .ranker-select {
+    width: 100%;
+  }
+
+  /* Position filter buttons: 44px tap targets */
+  .ranker-pos-btn {
+    min-height: 44px;
+    padding: var(--space-2) var(--space-2);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ─── GW Dashboard ────────────────────────────────────────────────────── */
+
+  /* Controls: stack vertically so each control is full width */
+  .dash-controls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-3);
+    padding: var(--space-3);
+  }
+
+  /* Search combo and input: full width */
+  .dash-search-combo {
+    width: 100%;
+  }
+
+  .dash-search-input {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* Search results dropdown: match the now full-width input */
+  .dash-search-results {
+    max-width: 100%;
+  }
+
+  /* Position filter: 44px tap targets */
+  .dash-pos-btn {
+    min-height: 44px;
+    padding: var(--space-2) var(--space-3);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Import button: full width so it's easy to tap */
+  .squad-import-btn {
+    min-height: 44px;
+    width: 100%;
+  }
+
+  /* Import panel: full width below the button */
+  .squad-import-wrap {
+    width: 100%;
+  }
+
+  .squad-import-panel {
+    left: 0;
+    right: 0;
+    min-width: 0;
+    width: 100%;
+  }
+
+  /* Squad tally: centred */
+  .dash-squad-tally {
+    text-align: center;
+    align-self: center;
+  }
+
+  /* dash-shell is already single-column at 900px; reduce padding */
+  .dash-shell {
+    padding: 0 0 var(--space-8);
+    gap: var(--space-4);
+  }
+
+  /* Squad slots: taller to be comfortably tappable */
+  .dash-squad-slot {
+    min-height: 44px;
+  }
+
+  /* Captain card: less horizontal padding on a small screen */
+  .dash-captain {
+    padding: var(--space-3);
+  }
+
+  /* Player rows: 44px minimum tap height */
+  .dash-player-row {
+    min-height: 44px;
+    padding: var(--space-2) var(--space-3);
+  }
+
+  /* Risk flags: remove the desktop indent that assumes a wide name column */
+  .dash-player-row__flags {
+    padding-left: 0;
+  }
+
+  /* ─── Transfer Planner ────────────────────────────────────────────────── */
+
+  /* Controls: stack vertically */
+  .planner-controls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-3);
+    padding: var(--space-3);
+  }
+
+  /* Budget input: full width */
+  .planner-budget-wrap {
+    width: 100%;
+  }
+
+  .planner-budget-input {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* Free-transfer buttons: 44px tap targets */
+  .planner-ft-btn {
+    min-height: 44px;
+    flex: 1;
+    justify-content: center;
+  }
+
+  /* Hit toggle: full width, 44px */
+  .planner-hit-toggle {
+    min-height: 44px;
+    width: 100%;
+  }
+
+  /* Position filter: 44px */
+  .planner-pos-btn {
+    min-height: 44px;
+    padding: var(--space-2) var(--space-3);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* planner-shell is already single-column at 900px; reduce padding */
+  .planner-shell {
+    padding: 0 0 var(--space-8);
+    gap: var(--space-4);
+  }
+
+  /* Chip grid: single column */
+  .planner-chips__grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Transfer card body: OUT stacks above IN instead of left/right.
+     The arrow element is rotated 90° so "→" becomes "↓" without HTML changes. */
+  .planner-transfer-card__body {
+    flex-direction: column;
+    align-items: stretch;
+    padding: var(--space-2) var(--space-3);
+    gap: var(--space-2);
+  }
+
+  .planner-transfer-card__arrow {
+    align-self: center;
+    /* Rotate the → arrow clockwise so it points downward */
+    transform: rotate(90deg);
+  }
+
+  /* Player projection blocks: full width when stacked */
+  .planner-player {
+    width: 100%;
+  }
+
+  /* Price change footer: reduce padding */
+  .planner-transfer-card__price-footer {
+    padding: var(--space-2) var(--space-3);
+  }
+}
