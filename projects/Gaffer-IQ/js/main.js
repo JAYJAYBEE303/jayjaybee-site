@@ -18,7 +18,7 @@ import { buildScoreContext, scoreFixture, scoreOverHorizon, scorePlayer, rankPla
 import { calcBaseDifficulty, calcHomeAwaySplit, calcFixtureHistory } from './engine/fixtures.js';
 import { calcTeamForm, calcPlayerForm } from './engine/form.js';
 import { calcStyleProfile, calcStyleClash } from './engine/style.js';
-import { calcCounterMatchup } from './engine/counter.js';
+import { calcCounterMatchup, calcIndividualDuels } from './engine/counter.js';
 
 import { initMatchup }      from './modules/matchup.js';
 import { initRanker }       from './modules/ranker.js';
@@ -212,6 +212,7 @@ window.__engine = {
   calcTeamForm, calcPlayerForm,
   calcStyleProfile, calcStyleClash,
   calcCounterMatchup,
+  calcIndividualDuels,
 };
 
 // ─── Kick off ─────────────────────────────────────────────────────────────────
