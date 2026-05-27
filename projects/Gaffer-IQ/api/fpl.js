@@ -58,7 +58,16 @@ function sendError(res, status, error, upstream = null) {
 export default async function handler(req, res) {
   // CORS — permissive for a personal tool; tighten to the deployment origin later.
   res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   res.setHeader('Vary', 'Origin');
+
+  // Handle the OPTIONS preflight that browsers send before cross-origin fetches.
+  // Must be answered before any allowlist validation or upstream work — the
+  // browser will not send the real GET until this 204 comes back.
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
 
   if (req.method !== 'GET') {
     return sendError(res, 405, 'Method not allowed');
