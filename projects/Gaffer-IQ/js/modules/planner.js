@@ -12,6 +12,7 @@
 import { store } from '../store.js';
 import { HORIZONS } from '../config.js';
 import { buildScoreContext, scorePlayer } from '../engine/composite.js';
+import { fetchAndMapSquad, loadSavedTeamId, saveTeamId, resolveImportGw } from '../squadImport.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -37,6 +38,17 @@ const COMBO_POOL = 60;
 
 /** Ordered array of player IDs (max SQUAD_TOTAL). */
 let _squad = [];
+
+// ─── Import state (Phase 4-1) ─────────────────────────────────────────────────
+
+/** FPL team ID last used for a successful import, or null. */
+let _importedTeamId = null;
+
+/** Raw FPL entry object from last import (name, rank, etc.), or null. */
+let _importedEntryInfo = null;
+
+/** True while an import fetch is in flight — prevents concurrent imports. */
+let _importInFlight = false;
 
 /** Remaining transfer budget in £m (e.g. 2.5 = £2.5m). */
 let _budget = 0;
@@ -75,6 +87,13 @@ let _tally           = null;
 let _budgetInput     = null;
 let _hitToggle       = null;
 let _recommendations = null;
+
+// Import panel refs (Phase 4-1)
+let _importBtn     = null;
+let _importPanel   = null;
+let _importIdInput = null;
+let _importStatus  = null;
+let _importInfo    = null;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -709,6 +728,118 @@ function onHitToggle() {
   renderRecommendations();
 }
 
+// ─── Squad import helpers (Phase 4-1) ────────────────────────────────────────
+
+/**
+ * Replace the current squad with the given player IDs, respecting slot limits.
+ * @param {number[]} playerIds
+ */
+function replaceSquad(playerIds) {
+  const counts = { GKP: 0, DEF: 0, MID: 0, FWD: 0 };
+  const accepted = [];
+  for (const id of playerIds) {
+    const player = store.getPlayer(id);
+    if (!player) continue;
+    const pos = player.position;
+    if (!SQUAD_LIMITS[pos]) continue;
+    if (counts[pos] >= SQUAD_LIMITS[pos]) continue;
+    counts[pos]++;
+    accepted.push(id);
+  }
+  _squad = accepted;
+  saveSquad();
+  afterSquadChange();
+}
+
+/** @param {object|null} entryInfo */
+function renderImportInfo(entryInfo) {
+  if (!_importInfo) return;
+  if (!entryInfo) {
+    _importInfo.textContent = '';
+    return;
+  }
+  const teamName = entryInfo.name ?? '';
+  const manager  = `${entryInfo.player_first_name ?? ''} ${entryInfo.player_last_name ?? ''}`.trim();
+  const rank     = entryInfo.summary_overall_rank
+    ? `Overall rank: ${Number(entryInfo.summary_overall_rank).toLocaleString()}`
+    : '';
+  const parts = [teamName, manager, rank].filter(Boolean);
+  _importInfo.textContent = parts.join(' · ');
+}
+
+/** @param {string} msg @param {'idle'|'loading'|'success'|'error'} type */
+function showImportStatus(msg, type) {
+  if (!_importStatus) return;
+  _importStatus.textContent = msg;
+  _importStatus.className = `squad-import-status squad-import-status--${type}`;
+}
+
+function openImportPanel() {
+  if (!_importPanel) return;
+  _importPanel.hidden = false;
+  if (_importIdInput) {
+    const saved = loadSavedTeamId();
+    if (saved && !_importIdInput.value) _importIdInput.value = String(saved);
+    _importIdInput.focus();
+  }
+  showImportStatus('', 'idle');
+  renderImportInfo(_importedEntryInfo);
+}
+
+function closeImportPanel() {
+  if (!_importPanel) return;
+  _importPanel.hidden = true;
+  showImportStatus('', 'idle');
+}
+
+async function handleImport() {
+  if (_importInFlight) return;
+  if (!_importIdInput) return;
+
+  const raw = _importIdInput.value.trim();
+  const teamId = parseInt(raw, 10);
+  if (!Number.isInteger(teamId) || teamId <= 0) {
+    showImportStatus('Enter a valid FPL Team ID (numbers only).', 'error');
+    return;
+  }
+
+  const gw = resolveImportGw();
+  if (!gw) {
+    showImportStatus('No completed gameweek to import from yet.', 'error');
+    return;
+  }
+
+  _importInFlight = true;
+  showImportStatus(`Importing GW${gw} squad…`, 'loading');
+
+  try {
+    const { playerIds, entryInfo, missingCount } = await fetchAndMapSquad(teamId, gw);
+
+    if (playerIds.length === 0) {
+      showImportStatus('No recognised players found — check the Team ID and try again.', 'error');
+      return;
+    }
+
+    saveTeamId(teamId);
+    _importedTeamId    = teamId;
+    _importedEntryInfo = entryInfo;
+
+    replaceSquad(playerIds);
+    renderImportInfo(entryInfo);
+
+    const warn = missingCount > 0 ? ` (${missingCount} player${missingCount === 1 ? '' : 's'} not recognised)` : '';
+    showImportStatus(`Imported ${playerIds.length} players from GW${gw}.${warn}`, 'success');
+  } catch (err) {
+    const detail = err?.upstreamStatus === 404
+      ? 'Team not found — check the ID. Private leagues may block access.'
+      : (err?.message ?? String(err));
+    showImportStatus(`Import failed: ${detail}`, 'error');
+    console.warn('[planner] Squad import failed:', err);
+  } finally {
+    _importInFlight = false;
+  }
+}
+
 /**
  * Cache all DOM refs and attach all event listeners. Called once from
  * onDataReady() — guaranteed to run after the browser has fully parsed the
@@ -769,6 +900,21 @@ function wireDom() {
 
   // ── Hit toggle ────────────────────────────────────────────────────────────
   _hitToggle?.addEventListener('click', onHitToggle);
+
+  // ── Squad import (Phase 4-1) ─────────────────────────────────────────────
+  _importBtn     = document.getElementById('planner-import-btn');
+  _importPanel   = document.getElementById('planner-import-panel');
+  _importIdInput = document.getElementById('planner-import-id');
+  _importStatus  = document.getElementById('planner-import-status');
+  _importInfo    = document.getElementById('planner-import-info');
+
+  _importBtn?.addEventListener('click', openImportPanel);
+  document.getElementById('planner-import-cancel')?.addEventListener('click', closeImportPanel);
+  document.getElementById('planner-import-go')?.addEventListener('click', handleImport);
+  _importIdInput?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') handleImport();
+    if (e.key === 'Escape') closeImportPanel();
+  });
 
   // ── Restore from sessionStorage and render the initial shell ─────────────
   loadSquad();

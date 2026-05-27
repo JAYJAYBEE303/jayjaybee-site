@@ -21,6 +21,7 @@ import { store }       from '../store.js';
 import { HORIZONS }    from '../config.js';
 import { buildScoreContext, scorePlayer } from '../engine/composite.js';
 import { fetchLivePoints }               from '../api.js';
+import { fetchAndMapSquad, loadSavedTeamId, saveTeamId, resolveImportGw } from '../squadImport.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -49,6 +50,17 @@ const LIVE_POLL_INTERVAL_MS = 60_000;
 
 /** Ordered array of player IDs currently in the squad (max SQUAD_TOTAL). */
 let _squad = [];
+
+// ─── Import state (Phase 4-1) ─────────────────────────────────────────────────
+
+/** FPL team ID last used for a successful import, or null. */
+let _importedTeamId = null;
+
+/** Raw FPL entry object from last import (name, rank, etc.), or null. */
+let _importedEntryInfo = null;
+
+/** True while an import fetch is in flight — prevents concurrent imports. */
+let _importInFlight = false;
 
 /** Map<playerId, scorePlayer result> — rebuilt on data:ready + squad changes. */
 let _scores = new Map();
@@ -91,6 +103,13 @@ let _searchResults = null;
 let _squadSlots    = null;
 let _decisions     = null;
 let _tally         = null;
+
+// Import panel refs (Phase 4-1)
+let _importBtn     = null;
+let _importPanel   = null;
+let _importIdInput = null;
+let _importStatus  = null;
+let _importInfo    = null;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -817,6 +836,133 @@ function onHashChange() {
   reconcileLivePoll();
 }
 
+// ─── Squad import helpers (Phase 4-1) ────────────────────────────────────────
+
+/**
+ * Replace the current squad with the given player IDs, respecting slot limits.
+ * IDs that exceed a position's slot limit (shouldn't happen with valid FPL picks,
+ * but guard anyway) are silently dropped. Triggers a full re-score + re-render.
+ * @param {number[]} playerIds
+ */
+function replaceSquad(playerIds) {
+  const counts = { GKP: 0, DEF: 0, MID: 0, FWD: 0 };
+  const accepted = [];
+  for (const id of playerIds) {
+    const player = store.getPlayer(id);
+    if (!player) continue;
+    const pos = player.position;
+    if (!SQUAD_LIMITS[pos]) continue;
+    if (counts[pos] >= SQUAD_LIMITS[pos]) continue;
+    counts[pos]++;
+    accepted.push(id);
+  }
+  _squad = accepted;
+  saveSquad();
+  afterSquadChange();
+}
+
+/**
+ * Render the team name and overall rank from the last import's entryInfo.
+ * Clears the info element when entryInfo is null.
+ * @param {object|null} entryInfo  raw FPL entry object
+ */
+function renderImportInfo(entryInfo) {
+  if (!_importInfo) return;
+  if (!entryInfo) {
+    _importInfo.textContent = '';
+    return;
+  }
+  const teamName = entryInfo.name ?? '';
+  const manager  = `${entryInfo.player_first_name ?? ''} ${entryInfo.player_last_name ?? ''}`.trim();
+  const rank     = entryInfo.summary_overall_rank
+    ? `Overall rank: ${Number(entryInfo.summary_overall_rank).toLocaleString()}`
+    : '';
+  const parts = [teamName, manager, rank].filter(Boolean);
+  _importInfo.textContent = parts.join(' · ');
+}
+
+/**
+ * Show a status message in the import panel.
+ * @param {string} msg
+ * @param {'idle'|'loading'|'success'|'error'} type
+ */
+function showImportStatus(msg, type) {
+  if (!_importStatus) return;
+  _importStatus.textContent = msg;
+  _importStatus.className = `squad-import-status squad-import-status--${type}`;
+}
+
+/**
+ * Toggle the import panel's visibility.
+ * Pre-fills the ID input from localStorage and clears any prior status.
+ */
+function openImportPanel() {
+  if (!_importPanel) return;
+  _importPanel.hidden = false;
+  if (_importIdInput) {
+    const saved = loadSavedTeamId();
+    if (saved && !_importIdInput.value) _importIdInput.value = String(saved);
+    _importIdInput.focus();
+  }
+  showImportStatus('', 'idle');
+  renderImportInfo(_importedEntryInfo);
+}
+
+function closeImportPanel() {
+  if (!_importPanel) return;
+  _importPanel.hidden = true;
+  showImportStatus('', 'idle');
+}
+
+/** Run the import: validate input, fetch, replace squad. */
+async function handleImport() {
+  if (_importInFlight) return;
+  if (!_importIdInput) return;
+
+  const raw = _importIdInput.value.trim();
+  const teamId = parseInt(raw, 10);
+  if (!Number.isInteger(teamId) || teamId <= 0) {
+    showImportStatus('Enter a valid FPL Team ID (numbers only).', 'error');
+    return;
+  }
+
+  const gw = resolveImportGw();
+  if (!gw) {
+    showImportStatus('No completed gameweek to import from yet.', 'error');
+    return;
+  }
+
+  _importInFlight = true;
+  showImportStatus(`Importing GW${gw} squad…`, 'loading');
+
+  try {
+    const { playerIds, entryInfo, missingCount } = await fetchAndMapSquad(teamId, gw);
+
+    if (playerIds.length === 0) {
+      showImportStatus('No recognised players found — check the Team ID and try again.', 'error');
+      return;
+    }
+
+    saveTeamId(teamId);
+    _importedTeamId   = teamId;
+    _importedEntryInfo = entryInfo;
+
+    replaceSquad(playerIds);
+    renderImportInfo(entryInfo);
+
+    const warn = missingCount > 0 ? ` (${missingCount} player${missingCount === 1 ? '' : 's'} not recognised)` : '';
+    showImportStatus(`Imported ${playerIds.length} players from GW${gw}.${warn}`, 'success');
+  } catch (err) {
+    const detail = err?.upstreamStatus === 404
+      ? 'Team not found — check the ID. Private leagues may block access.'
+      : (err?.message ?? String(err));
+    showImportStatus(`Import failed: ${detail}`, 'error');
+    console.warn('[dashboard] Squad import failed:', err);
+  } finally {
+    _importInFlight = false;
+  }
+}
+
 /**
  * Cache all DOM refs and attach all event listeners. Called once from
  * onDataReady() — guaranteed to run after the browser has fully parsed the
@@ -871,6 +1017,21 @@ function wireDom() {
 
   // ── Live poll lifecycle — start/stop on navigation ───────────────────────
   window.addEventListener('hashchange', onHashChange);
+
+  // ── Squad import (Phase 4-1) ─────────────────────────────────────────────
+  _importBtn     = document.getElementById('dash-import-btn');
+  _importPanel   = document.getElementById('dash-import-panel');
+  _importIdInput = document.getElementById('dash-import-id');
+  _importStatus  = document.getElementById('dash-import-status');
+  _importInfo    = document.getElementById('dash-import-info');
+
+  _importBtn?.addEventListener('click', openImportPanel);
+  document.getElementById('dash-import-cancel')?.addEventListener('click', closeImportPanel);
+  document.getElementById('dash-import-go')?.addEventListener('click', handleImport);
+  _importIdInput?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') handleImport();
+    if (e.key === 'Escape') closeImportPanel();
+  });
 
   // ── Restore squad from sessionStorage and render the shell ───────────────
   loadSquad();

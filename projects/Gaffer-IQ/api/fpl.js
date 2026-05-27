@@ -21,11 +21,17 @@
 // `cache` is the Cache-Control header applied to a successful forward, tuned
 // per endpoint per ARCHITECTURE.md §6 (static data caches longer, live never).
 const ALLOWED_PATTERNS = [
-  { name: 'bootstrap',     pattern: /^bootstrap-static\/$/,           cache: 'public, s-maxage=300, stale-while-revalidate=600'   },
-  { name: 'fixtures',      pattern: /^fixtures\/$/,                   cache: 'public, s-maxage=600, stale-while-revalidate=3600'  },
-  { name: 'fixturesByGw',  pattern: /^fixtures\/\?event=\d{1,2}$/,    cache: 'public, s-maxage=600, stale-while-revalidate=3600'  },
-  { name: 'playerSummary', pattern: /^element-summary\/\d{1,4}\/$/,   cache: 'public, s-maxage=300, stale-while-revalidate=600'   },
-  { name: 'live',          pattern: /^event\/\d{1,2}\/live\/$/,       cache: 'no-store, max-age=0'                                },
+  { name: 'bootstrap',     pattern: /^bootstrap-static\/$/,                           cache: 'public, s-maxage=300, stale-while-revalidate=600'   },
+  { name: 'fixtures',      pattern: /^fixtures\/$/,                                   cache: 'public, s-maxage=600, stale-while-revalidate=3600'  },
+  { name: 'fixturesByGw',  pattern: /^fixtures\/\?event=\d{1,2}$/,                    cache: 'public, s-maxage=600, stale-while-revalidate=3600'  },
+  { name: 'playerSummary', pattern: /^element-summary\/\d{1,4}\/$/,                   cache: 'public, s-maxage=300, stale-while-revalidate=600'   },
+  { name: 'live',          pattern: /^event\/\d{1,2}\/live\/$/,                       cache: 'no-store, max-age=0'                                },
+  // Phase 4-1: FPL squad import — read-only entry endpoints (picks + entry info).
+  // entryPicks: short-lived cache (60 s) — squad picks can change on deadline.
+  // entryInfo: longer cache (5 min) — name/rank seldom change mid-session.
+  { name: 'entryPicks',    pattern: /^entry\/\d{1,8}\/event\/\d{1,2}\/picks\/$/,      cache: 'public, s-maxage=60, stale-while-revalidate=120'    },
+  { name: 'entryInfo',     pattern: /^entry\/\d{1,8}\/$/,                             cache: 'public, s-maxage=300, stale-while-revalidate=600'   },
+  { name: 'me',            pattern: /^me\/$/,                                         cache: 'no-store, max-age=0'                                },
 ];
 
 // ─── Understat allowlist (Phase 3A) ─────────────────────────────────────────

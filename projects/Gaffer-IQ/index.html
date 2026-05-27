@@ -117,6 +117,22 @@
             <button class="dash-pos-btn is-active" data-pos="FWD" type="button">FWD</button>
           </div>
 
+          <!-- Squad import (Phase 4-1) -->
+          <div class="squad-import-wrap" id="dash-import-wrap">
+            <button class="squad-import-btn" id="dash-import-btn" type="button"
+                    title="Import your FPL squad by Team ID">Import FPL squad</button>
+            <div class="squad-import-panel" id="dash-import-panel" hidden>
+              <label class="squad-import-label" for="dash-import-id">FPL Team ID</label>
+              <input class="squad-import-input" id="dash-import-id"
+                     type="number" min="1" placeholder="e.g. 1234567"
+                     autocomplete="off">
+              <button class="squad-import-go" id="dash-import-go" type="button">Import</button>
+              <button class="squad-import-cancel" id="dash-import-cancel" type="button">Cancel</button>
+              <p class="squad-import-status" id="dash-import-status" aria-live="polite"></p>
+              <p class="squad-import-info"  id="dash-import-info"></p>
+            </div>
+          </div>
+
           <p class="dash-squad-tally" id="dash-squad-tally">0 / 15 players selected</p>
         </div>
 
@@ -178,6 +194,22 @@
             <label class="planner-label" for="planner-hit-toggle">Allow hit (−4 pts)</label>
             <button class="planner-hit-toggle" id="planner-hit-toggle"
                     type="button" aria-pressed="false">Off</button>
+          </div>
+
+          <!-- Squad import (Phase 4-1) -->
+          <div class="squad-import-wrap" id="planner-import-wrap">
+            <button class="squad-import-btn" id="planner-import-btn" type="button"
+                    title="Import your FPL squad by Team ID">Import FPL squad</button>
+            <div class="squad-import-panel" id="planner-import-panel" hidden>
+              <label class="squad-import-label" for="planner-import-id">FPL Team ID</label>
+              <input class="squad-import-input" id="planner-import-id"
+                     type="number" min="1" placeholder="e.g. 1234567"
+                     autocomplete="off">
+              <button class="squad-import-go" id="planner-import-go" type="button">Import</button>
+              <button class="squad-import-cancel" id="planner-import-cancel" type="button">Cancel</button>
+              <p class="squad-import-status" id="planner-import-status" aria-live="polite"></p>
+              <p class="squad-import-info"  id="planner-import-info"></p>
+            </div>
           </div>
 
           <p class="dash-squad-tally" id="planner-squad-tally">0 / 15 players selected</p>

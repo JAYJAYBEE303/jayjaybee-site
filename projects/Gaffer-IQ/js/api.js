@@ -148,6 +148,55 @@ export async function fetchLivePoints(gw) {
   }
 }
 
+// ─── Phase 4-1 — FPL squad import (read-only) ────────────────────────────────
+// Never write to the FPL account; never handle credentials. Team ID comes from
+// the caller (stored in localStorage by squadImport.js). Errors are translated
+// to ApiError — callers show a clear message and fall back to manual entry.
+
+/**
+ * Fetches an FPL manager's GW squad picks (15 players + captain/vc + subs).
+ * @param {number} teamId  FPL manager ID (positive integer up to 8 digits)
+ * @param {number} gw      gameweek number (1–38)
+ * @returns {Promise<object>}  raw entry/picks JSON: { picks, active_chip, … }
+ * @throws {ApiError}  with message "Failed to load squad picks for team <id> GW<gw>: …"
+ */
+export async function fetchSquadPicks(teamId, gw) {
+  if (!Number.isInteger(teamId) || teamId <= 0 || teamId > 99_999_999) {
+    throw new ApiError(`Invalid teamId: ${teamId}`, { path: 'entry-picks' });
+  }
+  if (!Number.isInteger(gw) || gw < 1 || gw > 38) {
+    throw new ApiError(`Invalid GW number for squad picks: ${gw}`, { path: 'entry-picks' });
+  }
+  try {
+    return await callProxy(`entry/${teamId}/event/${gw}/picks/`);
+  } catch (err) {
+    throw new ApiError(
+      `Failed to load squad picks for team ${teamId} GW${gw}: ${err.message}`,
+      { upstreamStatus: err.upstreamStatus ?? null, path: `entry/${teamId}/event/${gw}/picks/` },
+    );
+  }
+}
+
+/**
+ * Fetches basic info for an FPL manager entry (name, overall rank, team name).
+ * @param {number} teamId  FPL manager ID (positive integer up to 8 digits)
+ * @returns {Promise<object>}  raw entry JSON: { name, player_first_name, … }
+ * @throws {ApiError}  with message "Failed to load entry info for team <id>: …"
+ */
+export async function fetchEntryInfo(teamId) {
+  if (!Number.isInteger(teamId) || teamId <= 0 || teamId > 99_999_999) {
+    throw new ApiError(`Invalid teamId: ${teamId}`, { path: 'entry-info' });
+  }
+  try {
+    return await callProxy(`entry/${teamId}/`);
+  } catch (err) {
+    throw new ApiError(
+      `Failed to load entry info for team ${teamId}: ${err.message}`,
+      { upstreamStatus: err.upstreamStatus ?? null, path: `entry/${teamId}/` },
+    );
+  }
+}
+
 // ─── Phase 3A — Understat (external xG) ──────────────────────────────────────
 // Failures here are NON-FATAL — callers use Promise.allSettled and continue
 // with FPL-only data when these fail. See main.js loadInitialData() and

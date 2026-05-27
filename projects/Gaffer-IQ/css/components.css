@@ -2005,3 +2005,143 @@
   color: var(--band-brutal);
   font-weight: 700;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SQUAD IMPORT  (Phase 4-1)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.squad-import-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.squad-import-btn {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.squad-import-btn:hover {
+  border-color: var(--color-accent);
+  background: var(--color-surface);
+}
+
+.squad-import-btn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.squad-import-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.squad-import-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+.squad-import-input {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-sans);
+  padding: var(--space-2) var(--space-3);
+  width: 130px;
+  transition: border-color 0.15s;
+  /* Hide the number-input spinners — they add no value here */
+  -moz-appearance: textfield;
+}
+
+.squad-import-input::-webkit-inner-spin-button,
+.squad-import-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.squad-import-input:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-color: var(--color-accent);
+}
+
+.squad-import-go {
+  background: var(--color-accent);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: #fff;
+  font-size: var(--font-size-sm);
+  font-family: var(--font-sans);
+  font-weight: 700;
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.squad-import-go:hover  { opacity: 0.85; }
+.squad-import-go:active { opacity: 0.7;  }
+
+.squad-import-go:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.squad-import-cancel {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-muted);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-sans);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.squad-import-cancel:hover {
+  border-color: var(--color-muted);
+  color: var(--color-text);
+}
+
+.squad-import-cancel:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Status line — full-width row below the controls */
+.squad-import-status {
+  width: 100%;
+  font-size: var(--font-size-xs);
+  min-height: 1.2em;
+}
+
+.squad-import-status--loading { color: var(--color-muted); font-style: italic; }
+.squad-import-status--success { color: var(--band-great);  font-weight: 600; }
+.squad-import-status--error   { color: var(--band-brutal); font-weight: 600; }
+.squad-import-status--idle    { color: var(--color-muted); }
+
+/* Team info line: "Team Name · Manager · Overall rank: N" */
+.squad-import-info {
+  width: 100%;
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  min-height: 1.2em;
+}
