@@ -1293,6 +1293,100 @@
   padding-left: calc(36px + var(--space-2));
 }
 
+/* ─── GW state badge (Phase 3C-5) ───────────────────────────────────────── */
+
+/* Container: sits at the top of the decisions panel at all times. */
+.dash-gw-state {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+/* Base badge: pill shape, tight uppercase label. */
+.gw-state-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 3px var(--space-3);
+  border-radius: 999px;
+  font-size: var(--font-size-xs);
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  line-height: 1.5;
+}
+
+/* GW LIVE — green with a gentle pulse to signal active data. */
+.gw-state-badge--live {
+  background: rgba(63, 185, 80, 0.13);
+  color: var(--band-great);
+  border: 1px solid var(--band-great);
+  animation: gw-badge-pulse 1.8s ease-in-out infinite;
+}
+
+/* PRE-DEADLINE / OFF SEASON — quiet muted badge, no animation. */
+.gw-state-badge--pre,
+.gw-state-badge--done {
+  background: var(--color-surface-raised);
+  color: var(--color-muted);
+  border: 1px solid var(--color-border);
+}
+
+/* Subtle opacity pulse on the live badge only. */
+@keyframes gw-badge-pulse {
+  0%,  100% { opacity: 1;    }
+  50%        { opacity: 0.55; }
+}
+
+/* "· data may be delayed" note shown next to the badge when data is stale. */
+.gw-state-badge__stale {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+/* ─── Captain score wrap — projected chip + live pts side by side ─────────── */
+
+.dash-captain__score-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-1);
+  margin-left: auto;
+}
+
+/* ─── Live points display (Phase 3C-5) ───────────────────────────────────── */
+
+/* Base: small accent-coloured text shown alongside the projected score chip. */
+.dash-live-pts {
+  display: inline-block;
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--band-good);
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+/* Stale: last known data but fetch failed — muted and italic. */
+.dash-live-pts--stale {
+  color: var(--color-muted);
+  font-style: italic;
+  opacity: 0.8;
+}
+
+/* Captain: accent colour to highlight the doubled-points pick. */
+.dash-live-pts--captain {
+  color: var(--color-accent);
+}
+
+/* Stale captain: override captain colour with muted, keep italic. */
+.dash-live-pts--captain.dash-live-pts--stale {
+  color: var(--color-muted);
+}
+
 /* ─── Risk flag chips ────────────────────────────────────────────────────── */
 
 .dash-flag {

@@ -1,18 +1,26 @@
 /**
  * js/modules/dashboard.js
  * Layer: module. Owns the DOM for the GW Decision Dashboard view.
- * Side effects: DOM writes, sessionStorage reads/writes. Reads from store;
- * delegates all scoring to engine/composite.js exclusively.
+ * Side effects: DOM writes, sessionStorage reads/writes, network (live poll).
+ * Reads from store; delegates all scoring to engine/composite.js exclusively.
  * No analytical logic lives here — scorePlayer(player, HORIZONS.GW1, ctx)
  * is the sole engine call. Horizon is locked to GW1; the global horizon
  * switcher has no effect on this module. See ROADMAP.md Phase 2C.
  *
+ * Live points (Phase 3C-5):
+ *   - When the current GW is live (finished=false, dataChecked=true), the module
+ *     fetches event/<gw>/live/ on load and every 60 s via setInterval.
+ *   - Polling stops when the user navigates away from the dashboard (hashchange).
+ *   - A failed live fetch shows the last known data with a "stale" indicator;
+ *     the dashboard never crashes. ARCHITECTURE.md §6: live data is never cached.
+ *
  * Subscriptions: data:ready
  */
 
-import { store } from '../store.js';
-import { HORIZONS } from '../config.js';
+import { store }       from '../store.js';
+import { HORIZONS }    from '../config.js';
 import { buildScoreContext, scorePlayer } from '../engine/composite.js';
+import { fetchLivePoints }               from '../api.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -34,6 +42,9 @@ const SQUAD_TOTAL = Object.values(SQUAD_LIMITS).reduce((s, n) => s + n, 0);
  */
 const MIN_SEC_RISK = 0.65;
 
+/** Live poll interval — 60 s per ROADMAP.md §2C / ARCHITECTURE.md §6. */
+const LIVE_POLL_INTERVAL_MS = 60_000;
+
 // ─── Module-level state ───────────────────────────────────────────────────────
 
 /** Ordered array of player IDs currently in the squad (max SQUAD_TOTAL). */
@@ -53,6 +64,24 @@ let _dataReady = false;
  * Guards against double-wiring if data:ready fires more than once.
  */
 let _domWired = false;
+
+// ─── Live points state (Phase 3C-5) ──────────────────────────────────────────
+
+/**
+ * Map<playerId, number> of live GW points, or null if not yet fetched.
+ * Populated by the live poll; cleared on each data:ready so a new GW starts
+ * fresh. ARCHITECTURE.md §6: live data is never cached across fetches.
+ */
+let _livePoints = null;
+
+/**
+ * True when the most recent live poll failed and _livePoints holds stale data.
+ * The UI shows a "data may be delayed" note; the dashboard never crashes.
+ */
+let _liveStale  = false;
+
+/** setInterval handle while live polling is active; null otherwise. */
+let _pollTimer  = null;
 
 // ─── DOM refs (populated in wireDom, called from onDataReady) ────────────────
 
@@ -91,6 +120,103 @@ function buildCtx() {
     leagueXg: store.getLeagueXg(),
     currentGw: store.getCurrentGw() ?? store.getNextGw() ?? 1,
   });
+}
+
+// ─── GW state detection (Phase 3C-5) ─────────────────────────────────────────
+
+/**
+ * Returns the current GW's live state based on the normalised season events.
+ * Requires data:ready to have fired; returns 'off-season' if no data.
+ *
+ * States:
+ *   'live'         — GW in progress: isCurrent, not finished, data_checked (FPL
+ *                    has processed at least one fixture's data).
+ *   'pre-deadline' — GW upcoming: isCurrent, not finished, not yet data_checked.
+ *   'finished'     — current GW is fully finished.
+ *   'off-season'   — no current GW (between seasons or unrecognised state).
+ *
+ * See normalise.js → events[].dataChecked for how data_checked is exposed.
+ * @returns {'live'|'pre-deadline'|'finished'|'off-season'}
+ */
+function getGwState() {
+  const currentGwId = store.getCurrentGw();
+  if (!currentGwId) return 'off-season';
+  const ev = store.getEvents().find(e => e.id === currentGwId);
+  if (!ev) return 'off-season';
+  if (ev.finished) return 'finished';
+  if (ev.dataChecked) return 'live';
+  return 'pre-deadline';
+}
+
+// ─── Live polling (Phase 3C-5) ────────────────────────────────────────────────
+
+/**
+ * Fetch live points for the current GW and cache in _livePoints.
+ * On failure: sets _liveStale=true and keeps the last known data.
+ * Guards against fetching when not on the dashboard (stops the poll).
+ */
+async function fetchAndCacheLivePoints() {
+  // Guard: stop polling silently if user has navigated away.
+  const hash = window.location.hash.slice(1) || 'matchup';
+  if (hash !== 'dashboard') {
+    stopLivePoll();
+    return;
+  }
+
+  const gw = store.getCurrentGw();
+  if (!gw) return;
+
+  try {
+    const raw = await fetchLivePoints(gw);
+    const map = new Map();
+    for (const el of raw?.elements ?? []) {
+      if (Number.isInteger(el.id) && typeof el.stats?.total_points === 'number') {
+        map.set(el.id, el.stats.total_points);
+      }
+    }
+    _livePoints = map;
+    _liveStale  = false;
+  } catch (err) {
+    // Non-fatal: preserve last known data and flag stale. CONVENTIONS.md §9.
+    _liveStale = true;
+    console.warn('[dashboard] Live points fetch failed — showing stale data:', err.message ?? err);
+  }
+
+  renderDecisions();
+}
+
+/**
+ * Start the live poll. No-op if already polling.
+ * Immediately fires the first fetch, then repeats every LIVE_POLL_INTERVAL_MS.
+ */
+function startLivePoll() {
+  if (_pollTimer !== null) return;
+  fetchAndCacheLivePoints();
+  _pollTimer = setInterval(fetchAndCacheLivePoints, LIVE_POLL_INTERVAL_MS);
+}
+
+/**
+ * Stop the live poll. No-op if not polling.
+ * Called on hashchange away from dashboard, on data:ready (reset), and on
+ * GW state transition to finished/pre-deadline.
+ */
+function stopLivePoll() {
+  if (_pollTimer === null) return;
+  clearInterval(_pollTimer);
+  _pollTimer = null;
+}
+
+/**
+ * Evaluate whether live polling should be running given the current hash and
+ * GW state. Start or stop accordingly.
+ */
+function reconcileLivePoll() {
+  const hash = window.location.hash.slice(1) || 'matchup';
+  if (hash === 'dashboard' && _dataReady && getGwState() === 'live') {
+    startLivePoll();
+  } else {
+    stopLivePoll();
+  }
 }
 
 // ─── Squad persistence ────────────────────────────────────────────────────────
@@ -196,39 +322,29 @@ function pickStartingXI(scoredSquad) {
     const pos = entry.player.position;
     if (byPos[pos]) byPos[pos].push(entry);
   }
-  // Sort each group descending by projected value.
   for (const pos of Object.keys(byPos)) {
     byPos[pos].sort((a, b) => b.score.value - a.score.value);
   }
 
   const xi = [];
 
-  // 1 GKP starts; the second GKP goes to bench (always last position).
   xi.push(byPos.GKP[0]);
   const benchGkp = byPos.GKP[1] ?? null;
 
-  // Fill position minimums from the top scorers in each group.
-  const defMin = byPos.DEF.slice(0, 3);   // exactly 3
-  const midMin = byPos.MID.slice(0, 2);   // exactly 2
-  const fwdMin = byPos.FWD.slice(0, 1);   // exactly 1
+  const defMin = byPos.DEF.slice(0, 3);
+  const midMin = byPos.MID.slice(0, 2);
+  const fwdMin = byPos.FWD.slice(0, 1);
   xi.push(...defMin, ...midMin, ...fwdMin);
-  // xi.length = 1 + 3 + 2 + 1 = 7 — need 4 more from the outfield pool.
 
-  // Build pool: remaining outfielders not already in XI.
   const pool = [
-    ...byPos.DEF.slice(3),   // DEF[3–4] — up to 2
-    ...byPos.MID.slice(2),   // MID[2–4] — up to 3
-    ...byPos.FWD.slice(1),   // FWD[1–2] — up to 2
+    ...byPos.DEF.slice(3),
+    ...byPos.MID.slice(2),
+    ...byPos.FWD.slice(1),
   ].sort((a, b) => b.score.value - a.score.value);
-  // pool.length = 7; take top 4 into XI, remaining 3 to bench.
 
   xi.push(...pool.slice(0, 4));
-  // xi.length = 11 ✓
 
-  // Bench outfielders = pool remainder (already sorted desc by score).
   const benchOutfield = pool.slice(4);
-
-  // Ordered bench: outfield-score-desc, GKP always last.
   const bench = benchGkp ? [...benchOutfield, benchGkp] : benchOutfield;
 
   return { xi, bench };
@@ -265,19 +381,56 @@ function buildFlagChips(flags) {
   ).join('');
 }
 
-// ─── Search results visibility helpers ───────────────────────────────────────
+// ─── Live points HTML builders (Phase 3C-5) ───────────────────────────────────
 
 /**
- * Show the results dropdown.
- * Uses a CSS class rather than the `hidden` attribute so there is no conflict
- * with the `[hidden] { display: none !important; }` rule in base.css.
+ * Build a live-points display span for a player row.
+ * Returns '' if _livePoints has not yet been fetched.
+ *
+ * @param {number}  playerId
+ * @param {boolean} isCaptain  captain's points are doubled in FPL
+ * @returns {string}  HTML string or ''
  */
+function buildLivePtsHtml(playerId, isCaptain) {
+  if (!_livePoints) return '';
+  const pts = _livePoints.get(playerId) ?? 0;
+  const staleClass = _liveStale ? ' dash-live-pts--stale' : '';
+  if (isCaptain) {
+    return `<span class="dash-live-pts dash-live-pts--captain${staleClass}" title="Captain: raw points shown; FPL doubles them">`
+         + `Live: ${pts}pts (×2 = ${pts * 2}pts)`
+         + `</span>`;
+  }
+  return `<span class="dash-live-pts${staleClass}">Live: ${pts}pts</span>`;
+}
+
+// ─── GW state badge ───────────────────────────────────────────────────────────
+
+/**
+ * Build the GW state badge shown at the top of the decisions panel.
+ * @param {'live'|'pre-deadline'|'finished'|'off-season'} gwState
+ * @returns {string}  HTML string
+ */
+function renderGwStateBadge(gwState) {
+  const BADGE = {
+    live:           `<span class="gw-state-badge gw-state-badge--live">GW LIVE 🟢</span>`,
+    'pre-deadline': `<span class="gw-state-badge gw-state-badge--pre">PRE-DEADLINE ⏳</span>`,
+    finished:       `<span class="gw-state-badge gw-state-badge--done">GW FINISHED ✓</span>`,
+    'off-season':   `<span class="gw-state-badge gw-state-badge--done">OFF SEASON</span>`,
+  };
+  // Only show the stale note when we have some data but it failed to refresh.
+  const staleNote = (gwState === 'live' && _liveStale && _livePoints !== null)
+    ? `<span class="gw-state-badge__stale">· data may be delayed</span>`
+    : '';
+  return `<div class="dash-gw-state">${BADGE[gwState] ?? ''}${staleNote}</div>`;
+}
+
+// ─── Search results visibility helpers ───────────────────────────────────────
+
 function showResults() {
   if (!_searchResults) return;
   _searchResults.classList.add('is-open');
 }
 
-/** Hide the results dropdown. */
 function hideResults() {
   if (!_searchResults) return;
   _searchResults.classList.remove('is-open');
@@ -286,7 +439,6 @@ function hideResults() {
 // ─── Render: search results dropdown ─────────────────────────────────────────
 
 function renderSearchResults() {
-  // Guard: DOM refs must be present. Warn once so the console makes it obvious.
   if (!_searchResults) {
     console.warn('[dashboard] renderSearchResults: _searchResults is null — check #dash-search-results in HTML');
     return;
@@ -304,9 +456,6 @@ function renderSearchResults() {
     return;
   }
 
-  // Read player list from the store at call time — store.getPlayers() may return
-  // an empty array if called before data:ready, but since the event listener fires
-  // only when the user types, data should already be loaded by then.
   const allPlayers = store.getPlayers();
   if (allPlayers.length === 0) {
     _searchResults.innerHTML =
@@ -382,14 +531,12 @@ function renderSquadPanel() {
   if (!_squadSlots) return;
 
   const html = Object.entries(SQUAD_LIMITS).map(([pos, max]) => {
-    // Players in this squad at this position (insertion order).
     const playersInPos = _squad
       .map(id => store.getPlayer(id))
       .filter(p => p?.position === pos);
 
     const slots = [];
 
-    // Filled slots.
     for (const player of playersInPos) {
       const score = _scores.get(player.id);
       const team  = store.getTeam(player.teamId);
@@ -410,7 +557,6 @@ function renderSquadPanel() {
       `.trim());
     }
 
-    // Empty slots.
     const emptyCount = max - playersInPos.length;
     for (let i = 0; i < emptyCount; i++) {
       slots.push(`<div class="dash-squad-slot dash-squad-slot--empty">Empty slot</div>`);
@@ -435,13 +581,18 @@ function renderSquadPanel() {
 function renderDecisions() {
   if (!_decisions) return;
 
+  // GW badge is shown whenever data is ready — it's always informative.
+  const gwState   = _dataReady ? getGwState() : null;
+  const badgeHtml = gwState ? renderGwStateBadge(gwState) : '';
+
   if (_squad.length < SQUAD_TOTAL) {
     const remaining = SQUAD_TOTAL - _squad.length;
-    _decisions.innerHTML = `
-      <p class="dash-decisions__hint">
+    _decisions.innerHTML = [
+      badgeHtml,
+      `<p class="dash-decisions__hint">
         Add ${remaining} more player${remaining === 1 ? '' : 's'} to see GW recommendations.
-      </p>
-    `.trim();
+      </p>`,
+    ].join('');
     return;
   }
 
@@ -450,19 +601,20 @@ function renderDecisions() {
     return;
   }
 
-  // Build scored squad — filter out any player no longer in the store.
   const scoredSquad = _squad
     .map(id => ({ player: store.getPlayer(id), score: _scores.get(id) }))
     .filter(e => e.player && e.score);
 
   if (scoredSquad.length < SQUAD_TOTAL) {
-    _decisions.innerHTML = `<p class="dash-decisions__hint">Computing scores…</p>`;
+    _decisions.innerHTML = [
+      badgeHtml,
+      `<p class="dash-decisions__hint">Computing scores…</p>`,
+    ].join('');
     return;
   }
 
   const { xi, bench } = pickStartingXI(scoredSquad);
 
-  // Captain = highest scorer in the starting XI.
   const captainEntry = xi.reduce(
     (best, e) => (!best || e.score.value > best.score.value ? e : best),
     null,
@@ -470,6 +622,7 @@ function renderDecisions() {
   const captainId = captainEntry?.player.id ?? null;
 
   _decisions.innerHTML = [
+    badgeHtml,
     renderCaptainBlock(captainEntry),
     renderXIBlock(xi, captainId),
     renderBenchBlock(bench),
@@ -487,7 +640,6 @@ function renderCaptainBlock(entry) {
     ? `<span class="ranker-status-badge" title="${esc(player.statusNote || player.status)}">!</span>`
     : '';
 
-  // Breakdown bars: raw sub-scores (0–100) for Form, Fixture, Counter.
   const bd   = score.breakdown ?? {};
   const bars = [
     { label: 'Form',    value: Math.round(bd.form?.value    ?? 0) },
@@ -507,6 +659,9 @@ function renderCaptainBlock(entry) {
     ? `<div class="dash-player-row__flags" style="margin-top:var(--space-2)">${buildFlagChips(flags)}</div>`
     : '';
 
+  // Live pts for captain: show raw and doubled value.
+  const captainLiveHtml = buildLivePtsHtml(player.id, true);
+
   return `
     <div class="dash-captain">
       <div class="dash-captain__header">
@@ -517,7 +672,10 @@ function renderCaptainBlock(entry) {
             ${esc(player.name)}${statusMark}${team ? `<span class="dash-captain__team">${esc(team.shortName)}</span>` : ''}
           </div>
         </div>
-        <span class="score-chip score-chip--${esc(score.band)}${isScoreEstimated(score) ? ' score-chip--estimated' : ''}" style="margin-left:auto">${Math.round(score.value)}</span>
+        <div class="dash-captain__score-wrap">
+          <span class="score-chip score-chip--${esc(score.band)}${isScoreEstimated(score) ? ' score-chip--estimated' : ''}">${Math.round(score.value)}</span>
+          ${captainLiveHtml}
+        </div>
       </div>
       ${flagsHtml}
       <div class="dash-captain__breakdown">${bars}</div>
@@ -527,6 +685,14 @@ function renderCaptainBlock(entry) {
 
 // ─── Render: player row (shared by XI and bench) ──────────────────────────────
 
+/**
+ * Render one player row for the Starting XI or Bench list.
+ * When live points are available (_livePoints !== null), a live-pts span is
+ * appended alongside the projected score chip.
+ *
+ * @param {{player: Player, score: object}} entry
+ * @param {number|null} captainId  the captain's player id (XI only; null for bench)
+ */
 function renderPlayerRow(entry, captainId) {
   const { player, score } = entry;
   const team      = store.getTeam(player.teamId);
@@ -535,6 +701,10 @@ function renderPlayerRow(entry, captainId) {
   const statusMark = player.status !== 'available'
     ? `<span class="ranker-status-badge" title="${esc(player.statusNote || player.status)}">!</span>`
     : '';
+
+  const estClass   = isScoreEstimated(score) ? ' score-chip--estimated' : '';
+  // Live points: captain's points are doubled in FPL — show both raw and ×2.
+  const liveHtml   = buildLivePtsHtml(player.id, isCaptain);
 
   return `
     <div class="dash-player-row${isCaptain ? ' dash-player-row--captain' : ''}">
@@ -546,7 +716,8 @@ function renderPlayerRow(entry, captainId) {
       </span>
       <span class="dash-player-row__team">${team ? esc(team.shortName) : '—'}</span>
       <span class="dash-player-row__score">
-        <span class="score-chip score-chip--${esc(score.band)}${isScoreEstimated(score) ? ' score-chip--estimated' : ''}">${Math.round(score.value)}</span>
+        <span class="score-chip score-chip--${esc(score.band)}${estClass}">${Math.round(score.value)}</span>
+        ${liveHtml}
       </span>
       ${flags.length ? `<span class="dash-player-row__flags">${buildFlagChips(flags)}</span>` : ''}
     </div>
@@ -556,18 +727,20 @@ function renderPlayerRow(entry, captainId) {
 // ─── Render: Starting XI block ────────────────────────────────────────────────
 
 function renderXIBlock(xi, captainId) {
-  // Display order: GKP → DEF → MID → FWD, each group score-desc.
   const posOrder = { GKP: 0, DEF: 1, MID: 2, FWD: 3 };
   const sorted = xi.slice().sort((a, b) => {
     const pd = posOrder[a.player.position] - posOrder[b.player.position];
     return pd !== 0 ? pd : b.score.value - a.score.value;
   });
 
+  // Update the "Score" column header label when live data is present.
+  const scoreColLabel = _livePoints ? 'Proj / Live' : 'Score';
+
   return `
     <div class="dash-xi">
       <div class="dash-xi__header">
         <span>Starting XI</span>
-        <span>Score</span>
+        <span>${esc(scoreColLabel)}</span>
       </div>
       ${sorted.map(e => renderPlayerRow(e, captainId)).join('')}
     </div>
@@ -591,15 +764,10 @@ function renderBenchBlock(bench) {
 
 // ─── After squad change ───────────────────────────────────────────────────────
 
-/**
- * Common callback after any squad mutation. Re-scores, re-renders the squad
- * panel and decisions panel, and resets the search input.
- */
 function afterSquadChange() {
   scoreSquad();
   renderSquadPanel();
   renderDecisions();
-  // Clear search so the user isn't looking at stale results.
   if (_searchInput) _searchInput.value = '';
   hideResults();
 }
@@ -611,12 +779,10 @@ function onSearchInput() {
 }
 
 function onSearchFocus() {
-  // Re-render if there is already a qualifying query in the box.
   if ((_searchInput?.value.trim().length ?? 0) >= 2) renderSearchResults();
 }
 
 function onSearchBlur() {
-  // Delay so a mousedown on a result item fires before the list hides.
   setTimeout(hideResults, 150);
 }
 
@@ -627,22 +793,16 @@ function onSearchKeydown(e) {
   }
 }
 
-/**
- * mousedown (not click) on the results list: fires before the input's blur
- * event, so the dropdown remains visible long enough for the selection to land.
- */
 function onResultsMousedown(e) {
   const item = e.target.closest('[data-player-id]');
   if (!item) return;
   if (item.classList.contains('dash-search-results__item--disabled')) return;
   const id = Number(item.dataset.playerId);
   if (!id) return;
-  // Prevent blur so the dropdown doesn't hide before the click registers.
   e.preventDefault();
   addPlayer(id);
 }
 
-/** Click-delegation on the squad slots panel for remove buttons. */
 function onSquadSlotsClick(e) {
   const btn = e.target.closest('[data-remove-id]');
   if (!btn) return;
@@ -650,16 +810,21 @@ function onSquadSlotsClick(e) {
 }
 
 /**
+ * hashchange handler: start or stop the live poll based on the active view
+ * and current GW state. Attached once in wireDom().
+ */
+function onHashChange() {
+  reconcileLivePoll();
+}
+
+/**
  * Cache all DOM refs and attach all event listeners. Called once from
  * onDataReady() — guaranteed to run after the browser has fully parsed the
- * document (module scripts are deferred, and data:ready only fires after the
- * fetch resolves). The _domWired guard prevents double-wiring if data:ready
- * fires more than once (e.g. after a manual refresh via __refresh()).
+ * document. The _domWired guard prevents double-wiring.
  */
 function wireDom() {
   if (_domWired) return;
 
-  // Use getElementById directly — does not depend on _root being non-null.
   _root          = document.querySelector('[data-module="dashboard"]');
   _searchInput   = document.getElementById('dash-search-input');
   _searchResults = document.getElementById('dash-search-results');
@@ -682,7 +847,6 @@ function wireDom() {
   _searchInput.addEventListener('blur',    onSearchBlur);
   _searchInput.addEventListener('keydown', onSearchKeydown);
 
-  // ── Results dropdown — mousedown fires before the blur event ─────────────
   _searchResults?.addEventListener('mousedown', onResultsMousedown);
 
   // ── Position filter pills ────────────────────────────────────────────────
@@ -690,7 +854,6 @@ function wireDom() {
     btn.addEventListener('click', () => {
       const pos = btn.dataset.pos;
       if (_searchPosSet.has(pos)) {
-        // Keep at least one position active.
         if (_searchPosSet.size > 1) {
           _searchPosSet.delete(pos);
           btn.classList.remove('is-active');
@@ -699,13 +862,15 @@ function wireDom() {
         _searchPosSet.add(pos);
         btn.classList.add('is-active');
       }
-      // Re-render the dropdown if it is currently visible.
       if (_searchResults?.classList.contains('is-open')) renderSearchResults();
     });
   });
 
   // ── Squad slots — click delegation for remove buttons ────────────────────
   _squadSlots?.addEventListener('click', onSquadSlotsClick);
+
+  // ── Live poll lifecycle — start/stop on navigation ───────────────────────
+  window.addEventListener('hashchange', onHashChange);
 
   // ── Restore squad from sessionStorage and render the shell ───────────────
   loadSquad();
@@ -717,11 +882,20 @@ function wireDom() {
 }
 
 function onDataReady() {
-  wireDom();          // no-op after first call
+  wireDom();       // no-op after first call
+
+  // Reset live state on each data:ready so a new GW always starts from scratch.
+  stopLivePoll();
+  _livePoints = null;
+  _liveStale  = false;
+
   _dataReady = true;
   scoreSquad();
   renderSquadPanel();
   renderDecisions();
+
+  // Start live polling if we're already on the dashboard and the GW is live.
+  reconcileLivePoll();
 }
 
 // ─── Public init ─────────────────────────────────────────────────────────────

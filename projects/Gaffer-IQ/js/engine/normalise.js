@@ -214,6 +214,9 @@ export function normaliseSeason(rawBootstrap, rawFixtures) {
     id:           e.id,
     deadline:     e.deadline_time,
     finished:     Boolean(e.finished),
+    // data_checked becomes true once FPL has processed at least one fixture's
+    // live data — used by dashboard.js to distinguish "live" from "pre-deadline".
+    dataChecked:  Boolean(e.data_checked),
     isCurrent:    Boolean(e.is_current),
     isNext:       Boolean(e.is_next),
     averageScore: e.average_entry_score || 0,

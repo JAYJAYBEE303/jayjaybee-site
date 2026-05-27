@@ -124,6 +124,30 @@ export async function fetchPlayerSummary(playerId) {
   }
 }
 
+/**
+ * Fetches live GW points for every FPL player in the given gameweek.
+ * NEVER cached — always re-fetched. The dashboard polls this every 60 s
+ * while the GW is in progress. See ARCHITECTURE.md §6 and ROADMAP.md §2C.
+ * @param {number} gw  gameweek number (1–38)
+ * @returns {Promise<object>}  raw event/live response: { elements: [{ id, stats, explain }] }
+ * @throws {ApiError}  with message "Failed to load live points for GW<gw>: …"
+ */
+export async function fetchLivePoints(gw) {
+  if (!Number.isInteger(gw) || gw < 1 || gw > 38) {
+    throw new ApiError(`Invalid GW number for live points: ${gw}`, {
+      path: `event/${gw}/live/`,
+    });
+  }
+  try {
+    return await callProxy(`event/${gw}/live/`);
+  } catch (err) {
+    throw new ApiError(
+      `Failed to load live points for GW${gw}: ${err.message}`,
+      { upstreamStatus: err.upstreamStatus ?? null, path: `event/${gw}/live/` },
+    );
+  }
+}
+
 // ─── Phase 3A — Understat (external xG) ──────────────────────────────────────
 // Failures here are NON-FATAL — callers use Promise.allSettled and continue
 // with FPL-only data when these fail. See main.js loadInitialData() and
