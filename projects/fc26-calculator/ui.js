@@ -989,6 +989,14 @@
     document.getElementById('roleSelection').classList.toggle('visible', hasName);
   }
 
+  // Typing in the name field means we're no longer working on the loaded
+  // save, so drop any pending colour tags seeded from it — they shouldn't
+  // silently carry onto a differently-named save.
+  function onPlayerNameInput() {
+    if (pendingTags.length) { pendingTags = []; renderPendingTagStrip(); }
+    updateRoleSelectionVisibility();
+  }
+
   function savePlayer() {
     const name = document.getElementById('playerName').value.trim();
     const folderId = document.getElementById('folderSelect').value;
@@ -1028,12 +1036,15 @@
       effShootVol:  +document.getElementById('numShootVolEff').textContent  || 0,
       effShootLdr:  +document.getElementById('numShootLdrEff').textContent  || 0,
       effShootFk:   +document.getElementById('numShootFkEff').textContent   || 0,
+      colorTags: pendingTags.map(t => ({ fill: safeHex(t.fill), border: safeHex(t.border) })),
     };
     const existing = folder.players.findIndex(p => p.name.toLowerCase() === name.toLowerCase());
     if (existing >= 0) folder.players[existing] = entry;
     else folder.players.push(entry);
     persistData(data);
     document.getElementById('playerName').value = '';
+    pendingTags = [];
+    renderPendingTagStrip();
     updateRoleSelectionVisibility();
     renderAll();
   }
@@ -1067,6 +1078,8 @@
       else if (c.dataset.arch === player.archetypeSecondary) c.classList.add('secondary');
     });
     document.getElementById('folderSelect').value = folderId;
+    pendingTags = (player.colorTags || []).map(t => ({ fill: t.fill, border: t.border }));
+    renderPendingTagStrip();
   }
 
   function esc(str) { return (str || '').replace(/'/g, "\\'"); }
@@ -1105,6 +1118,7 @@
               ${p.name}
               ${p.archetypePrimary ? `<span class="player-arch-tag primary-arch">${p.archetypePrimary}</span>` : ''}
               ${p.archetypeSecondary ? `<span class="player-arch-tag secondary-arch">/ ${p.archetypeSecondary}</span>` : ''}
+              ${(p.colorTags && p.colorTags.length) ? `<span class="player-color-tags" onclick="event.stopPropagation()">${p.colorTags.map((t, i) => `<span class="player-color-tag" style="background:${safeHex(t.fill)};border-color:${safeHex(t.border)};" title="Colour tag"><button class="ctag-del" type="button" onclick="event.stopPropagation();removePlayerColorTag('${esc(folder.id)}','${esc(p.name)}',${i})" aria-label="Remove colour tag">✕</button></span>`).join('')}</span>` : ''}
             </div>
           </div>
           <div class="saved-player-actions">
@@ -1324,6 +1338,181 @@
       if (e.key === 'Escape') { input.value = current; input.blur(); }
     });
   }
+
+  // ─────────────────────────────────────────────────────────
+  // Colour tags — per-save inline circle labels (fill + outline).
+  // pendingTags is the working set written onto the next savePlayer();
+  // loadPlayer() seeds it from the loaded save so edits round-trip.
+  // ─────────────────────────────────────────────────────────
+  let pendingTags = [];
+  const tagPickerColors = { fill: { r: 252, g: 60, b: 122 }, border: { r: 255, g: 255, b: 255 } };
+  let tagPopupEl = null;
+
+  function clampChannel(v) {
+    v = parseInt(v, 10);
+    if (isNaN(v)) v = 0;
+    return Math.max(0, Math.min(255, v));
+  }
+
+  function rgbToHex(c) {
+    const h = n => n.toString(16).padStart(2, '0');
+    return '#' + h(c.r) + h(c.g) + h(c.b);
+  }
+
+  // Only ever render colours we produced ourselves; guards against a
+  // tampered imported Squad_saves.js injecting markup via the style attr.
+  function safeHex(v) {
+    return (typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v)) ? v : '#000000';
+  }
+
+  function buildTagGroup(target, title) {
+    const rows = ['r', 'g', 'b'].map(ch => `
+        <div class="tag-rgb-row">
+          <span class="tag-rgb-ch">${ch.toUpperCase()}</span>
+          <input type="range" min="0" max="255" class="tag-slider" data-target="${target}" data-ch="${ch}" oninput="onTagChannel('${target}','${ch}',this.value)">
+          <input type="number" min="0" max="255" class="tag-num" data-target="${target}" data-ch="${ch}" oninput="onTagChannel('${target}','${ch}',this.value)">
+        </div>`).join('');
+    return `
+      <div class="tag-rgb-group">
+        <div class="tag-rgb-head">
+          <span class="tag-rgb-label">${title}</span>
+          <span class="tag-rgb-hex" id="tagHex-${target}">#000000</span>
+          <span class="tag-rgb-swatch" id="tagSwatch-${target}"></span>
+        </div>
+        ${rows}
+      </div>`;
+  }
+
+  function ensureTagPopup() {
+    if (tagPopupEl) return tagPopupEl;
+    const el = document.createElement('div');
+    el.className = 'tag-picker-popup';
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-label', 'Colour tag picker');
+    el.innerHTML = `
+      <div class="tag-picker-head">
+        <span class="tag-picker-title">Colour tag</span>
+        <span class="tag-preview-circle" id="tagPreviewCircle"></span>
+      </div>
+      ${buildTagGroup('fill', 'Fill')}
+      ${buildTagGroup('border', 'Outline')}
+      <div class="tag-picker-actions">
+        <button class="tag-add-btn" type="button" onclick="addPendingTag()">Add tag</button>
+      </div>`;
+    document.body.appendChild(el);
+    tagPopupEl = el;
+    return el;
+  }
+
+  function updateTagPickerUI() {
+    if (!tagPopupEl) return;
+    ['fill', 'border'].forEach(target => {
+      const c = tagPickerColors[target];
+      const hex = rgbToHex(c);
+      tagPopupEl.querySelectorAll(`.tag-slider[data-target="${target}"]`).forEach(s => { s.value = c[s.dataset.ch]; });
+      tagPopupEl.querySelectorAll(`.tag-num[data-target="${target}"]`).forEach(n => {
+        if (document.activeElement !== n) n.value = c[n.dataset.ch];
+      });
+      const hexEl = tagPopupEl.querySelector(`#tagHex-${target}`);
+      const swEl = tagPopupEl.querySelector(`#tagSwatch-${target}`);
+      if (hexEl) hexEl.textContent = hex;
+      if (swEl) swEl.style.background = hex;
+    });
+    const prev = tagPopupEl.querySelector('#tagPreviewCircle');
+    if (prev) {
+      prev.style.background = rgbToHex(tagPickerColors.fill);
+      prev.style.borderColor = rgbToHex(tagPickerColors.border);
+    }
+  }
+
+  function onTagChannel(target, ch, val) {
+    if (!tagPickerColors[target]) return;
+    tagPickerColors[target][ch] = clampChannel(val);
+    updateTagPickerUI();
+  }
+
+  function positionTagPopup(btn) {
+    const el = tagPopupEl;
+    const r = btn.getBoundingClientRect();
+    const pw = el.offsetWidth, ph = el.offsetHeight;
+    let top = r.bottom + 8;
+    if (top + ph > window.innerHeight - 8) top = r.top - ph - 8; // flip above
+    if (top < 8) top = 8;
+    let left = r.left;
+    if (left + pw > window.innerWidth - 8) left = window.innerWidth - pw - 8;
+    if (left < 8) left = 8;
+    el.style.top = `${top}px`;
+    el.style.left = `${left}px`;
+  }
+
+  function openTagPicker(btn) {
+    const el = ensureTagPopup();
+    updateTagPickerUI();
+    el.classList.add('open');     // make measurable before positioning
+    positionTagPopup(btn);
+    btn.classList.add('active');
+  }
+
+  function closeTagPicker() {
+    if (tagPopupEl) tagPopupEl.classList.remove('open');
+    const btn = document.getElementById('tagPickerBtn');
+    if (btn) btn.classList.remove('active');
+  }
+
+  function isTagPickerOpen() {
+    return !!tagPopupEl && tagPopupEl.classList.contains('open');
+  }
+
+  function toggleTagPicker(e) {
+    if (e) e.stopPropagation();
+    const btn = document.getElementById('tagPickerBtn');
+    if (isTagPickerOpen()) closeTagPicker();
+    else openTagPicker(btn);
+  }
+
+  function addPendingTag() {
+    pendingTags.push({ fill: rgbToHex(tagPickerColors.fill), border: rgbToHex(tagPickerColors.border) });
+    renderPendingTagStrip();
+    closeTagPicker();
+  }
+
+  function removePendingTag(idx) {
+    pendingTags.splice(idx, 1);
+    renderPendingTagStrip();
+  }
+
+  function renderPendingTagStrip() {
+    const strip = document.getElementById('pendingTagStrip');
+    if (!strip) return;
+    strip.innerHTML = pendingTags.map((t, i) => `
+      <span class="pending-tag" style="background:${safeHex(t.fill)};border-color:${safeHex(t.border)};" title="Tag to apply on save">
+        <button class="ptag-del" type="button" onclick="removePendingTag(${i})" aria-label="Remove pending tag">✕</button>
+      </span>`).join('');
+  }
+
+  // Per-save tag removal (the ✕ that appears on hovering a circle in the list).
+  function removePlayerColorTag(folderId, playerName, idx) {
+    const data = loadData();
+    migrateData(data);
+    const folder = findFolder(data.folders, folderId);
+    if (!folder) return;
+    const player = folder.players.find(p => p.name === playerName);
+    if (!player || !Array.isArray(player.colorTags)) return;
+    player.colorTags.splice(idx, 1);
+    persistData(data);
+    renderAll();
+  }
+
+  // Dismiss the popup on outside click, Escape, scroll, or resize — matching
+  // the info-bubble behaviour so the two floating panels feel identical.
+  document.addEventListener('click', e => {
+    if (!isTagPickerOpen()) return;
+    if (e.target.closest('.tag-picker-popup') || e.target.closest('#tagPickerBtn')) return;
+    closeTagPicker();
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeTagPicker(); });
+  window.addEventListener('scroll', closeTagPicker, { passive: true });
+  window.addEventListener('resize', closeTagPicker);
 
   function renderAll() {
     renderFolderSelect();
