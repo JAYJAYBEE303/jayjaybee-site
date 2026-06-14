@@ -1,0 +1,8 @@
+{
+  "name": "totally-legit-chess",
+  "version": "0.1.0",
+  "type": "module",
+  "devDependencies": {
+    "chess.js": "1.0.0"
+  }
+}
