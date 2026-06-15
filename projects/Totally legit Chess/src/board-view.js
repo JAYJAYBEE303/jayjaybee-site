@@ -1,4 +1,4 @@
-const MOVE_ANIM_MS = 150;
+const MOVE_ANIM_MS = 120;
 
 const GLYPHS = {
   w: { p: '♙', n: '♘', b: '♗', r: '♖', q: '♕', k: '♔' },
@@ -80,19 +80,110 @@ export class BoardView {
   }
 
   renderDiff(diff) {
-    for (const { square, piece } of diff) {
-      const el = this.#squares[square];
-      if (!el) continue;
-      const existing = el.querySelector('.piece');
-      if (existing) el.removeChild(existing);
-      if (piece) {
-        const span = document.createElement('span');
-        span.className = `piece ${piece.color === 'w' ? 'white' : 'black'}`;
-        span.textContent = GLYPHS[piece.color][piece.type];
-        el.appendChild(span);
-        span.animate([{ opacity: 0 }, { opacity: 1 }], { duration: MOVE_ANIM_MS });
+    const removals = [];
+    const additions = [];
+    for (const entry of diff) {
+      (entry.piece ? additions : removals).push(entry);
+    }
+
+    const readDom = sq => {
+      const span = this.#squares[sq]?.querySelector('.piece');
+      if (!span) return null;
+      const color = span.classList.contains('white') ? 'w' : 'b';
+      const type = Object.entries(GLYPHS[color]).find(([, g]) => g === span.textContent)?.[0];
+      return { el: span, color, type };
+    };
+
+    const remState = removals.map(r => ({ square: r.square, dom: readDom(r.square) }));
+
+    const usedRem = new Set();
+    const movers = [];
+    for (const add of additions) {
+      const i = remState.findIndex((rs, idx) =>
+        !usedRem.has(idx) && rs.dom?.color === add.piece.color && rs.dom?.type === add.piece.type
+      );
+      if (i !== -1) {
+        usedRem.add(i);
+        movers.push({ from: remState[i].square, fromEl: remState[i].dom.el, to: add.square, piece: add.piece });
       }
     }
+
+    const unmatchedRem = remState.filter((_, i) => !usedRem.has(i));
+    const movedTo = new Set(movers.map(m => m.to));
+    const unmatchedAdd = additions.filter(a => !movedTo.has(a.square));
+
+    if (movers.length === 0) {
+      for (const { square, piece } of diff) {
+        const el = this.#squares[square];
+        if (!el) continue;
+        el.querySelector('.piece')?.remove();
+        if (piece) {
+          const span = document.createElement('span');
+          span.className = `piece ${piece.color === 'w' ? 'white' : 'black'}`;
+          span.textContent = GLYPHS[piece.color][piece.type];
+          el.appendChild(span);
+        }
+      }
+      return;
+    }
+
+    const animations = movers.map(mover => {
+      const fromRect = this.#squares[mover.from].getBoundingClientRect();
+      const toRect   = this.#squares[mover.to].getBoundingClientRect();
+      const capturedEl = this.#squares[mover.to].querySelector('.piece');
+
+      const floater = mover.fromEl.cloneNode(true);
+      const fs = window.getComputedStyle(mover.fromEl).fontSize;
+      floater.style.cssText = [
+        'position:fixed',
+        `left:${fromRect.left}px`,
+        `top:${fromRect.top}px`,
+        `width:${fromRect.width}px`,
+        `height:${fromRect.height}px`,
+        'margin:0',
+        'padding:0',
+        `font-size:${fs}`,
+        'z-index:1000',
+        'pointer-events:none',
+        'box-sizing:border-box',
+      ].join(';');
+      document.body.appendChild(floater);
+
+      mover.fromEl.style.visibility = 'hidden';
+
+      const dx = toRect.left - fromRect.left;
+      const dy = toRect.top  - fromRect.top;
+      const anim = floater.animate(
+        [{ transform: 'translate(0,0)' }, { transform: `translate(${dx}px,${dy}px)` }],
+        { duration: MOVE_ANIM_MS, easing: 'ease-in-out' }
+      );
+
+      return { anim, floater, mover, capturedEl };
+    });
+
+    Promise.all(animations.map(a => a.anim.finished)).then(() => {
+      for (const { floater, mover, capturedEl } of animations) {
+        floater.remove();
+        mover.fromEl.remove();
+        capturedEl?.remove();
+        const span = document.createElement('span');
+        span.className = `piece ${mover.piece.color === 'w' ? 'white' : 'black'}`;
+        span.textContent = GLYPHS[mover.piece.color][mover.piece.type];
+        this.#squares[mover.to].appendChild(span);
+      }
+      for (const rs of unmatchedRem) {
+        rs.dom?.el.remove();
+      }
+      for (const add of unmatchedAdd) {
+        const el = this.#squares[add.square];
+        if (!el) continue;
+        el.querySelector('.piece')?.remove();
+        const span = document.createElement('span');
+        span.className = `piece ${add.piece.color === 'w' ? 'white' : 'black'}`;
+        span.textContent = GLYPHS[add.piece.color][add.piece.type];
+        el.appendChild(span);
+      }
+    });
   }
 
   getSquareEl(sqName) {
