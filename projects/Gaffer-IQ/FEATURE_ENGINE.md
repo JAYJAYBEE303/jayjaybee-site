@@ -58,7 +58,11 @@ baseDifficulty = min(strengthScore, max(TENURE_FLOOR, strengthScore - tenurePena
 - `OPP_STRENGTH_MIN`/`OPP_STRENGTH_MAX` default **1000 / 1400**, the observed band of FPL's strength integers.
 - The opponent is read at *their* venue — away strengths for an away side. §3 layers a separate, data-driven home/away adjustment on top.
 
-**Fallback:** strengths are always present in bootstrap, so this metric never needs a fallback. It is the floor the whole model stands on.
+**Fallback (bugfix, confirmed live 2026/27 preseason):** the strengths are *usually* always present, but FPL has been observed leaving `strength_attack_home/away` and `strength_defence_home/away` at **0 for every team** before it has calculated the granular attack/defence breakdown for a new season — while `strength_overall_home/away` and the fixture's own FDR (`team_h_difficulty`/`team_a_difficulty`) are already published. A real strength int never reads 0 (the scale runs ~1000–1400), so `calcBaseDifficulty` treats "both fields exactly 0" as a reliable "not yet published" signal and substitutes the **team's own FPL FDR for that fixture** via a fixed lookup (`config.js → FDR_FALLBACK_VALUES`):
+```
+FDR 1 → 10   FDR 2 → 30   FDR 3 → 50   FDR 4 → 70   FDR 5 → 90
+```
+Same direction as the granular calc (higher = HARDER). This is real FPL data, not a guess, so it keeps `estimated: false` — same reasoning as the tenure penalty in §2.1. The breakdown extra `usedFdrFallback` records when this path fired, for auditability. Once FPL publishes real attack/defence values, the granular calc resumes automatically (the `=== 0` check simply stops matching).
 
 ---
 

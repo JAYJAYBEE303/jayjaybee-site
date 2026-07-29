@@ -329,7 +329,7 @@ function buildCard(team, venue, score, fdr, horizonScore, horizon, duels, defend
         <span class="score-pill__band">${esc(score.band)}</span>
       </div>
       <div class="fdr-comparison">
-        <span class="fdr-comparison__label">FPL FDR</span>
+        <span class="fdr-comparison__label">FPL Fixture Difficulty Rating</span>
         <span class="fdr-comparison__value" data-fdr="${esc(String(fdr))}">${esc(String(fdr))}</span>
         <span class="fdr-comparison__scale">/ 5</span>
       </div>

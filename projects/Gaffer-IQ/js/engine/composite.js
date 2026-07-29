@@ -148,7 +148,10 @@ export function scoreFixture(team, fixture, ctx) {
     throw new TypeError(`scoreFixture: opponent team ${opponentId} missing from ctx`);
   }
 
-  const base    = calcBaseDifficulty(team, opponent, isHome);
+  // team's own FDR for this fixture — the fallback calcBaseDifficulty uses
+  // when FPL's granular strength fields aren't published yet (see fixtures.js).
+  const fdrForTeam = isHome ? fixture.fplDifficulty?.home : fixture.fplDifficulty?.away;
+  const base    = calcBaseDifficulty(team, opponent, isHome, fdrForTeam);
   const venue   = calcHomeAwaySplit(team, isHome, ctx);
   const form    = calcTeamForm(team, ctx);
   const counter = calcCounterMatchup(team, opponent, ctx);
@@ -197,6 +200,7 @@ export function scoreFixture(team, fixture, ctx) {
         strengthScore: base.strengthScore,   // before any tenure deduction
         tenurePenalty: base.tenurePenalty,   // points deducted for thin PL history
         tenureRatio:   base.tenureRatio,     // 0–1, opponent's recency-weighted tenure
+        usedFdrFallback: base.usedFdrFallback, // true when FPL's own FDR substituted for unpublished strength data
       },
       counterMatchup: {
         value:     counter.value,

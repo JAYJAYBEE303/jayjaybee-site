@@ -10,6 +10,7 @@
 
 import {
   W_OPP_ATTACK, W_OPP_DEFENCE, OPP_STRENGTH_MIN, OPP_STRENGTH_MAX,
+  FDR_FALLBACK_VALUES,
   TENURE_MAX_PENALTY, TENURE_FLOOR, TENURE_CURVE,
   W_PPG, W_GD, MIN_VENUE_GAMES,
   N_H2H,
@@ -53,15 +54,21 @@ export function calcTenurePenalty(opponent) {
  * @param {Team} team       team being scored (used only to resolve venue)
  * @param {Team} opponent   the side whose strength this measures
  * @param {boolean} isHome  true if `team` is the home side
+ * @param {number} [fdrForTeam]  `team`'s own FPL FDR (1-5) for this fixture —
+ *   fixture.fplDifficulty.home/away, picked by the caller per `isHome`. Only
+ *   consulted when FPL's granular strength fields read as not-yet-published
+ *   (see MODEL note below); optional so existing call sites without a fixture
+ *   in scope keep working.
  * @returns {{value: number, estimated: boolean, rawStrength: number,
- *            strengthScore: number, tenurePenalty: number, tenureRatio: number}}
+ *            strengthScore: number, tenurePenalty: number, tenureRatio: number,
+ *            usedFdrFallback: boolean}}
  *   value: 0–100.
  *   Direction: **higher = HARDER for `team`** — the one metric in the engine
  *   stored inverted relative to FEATURE_ENGINE.md §1 rule 2, because the UI
  *   surfaces it directly as "how tough is this opponent". engine/composite.js
  *   applies invert() before weighting it. See FEATURE_ENGINE.md §2.
  */
-export function calcBaseDifficulty(team, opponent, isHome) {
+export function calcBaseDifficulty(team, opponent, isHome, fdrForTeam) {
   // MODEL: the opponent is read at the venue they will actually play at — an
   // away side is measured on its away strengths. calcHomeAwaySplit then layers
   // a separate, data-driven venue adjustment on top.
@@ -69,7 +76,22 @@ export function calcBaseDifficulty(team, opponent, isHome) {
   const oppResist = isHome ? opponent.strength.defenceAway : opponent.strength.defenceHome;
 
   const rawStrength = (W_OPP_ATTACK * oppThreat) + (W_OPP_DEFENCE * oppResist);
-  const strengthScore = normaliseLinear(rawStrength, OPP_STRENGTH_MIN, OPP_STRENGTH_MAX);
+
+  // MODEL: FPL occasionally leaves the granular attack/defence breakdown at 0
+  // for every team (confirmed live on bootstrap-static during 2026/27
+  // preseason) while the fixture's own FDR is already published. A real
+  // strength int never reads 0 (FPL's scale runs ~1000-1400), so both fields
+  // being exactly 0 is a reliable "not yet published" signal, not a real
+  // reading — fall back to FDR_FALLBACK_VALUES rather than let
+  // normaliseLinear floor this at 0 (reads as "impossibly easy" once
+  // inverted in the composite). See config.js.
+  const strengthDataMissing = oppThreat === 0 && oppResist === 0;
+  const fdrFallback = FDR_FALLBACK_VALUES[fdrForTeam];
+  const usedFdrFallback = strengthDataMissing && fdrFallback !== undefined;
+
+  const strengthScore = usedFdrFallback
+    ? fdrFallback
+    : normaliseLinear(rawStrength, OPP_STRENGTH_MIN, OPP_STRENGTH_MAX);
 
   // Tenure can only ever pull a reading DOWN. The outer min() is what stops the
   // floor from lifting a club that FPL already rates below TENURE_FLOOR.
@@ -80,14 +102,16 @@ export function calcBaseDifficulty(team, opponent, isHome) {
 
   return {
     value,
-    // A promoted side's low reading is a known fact, not a data gap — so this
-    // stays false and confidence is untouched. Only genuinely missing inputs
-    // set estimated (CONVENTIONS.md §9, FEATURE_ENGINE.md §8.3).
+    // A promoted side's low reading, and the FDR fallback above, are both
+    // known facts rather than data gaps — so this stays false and confidence
+    // is untouched. Only genuinely missing inputs set estimated
+    // (CONVENTIONS.md §9, FEATURE_ENGINE.md §8.3).
     estimated: false,
     rawStrength,
     strengthScore,
     tenurePenalty,
     tenureRatio: opponent?.plTenure?.ratio ?? 0,
+    usedFdrFallback,
   };
 }
 

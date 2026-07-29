@@ -28,6 +28,18 @@ export const W_OPP_DEFENCE = 0.5;
 export const OPP_STRENGTH_MIN = 1000;
 export const OPP_STRENGTH_MAX = 1400;
 
+// FDR fallback (bugfix, confirmed live 2026/27 preseason): FPL sometimes leaves
+// strength_attack_home/away and strength_defence_home/away at 0 for every team
+// — seen before FPL has calculated the granular attack/defence breakdown —
+// while strength_overall_home/away and the fixture's own FDR
+// (team_h_difficulty/team_a_difficulty) ARE already populated. A real strength
+// int never reads 0 (FPL's scale runs ~1000-1400), so calcBaseDifficulty
+// treats "both fields exactly 0" as "not yet published" and substitutes the
+// team's own FPL FDR for that fixture via this lookup instead of letting
+// normaliseLinear floor a missing input at 0 (which reads as "impossibly easy"
+// once inverted). Same direction as the granular calc: higher = HARDER.
+export const FDR_FALLBACK_VALUES = { 1: 10, 2: 30, 3: 50, 4: 70, 5: 90 };
+
 // ─── §2.1  Premier League tenure (promoted-team awareness) ───────────────────
 
 // How many seasons of top-flight history to consider. 15 covers 2011/12–2025/26.
