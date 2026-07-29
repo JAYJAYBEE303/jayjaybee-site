@@ -45,9 +45,9 @@ const METRIC_ORDER = [
 // when it isn't). Previously only the fallback keys were mapped, so the
 // role-mode pairings (the common case) silently rendered raw camelCase keys.
 const PAIRING_LABELS = {
-  stVsCb:      'ST/SS vs CB',
-  wmVsFb:      'Wide MID vs FB',
-  cmVsCbDm:    'CM/SS vs CB+DM',
+  stVsCb:      'ST vs CB',
+  wmVsFb:      'Wingers vs Fullbacks',
+  cmVsCbDm:    'Playmaker vs Defensive Mid',
   fwdVsCb:     'FWD vs CB',
   wideMidVsFb: 'Wide MID vs FB',
   camVsCbMid:  'CAM vs CB+DM',
@@ -56,9 +56,9 @@ const PAIRING_LABELS = {
 // Defending mirror of PAIRING_LABELS — same units, defender-first phrasing.
 // Keys must match MIRRORED_PAIRING_KEYS in engine/counter.js.
 const DEFENDING_PAIRING_LABELS = {
-  cbVsSt:      'CB vs ST/SS',
-  fbVsWm:      'FB vs Wide MID',
-  cbDmVsCm:    'CB+DM vs CM/SS',
+  cbVsSt:      'CB vs ST',
+  fbVsWm:      'Fullbacks vs Wingers',
+  cbDmVsCm:    'Defensive Mid vs Playmaker',
   cbVsFwd:     'CB vs FWD',
   fbVsWideMid: 'FB vs Wide MID',
   cbMidVsCam:  'CB+DM vs CAM',
