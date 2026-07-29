@@ -452,11 +452,23 @@ export function scoreOverHorizon(team, horizon, ctx) {
 /**
  * Average FPL points per gameweek this season. Prefers real per-GW history
  * (already lazily loaded via a player-summary fetch — never bulk-fetched, see
- * ARCHITECTURE.md §3 rule 7); falls back to season totals ÷ an estimated games-
- * played count (minutes / 90) when no summary is loaded, flagged estimated.
+ * ARCHITECTURE.md §3 rule 7): FPL's history payload has one entry per elapsed
+ * gameweek regardless of whether the player featured (0 minutes/0 points for
+ * a blank week), so totalPoints / history.length is already a true weekly
+ * average. Falls back to season totals ÷ elapsed gameweeks when no summary
+ * is loaded, flagged estimated.
  *
- * Pure: depends only on `player` and `ctx.playerSummariesById` (already part
- * of every ctx built by buildScoreContext) — no new network access.
+ * MODEL: the fallback divides by gameweeks ELAPSED THIS SEASON
+ * (ctx.playedFixtures, deduplicated by gw), not by games the player actually
+ * appeared in. A player who scored 10 points in GW1 and then missed GW2-4
+ * averages 10/4 = 2.5, not 10/1 = 10 — a non-playing week counts as a
+ * (correctly zero-contributing) week, exactly like the real per-GW-history
+ * branch above already does. Dividing by games played instead would make
+ * fringe/rotation players who had one big week look like elite performers.
+ *
+ * Pure: depends only on `player` and ctx (playerSummariesById, playedFixtures
+ * — both already part of every ctx built by buildScoreContext) — no new
+ * network access.
  *
  * @param {Player} player
  * @param {object} ctx
@@ -472,14 +484,10 @@ export function calcAvgPointsPerGw(player, ctx) {
     return { value: totalPoints / history.length, estimated: false };
   }
 
-  const minutes = player.totals?.minutes ?? 0;
-  const points  = player.totals?.points  ?? 0;
-  if (minutes <= 0) return { value: 0, estimated: true };
-  // MODEL: 90 minutes ≈ one game played. Coarser than real per-GW history
-  // (doesn't distinguish a sub appearance from a full 90) but avoids inventing
-  // a "games played" field the FPL bootstrap payload doesn't provide.
-  const gamesPlayed = Math.max(1, minutes / 90);
-  return { value: points / gamesPlayed, estimated: true };
+  const points      = player.totals?.points ?? 0;
+  const elapsedGws  = new Set((ctx.playedFixtures || []).map(f => f.gw)).size;
+  if (elapsedGws <= 0) return { value: 0, estimated: true };
+  return { value: points / elapsedGws, estimated: true };
 }
 
 /**
