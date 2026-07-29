@@ -319,7 +319,7 @@ function buildRow({ player, team, score }, nextFixtureRankById) {
   const estClass = isScoreEstimated(score) ? ' score-chip--estimated' : '';
 
   const costPerPointDisplay = score.costPerPoint !== null
-    ? `£${esc(score.costPerPoint.toFixed(2))}`
+    ? `£${esc(score.costPerPoint.toFixed(2))}m`
     : '<span class="ranker-no-fixtures">—</span>';
 
   const avgPtsEstMark = score.avgPointsPerGw.estimated
@@ -345,7 +345,7 @@ function buildRow({ player, team, score }, nextFixtureRankById) {
         <span class="ranker-pos-badge ranker-pos-badge--${player.position.toLowerCase()}">${esc(player.position)}</span>
       </td>
       <td class="ranker-table__td ranker-table__td--price">
-        £${esc(player.price.toFixed(1))}
+        £${esc(player.price.toFixed(1))}m
       </td>
       <td class="ranker-table__td ranker-table__td--value">
         <span class="score-chip score-chip--${esc(score.band)}${estClass}">${Math.round(score.value)}</span>
