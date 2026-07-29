@@ -369,6 +369,47 @@ export function calcCounterMatchupMirrored(attackingResult) {
   };
 }
 
+// ─── Pairing → individual-duel bridge ────────────────────────────────────────
+
+// Every pairing key in the app — role-mode (stVsCb…), element-fallback
+// (fwdVsCb…), and defending mirror (cbVsSt…) — describes the same three
+// underlying unit interactions, so one alias table collapses all of them onto
+// the canonical role-mode key. Lives here, not in matchup.js, so the knowledge
+// of which roles constitute a pairing stays in the module that defines it.
+const PAIRING_ROLE_ALIAS = {
+  // attacking, role mode
+  stVsCb: 'stVsCb',       wmVsFb: 'wmVsFb',           cmVsCbDm: 'cmVsCbDm',
+  // attacking, element fallback
+  fwdVsCb: 'stVsCb',      wideMidVsFb: 'wmVsFb',      camVsCbMid: 'cmVsCbDm',
+  // defending mirrors — same two units, viewed from the defending side
+  cbVsSt: 'stVsCb',       fbVsWm: 'wmVsFb',           cbDmVsCm: 'cmVsCbDm',
+  cbVsFwd: 'stVsCb',      fbVsWideMid: 'wmVsFb',      cbMidVsCam: 'cmVsCbDm',
+};
+
+/**
+ * Select the individual duels that sit behind a given position-group pairing —
+ * i.e. the actual named players whose form produced that pairing's score.
+ *
+ * Pure filter over an existing calcIndividualDuels() result. Deliberately does
+ * NOT re-identify players: the duel list already resolved likely XI, roles and
+ * defender assignment, so re-deriving any of that here would risk the info
+ * panel disagreeing with the Individual Duels section on the same card.
+ *
+ * @param {Array} duels        output of calcIndividualDuels for the ATTACKING side
+ *   of this pairing (for a defending pairing, that is the opponent's duel list).
+ * @param {string} pairingKey  any attacking, element-fallback, or defending key.
+ * @returns {Array} the subset of `duels` belonging to that pairing; [] when the
+ *   key is unknown or no duel matched (caller renders a no-data state).
+ */
+export function duelsForPairing(duels, pairingKey) {
+  const canonical = PAIRING_ROLE_ALIAS[pairingKey];
+  if (!canonical || !duels || duels.length === 0) return [];
+  const attackRoles  = ROLE_ATTACK_GROUPS[canonical];
+  const defenceRoles = ROLE_DEFENCE_GROUPS[canonical];
+  return duels.filter(d =>
+    attackRoles.includes(d.attacker.role) && defenceRoles.includes(d.defender.role));
+}
+
 // ─── Phase 4-2: individual player-vs-player duels ────────────────────────────
 
 // MODEL: a baseline 4-4-2 used to pick a likely starting XI by minutes security

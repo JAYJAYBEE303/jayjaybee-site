@@ -13,7 +13,9 @@
 import { store } from '../store.js';
 import { BANDS, HORIZONS } from '../config.js';
 import { buildScoreContext, scoreFixture, scoreOverHorizon } from '../engine/composite.js';
-import { calcIndividualDuels, calcCounterMatchupMirrored } from '../engine/counter.js';
+import {
+  calcIndividualDuels, calcCounterMatchupMirrored, duelsForPairing,
+} from '../engine/counter.js';
 import { invert } from '../util.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -238,12 +240,15 @@ function renderMatchup() {
   const homeDefending = calcCounterMatchupMirrored(awayScore.breakdown.counterMatchup);
   const awayDefending = calcCounterMatchupMirrored(homeScore.breakdown.counterMatchup);
 
+  // Each card needs BOTH duel lists: its own for the Attacking Counters info
+  // panels, and the opponent's for the Defending Counters ones — a defending
+  // pairing is the opponent's attack, so its named players live in their list.
   _grid.innerHTML = '';
   _grid.appendChild(
-    buildCard(homeTeam, 'Home', homeScore, fixture.fplDifficulty.home, homeHorizonScore, horizon, homeDuels, homeDefending),
+    buildCard(homeTeam, 'Home', homeScore, fixture.fplDifficulty.home, homeHorizonScore, horizon, homeDuels, homeDefending, awayDuels),
   );
   _grid.appendChild(
-    buildCard(awayTeam, 'Away', awayScore, fixture.fplDifficulty.away, awayHorizonScore, horizon, awayDuels, awayDefending),
+    buildCard(awayTeam, 'Away', awayScore, fixture.fplDifficulty.away, awayHorizonScore, horizon, awayDuels, awayDefending, homeDuels),
   );
 }
 
@@ -289,9 +294,12 @@ function buildPerGwStrip(perGw) {
  * @param {{pairings: Object, estimated: boolean}} defending
  *   from calcCounterMatchupMirrored — this team's defence vs the opponent's
  *   attack, derived from the opponent's own attacking pairings.
+ * @param {Array} oppDuels  the OPPONENT's calcIndividualDuels result. Supplies
+ *   the named players behind the Defending Counters rows, since a defending
+ *   pairing is the opponent's attack against this team's defence.
  * @returns {HTMLElement}
  */
-function buildCard(team, venue, score, fdr, horizonScore, horizon, duels, defending) {
+function buildCard(team, venue, score, fdr, horizonScore, horizon, duels, defending, oppDuels) {
   const card = document.createElement('article');
   card.className = `matchup-card matchup-card--${score.band}`;
   if (score.provisional) card.classList.add('matchup-card--provisional');
@@ -346,12 +354,12 @@ function buildCard(team, venue, score, fdr, horizonScore, horizon, duels, defend
 
     <div class="matchup-card__counter">
       <h3 class="matchup-card__section-title">Attacking Counters</h3>
-      ${buildCounterPairings(score.breakdown.counterMatchup.pairings, PAIRING_LABELS, 'attacking')}
+      ${buildCounterPairings(score.breakdown.counterMatchup.pairings, PAIRING_LABELS, 'attacking', duels)}
     </div>
 
     <div class="matchup-card__counter">
       <h3 class="matchup-card__section-title">Defending Counters</h3>
-      ${buildCounterPairings(defending.pairings, DEFENDING_PAIRING_LABELS, 'defending')}
+      ${buildCounterPairings(defending.pairings, DEFENDING_PAIRING_LABELS, 'defending', oppDuels)}
     </div>
 
     ${buildIndividualDuels(duels)}
@@ -428,14 +436,22 @@ function buildBreakdownRows(breakdown, venue) {
  * team-strength proxy, not a real player-form read. Shown as "N/A" rather
  * than the fallback number, so it doesn't read as a genuine calculated score.
  *
+ * Each row is wrapped in a <details> whose summary carries a small "i" button;
+ * opening it lists the actual named players behind that pairing's score, via
+ * duelsForPairing() over the already-computed calcIndividualDuels result. Same
+ * disclosure pattern as the Individual Duels section below — no new interaction
+ * model, no new dependency.
+ *
  * @param {Object} pairings
  * @param {Object} labels       PAIRING_LABELS or DEFENDING_PAIRING_LABELS
  * @param {'attacking'|'defending'} perspective
  *   'attacking': detail line reads "Atk X / Def Y" (attacker's own card).
  *   'defending': detail line reads "Def X / Atk Y" — defender's form leads,
  *   since this section is framed as "my defence vs their attack".
+ * @param {Array} duels  calcIndividualDuels result for the ATTACKING side of
+ *   these pairings — own duels for 'attacking', the opponent's for 'defending'.
  */
-function buildCounterPairings(pairings, labels, perspective) {
+function buildCounterPairings(pairings, labels, perspective, duels) {
   return Object.entries(pairings).map(([key, p]) => {
     const val        = Math.round(p.value);
     const valDisplay = p.estimated ? 'N/A' : String(val);
@@ -452,11 +468,69 @@ function buildCounterPairings(pairings, labels, perspective) {
       : `Atk ${esc(String(atkDisplay))} / Def ${esc(String(defDisplay))}`;
 
     return `
-      <div class="counter-pairing${rowClass}">
-        <span class="counter-pairing__label">${label}</span>
-        <span class="score-chip score-chip--${chipBand} counter-pairing__score">${esc(valDisplay)}</span>
-        <span class="counter-pairing__detail">${detail}</span>
-        ${estMark}
+      <details class="counter-pairing-info">
+        <summary class="counter-pairing-info__summary">
+          <span class="counter-pairing${rowClass}">
+            <span class="counter-pairing__label">${label}</span>
+            <span class="score-chip score-chip--${chipBand} counter-pairing__score">${esc(valDisplay)}</span>
+            <span class="counter-pairing__detail">${detail}</span>
+            ${estMark}
+          </span>
+          <span class="counter-pairing-info__btn" aria-hidden="true"
+                title="Show the players behind this pairing">i</span>
+        </summary>
+        <div class="counter-pairing-info__panel">
+          ${buildPairingPlayers(duels, key, perspective)}
+        </div>
+      </details>
+    `.trim();
+  }).join('');
+}
+
+/**
+ * List the named players behind one pairing, newest-style rows reusing the
+ * existing .individual-duel classes so the panel matches the Individual Duels
+ * section visually.
+ *
+ * Renders an explicit no-data state rather than blank: duels are empty whenever
+ * player summaries or ICT data haven't loaded (pre-season, or before the user
+ * has browsed the Ranker), which is a normal condition, not an error.
+ *
+ * @param {Array} duels                 calcIndividualDuels result, attacking side
+ * @param {string} pairingKey
+ * @param {'attacking'|'defending'} perspective  controls which side leads the row
+ */
+function buildPairingPlayers(duels, pairingKey, perspective) {
+  const matched = duelsForPairing(duels, pairingKey);
+
+  if (matched.length === 0) {
+    return `<p class="counter-pairing-info__empty">No player data available —`
+         + ` open some players in the Ranker to load their form, then revisit.</p>`;
+  }
+
+  return matched.map(d => {
+    const atkForm = Math.round(d.attacker.formValue);
+    const defForm = Math.round(d.defender.formValue);
+    // Defending sections lead with the defender, matching the score row above it.
+    const first  = perspective === 'defending' ? d.defender : d.attacker;
+    const second = perspective === 'defending' ? d.attacker : d.defender;
+    const firstForm  = perspective === 'defending' ? defForm : atkForm;
+    const secondForm = perspective === 'defending' ? atkForm : defForm;
+
+    return `
+      <div class="individual-duel">
+        <span class="individual-duel__attacker">
+          ${esc(first.name)}
+          <span class="individual-duel__role">${esc(first.role)}</span>
+          <span class="individual-duel__form">${firstForm}</span>
+        </span>
+        <span class="individual-duel__vs">vs</span>
+        <span class="individual-duel__defender">
+          ${esc(second.name)}
+          <span class="individual-duel__role">${esc(second.role)}</span>
+          <span class="individual-duel__form">${secondForm}</span>
+        </span>
+        <span class="score-chip score-chip--${esc(d.band)} individual-duel__score">${Math.round(d.duelScore)}</span>
       </div>
     `.trim();
   }).join('');

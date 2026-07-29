@@ -477,6 +477,151 @@
   color: var(--color-muted);
 }
 
+/* ─── Pairing info disclosure — reveals the named players behind a pairing ─── */
+/* Each pairing row is now a <details>; the row itself is the <summary>, with a
+   small "i" affordance at its right edge. The native triangle is suppressed
+   because the "i" is the affordance. Same disclosure pattern as
+   .matchup-card__duels below — no new interaction model. */
+
+/* The row-separator border moved here: the .counter-pairing elements are no
+   longer siblings of each other, they're each wrapped in their own <details>. */
+.counter-pairing-info + .counter-pairing-info {
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.counter-pairing-info__summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  list-style: none;
+}
+
+.counter-pairing-info__summary::-webkit-details-marker {
+  display: none;
+}
+
+/* The pairing row keeps its own grid; it just has to fill the summary now. */
+.counter-pairing-info__summary .counter-pairing {
+  flex: 1;
+  min-width: 0;
+}
+
+.counter-pairing-info__btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-raised);
+  color: var(--color-muted);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  font-style: italic;
+  line-height: 1;
+  transition: color 0.1s, border-color 0.1s;
+}
+
+.counter-pairing-info__summary:hover .counter-pairing-info__btn,
+.counter-pairing-info[open] .counter-pairing-info__btn {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.counter-pairing-info__panel {
+  padding: var(--space-2) 0 var(--space-3) var(--space-3);
+  border-left: 2px solid var(--color-border-subtle);
+  margin-left: var(--space-2);
+}
+
+.counter-pairing-info__empty {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   INDIVIDUAL DUELS — player-vs-player rows
+   Used by the Individual Duels section AND by the pairing info panels above,
+   so both read identically. (These classes previously had no styles at all.)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.matchup-card__duels {
+  border-top: 1px solid var(--color-border-subtle);
+  padding-top: var(--space-2);
+}
+
+.matchup-card__duels-summary {
+  cursor: pointer;
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-muted);
+}
+
+.matchup-card__duels-summary:hover {
+  color: var(--color-accent);
+}
+
+.individual-duels {
+  padding-top: var(--space-2);
+}
+
+.individual-duel {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr auto;
+  gap: var(--space-2);
+  align-items: center;
+  padding: var(--space-1) 0;
+  font-size: var(--font-size-xs);
+}
+
+.individual-duel + .individual-duel {
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.individual-duel__attacker,
+.individual-duel__defender {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.individual-duel__defender {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+/* Role tag (ST / CB / WM …) — quiet, so the player name stays dominant. */
+.individual-duel__role {
+  flex-shrink: 0;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--color-muted);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 0 3px;
+}
+
+.individual-duel__form {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-muted);
+}
+
+.individual-duel__vs {
+  flex-shrink: 0;
+  color: var(--color-muted);
+  font-style: italic;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    HORIZON OUTLOOK SECTION — scoreOverHorizon perGw strip + aggregate
    Appears in the matchup card when the active horizon is GW3 or GW6.
