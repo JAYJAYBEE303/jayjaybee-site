@@ -47,7 +47,7 @@ const METRIC_ORDER = [
 const PAIRING_LABELS = {
   stVsCb:      'ST vs CB',
   wmVsFb:      'Wingers vs Fullbacks',
-  cmVsCbDm:    'Playmaker vs Defensive Mid',
+  cmVsCbDm:    'CAM vs CDM',
   fwdVsCb:     'FWD vs CB',
   wideMidVsFb: 'Wide MID vs FB',
   camVsCbMid:  'CAM vs CB+DM',
@@ -58,7 +58,7 @@ const PAIRING_LABELS = {
 const DEFENDING_PAIRING_LABELS = {
   cbVsSt:      'CB vs ST',
   fbVsWm:      'Fullbacks vs Wingers',
-  cbDmVsCm:    'Defensive Mid vs Playmaker',
+  cbDmVsCm:    'CDM vs CAM',
   cbVsFwd:     'CB vs FWD',
   fbVsWideMid: 'FB vs Wide MID',
   cbMidVsCam:  'CB+DM vs CAM',
@@ -423,6 +423,10 @@ function buildBreakdownRows(breakdown, venue) {
  * attacking pairing's, by construction, see engine/counter.js).
  * Attack/defence form values are null when no player summaries are loaded —
  * displayed as "—" and flagged estimated until Phase 2 lazy-loads summaries.
+ * p.estimated is true only when the fallback path fired (attackForm or
+ * defenceForm was null for this pairing) — so the score itself is a coarse
+ * team-strength proxy, not a real player-form read. Shown as "N/A" rather
+ * than the fallback number, so it doesn't read as a genuine calculated score.
  *
  * @param {Object} pairings
  * @param {Object} labels       PAIRING_LABELS or DEFENDING_PAIRING_LABELS
@@ -434,7 +438,8 @@ function buildBreakdownRows(breakdown, venue) {
 function buildCounterPairings(pairings, labels, perspective) {
   return Object.entries(pairings).map(([key, p]) => {
     const val        = Math.round(p.value);
-    const chipBand   = bandFromValue(val);
+    const valDisplay = p.estimated ? 'N/A' : String(val);
+    const chipBand   = p.estimated ? 'neutral' : bandFromValue(val);
     const atkDisplay = p.attackForm  !== null ? Math.round(p.attackForm)  : '—';
     const defDisplay = p.defenceForm !== null ? Math.round(p.defenceForm) : '—';
     const label      = esc(labels[key] ?? key);
@@ -449,7 +454,7 @@ function buildCounterPairings(pairings, labels, perspective) {
     return `
       <div class="counter-pairing${rowClass}">
         <span class="counter-pairing__label">${label}</span>
-        <span class="score-chip score-chip--${chipBand} counter-pairing__score">${val}</span>
+        <span class="score-chip score-chip--${chipBand} counter-pairing__score">${esc(valDisplay)}</span>
         <span class="counter-pairing__detail">${detail}</span>
         ${estMark}
       </div>
