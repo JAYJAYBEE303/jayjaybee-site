@@ -11,6 +11,12 @@
 // cached payloads will then be ignored rather than feeding stale data through.
 const SS_KEY_SEASON = 'gaffer-iq:season:v1';
 
+// Shared squad key — the ONE place the user's 15-man squad is persisted.
+// Reuses the Dashboard's pre-existing key so an already-saved squad survives
+// this change unchanged; the Planner's old separate 'gafferiq_squad_planner'
+// key is now unused and simply ages out of sessionStorage.
+const SS_KEY_SQUAD = 'gafferiq_squad';
+
 const state = {
   season: null,         // see engine/normalise.js → normaliseSeason output
   playerSummaries: {},  // playerId → normalised PlayerSummary
@@ -20,6 +26,11 @@ const state = {
   leagueXg: null,
   teamXg: {},
   activeHorizon: 'GW1',
+  // The user's squad: an ordered array of player IDs (max 15), shared by every
+  // module that reads/edits it (Dashboard, Planner). Previously each module
+  // kept its own private copy with its own sessionStorage key — this is now
+  // the single source of truth. See CONVENTIONS.md §8.
+  squad: [],
   lastError: null,
   lastRefreshAt: null,
 };
@@ -66,6 +77,7 @@ function getAllPlayerSummaries()       { return state.playerSummaries; }
 function getLeagueXg()                { return state.leagueXg; }
 function getTeamXg(teamSlug)          { return state.teamXg[teamSlug] ?? null; }
 function getActiveHorizon()           { return state.activeHorizon; }
+function getSquad()                   { return state.squad; }
 function getError()                   { return state.lastError; }
 function getLastRefreshAt()           { return state.lastRefreshAt; }
 function isFresh()                    { return state.season !== null; }
@@ -100,6 +112,23 @@ function setActiveHorizon(key) {
   if (state.activeHorizon === key) return;
   state.activeHorizon = key;
   emit('horizon:changed', key);
+}
+
+/**
+ * Replace the whole squad and persist it. The single mutation point for squad
+ * state — Dashboard and Planner both call this (never touching sessionStorage
+ * or a local array themselves), so a squad built or edited in either module is
+ * immediately visible, correctly, in the other via 'squad:updated'.
+ * @param {number[]} playerIds  ordered player IDs (position-limit validation
+ *   stays with the calling module, same as before — this is a state primitive,
+ *   not a rules engine).
+ */
+function setSquad(playerIds) {
+  state.squad = Array.isArray(playerIds) ? playerIds.slice() : [];
+  try {
+    sessionStorage.setItem(SS_KEY_SQUAD, JSON.stringify(state.squad));
+  } catch { /* quota exceeded or disabled — non-fatal */ }
+  emit('squad:updated', state.squad);
 }
 
 function setError(err) {
@@ -143,6 +172,18 @@ function clearCache() {
       state.lastRefreshAt = parsed.at ?? null;
     }
   } catch { /* corrupt or absent — ignore and re-fetch */ }
+
+  // Squad hydrates independently of season freshness — it's the user's own
+  // list, not derived from the fetched data, so it survives a reload even
+  // when the season cache above is stale/absent.
+  try {
+    const rawSquad = sessionStorage.getItem(SS_KEY_SQUAD);
+    if (!rawSquad) return;
+    const parsedSquad = JSON.parse(rawSquad);
+    if (Array.isArray(parsedSquad)) {
+      state.squad = parsedSquad.filter(id => typeof id === 'number');
+    }
+  } catch { /* corrupt or absent — ignore and start fresh */ }
 })();
 
 export const store = {
@@ -151,8 +192,8 @@ export const store = {
   getFixtures, getFixture, getPositions, getEvents,
   getCurrentGw, getNextGw, getPlayerSummary, getAllPlayerSummaries,
   getLeagueXg, getTeamXg,
-  getActiveHorizon, getError, getLastRefreshAt, isFresh,
+  getActiveHorizon, getSquad, getError, getLastRefreshAt, isFresh,
   setSeason, setPlayerSummary, setLeagueXg, setTeamXg,
-  setActiveHorizon, setError, markDataReady,
+  setActiveHorizon, setSquad, setError, markDataReady,
   clearCache,
 };

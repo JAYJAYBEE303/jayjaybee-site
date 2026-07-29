@@ -21,9 +21,6 @@ import { fetchAndMapSquad, loadSavedTeamId, saveTeamId, resolveImportGw } from '
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-/** sessionStorage key for squad persistence. */
-const SS_KEY = 'gafferiq_squad_planner';
-
 /** localStorage key for chip-usage tracking (Phase 4-3). Persists across sessions
  *  because chip usage is a season-long decision the user makes once per chip. */
 const CHIPS_USED_KEY = 'gafferiq_chips_used';
@@ -60,9 +57,10 @@ const TOP_N = 8;
 const COMBO_POOL = 60;
 
 // ─── Module-level state ───────────────────────────────────────────────────────
-
-/** Ordered array of player IDs (max SQUAD_TOTAL). */
-let _squad = [];
+//
+// NOTE: the squad itself is NOT module-level state — it lives in store.js
+// (store.getSquad()/setSquad()), shared with the Dashboard. See
+// afterSquadChange() and initPlanner()'s 'squad:updated' subscription.
 
 // ─── Import state (Phase 4-1) ─────────────────────────────────────────────────
 
@@ -183,38 +181,23 @@ function saveChipsUsed() {
   } catch { /* quota exceeded — non-fatal */ }
 }
 
-// ─── Squad persistence ────────────────────────────────────────────────────────
-
-function loadSquad() {
-  try {
-    const raw = sessionStorage.getItem(SS_KEY);
-    if (!raw) return;
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) {
-      _squad = parsed.filter(id => typeof id === 'number');
-    }
-  } catch { /* corrupt — ignore and start fresh */ }
-}
-
-function saveSquad() {
-  try {
-    sessionStorage.setItem(SS_KEY, JSON.stringify(_squad));
-  } catch { /* quota exceeded — non-fatal */ }
-}
-
 // ─── Squad management ─────────────────────────────────────────────────────────
+// Reads store.getSquad() directly rather than caching a local copy — the
+// store is the only source of truth (CONVENTIONS.md §8), and afterSquadChange()
+// (subscribed to 'squad:updated') is what re-renders after any mutation, from
+// either this module or the Dashboard.
 
 function squadCountByPos(pos) {
-  return _squad.filter(id => store.getPlayer(id)?.position === pos).length;
+  return store.getSquad().filter(id => store.getPlayer(id)?.position === pos).length;
 }
 
 function isInSquad(playerId) {
-  return _squad.includes(playerId);
+  return store.getSquad().includes(playerId);
 }
 
 function canAdd(player) {
   if (!player) return false;
-  if (_squad.length >= SQUAD_TOTAL) return false;
+  if (store.getSquad().length >= SQUAD_TOTAL) return false;
   if (isInSquad(player.id)) return false;
   if (squadCountByPos(player.position) >= SQUAD_LIMITS[player.position]) return false;
   return true;
@@ -223,17 +206,19 @@ function canAdd(player) {
 function addPlayer(playerId) {
   const player = store.getPlayer(playerId);
   if (!player || !canAdd(player)) return;
-  _squad.push(playerId);
-  saveSquad();
-  afterSquadChange();
+  // afterSquadChange() runs via the 'squad:updated' subscription, not a direct
+  // call here — the same path the Dashboard's edits take, so both modules
+  // react identically regardless of which one made the change.
+  store.setSquad([...store.getSquad(), playerId]);
 }
 
 function removePlayer(playerId) {
-  const idx = _squad.indexOf(playerId);
+  const squad = store.getSquad();
+  const idx = squad.indexOf(playerId);
   if (idx < 0) return;
-  _squad.splice(idx, 1);
-  saveSquad();
-  afterSquadChange();
+  const next = squad.slice();
+  next.splice(idx, 1);
+  store.setSquad(next);
 }
 
 // ─── Scoring ──────────────────────────────────────────────────────────────────
@@ -245,7 +230,7 @@ function scoreSquad() {
   if (!ctx) return;
   const horizon = getHorizon();
   _scores = new Map();
-  for (const id of _squad) {
+  for (const id of store.getSquad()) {
     const player = store.getPlayer(id);
     if (!player) continue;
     try {
@@ -265,13 +250,13 @@ function scoreSquad() {
  * @returns {Array<SwapObj>}  sorted by delta descending
  */
 function computeSingleSwaps(ctx) {
-  if (!ctx || _squad.length < SQUAD_TOTAL) return [];
+  if (!ctx || store.getSquad().length < SQUAD_TOTAL) return [];
 
   const horizon    = getHorizon();
   const allPlayers = store.getPlayers();
   const swaps      = [];
 
-  for (const outId of _squad) {
+  for (const outId of store.getSquad()) {
     const outPlayer = store.getPlayer(outId);
     const outScore  = _scores.get(outId);
     if (!outPlayer || !outScore) continue;
@@ -602,7 +587,7 @@ function renderSearchResults() {
     const team         = store.getTeam(p.teamId);
     const inSquad      = isInSquad(p.id);
     const posSlotsFull = squadCountByPos(p.position) >= SQUAD_LIMITS[p.position];
-    const squadFull    = _squad.length >= SQUAD_TOTAL;
+    const squadFull    = store.getSquad().length >= SQUAD_TOTAL;
     const disabled     = inSquad || posSlotsFull || squadFull;
     const reason       = inSquad      ? 'Already in squad'
                        : posSlotsFull ? `${p.position} slots full`
@@ -628,13 +613,14 @@ function renderSearchResults() {
 // ─── Render: squad slots ──────────────────────────────────────────────────────
 
 function renderSquadPanel() {
+  const squad = store.getSquad();
   if (_tally) {
-    _tally.textContent = `${_squad.length} / ${SQUAD_TOTAL} players selected`;
+    _tally.textContent = `${squad.length} / ${SQUAD_TOTAL} players selected`;
   }
   if (!_squadSlots) return;
 
   _squadSlots.innerHTML = Object.entries(SQUAD_LIMITS).map(([pos, max]) => {
-    const playersInPos = _squad
+    const playersInPos = squad
       .map(id => store.getPlayer(id))
       .filter(p => p?.position === pos);
 
@@ -679,8 +665,8 @@ function renderSquadPanel() {
 function renderRecommendations() {
   if (!_recommendations) return;
 
-  if (_squad.length < SQUAD_TOTAL) {
-    const remaining = SQUAD_TOTAL - _squad.length;
+  if (store.getSquad().length < SQUAD_TOTAL) {
+    const remaining = SQUAD_TOTAL - store.getSquad().length;
     _recommendations.innerHTML = `
       <p class="planner-hint">
         Add ${remaining} more player${remaining === 1 ? '' : 's'} to see transfer recommendations.
@@ -759,8 +745,9 @@ function renderRecommendations() {
  * unavailable or the squad is empty.
  */
 function pickBenchPlayerIds() {
-  if (_squad.length === 0) return [];
-  const ranked = _squad
+  const squad = store.getSquad();
+  if (squad.length === 0) return [];
+  const ranked = squad
     .map(id => ({ id, value: _scores.get(id)?.value ?? 0 }))
     .sort((a, b) => a.value - b.value);
   return ranked.slice(0, BENCH_SIZE).map(r => r.id);
@@ -773,7 +760,7 @@ function pickBenchPlayerIds() {
 function pickTcCandidate() {
   let bestId = null;
   let bestVal = -Infinity;
-  for (const id of _squad) {
+  for (const id of store.getSquad()) {
     const v = _scores.get(id)?.value;
     if (typeof v === 'number' && v > bestVal) {
       bestVal = v;
@@ -994,9 +981,7 @@ function replaceSquad(playerIds) {
     counts[pos]++;
     accepted.push(id);
   }
-  _squad = accepted;
-  saveSquad();
-  afterSquadChange();
+  store.setSquad(accepted);
 }
 
 /** @param {object|null} entryInfo */
@@ -1171,8 +1156,7 @@ function wireDom() {
     if (e.key === 'Escape') closeImportPanel();
   });
 
-  // ── Restore from sessionStorage and render the initial shell ─────────────
-  loadSquad();
+  // ── Render the initial shell — squad is already hydrated by store.js ─────
   renderSquadPanel();
   renderRecommendations();
 
@@ -1208,10 +1192,16 @@ function onHorizonChanged() {
  * loadInitialData(). Registers store subscriptions so the module is ready
  * to receive events whenever the fetch completes. All DOM wiring is deferred
  * to wireDom(), called from onDataReady().
+ *
+ * Also subscribes to 'squad:updated' so a squad built or imported on the
+ * Dashboard — or anywhere else — re-scores and re-renders here too, with no
+ * rebuild step. afterSquadChange() itself no-ops safely via renderSquadPanel's/
+ * renderRecommendations' null DOM-ref guards if this module hasn't wired yet.
  */
 export function initPlanner() {
   store.subscribe('data:ready',      onDataReady);
   store.subscribe('horizon:changed', onHorizonChanged);
+  store.subscribe('squad:updated',   afterSquadChange);
 
   // If the store is already hydrated (sessionStorage), wire up immediately.
   if (store.isFresh()) {

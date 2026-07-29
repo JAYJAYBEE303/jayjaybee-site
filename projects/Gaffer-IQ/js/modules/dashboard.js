@@ -25,9 +25,6 @@ import { fetchAndMapSquad, loadSavedTeamId, saveTeamId, resolveImportGw } from '
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-/** sessionStorage key for squad persistence (ARCHITECTURE.md §6). */
-const SS_KEY = 'gafferiq_squad';
-
 /** Dashboard is horizon-locked to GW1 — ignores the global horizon switcher. */
 const HORIZON = HORIZONS.GW1;
 
@@ -47,9 +44,10 @@ const MIN_SEC_RISK = 0.65;
 const LIVE_POLL_INTERVAL_MS = 60_000;
 
 // ─── Module-level state ───────────────────────────────────────────────────────
-
-/** Ordered array of player IDs currently in the squad (max SQUAD_TOTAL). */
-let _squad = [];
+//
+// NOTE: the squad itself is NOT module-level state — it lives in store.js
+// (store.getSquad()/setSquad()) so Dashboard and Planner share one source of
+// truth. See afterSquadChange() and initDashboard()'s 'squad:updated' subscription.
 
 // ─── Import state (Phase 4-1) ─────────────────────────────────────────────────
 
@@ -337,33 +335,18 @@ function reconcileLivePoll() {
   }
 }
 
-// ─── Squad persistence ────────────────────────────────────────────────────────
-
-function loadSquad() {
-  try {
-    const raw = sessionStorage.getItem(SS_KEY);
-    if (!raw) return;
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) {
-      _squad = parsed.filter(id => typeof id === 'number');
-    }
-  } catch { /* corrupt — ignore and start fresh */ }
-}
-
-function saveSquad() {
-  try {
-    sessionStorage.setItem(SS_KEY, JSON.stringify(_squad));
-  } catch { /* quota exceeded — non-fatal */ }
-}
-
 // ─── Squad management ─────────────────────────────────────────────────────────
+// Reads store.getSquad() directly rather than caching a local copy — the
+// store is the only source of truth (CONVENTIONS.md §8), and afterSquadChange()
+// (subscribed to 'squad:updated') is what re-renders after any mutation, from
+// either this module or Planner.
 
 function squadCountByPos(pos) {
-  return _squad.filter(id => store.getPlayer(id)?.position === pos).length;
+  return store.getSquad().filter(id => store.getPlayer(id)?.position === pos).length;
 }
 
 function isInSquad(playerId) {
-  return _squad.includes(playerId);
+  return store.getSquad().includes(playerId);
 }
 
 /**
@@ -372,7 +355,7 @@ function isInSquad(playerId) {
  */
 function canAdd(player) {
   if (!player) return false;
-  if (_squad.length >= SQUAD_TOTAL) return false;
+  if (store.getSquad().length >= SQUAD_TOTAL) return false;
   if (isInSquad(player.id)) return false;
   if (squadCountByPos(player.position) >= SQUAD_LIMITS[player.position]) return false;
   return true;
@@ -381,17 +364,19 @@ function canAdd(player) {
 function addPlayer(playerId) {
   const player = store.getPlayer(playerId);
   if (!player || !canAdd(player)) return;
-  _squad.push(playerId);
-  saveSquad();
-  afterSquadChange();
+  // afterSquadChange() runs via the 'squad:updated' subscription, not a direct
+  // call here — the same path Planner's edits take, so both modules react
+  // identically regardless of which one made the change.
+  store.setSquad([...store.getSquad(), playerId]);
 }
 
 function removePlayer(playerId) {
-  const idx = _squad.indexOf(playerId);
+  const squad = store.getSquad();
+  const idx = squad.indexOf(playerId);
   if (idx < 0) return;
-  _squad.splice(idx, 1);
-  saveSquad();
-  afterSquadChange();
+  const next = squad.slice();
+  next.splice(idx, 1);
+  store.setSquad(next);
 }
 
 // ─── Scoring ──────────────────────────────────────────────────────────────────
@@ -405,7 +390,7 @@ function scoreSquad() {
   const ctx = buildCtx();
   if (!ctx) return;
   _scores = new Map();
-  for (const id of _squad) {
+  for (const id of store.getSquad()) {
     const player = store.getPlayer(id);
     if (!player) continue;
     try {
@@ -610,7 +595,7 @@ function renderSearchResults() {
       const team         = store.getTeam(p.teamId);
       const inSquad      = isInSquad(p.id);
       const posSlotsFull = squadCountByPos(p.position) >= SQUAD_LIMITS[p.position];
-      const squadFull    = _squad.length >= SQUAD_TOTAL;
+      const squadFull    = store.getSquad().length >= SQUAD_TOTAL;
       const disabled     = inSquad || posSlotsFull || squadFull;
       const reason       = inSquad      ? 'Already in squad'
                          : posSlotsFull ? `${p.position} slots full`
@@ -642,14 +627,15 @@ function renderSearchResults() {
 // ─── Render: squad slots ──────────────────────────────────────────────────────
 
 function renderSquadPanel() {
+  const squad = store.getSquad();
   if (_tally) {
-    _tally.textContent = `${_squad.length} / ${SQUAD_TOTAL} players selected`;
+    _tally.textContent = `${squad.length} / ${SQUAD_TOTAL} players selected`;
   }
 
   if (!_squadSlots) return;
 
   const html = Object.entries(SQUAD_LIMITS).map(([pos, max]) => {
-    const playersInPos = _squad
+    const playersInPos = squad
       .map(id => store.getPlayer(id))
       .filter(p => p?.position === pos);
 
@@ -698,12 +684,14 @@ function renderSquadPanel() {
 function renderDecisions() {
   if (!_decisions) return;
 
+  const squad = store.getSquad();
+
   // GW badge is shown whenever data is ready — it's always informative.
   const gwState   = _dataReady ? getGwState() : null;
   const badgeHtml = gwState ? renderGwStateBadge(gwState) : '';
 
-  if (_squad.length < SQUAD_TOTAL) {
-    const remaining = SQUAD_TOTAL - _squad.length;
+  if (squad.length < SQUAD_TOTAL) {
+    const remaining = SQUAD_TOTAL - squad.length;
     _decisions.innerHTML = [
       badgeHtml,
       `<p class="dash-decisions__hint">
@@ -718,7 +706,7 @@ function renderDecisions() {
     return;
   }
 
-  const scoredSquad = _squad
+  const scoredSquad = squad
     .map(id => ({ player: store.getPlayer(id), score: _scores.get(id) }))
     .filter(e => e.player && e.score);
 
@@ -945,9 +933,7 @@ function replaceSquad(playerIds) {
     counts[pos]++;
     accepted.push(id);
   }
-  _squad = accepted;
-  saveSquad();
-  afterSquadChange();
+  store.setSquad(accepted);
 }
 
 /**
@@ -1124,8 +1110,7 @@ function wireDom() {
     if (e.key === 'Escape') closeImportPanel();
   });
 
-  // ── Restore squad from sessionStorage and render the shell ───────────────
-  loadSquad();
+  // ── Render the initial shell — squad is already hydrated by store.js ─────
   renderSquadPanel();
   renderDecisions();
 
@@ -1158,9 +1143,15 @@ function onDataReady() {
  * so the module is ready to receive the event whenever the fetch completes.
  * All DOM wiring is deferred to wireDom(), called from onDataReady(), so that
  * getElementById calls are guaranteed to find live elements.
+ *
+ * Also subscribes to 'squad:updated' so a squad built or imported on the
+ * Planner — or anywhere else — re-scores and re-renders here too, with no
+ * rebuild step. afterSquadChange() itself no-ops safely via renderSquadPanel's/
+ * renderDecisions' null DOM-ref guards if this module hasn't wired yet.
  */
 export function initDashboard() {
   store.subscribe('data:ready', onDataReady);
+  store.subscribe('squad:updated', afterSquadChange);
 
   // If the store is already hydrated from sessionStorage, data:ready won't
   // fire again — wire the DOM and render immediately.
