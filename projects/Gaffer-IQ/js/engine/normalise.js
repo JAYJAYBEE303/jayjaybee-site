@@ -9,6 +9,10 @@
  * exactly one file: this one.
  */
 
+import {
+  PL_SEASONS, PL_TENURE_LOOKBACK, TEAM_NAME_ALIASES, TENURE_RECENCY_DECAY,
+} from '../config.js';
+
 // element_type id → internal position code. FPL uses 1=GKP, 2=DEF, 3=MID, 4=FWD.
 const POSITION_BY_ELEMENT_TYPE = {
   1: 'GKP',
@@ -28,6 +32,93 @@ const STATUS_MAP = {
   u: 'unavailable',
 };
 
+// ─── Premier League tenure ───────────────────────────────────────────────────
+// Derives how much recent top-flight history a club has, from the static
+// PL_SEASONS table in config.js. See FEATURE_ENGINE.md §2.1.
+
+/** Collapses a club name or short code to a comparable key: 'Nott'm Forest' → 'nottmforest'. */
+function normaliseClubKey(value) {
+  return String(value ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+// Season labels newest-first, capped at the configured lookback. Sorted
+// explicitly rather than trusting object key order, so a reordered PL_SEASONS
+// literal can never silently change every club's tenure.
+const SEASONS_NEWEST_FIRST = Object.keys(PL_SEASONS)
+  .sort()
+  .reverse()
+  .slice(0, PL_TENURE_LOOKBACK);
+
+// club key → Set of "seasons ago" indices (0 = most recent season in the table).
+const PL_PRESENCE_BY_CLUB = (() => {
+  const out = {};
+  SEASONS_NEWEST_FIRST.forEach((label, seasonsAgo) => {
+    for (const club of PL_SEASONS[label]) {
+      (out[normaliseClubKey(club)] ||= new Set()).add(seasonsAgo);
+    }
+  });
+  return out;
+})();
+
+// Alias key → canonical club key, both normalised.
+const CANONICAL_BY_ALIAS = (() => {
+  const out = {};
+  for (const [alias, canonical] of Object.entries(TEAM_NAME_ALIASES)) {
+    out[normaliseClubKey(alias)] = normaliseClubKey(canonical);
+  }
+  return out;
+})();
+
+// Denominator for the recency-weighted ratio: an ever-present club's total.
+const TENURE_TOTAL_WEIGHT = SEASONS_NEWEST_FIRST
+  .reduce((sum, _label, seasonsAgo) => sum + (TENURE_RECENCY_DECAY ** seasonsAgo), 0);
+
+/**
+ * Recency-weighted Premier League tenure for a club, matched by name then short
+ * name (never by FPL team id — ids are reassigned as clubs are promoted and
+ * relegated, so an id join silently mismatches exactly the clubs this measures).
+ *
+ * MODEL: recent seasons dominate. A club relegated last season loses the full
+ * weight of the newest season; one that missed a season eight years ago loses
+ * only TENURE_RECENCY_DECAY^8 of it.
+ *
+ * @param {string} name       club name as FPL reports it
+ * @param {string} shortName  FPL short code, used as the fallback join key
+ * @returns {{seasons: number, lookback: number, ratio: number, matched: boolean}}
+ *   ratio: 0–1, 1 = present in every season of the lookback.
+ *   matched: false when the club appears nowhere in PL_SEASONS. That covers both
+ *   a genuine newcomer and a join failure; both correctly yield ratio 0, so the
+ *   ambiguity has no behavioural consequence.
+ */
+export function buildPlTenure(name, shortName) {
+  let clubKey = null;
+  for (const candidate of [normaliseClubKey(name), normaliseClubKey(shortName)]) {
+    if (!candidate) continue;
+    const resolved = CANONICAL_BY_ALIAS[candidate] ?? candidate;
+    if (PL_PRESENCE_BY_CLUB[resolved]) {
+      clubKey = resolved;
+      break;
+    }
+  }
+
+  if (!clubKey) {
+    return { seasons: 0, lookback: SEASONS_NEWEST_FIRST.length, ratio: 0, matched: false };
+  }
+
+  const seasonsAgoPresent = PL_PRESENCE_BY_CLUB[clubKey];
+  let weighted = 0;
+  for (const seasonsAgo of seasonsAgoPresent) {
+    weighted += TENURE_RECENCY_DECAY ** seasonsAgo;
+  }
+
+  return {
+    seasons:  seasonsAgoPresent.size,
+    lookback: SEASONS_NEWEST_FIRST.length,
+    ratio:    TENURE_TOTAL_WEIGHT === 0 ? 0 : weighted / TENURE_TOTAL_WEIGHT,
+    matched:  true,
+  };
+}
+
 /**
  * @param {object} raw  one entry from bootstrap-static.teams[]
  * @returns {Team}      internal Team — see ARCHITECTURE.md §8
@@ -46,6 +137,9 @@ export function normaliseTeam(raw) {
       defenceHome:  raw.strength_defence_home,
       defenceAway:  raw.strength_defence_away,
     },
+    // Recency-weighted top-flight history — drives the promoted-team penalty in
+    // engine/fixtures.js → calcBaseDifficulty. See FEATURE_ENGINE.md §2.1.
+    plTenure: buildPlTenure(raw.name, raw.short_name),
     fixtures: [],   // fixture ids, populated by normaliseSeason
     form:  null,    // filled by engine/form.js
     style: null,    // filled by engine/style.js

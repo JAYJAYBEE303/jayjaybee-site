@@ -14,6 +14,7 @@ These rules make the metrics composable. Violating any of them silently corrupts
 
 1. **Scale.** Every metric is normalised to **0–100**.
 2. **Direction.** **Higher is always better *for the team being scored*.** A fixture score of 90 = a great fixture for *this* team; 10 = brutal. Team form 80 = in great form. Counter-matchup 75 = this team's attack is well-matched against the opponent's defence. Never let a metric default to "higher = harder"; if a raw input is naturally inverted (e.g. opponent strength), invert it during normalisation and leave a `// MODEL:` comment.
+   - **One documented exception: `baseDifficulty` (§2).** It is stored as the opponent's strength (higher = harder) because the UI surfaces that number directly, and `engine/composite.js` inverts it at the weighting step. This is the *only* metric permitted to break this rule, and it is inverted exactly once, at that one boundary. Do not add another.
 3. **Neutral point = 50.** Missing/blank inputs fall back to 50 (genuinely neutral), never 0. Absence of information is not evidence of a hard fixture.
 4. **Perspective.** Almost everything is computed *from one team's point of view against a specific opponent in a specific fixture*. A fixture produces **two** scores — one per side — which are not simply complements of each other (home/away, form, and counter-matchups are asymmetric).
 5. **Explainability.** Every metric returns enough to populate `CompositeScore.breakdown`. If a value used a fallback, flag `estimated: true`.
@@ -30,28 +31,63 @@ invert(score)               = 100 - score
 
 **Purpose:** Replace the FPL app's blunt 1–5 FDR with a continuous, strength-aware base difficulty, *before* form/style/counter adjustments.
 
-**Inputs (from FPL `bootstrap-static` → `teams[]`):** each team's `strength_overall_home/away`, `strength_attack_home/away`, `strength_defence_home/away`. These are FPL's own integer priors (~1000–1400 range) and are a reasonable, always-available starting point.
+**Inputs (from FPL `bootstrap-static` → `teams[]`):** the **opponent's** `strength_attack_home/away` and `strength_defence_home/away`. These are FPL's own integer priors (~1000–1400 range) and are a reasonable, always-available starting point.
+
+> **⚠ DIRECTION EXCEPTION — read this before touching the formula.**
+> Base difficulty is the **one** metric in the engine stored as **higher = HARDER for the team being scored**, contrary to §1 rule 2. It is stored that way because the Matchup Analyser surfaces it directly as "how tough is this opponent", and that is the reading the project owner wants on screen.
+> `engine/composite.js` therefore applies `invert()` to this value before weighting it, so the composite still consumes a higher-is-better number. **Removing that `invert()` would make facing Man City raise a team's score.** Every other sub-metric follows §1 rule 2 unchanged.
+>
+> **This exception has a second consequence, found by Phase-2 audit: rendering must invert it too, separately from scoring.** `modules/matchup.js`'s breakdown row colours every metric by feeding its stored value into `bandFromValue()`, which assumes higher = better. For five of six rows that's correct as stored. For `baseDifficulty` it is **not** — a brutal fixture (strong opponent, high stored value) would band as `'great'` (green) if rendered raw. `buildBreakdownRows()` therefore calls `bandFromValue(invert(m.value))` for this one row only, while the **displayed number stays uninverted** (the opponent-strength reading is what's meant to be shown). Any future consumer of `breakdown.baseDifficulty.value` for colouring/banding — not just for display — must invert first. Consumers that only read the top-level composite `score.value`/`score.band` (ranker, dashboard, planner) are unaffected; they already receive the correctly-inverted composite.
+
+**Model:** base difficulty is an **absolute read of the opponent**, not a relative edge between the two sides. A strong club posts the same high number in whoever's box it appears in — Man City are a hard fixture for Wolves and for Arsenal alike (~80 either way). Two weak sides meeting produces a low number on both sides of the tie; two strong sides produce a high number on both.
 
 **Formula (scoring TEAM A at home vs TEAM B):**
 ```
-# How hard B's defence/attack makes life for A, from A's perspective.
-oppThreat   = B.strength_attack_away      # B attacking when away at A
-oppResist   = B.strength_defence_away     # B defending when away at A
-ownThreat   = A.strength_attack_home
-ownResist   = A.strength_defence_home
+# Read B at the venue B will actually play at.
+oppThreat = B.strength_attack_away        # B attacking when away at A
+oppResist = B.strength_defence_away       # B defending when away at A
 
-# A favourable fixture = A's attack > B's away defence, AND A's defence > B's away attack.
-attackEdge  = ownThreat - oppResist       # higher = A can score
-defenceEdge = ownResist - oppThreat       # higher = A can keep them out
+rawStrength   = (W_OPP_ATTACK * oppThreat) + (W_OPP_DEFENCE * oppResist)
+strengthScore = normaliseLinear(rawStrength, OPP_STRENGTH_MIN, OPP_STRENGTH_MAX)
 
-rawEdge     = (W_ATTACK_EDGE * attackEdge) + (W_DEFENCE_EDGE * defenceEdge)
-baseDifficulty = normaliseLinear(rawEdge, EDGE_MIN, EDGE_MAX)   # 0–100, higher = easier for A
+# §2.1 tenure deduction — only ever lowers, never raises.
+baseDifficulty = min(strengthScore, max(TENURE_FLOOR, strengthScore - tenurePenalty(B)))
+# 0–100, higher = HARDER for A
 ```
-- `W_ATTACK_EDGE`, `W_DEFENCE_EDGE` default **0.5 / 0.5** in `config.js` (tune per how attack- vs defence-oriented your FPL strategy is).
-- `EDGE_MIN`/`EDGE_MAX` are derived from the observed spread of `rawEdge` across all fixtures so the scale fills 0–100.
-- Use the *home* strength fields for the home side and *away* fields for the away side — this is where venue first enters; §3 layers a separate, data-driven home/away adjustment on top.
+- `W_OPP_ATTACK`, `W_OPP_DEFENCE` default **0.5 / 0.5** in `config.js`.
+- `OPP_STRENGTH_MIN`/`OPP_STRENGTH_MAX` default **1000 / 1400**, the observed band of FPL's strength integers.
+- The opponent is read at *their* venue — away strengths for an away side. §3 layers a separate, data-driven home/away adjustment on top.
 
 **Fallback:** strengths are always present in bootstrap, so this metric never needs a fallback. It is the floor the whole model stands on.
+
+---
+
+## 2.1 Premier League tenure (`engine/fixtures.js → calcTenurePenalty`)
+
+**Purpose:** FPL's `strength_*` priors systematically over-rate newly promoted sides — the numbers are seeded, not earned, so a club with no top-flight history can arrive rated close to an established mid-table side. Tenure corrects that, so a promoted opponent reads as the soft fixture it usually is.
+
+**Inputs:** `PL_SEASONS` in `config.js` — a static table of which clubs contested each of the last `PL_TENURE_LOOKBACK` (default **15**) seasons, newest first.
+
+**Join:** by club **name**, falling back to **short name**, resolved through `TEAM_NAME_ALIASES`. Both sides are normalised (lowercased, non-alphanumerics stripped) so `Nott'm Forest`, `nottm forest` and `NFO` all reach the same entry.
+- **MODEL:** never join by FPL team id. Ids are reassigned each season as clubs go up and down, so an id join silently mismatches exactly the promoted and relegated clubs this metric exists to measure.
+
+**Formula:**
+```
+seasonsAgo    = 0 for the most recent season in the table, 1 for the one before, …
+recencyWeight = TENURE_RECENCY_DECAY ^ seasonsAgo          # default 0.85
+tenureRatio   = Σ(present(s) * recencyWeight(s)) / Σ recencyWeight(s)    # 0–1
+deficit       = 1 - tenureRatio
+tenurePenalty = TENURE_MAX_PENALTY * (deficit ^ TENURE_CURVE)            # 0–40
+```
+- **MODEL:** presence is **recency-weighted, not counted**. A relegation last season says far more about a squad's current level than an absence eight years ago — at the default decay the newest season carries ~4.5× the weight of one eight seasons back.
+- **MODEL:** `TENURE_CURVE` (default **2.0**) makes the punishment *curve* rather than ramp, so this stays a promoted-team rule instead of a tax on anyone who was ever in the Championship. Measured effect: Crystal Palace (13/15 seasons) **0.05 pts**, Brentford (5/15, all consecutive and recent) **6.10 pts**, a club never in the PL **40 pts**. A linear deficit gave Brentford ~12, which was wrong — five straight seasons up is established in practice.
+- `TENURE_MAX_PENALTY` (default **40**) with `TENURE_FLOOR` (default **20**): a club with no recent top-flight history at all bottoms out at 20, not a token nudge. The `min()` in §2 guarantees the floor can never *raise* a club FPL already rates below it.
+- An ever-present club scores `tenureRatio = 1` → penalty **0**. Established sides are therefore provably unaffected by this rule: the deduction is exactly zero, not merely small.
+- A club absent from every season in the table scores 0 — the correct reading for a genuine newcomer, and the same reading a join failure would produce, so the two need not be distinguished.
+
+**Direction of effect:** tenure is a **pure punishment on the opponent's reading**. It lowers the number shown in the *other* team's box — Coventry's thin history makes Arsenal's box read low (easy fixture), while Coventry's own box still shows Arsenal's full strength (hard fixture). The established side's own numbers are never touched.
+
+**Estimated flag:** a low tenure reading is a **known fact, not missing data**, so `calcBaseDifficulty` keeps `estimated: false` throughout and confidence is unaffected. Only genuinely absent inputs set `estimated` (§8.3).
 
 ---
 

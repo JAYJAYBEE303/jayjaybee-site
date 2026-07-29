@@ -553,8 +553,8 @@
       const key = '_' + layer.key;
       const open = squadFocus === layer.key;
       head += `<div class="sq-h-stat${open ? ' is-focused' : ''}" data-layer="${layer.key}">
-        <span class="sq-h-label sq-sortable${sortCls(key)}" onclick="squadSortBy('${key}')">${esc(layer.label)} ${sortInd(key)}</span>
-        <button class="sq-expand${open ? ' is-on' : ''}" type="button" data-layer="${layer.key}" data-label="${esc(layer.label)}" onclick="squadToggleExpand('${layer.key}')" aria-label="${open ? 'Collapse' : 'Expand'} ${esc(layer.label)}">${open ? '–' : '+'}</button>
+        <span class="sq-h-label sq-sortable${sortCls(key)}" onclick="squadSortBy('${key}')">${escHtml(layer.label)} ${sortInd(key)}</span>
+        <button class="sq-expand${open ? ' is-on' : ''}" type="button" data-layer="${layer.key}" data-label="${escHtml(layer.label)}" onclick="squadToggleExpand('${layer.key}')" aria-label="${open ? 'Collapse' : 'Expand'} ${escHtml(layer.label)}">${open ? '–' : '+'}</button>
       </div>`;
     });
     head += '</div>';
@@ -590,7 +590,7 @@
           const sv = +(p[s.key] || 0);
           const st = squadTier(sv);
           return `<div class="sq-sub">
-            <span class="sq-sub-l">${esc(s.label)}</span>
+            <span class="sq-sub-l">${escHtml(s.label)}</span>
             <span class="sq-sub-bar"><span class="sq-sub-fill tier-${st}" style="width:${sqBarPct(sv)}%"></span></span>
             <span class="sq-sub-v${sv ? ' tier-' + st : ' muted'}">${sv ? Math.round(sv) : '—'}</span>
           </div>`;
@@ -601,11 +601,11 @@
       rows += `<div class="sq-row">
         <div class="sq-pos${i < 3 ? ' p' + (i + 1) : ''}">${i + 1}</div>
         <div class="sq-id">
-          <div class="sq-name">${esc(p.name)}</div>
+          <div class="sq-name">${escHtml(p.name)}</div>
           <div class="sq-meta">
-            ${rs ? `<span class="sq-roles">${esc(rs)}</span>` : ''}
-            ${arch ? `<span class="sq-arch">${esc(arch)}</span>` : ''}
-            <span class="sq-phys">${esc(h)} · ${esc(build)}</span>
+            ${rs ? `<span class="sq-roles">${escHtml(rs)}</span>` : ''}
+            ${arch ? `<span class="sq-arch">${escHtml(arch)}</span>` : ''}
+            <span class="sq-phys">${escHtml(h)} · ${escHtml(build)}</span>
           </div>
         </div>
         ${cells}
@@ -1084,6 +1084,37 @@
 
   function esc(str) { return (str || '').replace(/'/g, "\\'"); }
 
+  // HTML-escape for values placed in element text or double-quoted attributes.
+  // Escapes & < > " ' to entities so imported/renamed save data (player names,
+  // folder names, archetypes) can never inject markup. Lossless: the browser
+  // decodes the entities back to the original text on render / .value read.
+  function escHtml(str) {
+    return (str == null ? '' : String(str))
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  // Escape for a value used as a single-quoted JS-string argument INSIDE a
+  // double-quoted inline handler, e.g. onclick="loadPlayer('<here>')". This is a
+  // nested context: the HTML parser entity-decodes the attribute first, THEN the
+  // JS engine parses the string literal. So we entity-escape & " < > (to stop the
+  // value from ending the attribute or being turned into a quote via &#39;), and
+  // backslash-escape \ and ' (to keep the JS single-quoted string intact — this
+  // preserves legitimate apostrophes like "N'Golo"). Order matters: backslash and
+  // & first, so later-inserted entities/escapes are not re-processed.
+  function escAttr(str) {
+    return (str == null ? '' : String(str))
+      .replace(/\\/g, '\\\\')
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/'/g, "\\'");
+  }
+
   function renderFolderSelect() {
     const data = loadData();
     migrateData(data);
@@ -1091,7 +1122,7 @@
     const current = sel.value;
     function opts(folders, prefix) {
       return folders.flatMap(f => [
-        `<option value="${f.id}"${f.id===current?' selected':''}>${prefix}${f.name} (${f.players.length})</option>`,
+        `<option value="${f.id}"${f.id===current?' selected':''}>${prefix}${escHtml(f.name)} (${f.players.length})</option>`,
         ...opts(f.subfolders || [], prefix + '\u00a0\u00a0\u00a0')
       ]);
     }
@@ -1107,23 +1138,23 @@
     const playersHtml = folder.players.length
       ? folder.players.map(p => `
         <div class="saved-player"
-          ondragstart="onPlayerDragStart(event,'${esc(folder.id)}','${esc(p.name)}')"
+          ondragstart="onPlayerDragStart(event,'${escAttr(folder.id)}','${escAttr(p.name)}')"
           ondragover="onPlayerDragOver(event)"
           ondragleave="onPlayerDragLeave(event)"
-          ondrop="onPlayerDrop(event,'${esc(folder.id)}','${esc(p.name)}')"
+          ondrop="onPlayerDrop(event,'${escAttr(folder.id)}','${escAttr(p.name)}')"
           ondragend="onDragEnd(event)">
           <span class="drag-handle" onmousedown="setDraggable(event,true)" onmouseup="setDraggable(event,false)">⠿</span>
           <div class="saved-player-info">
-            <div class="saved-player-name" onclick="startRename(event,'${esc(folder.id)}','${esc(p.name)}')" title="Click to rename" style="cursor:text;">
-              ${p.name}
-              ${p.archetypePrimary ? `<span class="player-arch-tag primary-arch">${p.archetypePrimary}</span>` : ''}
-              ${p.archetypeSecondary ? `<span class="player-arch-tag secondary-arch">/ ${p.archetypeSecondary}</span>` : ''}
-              ${(p.colorTags && p.colorTags.length) ? `<span class="player-color-tags" onclick="event.stopPropagation()">${p.colorTags.map((t, i) => `<span class="player-color-tag" style="background:${safeHex(t.fill)};border-color:${safeHex(t.border)};" title="Colour tag"><button class="ctag-del" type="button" onclick="event.stopPropagation();removePlayerColorTag('${esc(folder.id)}','${esc(p.name)}',${i})" aria-label="Remove colour tag">✕</button></span>`).join('')}</span>` : ''}
+            <div class="saved-player-name" onclick="startRename(event,'${escAttr(folder.id)}','${escAttr(p.name)}')" title="Click to rename" style="cursor:text;">
+              ${escHtml(p.name)}
+              ${p.archetypePrimary ? `<span class="player-arch-tag primary-arch">${escHtml(p.archetypePrimary)}</span>` : ''}
+              ${p.archetypeSecondary ? `<span class="player-arch-tag secondary-arch">/ ${escHtml(p.archetypeSecondary)}</span>` : ''}
+              ${(p.colorTags && p.colorTags.length) ? `<span class="player-color-tags" onclick="event.stopPropagation()">${p.colorTags.map((t, i) => `<span class="player-color-tag" style="background:${safeHex(t.fill)};border-color:${safeHex(t.border)};" title="Colour tag"><button class="ctag-del" type="button" onclick="event.stopPropagation();removePlayerColorTag('${escAttr(folder.id)}','${escAttr(p.name)}',${i})" aria-label="Remove colour tag">✕</button></span>`).join('')}</span>` : ''}
             </div>
           </div>
           <div class="saved-player-actions">
-            <button class="load-btn" onclick="loadPlayer('${esc(folder.id)}','${esc(p.name)}')">Load</button>
-            <button class="delete-btn" onclick="deletePlayer('${esc(folder.id)}','${esc(p.name)}')">Del</button>
+            <button class="load-btn" onclick="loadPlayer('${escAttr(folder.id)}','${escAttr(p.name)}')">Load</button>
+            <button class="delete-btn" onclick="deletePlayer('${escAttr(folder.id)}','${escAttr(p.name)}')">Del</button>
           </div>
         </div>`).join('')
       : '';
@@ -1132,20 +1163,20 @@
     const totalCount = folder.players.length + (folder.subfolders || []).reduce((acc, sf) => acc + allFolders([sf]).reduce((a, f) => a + f.players.length, 0), 0);
 
     return `
-      <div class="folder-group" data-folder-id="${esc(folder.id)}"
-        ondragstart="onFolderDragStart(event,'${esc(folder.id)}')"
+      <div class="folder-group" data-folder-id="${escHtml(folder.id)}"
+        ondragstart="onFolderDragStart(event,'${escAttr(folder.id)}')"
         ondragover="onFolderDragOver(event)"
         ondragleave="onFolderDragLeave(event)"
-        ondrop="onFolderDrop(event,'${esc(folder.id)}')"
+        ondrop="onFolderDrop(event,'${escAttr(folder.id)}')"
         ondragend="onDragEnd(event)">
-        <div class="folder-header" onclick="toggleFolder('${esc(folder.id)}')">
+        <div class="folder-header" onclick="toggleFolder('${escAttr(folder.id)}')">
           <div class="folder-header-left">
             <span class="drag-handle" style="margin-right:4px;" onmousedown="setDraggable(event,true)" onmouseup="setDraggable(event,false)">⠿</span>
             <span class="folder-chevron ${folder.open ? 'open' : ''}">▶</span>
-            <span class="folder-name-text" onclick="startFolderRename(event,'${esc(folder.id)}')" title="Click to rename" style="cursor:text;">${folder.name}</span>
+            <span class="folder-name-text" onclick="startFolderRename(event,'${escAttr(folder.id)}')" title="Click to rename" style="cursor:text;">${escHtml(folder.name)}</span>
             <span class="folder-count">${totalCount} player${totalCount !== 1 ? 's' : ''}</span>
           </div>
-          <button class="folder-delete-btn" onclick="event.stopPropagation();deleteFolder('${esc(folder.id)}')">✕</button>
+          <button class="folder-delete-btn" onclick="event.stopPropagation();deleteFolder('${escAttr(folder.id)}')">✕</button>
         </div>
         <div class="folder-contents ${folder.open ? 'open' : ''}"><div class="folder-contents-inner">${playersHtml}${subHtml}</div></div>
       </div>`;
@@ -1747,7 +1778,7 @@
         ? ` style="--slot-color: var(--slot-${winnerIdx + 1});"`
         : '';
       svg += `<text class="${cls}"${styleAttr} x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" `
-           + `text-anchor="${anchor}" dy="${dy}"><title>${esc(tip)}</title>${a.label}</text>`;
+           + `text-anchor="${anchor}" dy="${dy}"><title>${escHtml(tip)}</title>${a.label}</text>`;
     });
 
     svg += '</svg>';
@@ -1815,7 +1846,7 @@
       const slot = i + 1;
       return `<span class="radar-legend-item" style="--slot-color: var(--slot-${slot});">
         <span class="radar-legend-swatch"></span>
-        <span><b>${esc(p.name)}</b>${p.folder ? ` <span class="radar-legend-folder">— ${esc(p.folder)}</span>` : ''}</span>
+        <span><b>${escHtml(p.name)}</b>${p.folder ? ` <span class="radar-legend-folder">— ${escHtml(p.folder)}</span>` : ''}</span>
       </span>`;
     }).join('');
 
@@ -1841,17 +1872,17 @@
         byFolder.get(key).players.push(p);
       });
       [...byFolder.values()].forEach(f => {
-        html += `<optgroup label="${esc(f.name) || 'Unfiled'}">`;
-        html += f.players.map(p => `<option value="player::${esc(p.folderId)}||${esc(p.name)}">${esc(p.name)}</option>`).join('');
+        html += `<optgroup label="${escHtml(f.name) || 'Unfiled'}">`;
+        html += f.players.map(p => `<option value="player::${escHtml(p.folderId)}||${escHtml(p.name)}">${escHtml(p.name)}</option>`).join('');
         html += '</optgroup>';
       });
     }
     html += '<optgroup label="Ideal — Attackers">';
     Object.entries(IDEAL_ARCHETYPES).filter(([_,v]) => v.kind === 'attacker')
-      .forEach(([k]) => { html += `<option value="ideal::${esc(k)}">★ Ideal ${esc(k)}</option>`; });
+      .forEach(([k]) => { html += `<option value="ideal::${escHtml(k)}">★ Ideal ${escHtml(k)}</option>`; });
     html += '</optgroup><optgroup label="Ideal — Defenders">';
     Object.entries(IDEAL_ARCHETYPES).filter(([_,v]) => v.kind === 'defender')
-      .forEach(([k]) => { html += `<option value="ideal::${esc(k)}">★ Ideal ${esc(k)}</option>`; });
+      .forEach(([k]) => { html += `<option value="ideal::${escHtml(k)}">★ Ideal ${escHtml(k)}</option>`; });
     html += '</optgroup>';
     return html;
   }
@@ -2016,9 +2047,9 @@
     const headerCols = filled.map((p, i) => {
       const slot = i + 1;
       const sub = p.kind === 'ideal'
-        ? `<span style="font-size:0.6rem;color:var(--accent4);font-weight:500">${esc(p.folder)}</span>`
-        : `<span style="font-size:0.6rem;color:var(--muted);font-weight:400">${esc(p.folder || '')}</span>`;
-      return `<th class="col-slot" style="--slot-color: var(--slot-${slot});">${esc(p.name)}<br>${sub}</th>`;
+        ? `<span style="font-size:0.6rem;color:var(--accent4);font-weight:500">${escHtml(p.folder)}</span>`
+        : `<span style="font-size:0.6rem;color:var(--muted);font-weight:400">${escHtml(p.folder || '')}</span>`;
+      return `<th class="col-slot" style="--slot-color: var(--slot-${slot});">${escHtml(p.name)}<br>${sub}</th>`;
     }).join('');
     const subHeaderCols = filled.map((_, i) => {
       const slot = i + 1;

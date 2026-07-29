@@ -307,6 +307,12 @@ This is the crux of why Gaffer IQ exists. The API gives raw facts; the value-add
 Team {
   id, name, shortName,
   strength: { overall, attackHome, attackAway, defenceHome, defenceAway },  // from FPL priors
+  plTenure: {                            // recent top-flight history — set by normalise.js
+    seasons,                             // count of the last `lookback` seasons the club featured in
+    lookback,                            // seasons considered (config: PL_TENURE_LOOKBACK, default 15)
+    ratio,                               // 0–1, RECENCY-WEIGHTED presence (1 = ever-present)
+    matched                              // false = club absent from PL_SEASONS entirely
+  },
   fixtures: [fixtureId, ...],            // ordered by GW
   // derived (filled by engine, not normalise):
   form: { rolling, trend },              // engine/form.js

@@ -12,7 +12,7 @@ import {
   HORIZON_DECAY, AGG_METHOD, W_MEAN, W_MIN, BLANK_GW_VALUE,
   PROJ_FORM, PROJ_FIXTURE, PROJ_COUNTER,
 } from '../config.js';
-import { clamp } from '../util.js';
+import { clamp, invert } from '../util.js';
 import {
   calcBaseDifficulty, calcHomeAwaySplit, calcFixtureHistory,
 } from './fixtures.js';
@@ -157,8 +157,13 @@ export function scoreFixture(team, fixture, ctx) {
 
   // Weighted blend — every sub-metric is already 0–100, higher = better for `team`.
   // WEIGHTS sums to 1.00 (config.js / FEATURE_ENGINE.md §8.1), so no re-normalisation.
+  //
+  // baseDifficulty is the ONE exception to the higher-is-better rule: it is
+  // stored as the opponent's strength (higher = harder) because the UI shows it
+  // that way, so it is inverted here before weighting. Removing this invert()
+  // would make facing Man City *raise* a team's score. See FEATURE_ENGINE.md §2.
   const value = clamp(0, 100,
-      (WEIGHTS.baseDifficulty * base.value)
+      (WEIGHTS.baseDifficulty * invert(base.value))
     + (WEIGHTS.counterMatchup * counter.value)
     + (WEIGHTS.teamForm       * form.value)
     + (WEIGHTS.homeAway       * venue.value)
@@ -184,11 +189,14 @@ export function scoreFixture(team, fixture, ctx) {
     provisional:  confidence < CONFIDENCE_FLOOR,
     breakdown: {
       baseDifficulty: {
+        // Reported as stored — the opponent's strength, higher = harder. The
+        // composite above consumes invert(base.value); the UI wants this one.
         value:     base.value,
         weight:    WEIGHTS.baseDifficulty,
         estimated: base.estimated,
-        attackEdge:  base.attackEdge,
-        defenceEdge: base.defenceEdge,
+        strengthScore: base.strengthScore,   // before any tenure deduction
+        tenurePenalty: base.tenurePenalty,   // points deducted for thin PL history
+        tenureRatio:   base.tenureRatio,     // 0–1, opponent's recency-weighted tenure
       },
       counterMatchup: {
         value:     counter.value,

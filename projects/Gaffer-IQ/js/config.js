@@ -8,15 +8,192 @@
 
 // ─── §2  Base fixture difficulty ─────────────────────────────────────────────
 
-// Weights for attack vs defence edge components (must sum to 1).
-export const W_ATTACK_EDGE = 0.5;
-export const W_DEFENCE_EDGE = 0.5;
+// MODEL: base difficulty reads the OPPONENT's absolute strength, not the edge
+// between the two sides. A strong club therefore posts the same high number in
+// whoever's box it appears in — Man City are a hard fixture for Wolves and for
+// Arsenal alike. See FEATURE_ENGINE.md §2.
+//
+// DIRECTION EXCEPTION: this is the one metric stored as "higher = HARDER for
+// the team being scored", because the UI surfaces it directly as the opponent's
+// strength. Every other sub-metric follows §1 rule 2 (higher = better for the
+// team). engine/composite.js inverts this value before weighting it, so the
+// composite still sees a higher-is-better number. Do not remove that invert().
 
-// Normalisation bounds for rawEdge across all fixtures.
-// FPL strength integers sit roughly in the 1000–1400 band; re-calibrate after
-// loading bootstrap data to fill 0–100 tightly.
-export const EDGE_MIN = -400;
-export const EDGE_MAX =  400;
+// Weights for the opponent's attacking and defensive strength (must sum to 1).
+export const W_OPP_ATTACK  = 0.5;
+export const W_OPP_DEFENCE = 0.5;
+
+// Normalisation bounds for the opponent's raw strength. FPL's strength_* fields
+// sit roughly in the 1000–1400 band; re-calibrate once a season's spread is known.
+export const OPP_STRENGTH_MIN = 1000;
+export const OPP_STRENGTH_MAX = 1400;
+
+// ─── §2.1  Premier League tenure (promoted-team awareness) ───────────────────
+
+// How many seasons of top-flight history to consider. 15 covers 2011/12–2025/26.
+export const PL_TENURE_LOOKBACK = 15;
+
+// Per-season decay applied when weighting a club's PL presence, newest first.
+// MODEL: a relegation last season says far more about a squad's current level
+// than an absence eight years ago, so presence is recency-weighted rather than
+// a flat count. 0.85 ⇒ the most recent season carries ~4.5x the weight of one
+// eight seasons back.
+export const TENURE_RECENCY_DECAY = 0.85;
+
+// Maximum points deducted from an opponent's strength reading when that
+// opponent has no recent top-flight history at all.
+export const TENURE_MAX_PENALTY = 40;
+
+// Exponent applied to the tenure deficit before scaling by TENURE_MAX_PENALTY.
+// MODEL: makes the punishment curve, not ramp. A club with several consecutive
+// recent PL seasons is established in practice even if it was in the Championship
+// a decade ago — at 2.0 a 0.29 deficit (e.g. five straight seasons up) costs ~3
+// points rather than ~12, while a genuine newcomer still takes the full 40.
+// Raise toward 3.0 to spare part-tenured clubs further; 1.0 = linear.
+export const TENURE_CURVE = 2.0;
+
+// Hard lower bound for a tenure-penalised reading. The penalty can never drag a
+// score below this, and never RAISES a score that already sits under it.
+export const TENURE_FLOOR = 20;
+
+// Clubs that contested each Premier League season, newest first. Used to derive
+// a club's recency-weighted tenure — see engine/normalise.js → buildPlTenure.
+// MODEL: keyed by club name rather than FPL team id, because ids are reassigned
+// each season as clubs go up and down. Names are matched through
+// TEAM_NAME_ALIASES so FPL's short forms ("Spurs", "Nott'm Forest") resolve.
+// A club absent from every season here scores zero tenure — which is the
+// correct reading for a genuine newcomer.
+export const PL_SEASONS = {
+  '2025/26': ['Arsenal', 'Aston Villa', 'Bournemouth', 'Brentford', 'Brighton & Hove Albion',
+              'Burnley', 'Chelsea', 'Crystal Palace', 'Everton', 'Fulham', 'Leeds United',
+              'Liverpool', 'Manchester City', 'Manchester United', 'Newcastle United',
+              'Nottingham Forest', 'Sunderland', 'Tottenham Hotspur', 'West Ham United',
+              'Wolverhampton Wanderers'],
+  '2024/25': ['Arsenal', 'Aston Villa', 'Bournemouth', 'Brentford', 'Brighton & Hove Albion',
+              'Chelsea', 'Crystal Palace', 'Everton', 'Fulham', 'Ipswich Town', 'Leicester City',
+              'Liverpool', 'Manchester City', 'Manchester United', 'Newcastle United',
+              'Nottingham Forest', 'Southampton', 'Tottenham Hotspur', 'West Ham United',
+              'Wolverhampton Wanderers'],
+  '2023/24': ['Arsenal', 'Aston Villa', 'Bournemouth', 'Brentford', 'Brighton & Hove Albion',
+              'Burnley', 'Chelsea', 'Crystal Palace', 'Everton', 'Fulham', 'Liverpool',
+              'Luton Town', 'Manchester City', 'Manchester United', 'Newcastle United',
+              'Nottingham Forest', 'Sheffield United', 'Tottenham Hotspur', 'West Ham United',
+              'Wolverhampton Wanderers'],
+  '2022/23': ['Arsenal', 'Aston Villa', 'Bournemouth', 'Brentford', 'Brighton & Hove Albion',
+              'Chelsea', 'Crystal Palace', 'Everton', 'Fulham', 'Leeds United', 'Leicester City',
+              'Liverpool', 'Manchester City', 'Manchester United', 'Newcastle United',
+              'Nottingham Forest', 'Southampton', 'Tottenham Hotspur', 'West Ham United',
+              'Wolverhampton Wanderers'],
+  '2021/22': ['Arsenal', 'Aston Villa', 'Brentford', 'Brighton & Hove Albion', 'Burnley',
+              'Chelsea', 'Crystal Palace', 'Everton', 'Leeds United', 'Leicester City',
+              'Liverpool', 'Manchester City', 'Manchester United', 'Newcastle United',
+              'Norwich City', 'Southampton', 'Tottenham Hotspur', 'Watford', 'West Ham United',
+              'Wolverhampton Wanderers'],
+  '2020/21': ['Arsenal', 'Aston Villa', 'Brighton & Hove Albion', 'Burnley', 'Chelsea',
+              'Crystal Palace', 'Everton', 'Fulham', 'Leeds United', 'Leicester City',
+              'Liverpool', 'Manchester City', 'Manchester United', 'Newcastle United',
+              'Sheffield United', 'Southampton', 'Tottenham Hotspur', 'West Bromwich Albion',
+              'West Ham United', 'Wolverhampton Wanderers'],
+  '2019/20': ['Arsenal', 'Aston Villa', 'Bournemouth', 'Brighton & Hove Albion', 'Burnley',
+              'Chelsea', 'Crystal Palace', 'Everton', 'Leicester City', 'Liverpool',
+              'Manchester City', 'Manchester United', 'Newcastle United', 'Norwich City',
+              'Sheffield United', 'Southampton', 'Tottenham Hotspur', 'Watford',
+              'West Ham United', 'Wolverhampton Wanderers'],
+  '2018/19': ['Arsenal', 'Bournemouth', 'Brighton & Hove Albion', 'Burnley', 'Cardiff City',
+              'Chelsea', 'Crystal Palace', 'Everton', 'Fulham', 'Huddersfield Town',
+              'Leicester City', 'Liverpool', 'Manchester City', 'Manchester United',
+              'Newcastle United', 'Southampton', 'Tottenham Hotspur', 'Watford',
+              'West Ham United', 'Wolverhampton Wanderers'],
+  '2017/18': ['Arsenal', 'Bournemouth', 'Brighton & Hove Albion', 'Burnley', 'Chelsea',
+              'Crystal Palace', 'Everton', 'Huddersfield Town', 'Leicester City', 'Liverpool',
+              'Manchester City', 'Manchester United', 'Newcastle United', 'Southampton',
+              'Stoke City', 'Swansea City', 'Tottenham Hotspur', 'Watford',
+              'West Bromwich Albion', 'West Ham United'],
+  '2016/17': ['Arsenal', 'Bournemouth', 'Burnley', 'Chelsea', 'Crystal Palace', 'Everton',
+              'Hull City', 'Leicester City', 'Liverpool', 'Manchester City',
+              'Manchester United', 'Middlesbrough', 'Southampton', 'Stoke City', 'Sunderland',
+              'Swansea City', 'Tottenham Hotspur', 'Watford', 'West Bromwich Albion',
+              'West Ham United'],
+  '2015/16': ['Arsenal', 'Aston Villa', 'Bournemouth', 'Chelsea', 'Crystal Palace', 'Everton',
+              'Leicester City', 'Liverpool', 'Manchester City', 'Manchester United',
+              'Newcastle United', 'Norwich City', 'Southampton', 'Stoke City', 'Sunderland',
+              'Swansea City', 'Tottenham Hotspur', 'Watford', 'West Bromwich Albion',
+              'West Ham United'],
+  '2014/15': ['Arsenal', 'Aston Villa', 'Burnley', 'Chelsea', 'Crystal Palace', 'Everton',
+              'Hull City', 'Leicester City', 'Liverpool', 'Manchester City',
+              'Manchester United', 'Newcastle United', 'Queens Park Rangers', 'Southampton',
+              'Stoke City', 'Sunderland', 'Swansea City', 'Tottenham Hotspur',
+              'West Bromwich Albion', 'West Ham United'],
+  '2013/14': ['Arsenal', 'Aston Villa', 'Cardiff City', 'Chelsea', 'Crystal Palace', 'Everton',
+              'Fulham', 'Hull City', 'Liverpool', 'Manchester City', 'Manchester United',
+              'Newcastle United', 'Norwich City', 'Southampton', 'Stoke City', 'Sunderland',
+              'Swansea City', 'Tottenham Hotspur', 'West Bromwich Albion', 'West Ham United'],
+  '2012/13': ['Arsenal', 'Aston Villa', 'Chelsea', 'Everton', 'Fulham', 'Liverpool',
+              'Manchester City', 'Manchester United', 'Newcastle United', 'Norwich City',
+              'Queens Park Rangers', 'Reading', 'Southampton', 'Stoke City', 'Sunderland',
+              'Swansea City', 'Tottenham Hotspur', 'West Bromwich Albion', 'West Ham United',
+              'Wigan Athletic'],
+  '2011/12': ['Arsenal', 'Aston Villa', 'Blackburn Rovers', 'Bolton Wanderers', 'Chelsea',
+              'Everton', 'Fulham', 'Liverpool', 'Manchester City', 'Manchester United',
+              'Newcastle United', 'Norwich City', 'Queens Park Rangers', 'Stoke City',
+              'Sunderland', 'Swansea City', 'Tottenham Hotspur', 'West Bromwich Albion',
+              'Wigan Athletic', 'Wolverhampton Wanderers'],
+};
+
+// FPL name / short-name variants → the canonical club name used in PL_SEASONS.
+// Keys are compared after normalisation (lowercased, non-alphanumerics stripped),
+// so "Nott'm Forest", "nottm forest" and "NFO" all resolve to the same entry.
+// MODEL: same reasoning as UNDERSTAT_TEAM_SLUGS — an explicit alias table beats
+// fuzzy matching, which fails exactly on the clubs whose FPL short name diverges
+// most from their full name (Spurs ↔ Tottenham, Man Utd ↔ Manchester United).
+export const TEAM_NAME_ALIASES = {
+  // FPL `name` short forms
+  'man city':        'Manchester City',
+  'man utd':         'Manchester United',
+  'spurs':           'Tottenham Hotspur',
+  'nottm forest':    'Nottingham Forest',
+  'newcastle':       'Newcastle United',
+  'brighton':        'Brighton & Hove Albion',
+  'leeds':           'Leeds United',
+  'leicester':       'Leicester City',
+  'norwich':         'Norwich City',
+  'ipswich':         'Ipswich Town',
+  'luton':           'Luton Town',
+  'hull':            'Hull City',
+  'cardiff':         'Cardiff City',
+  'stoke':           'Stoke City',
+  'swansea':         'Swansea City',
+  'west brom':       'West Bromwich Albion',
+  'west ham':        'West Ham United',
+  'wolves':          'Wolverhampton Wanderers',
+  'sheffield utd':   'Sheffield United',
+  'qpr':             'Queens Park Rangers',
+  'huddersfield':    'Huddersfield Town',
+  'blackburn':       'Blackburn Rovers',
+  'bolton':          'Bolton Wanderers',
+  'wigan':           'Wigan Athletic',
+  // FPL `shortName` codes — the fallback join key
+  'mci': 'Manchester City',        'mun': 'Manchester United',
+  'tot': 'Tottenham Hotspur',      'nfo': 'Nottingham Forest',
+  'new': 'Newcastle United',       'bha': 'Brighton & Hove Albion',
+  'lee': 'Leeds United',           'lei': 'Leicester City',
+  'nor': 'Norwich City',           'ips': 'Ipswich Town',
+  'lut': 'Luton Town',             'hul': 'Hull City',
+  'car': 'Cardiff City',           'stk': 'Stoke City',
+  'swa': 'Swansea City',           'wba': 'West Bromwich Albion',
+  'whu': 'West Ham United',        'wol': 'Wolverhampton Wanderers',
+  'shu': 'Sheffield United',       'qpr': 'Queens Park Rangers',
+  'hud': 'Huddersfield Town',      'blb': 'Blackburn Rovers',
+  'bol': 'Bolton Wanderers',       'wig': 'Wigan Athletic',
+  'ars': 'Arsenal',                'avl': 'Aston Villa',
+  'bou': 'Bournemouth',            'bre': 'Brentford',
+  'bur': 'Burnley',                'che': 'Chelsea',
+  'cry': 'Crystal Palace',         'eve': 'Everton',
+  'ful': 'Fulham',                 'liv': 'Liverpool',
+  'sou': 'Southampton',            'sun': 'Sunderland',
+  'wat': 'Watford',                'mid': 'Middlesbrough',
+  'rea': 'Reading',
+};
 
 // ─── §3  Home/away split performance ─────────────────────────────────────────
 
@@ -152,7 +329,7 @@ export const ROLE_CLASSIFY_THRESHOLDS = {
 // Anchors for the counter-matchup fallback used when player-level form is missing
 // (no element-summary loaded yet). Maps (team-A attack − team-B defence) from the
 // FPL strength priors to a 0–100 pairing score, centred so the league-average gap
-// lands near 50. Same scale family as EDGE_MIN/EDGE_MAX but tighter (strength
+// lands near 50. Same scale family as OPP_STRENGTH_MIN/MAX but tighter (strength
 // priors compress for the average-team attack-vs-defence spread).
 export const COUNTER_FALLBACK_EDGE = { min: -300, max: 300 };
 

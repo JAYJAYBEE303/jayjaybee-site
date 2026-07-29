@@ -3,11 +3,14 @@
  * Layer: engine (pure). No DOM, no network, no store mutation.
  * Computes fixture-level metrics: base difficulty, home/away split performance,
  * and fixture history (head-to-head). See FEATURE_ENGINE.md §2–§4.
- * All outputs: 0–100, higher = easier/better for the team being scored.
+ * All outputs: 0–100. Higher = easier/better for the team being scored, EXCEPT
+ * calcBaseDifficulty, which is stored higher = HARDER — see its own doc block
+ * and FEATURE_ENGINE.md §1 rule 2 / §2 for why.
  */
 
 import {
-  W_ATTACK_EDGE, W_DEFENCE_EDGE, EDGE_MIN, EDGE_MAX,
+  W_OPP_ATTACK, W_OPP_DEFENCE, OPP_STRENGTH_MIN, OPP_STRENGTH_MAX,
+  TENURE_MAX_PENALTY, TENURE_FLOOR, TENURE_CURVE,
   W_PPG, W_GD, MIN_VENUE_GAMES,
   N_H2H,
 } from '../config.js';
@@ -16,35 +19,75 @@ import { clamp, normaliseLinear } from '../util.js';
 // ─── §2  Base fixture difficulty ─────────────────────────────────────────────
 
 /**
- * Base fixture difficulty for `team` playing `opponent` at the given venue,
- * derived from FPL strength priors. Always available — never estimated.
+ * Points deducted from an opponent's strength reading to reflect how little
+ * recent Premier League history that opponent has.
  *
- * @param {Team} team       team being scored
- * @param {Team} opponent
+ * MODEL: FPL's strength_* priors systematically over-rate newly promoted sides,
+ * because they are seeded rather than earned. Tenure is a pure punishment — it
+ * only ever lowers a reading, and only ever the reading of the side that lacks
+ * history. An established club's own numbers are never touched.
+ *
+ * @param {Team} opponent  the side whose strength is being read
+ * @returns {number}       0–TENURE_MAX_PENALTY; 0 for an ever-present club.
+ *   See FEATURE_ENGINE.md §2.1.
+ */
+export function calcTenurePenalty(opponent) {
+  const ratio = opponent?.plTenure?.ratio ?? 0;
+  const deficit = clamp(0, 1, 1 - ratio);
+  // MODEL: the curve is what keeps this a promoted-team rule rather than a tax
+  // on anyone who was ever in the Championship. A club with several consecutive
+  // recent seasons up carries a small deficit, which TENURE_CURVE shrinks to
+  // near-nothing; a genuine newcomer sits at deficit 1 and takes the full hit.
+  return TENURE_MAX_PENALTY * (deficit ** TENURE_CURVE);
+}
+
+/**
+ * Base fixture difficulty facing `team` — an absolute read of how strong
+ * `opponent` is, tempered by how much top-flight history they actually have.
+ * Always available — never estimated.
+ *
+ * A strong club posts the same high number in whoever's box it appears in:
+ * Man City are a hard fixture for Wolves and for Arsenal alike. Two weak sides
+ * meeting produces a low number on both sides of the tie.
+ *
+ * @param {Team} team       team being scored (used only to resolve venue)
+ * @param {Team} opponent   the side whose strength this measures
  * @param {boolean} isHome  true if `team` is the home side
- * @returns {{value: number, estimated: boolean, attackEdge: number, defenceEdge: number}}
- *   value: 0–100, higher = easier fixture for `team`.
- *   Direction: higher = better for `team`.
- *   See FEATURE_ENGINE.md §2 for the formula.
+ * @returns {{value: number, estimated: boolean, rawStrength: number,
+ *            strengthScore: number, tenurePenalty: number, tenureRatio: number}}
+ *   value: 0–100.
+ *   Direction: **higher = HARDER for `team`** — the one metric in the engine
+ *   stored inverted relative to FEATURE_ENGINE.md §1 rule 2, because the UI
+ *   surfaces it directly as "how tough is this opponent". engine/composite.js
+ *   applies invert() before weighting it. See FEATURE_ENGINE.md §2.
  */
 export function calcBaseDifficulty(team, opponent, isHome) {
-  // MODEL: venue-specific strength fields enter here — home side uses its home
-  // strengths, away side uses its away strengths. calcHomeAwaySplit then layers
+  // MODEL: the opponent is read at the venue they will actually play at — an
+  // away side is measured on its away strengths. calcHomeAwaySplit then layers
   // a separate, data-driven venue adjustment on top.
-  const ownThreat = isHome ? team.strength.attackHome  : team.strength.attackAway;
-  const ownResist = isHome ? team.strength.defenceHome : team.strength.defenceAway;
   const oppThreat = isHome ? opponent.strength.attackAway  : opponent.strength.attackHome;
   const oppResist = isHome ? opponent.strength.defenceAway : opponent.strength.defenceHome;
 
-  const attackEdge  = ownThreat - oppResist;   // higher = `team` can score
-  const defenceEdge = ownResist - oppThreat;   // higher = `team` can keep them out
-  const rawEdge = (W_ATTACK_EDGE * attackEdge) + (W_DEFENCE_EDGE * defenceEdge);
+  const rawStrength = (W_OPP_ATTACK * oppThreat) + (W_OPP_DEFENCE * oppResist);
+  const strengthScore = normaliseLinear(rawStrength, OPP_STRENGTH_MIN, OPP_STRENGTH_MAX);
+
+  // Tenure can only ever pull a reading DOWN. The outer min() is what stops the
+  // floor from lifting a club that FPL already rates below TENURE_FLOOR.
+  const tenurePenalty = calcTenurePenalty(opponent);
+  const value = tenurePenalty > 0
+    ? Math.min(strengthScore, Math.max(TENURE_FLOOR, strengthScore - tenurePenalty))
+    : strengthScore;
 
   return {
-    value: normaliseLinear(rawEdge, EDGE_MIN, EDGE_MAX),
+    value,
+    // A promoted side's low reading is a known fact, not a data gap — so this
+    // stays false and confidence is untouched. Only genuinely missing inputs
+    // set estimated (CONVENTIONS.md §9, FEATURE_ENGINE.md §8.3).
     estimated: false,
-    attackEdge,
-    defenceEdge,
+    rawStrength,
+    strengthScore,
+    tenurePenalty,
+    tenureRatio: opponent?.plTenure?.ratio ?? 0,
   };
 }
 

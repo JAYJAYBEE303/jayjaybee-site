@@ -14,11 +14,14 @@ import { store } from '../store.js';
 import { BANDS, HORIZONS } from '../config.js';
 import { buildScoreContext, scoreFixture, scoreOverHorizon } from '../engine/composite.js';
 import { calcIndividualDuels } from '../engine/counter.js';
+import { invert } from '../util.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const METRIC_LABELS = {
-  baseDifficulty: 'Base Difficulty',
+  // Suffixed — the ONE row where a high number means a tougher opponent, not a
+  // better fixture (see the label's title= tooltip and buildBreakdownRows()).
+  baseDifficulty: 'Base Difficulty (opponent strength)',
   counterMatchup: 'Counter-Matchup',
   teamForm:       'Team Form',
   homeAway:       'Home/Away Split',
@@ -308,7 +311,7 @@ function buildCard(team, venue, score, fdr, horizonScore, horizon, duels) {
 
     <div class="matchup-card__breakdown">
       <h3 class="matchup-card__section-title">Score Breakdown</h3>
-      ${buildBreakdownRows(score.breakdown)}
+      ${buildBreakdownRows(score.breakdown, venue)}
     </div>
 
     <div class="matchup-card__counter">
@@ -330,22 +333,41 @@ function buildCard(team, venue, score, fdr, horizonScore, horizon, duels) {
  * Build the six sub-metric breakdown rows as an HTML string.
  * Each row: label | bar (width = value%) | value | weight% | est?
  * Bar colour keys off the metric value's own band for at-a-glance diagnosis.
+ *
+ * baseDifficulty is a documented exception (FEATURE_ENGINE.md §1 rule 2, §2):
+ * it is STORED as the opponent's strength — higher = HARDER for the team being
+ * scored — because that is the number this row displays (e.g. "Man City: 80"
+ * regardless of who they're facing). Every other row's stored value is already
+ * higher = better for the team, so bandFromValue() colours it correctly as-is.
+ * Applying that same higher-is-good banding to baseDifficulty's raw value would
+ * colour a brutal fixture green — invert() before banding (display value is
+ * untouched) so the colour means the same thing on every row: green = good for
+ * this team, red = bad for this team.
+ *
+ * @param {object} breakdown  the CompositeScore.breakdown object
+ * @param {'Home'|'Away'} venue  which side of the fixture this card is for
  */
-function buildBreakdownRows(breakdown) {
+function buildBreakdownRows(breakdown, venue) {
   return METRIC_ORDER.map(key => {
     const m       = breakdown[key];
     const val     = Math.round(m.value);
     const pct     = Math.round(m.weight * 100);
-    const barBand = bandFromValue(val);
+    const barBand = key === 'baseDifficulty' ? bandFromValue(invert(m.value)) : bandFromValue(val);
     const estMark = m.estimated
       ? '<span class="breakdown-row__est" title="Estimated — limited data">~</span>'
       : '';
     const rowClass   = m.estimated ? ' breakdown-row--estimated' : '';
     const barEstClass = m.estimated ? ' breakdown-row__bar--estimated' : '';
+    const labelTitle = key === 'baseDifficulty'
+      ? ' title="Shows the OPPONENT\'s strength — a high number means a tougher opponent for this team. The bar colour reflects how good this fixture is for this team, same as every other row."'
+      : '';
+    const label = key === 'homeAway'
+      ? (venue === 'Home' ? 'Home Advantage' : 'Away Disadvantage')
+      : METRIC_LABELS[key];
 
     return `
       <div class="breakdown-row${rowClass}">
-        <span class="breakdown-row__label">${esc(METRIC_LABELS[key])}</span>
+        <span class="breakdown-row__label"${labelTitle}>${esc(label)}</span>
         <div class="breakdown-row__bar-wrap">
           <div class="breakdown-row__bar breakdown-row__bar--${barBand}${barEstClass}" style="width:${val}%"></div>
         </div>
