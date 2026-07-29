@@ -441,11 +441,11 @@ export const BB_MIN_DOUBLES = 2;
 // 700 players at 50/chunk = 14 chunks ≈ 14 yielded frames.
 export const RANKER_CHUNK_SIZE = 50;
 
-// Ranker price filter (Phase 5A): a single "minimum price" threshold selector,
+// Ranker price filter (Phase 5A): a single "maximum price" threshold selector,
 // generated from this range rather than hardcoded <option> strings. Each value
-// means "show players priced at or above this" — "All Prices" (handled
+// means "show players priced at or below this" — "All Prices" (handled
 // separately in ranker.js, not part of this range) stays unrestricted, which
-// already includes anyone above PRICE_FILTER_MAX too.
+// already includes anyone below PRICE_FILTER_MIN too.
 export const PRICE_FILTER_MIN  = 4.0;
 export const PRICE_FILTER_MAX  = 10.0;
 export const PRICE_FILTER_STEP = 0.5;

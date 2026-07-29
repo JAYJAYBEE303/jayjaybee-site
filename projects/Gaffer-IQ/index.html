@@ -49,50 +49,55 @@
 
       <section class="module-view" data-module="ranker" aria-label="Player Ranker">
 
-        <div class="ranker-controls">
-          <div class="ranker-controls__pos-group" role="group" aria-label="Filter by position">
-            <button class="ranker-pos-btn is-active" data-pos="GKP" type="button">GKP</button>
-            <button class="ranker-pos-btn is-active" data-pos="DEF" type="button">DEF</button>
-            <button class="ranker-pos-btn is-active" data-pos="MID" type="button">MID</button>
-            <button class="ranker-pos-btn is-active" data-pos="FWD" type="button">FWD</button>
+        <!-- Two-column shell: filters panel (left) + table (right) — mirrors
+             .dash-shell / .planner-shell's 300px-sidebar + 1fr-main pattern. -->
+        <div class="ranker-shell">
+
+          <aside class="ranker-filters" aria-label="Ranker filters">
+            <div class="ranker-controls__pos-group" role="group" aria-label="Filter by position">
+              <button class="ranker-pos-btn is-active" data-pos="GKP" type="button">GKP</button>
+              <button class="ranker-pos-btn is-active" data-pos="DEF" type="button">DEF</button>
+              <button class="ranker-pos-btn is-active" data-pos="MID" type="button">MID</button>
+              <button class="ranker-pos-btn is-active" data-pos="FWD" type="button">FWD</button>
+            </div>
+
+            <div class="ranker-controls__pos-group" role="group" aria-label="Filter by playtime security">
+              <button class="ranker-minsec-btn is-active" data-minsec="Guaranteed" type="button">Guaranteed</button>
+              <button class="ranker-minsec-btn is-active" data-minsec="Likely"     type="button">Likely</button>
+              <button class="ranker-minsec-btn is-active" data-minsec="Rotation"   type="button">Rotation</button>
+              <button class="ranker-minsec-btn is-active" data-minsec="Risk"       type="button">Risk</button>
+            </div>
+
+            <div class="ranker-controls__select-wrap">
+              <label class="ranker-controls__label" for="ranker-price">Price</label>
+              <select class="ranker-select" id="ranker-price">
+                <option value="all">All Prices</option>
+              </select>
+            </div>
+
+            <div class="ranker-controls__select-wrap">
+              <label class="ranker-controls__label" for="ranker-team">Team</label>
+              <select class="ranker-select" id="ranker-team">
+                <option value="all">All teams</option>
+              </select>
+            </div>
+          </aside>
+
+          <div class="ranker-main">
+            <div class="ranker-loading" id="ranker-loading">
+              <span class="ranker-loading__text">Computing rankings…</span>
+            </div>
+
+            <div class="ranker-table-wrap">
+              <table class="ranker-table">
+                <thead id="ranker-thead"></thead>
+                <tbody id="ranker-tbody">
+                  <tr><td class="ranker-table__empty" colspan="11">Loading FPL data…</td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
 
-          <div class="ranker-controls__pos-group" role="group" aria-label="Filter by minutes security">
-            <button class="ranker-minsec-btn is-active" data-minsec="Nailed"   type="button">Nailed</button>
-            <button class="ranker-minsec-btn is-active" data-minsec="Likely"   type="button">Likely</button>
-            <button class="ranker-minsec-btn is-active" data-minsec="Rotation" type="button">Rotation</button>
-            <button class="ranker-minsec-btn is-active" data-minsec="Risk"     type="button">Risk</button>
-          </div>
-
-          <div class="ranker-controls__select-wrap">
-            <label class="ranker-controls__label" for="ranker-price">Price</label>
-            <select class="ranker-select" id="ranker-price">
-              <option value="all">All Prices</option>
-            </select>
-          </div>
-
-          <div class="ranker-controls__select-wrap">
-            <label class="ranker-controls__label" for="ranker-team">Team</label>
-            <select class="ranker-select" id="ranker-team">
-              <option value="all">All teams</option>
-            </select>
-          </div>
-
-          <button class="ranker-toggle-btn" id="ranker-price-change-toggle"
-                  type="button" aria-pressed="false">Price Changes</button>
-        </div>
-
-        <div class="ranker-loading" id="ranker-loading">
-          <span class="ranker-loading__text">Computing rankings…</span>
-        </div>
-
-        <div class="ranker-table-wrap">
-          <table class="ranker-table">
-            <thead id="ranker-thead"></thead>
-            <tbody id="ranker-tbody">
-              <tr><td class="ranker-table__empty" colspan="10">Loading FPL data…</td></tr>
-            </tbody>
-          </table>
         </div>
 
       </section>

@@ -23,10 +23,10 @@ import { calcPriceChangeRisk } from '../engine/prices.js';
 // label and band. Checked in order; first threshold met wins.
 
 const MIN_SEC_LEVELS = [
-  { threshold: 0.85, label: 'Nailed',   band: 'great' },
-  { threshold: 0.65, label: 'Likely',   band: 'good' },
-  { threshold: 0.40, label: 'Rotation', band: 'neutral' },
-  { threshold: 0,    label: 'Risk',     band: 'tough' },
+  { threshold: 0.85, label: 'Guaranteed', band: 'great' },
+  { threshold: 0.65, label: 'Likely',     band: 'good' },
+  { threshold: 0.40, label: 'Rotation',   band: 'neutral' },
+  { threshold: 0,    label: 'Risk',       band: 'tough' },
 ];
 
 // ─── Module-level state ───────────────────────────────────────────────────────
@@ -36,7 +36,6 @@ let _tbody              = null;
 let _loading            = null;
 let _teamSelect         = null;
 let _priceSelect        = null;
-let _priceChangeToggle  = null;
 
 // Scored rows rebuilt on data:ready or horizon:changed; cached so filter and
 // sort changes do not re-invoke the engine.
@@ -48,12 +47,11 @@ let _computeId = 0;
 
 // Active filter / sort / display state.
 let _activePosSet    = new Set(['GKP', 'DEF', 'MID', 'FWD']);
-let _activePriceBand = 'all';      // 'all' | numeric-string minimum price threshold
+let _activePriceBand = 'all';      // 'all' | numeric-string maximum price threshold
 let _activeTeamId    = 'all';
 let _activeMinSecSet = new Set(MIN_SEC_LEVELS.map(l => l.label)); // all levels active by default
-let _sortBy          = 'value';    // 'value' | 'costPerPoint' | 'price' | 'minutesSecurity'
+let _sortBy          = 'value';    // 'value' | 'costPerPoint' | 'price' | 'minutesSecurity' | 'name' | 'team' | 'avgPointsPerGw' | 'nextFixtureScore'
 let _sortDesc        = true;
-let _showPriceChange = false;      // true = show price change indicator column
 
 // In-flight lazy loads keyed by playerId so concurrent clicks on the same
 // player share one Promise and never fire duplicate network requests.
@@ -115,16 +113,16 @@ function minSecLevel(ms) {
 /**
  * Price filter — `band` is either 'all' (unrestricted — includes players both
  * below PRICE_FILTER_MIN and above PRICE_FILTER_MAX) or a numeric-string
- * minimum-price threshold, e.g. '6.5' meaning "£6.5m and above".
+ * maximum-price threshold, e.g. '9.0' meaning "£9.0m and below".
  */
 function priceInBand(price, band) {
   if (band === 'all') return true;
-  return price >= parseFloat(band);
+  return price <= parseFloat(band);
 }
 
 /**
  * Populate the price <select> with 'All Prices' plus a generated run of
- * minimum-price thresholds from PRICE_FILTER_MIN to PRICE_FILTER_MAX in
+ * maximum-price thresholds from PRICE_FILTER_MIN to PRICE_FILTER_MAX in
  * PRICE_FILTER_STEP increments (config-driven — see config.js §11).
  */
 function populatePriceFilter() {
@@ -134,7 +132,7 @@ function populatePriceFilter() {
   const steps = Math.round((PRICE_FILTER_MAX - PRICE_FILTER_MIN) / PRICE_FILTER_STEP);
   for (let i = 0; i <= steps; i++) {
     const price = Math.round((PRICE_FILTER_MIN + i * PRICE_FILTER_STEP) * 10) / 10;
-    options.push(`<option value="${price}">£${price.toFixed(1)}m+</option>`);
+    options.push(`<option value="${price}">£${price.toFixed(1)}m and below</option>`);
   }
   _priceSelect.innerHTML = options.join('');
 }
@@ -254,12 +252,25 @@ function applySort(rows) {
       if (bv === null) return -1;
       return _sortDesc ? (bv - av) : (av - bv);
     }
+    // String columns use localeCompare, not subtraction. Same descending-first
+    // convention as every numeric column, for consistency (first click = 'Z'
+    // first) — the sort-arrow indicator shows the direction either way.
+    if (_sortBy === 'name' || _sortBy === 'team') {
+      const av = _sortBy === 'name' ? a.player.name : (a.team?.name ?? '');
+      const bv = _sortBy === 'name' ? b.player.name : (b.team?.name ?? '');
+      const cmp = av.localeCompare(bv);
+      return _sortDesc ? -cmp : cmp;
+    }
     let av, bv;
     if (_sortBy === 'price') {
       av = a.player.price; bv = b.player.price;
     } else if (_sortBy === 'minutesSecurity') {
       av = a.score.breakdown?.form?.minutesSecurity ?? 0;
       bv = b.score.breakdown?.form?.minutesSecurity ?? 0;
+    } else if (_sortBy === 'avgPointsPerGw') {
+      av = a.score.avgPointsPerGw.value; bv = b.score.avgPointsPerGw.value;
+    } else if (_sortBy === 'nextFixtureScore') {
+      av = a.score.nextFixtureScore.value; bv = b.score.nextFixtureScore.value;
     } else {
       av = a.score.value; bv = b.score.value;
     }
@@ -356,7 +367,7 @@ function buildRow({ player, team, score }, nextFixtureRankById) {
       <td class="ranker-table__td ranker-table__td--min">
         <span class="ranker-min-badge ranker-min-badge--${esc(lvl.band)}">${esc(lvl.label)}</span>
       </td>
-      ${_showPriceChange ? buildPriceChangeCell(player) : ''}
+      ${buildPriceChangeCell(player)}
     </tr>
   `.trim();
 }
@@ -364,12 +375,11 @@ function buildRow({ player, team, score }, nextFixtureRankById) {
 // ─── Price change helpers ─────────────────────────────────────────────────────
 
 /**
- * Dynamic column count: 10 base (Player, Team, Pos, Price, Value, Cost/Pt,
- * Avg Pts, Next Fixture, Fixtures, Min) + 1 when the price change column is
- * visible.
+ * Fixed column count: Player, Team, Pos, Price, Value, Cost/Pt, Avg Pts,
+ * Next Fixture, Fixtures, Playtime, Price Change — always all 11, no toggle.
  */
 function colCount() {
-  return _showPriceChange ? 11 : 10;
+  return 11;
 }
 
 /**
@@ -416,17 +426,17 @@ function renderThead() {
 
   _thead.innerHTML = `
     <tr>
-      ${thStatic('Player',      'name')}
-      ${thStatic('Team',        'team')}
+      ${thSortable('Player',    'name')}
+      ${thSortable('Team',      'team')}
       ${thStatic('Pos',         'pos')}
       ${thSortable('Price',     'price')}
       ${thSortable('Value',     'value')}
       ${thSortable('Cost/Pt',   'costPerPoint')}
-      ${thStatic('Avg Pts/GW',  'avg-pts')}
-      ${thStatic('Next Fixture', 'next-fixture')}
+      ${thSortable('Avg Pts/GW', 'avgPointsPerGw')}
+      ${thSortable('Next Fixture', 'nextFixtureScore')}
       ${thStatic(horizon.label, 'fixtures')}
-      ${thSortable('Min',       'minutesSecurity')}
-      ${_showPriceChange ? thStatic('£↑↓', 'price-change') : ''}
+      ${thSortable('Playtime',  'minutesSecurity')}
+      ${thStatic('£↑↓',         'price-change')}
     </tr>
   `;
 }
@@ -555,7 +565,6 @@ export function initRanker() {
   _loading            = root.querySelector('#ranker-loading');
   _teamSelect         = root.querySelector('#ranker-team');
   _priceSelect        = root.querySelector('#ranker-price');
-  _priceChangeToggle  = root.querySelector('#ranker-price-change-toggle');
 
   populatePriceFilter();
 
@@ -603,14 +612,6 @@ export function initRanker() {
 
   _teamSelect?.addEventListener('change', () => {
     _activeTeamId = _teamSelect.value;
-    renderTable();
-  });
-
-  // ── Price change column toggle ────────────────────────────────────────────
-  _priceChangeToggle?.addEventListener('click', () => {
-    _showPriceChange = !_showPriceChange;
-    _priceChangeToggle.textContent = _showPriceChange ? 'Hide Price Changes' : 'Price Changes';
-    _priceChangeToggle.setAttribute('aria-pressed', String(_showPriceChange));
     renderTable();
   });
 
