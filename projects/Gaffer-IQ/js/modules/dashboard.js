@@ -18,7 +18,7 @@
  */
 
 import { store }       from '../store.js';
-import { HORIZONS }    from '../config.js';
+import { HORIZONS, BANDS } from '../config.js';
 import { buildScoreContext, scorePlayer } from '../engine/composite.js';
 import { fetchLivePoints }               from '../api.js';
 import { fetchAndMapSquad, loadSavedTeamId, saveTeamId, resolveImportGw } from '../squadImport.js';
@@ -129,6 +129,105 @@ function esc(str) {
  */
 function isScoreEstimated(score) {
   return Boolean(score?.breakdown?.form?.estimated || score?.breakdown?.counter?.estimated);
+}
+
+/**
+ * Map a 0–100 value to a band string, reading thresholds from config so this
+ * render helper stays in sync with the engine. Not analytical — display only.
+ * Mirrors matchup.js's bandFromValue (each module keeps its own per CONVENTIONS.md).
+ */
+function bandFromValue(v) {
+  if (v >= BANDS.great)   return 'great';
+  if (v >= BANDS.good)    return 'good';
+  if (v >= BANDS.neutral) return 'neutral';
+  if (v >= BANDS.tough)   return 'tough';
+  return 'brutal';
+}
+
+// ─── Score breakdown disclosure (Phase 6) ─────────────────────────────────────
+
+/**
+ * scorePlayer's breakdown is { form, fixture, counter } (FEATURE_ENGINE.md §10)
+ * — a different shape from scoreFixture's { baseDifficulty, counterMatchup,
+ * teamForm, homeAway, styleClash, history } breakdown that matchup.js's
+ * buildBreakdownRows renders. Same visual pattern (bar + value + weight%),
+ * different schema — so the row markup is duplicated here in miniature
+ * rather than importing matchup.js's private (unexported) helper.
+ */
+const BREAKDOWN_ORDER  = ['form', 'fixture', 'counter'];
+const BREAKDOWN_LABELS = { form: 'Form', fixture: 'Fixture', counter: 'Counter' };
+
+/**
+ * Build the "which fixture is this" context line for a breakdown panel.
+ * Dashboard is GW1-locked, so score.perGw has exactly one entry (or two for
+ * a double GW, or none if the team has no ctx entry) — use the first.
+ */
+function buildFixtureContextLabel(score) {
+  const gw = score?.perGw?.[0];
+  if (!gw) return HORIZON.label;
+  if (gw.isBlank) return `GW${gw.gw} — Blank`;
+  return `GW${gw.gw} vs ${gw.opponent ?? '?'} (${gw.venue ?? '?'})`;
+}
+
+/**
+ * Build the three breakdown rows (Form / Fixture / Counter) for a
+ * scorePlayer breakdown. Same row markup/classes as matchup.js's
+ * buildBreakdownRows (bar + value + weight% + est marker) for visual
+ * consistency across the app — see components.css .breakdown-row*.
+ */
+function buildScoreBreakdownRows(breakdown) {
+  return BREAKDOWN_ORDER.map(key => {
+    const m = breakdown?.[key];
+    if (!m) return '';
+    const val         = Math.round(m.value);
+    const pct         = Math.round(m.weight * 100);
+    const band        = bandFromValue(val);
+    const estMark     = m.estimated
+      ? '<span class="breakdown-row__est" title="Estimated — limited data">~</span>'
+      : '';
+    const rowClass    = m.estimated ? ' breakdown-row--estimated' : '';
+    const barEstClass = m.estimated ? ' breakdown-row__bar--estimated' : '';
+
+    return `
+      <div class="breakdown-row${rowClass}">
+        <span class="breakdown-row__label">${esc(BREAKDOWN_LABELS[key])}</span>
+        <div class="breakdown-row__bar-wrap">
+          <div class="breakdown-row__bar breakdown-row__bar--${band}${barEstClass}" style="width:${val}%"></div>
+        </div>
+        <span class="breakdown-row__value">${val}</span>
+        <span class="breakdown-row__weight">${pct}%</span>
+        ${estMark}
+      </div>
+    `.trim();
+  }).join('');
+}
+
+/**
+ * Wrap a score chip in a <details> disclosure that reveals its form/fixture/
+ * counter breakdown on click — same collapsible pattern as matchup.js's
+ * Individual Duels section. The chip itself is the <summary>, so clicking
+ * the chip is what reveals the breakdown (ARCHITECTURE.md §8: every
+ * displayed score must be explainable via its breakdown).
+ *
+ * @param {Player} player
+ * @param {object} score   scorePlayer result
+ * @returns {string} HTML — '' if score is missing (not yet scored)
+ */
+function buildBreakdownDetails(player, score) {
+  if (!score) return '';
+  const estClass = isScoreEstimated(score) ? ' score-chip--estimated' : '';
+  const chip     = `<span class="score-chip score-chip--${esc(score.band)}${estClass}">${Math.round(score.value)}</span>`;
+  const context  = buildFixtureContextLabel(score);
+
+  return `
+    <details class="dash-breakdown">
+      <summary class="dash-breakdown__summary" aria-label="Show score breakdown for ${esc(player.name)}">${chip}</summary>
+      <div class="dash-breakdown__panel">
+        <div class="dash-breakdown__panel-title">${esc(player.name)} — ${esc(context)}</div>
+        ${buildScoreBreakdownRows(score.breakdown)}
+      </div>
+    </details>
+  `.trim();
 }
 
 function buildCtx() {
@@ -559,15 +658,14 @@ function renderSquadPanel() {
     for (const player of playersInPos) {
       const score = _scores.get(player.id);
       const team  = store.getTeam(player.teamId);
-      const estClass = score && isScoreEstimated(score) ? ' score-chip--estimated' : '';
-      const chip  = score
-        ? `<span class="score-chip score-chip--${esc(score.band)}${estClass}">${Math.round(score.value)}</span>`
-        : '';
+      const price = (typeof player.price === 'number' && !isNaN(player.price))
+        ? player.price.toFixed(1) : '?.?';
       slots.push(`
         <div class="dash-squad-slot dash-squad-slot--filled">
           <span class="dash-squad-slot__name">${esc(player.name)}</span>
           <span class="dash-squad-slot__team">${team ? esc(team.shortName) : '—'}</span>
-          ${chip}
+          <span class="dash-squad-slot__price">£${price}m</span>
+          ${buildBreakdownDetails(player, score)}
           <button class="dash-squad-slot__remove"
                   data-remove-id="${player.id}"
                   type="button"
@@ -659,20 +757,8 @@ function renderCaptainBlock(entry) {
     ? `<span class="ranker-status-badge" title="${esc(player.statusNote || player.status)}">!</span>`
     : '';
 
-  const bd   = score.breakdown ?? {};
-  const bars = [
-    { label: 'Form',    value: Math.round(bd.form?.value    ?? 0) },
-    { label: 'Fixture', value: Math.round(bd.fixture?.value ?? 0) },
-    { label: 'Counter', value: Math.round(bd.counter?.value ?? 0) },
-  ].map(({ label, value }) => `
-    <div class="dash-captain__breakdown-bar">
-      <span class="dash-captain__breakdown-label">${esc(label)}</span>
-      <div class="dash-captain__breakdown-track">
-        <div class="dash-captain__breakdown-fill" style="width:${value}%"></div>
-      </div>
-      <span class="dash-captain__breakdown-value">${value}</span>
-    </div>
-  `.trim()).join('');
+  const price = (typeof player.price === 'number' && !isNaN(player.price))
+    ? player.price.toFixed(1) : '?.?';
 
   const flagsHtml = flags.length
     ? `<div class="dash-player-row__flags" style="margin-top:var(--space-2)">${buildFlagChips(flags)}</div>`
@@ -688,16 +774,17 @@ function renderCaptainBlock(entry) {
         <div>
           <div class="dash-captain__title">Captain Pick</div>
           <div class="dash-captain__name">
-            ${esc(player.name)}${statusMark}${team ? `<span class="dash-captain__team">${esc(team.shortName)}</span>` : ''}
+            ${esc(player.name)}${statusMark}
+            <span class="dash-captain__price">£${price}m</span>
+            ${team ? `<span class="dash-captain__team">${esc(team.shortName)}</span>` : ''}
           </div>
         </div>
         <div class="dash-captain__score-wrap">
-          <span class="score-chip score-chip--${esc(score.band)}${isScoreEstimated(score) ? ' score-chip--estimated' : ''}">${Math.round(score.value)}</span>
+          ${buildBreakdownDetails(player, score)}
           ${captainLiveHtml}
         </div>
       </div>
       ${flagsHtml}
-      <div class="dash-captain__breakdown">${bars}</div>
     </div>
   `.trim();
 }
@@ -721,9 +808,10 @@ function renderPlayerRow(entry, captainId) {
     ? `<span class="ranker-status-badge" title="${esc(player.statusNote || player.status)}">!</span>`
     : '';
 
-  const estClass   = isScoreEstimated(score) ? ' score-chip--estimated' : '';
   // Live points: captain's points are doubled in FPL — show both raw and ×2.
-  const liveHtml   = buildLivePtsHtml(player.id, isCaptain);
+  const liveHtml = buildLivePtsHtml(player.id, isCaptain);
+  const price = (typeof player.price === 'number' && !isNaN(player.price))
+    ? player.price.toFixed(1) : '?.?';
 
   return `
     <div class="dash-player-row${isCaptain ? ' dash-player-row--captain' : ''}">
@@ -734,8 +822,9 @@ function renderPlayerRow(entry, captainId) {
         ${esc(player.name)}${statusMark}${isCaptain ? '<span class="dash-player-row__captain-mark">&nbsp;(C)</span>' : ''}
       </span>
       <span class="dash-player-row__team">${team ? esc(team.shortName) : '—'}</span>
+      <span class="dash-player-row__price">£${price}m</span>
       <span class="dash-player-row__score">
-        <span class="score-chip score-chip--${esc(score.band)}${estClass}">${Math.round(score.value)}</span>
+        ${buildBreakdownDetails(player, score)}
         ${liveHtml}
       </span>
       ${flags.length ? `<span class="dash-player-row__flags">${buildFlagChips(flags)}</span>` : ''}
