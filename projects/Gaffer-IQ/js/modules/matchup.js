@@ -13,7 +13,7 @@
 import { store } from '../store.js';
 import { BANDS, HORIZONS } from '../config.js';
 import { buildScoreContext, scoreFixture, scoreOverHorizon } from '../engine/composite.js';
-import { calcIndividualDuels } from '../engine/counter.js';
+import { calcIndividualDuels, calcCounterMatchupMirrored } from '../engine/counter.js';
 import { invert } from '../util.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -39,10 +39,29 @@ const METRIC_ORDER = [
   'history',
 ];
 
+// Attacking pairing labels. Covers both the role-mode keys (stVsCb/wmVsFb/
+// cmVsCbDm — Phase 3C, active whenever ICT data is available) and the
+// element-fallback keys (fwdVsCb/wideMidVsFb/camVsCbMid — Phase 1, active
+// when it isn't). Previously only the fallback keys were mapped, so the
+// role-mode pairings (the common case) silently rendered raw camelCase keys.
 const PAIRING_LABELS = {
+  stVsCb:      'ST/SS vs CB',
+  wmVsFb:      'Wide MID vs FB',
+  cmVsCbDm:    'CM/SS vs CB+DM',
   fwdVsCb:     'FWD vs CB',
   wideMidVsFb: 'Wide MID vs FB',
   camVsCbMid:  'CAM vs CB+DM',
+};
+
+// Defending mirror of PAIRING_LABELS — same units, defender-first phrasing.
+// Keys must match MIRRORED_PAIRING_KEYS in engine/counter.js.
+const DEFENDING_PAIRING_LABELS = {
+  cbVsSt:      'CB vs ST/SS',
+  fbVsWm:      'FB vs Wide MID',
+  cbDmVsCm:    'CB+DM vs CM/SS',
+  cbVsFwd:     'CB vs FWD',
+  fbVsWideMid: 'FB vs Wide MID',
+  cbMidVsCam:  'CB+DM vs CAM',
 };
 
 // ─── Module-level state ───────────────────────────────────────────────────────
@@ -211,12 +230,20 @@ function renderMatchup() {
   const homeDuels = calcIndividualDuels(homeTeam, awayTeam, ctx);
   const awayDuels = calcIndividualDuels(awayTeam, homeTeam, ctx);
 
+  // Defending Counters: the SAME attack-vs-defence pairing as the other card's
+  // Attacking Counters, re-read from the defending side (100 - value, by
+  // construction — see calcCounterMatchupMirrored). Home's defence faced away's
+  // attack, so home's mirror comes from awayScore's attacking pairings, and
+  // vice versa.
+  const homeDefending = calcCounterMatchupMirrored(awayScore.breakdown.counterMatchup);
+  const awayDefending = calcCounterMatchupMirrored(homeScore.breakdown.counterMatchup);
+
   _grid.innerHTML = '';
   _grid.appendChild(
-    buildCard(homeTeam, 'Home', homeScore, fixture.fplDifficulty.home, homeHorizonScore, horizon, homeDuels),
+    buildCard(homeTeam, 'Home', homeScore, fixture.fplDifficulty.home, homeHorizonScore, horizon, homeDuels, homeDefending),
   );
   _grid.appendChild(
-    buildCard(awayTeam, 'Away', awayScore, fixture.fplDifficulty.away, awayHorizonScore, horizon, awayDuels),
+    buildCard(awayTeam, 'Away', awayScore, fixture.fplDifficulty.away, awayHorizonScore, horizon, awayDuels, awayDefending),
   );
 }
 
@@ -259,9 +286,12 @@ function buildPerGwStrip(perGw) {
  * @param {{label:string, gws:number}} horizon  active horizon config
  * @param {Array}          duels         from calcIndividualDuels — may be [] when
  *                                       summaries / ICT data aren't loaded
+ * @param {{pairings: Object, estimated: boolean}} defending
+ *   from calcCounterMatchupMirrored — this team's defence vs the opponent's
+ *   attack, derived from the opponent's own attacking pairings.
  * @returns {HTMLElement}
  */
-function buildCard(team, venue, score, fdr, horizonScore, horizon, duels) {
+function buildCard(team, venue, score, fdr, horizonScore, horizon, duels, defending) {
   const card = document.createElement('article');
   card.className = `matchup-card matchup-card--${score.band}`;
   if (score.provisional) card.classList.add('matchup-card--provisional');
@@ -315,8 +345,13 @@ function buildCard(team, venue, score, fdr, horizonScore, horizon, duels) {
     </div>
 
     <div class="matchup-card__counter">
-      <h3 class="matchup-card__section-title">Counter-Matchup Pairings</h3>
-      ${buildCounterPairings(score.breakdown.counterMatchup.pairings)}
+      <h3 class="matchup-card__section-title">Attacking Counters</h3>
+      ${buildCounterPairings(score.breakdown.counterMatchup.pairings, PAIRING_LABELS, 'attacking')}
+    </div>
+
+    <div class="matchup-card__counter">
+      <h3 class="matchup-card__section-title">Defending Counters</h3>
+      ${buildCounterPairings(defending.pairings, DEFENDING_PAIRING_LABELS, 'defending')}
     </div>
 
     ${buildIndividualDuels(duels)}
@@ -382,27 +417,40 @@ function buildBreakdownRows(breakdown, venue) {
 // ─── Build: counter-matchup pairings ─────────────────────────────────────────
 
 /**
- * Build the three position-pairing rows (FWD vs CB, Wide MID vs FB, CAM vs CB+DM).
+ * Build position-pairing rows for either the Attacking Counters section
+ * (pairings from calcCounterMatchup) or the Defending Counters section
+ * (pairings from calcCounterMatchupMirrored — same units, value = 100 - the
+ * attacking pairing's, by construction, see engine/counter.js).
  * Attack/defence form values are null when no player summaries are loaded —
  * displayed as "—" and flagged estimated until Phase 2 lazy-loads summaries.
+ *
+ * @param {Object} pairings
+ * @param {Object} labels       PAIRING_LABELS or DEFENDING_PAIRING_LABELS
+ * @param {'attacking'|'defending'} perspective
+ *   'attacking': detail line reads "Atk X / Def Y" (attacker's own card).
+ *   'defending': detail line reads "Def X / Atk Y" — defender's form leads,
+ *   since this section is framed as "my defence vs their attack".
  */
-function buildCounterPairings(pairings) {
+function buildCounterPairings(pairings, labels, perspective) {
   return Object.entries(pairings).map(([key, p]) => {
     const val        = Math.round(p.value);
     const chipBand   = bandFromValue(val);
     const atkDisplay = p.attackForm  !== null ? Math.round(p.attackForm)  : '—';
     const defDisplay = p.defenceForm !== null ? Math.round(p.defenceForm) : '—';
-    const label      = esc(PAIRING_LABELS[key] ?? key);
+    const label      = esc(labels[key] ?? key);
     const estMark    = p.estimated
       ? '<span class="counter-pairing__est" title="Estimated — no player form loaded">~</span>'
       : '';
     const rowClass   = p.estimated ? ' counter-pairing--estimated' : '';
+    const detail     = perspective === 'defending'
+      ? `Def ${esc(String(defDisplay))} / Atk ${esc(String(atkDisplay))}`
+      : `Atk ${esc(String(atkDisplay))} / Def ${esc(String(defDisplay))}`;
 
     return `
       <div class="counter-pairing${rowClass}">
         <span class="counter-pairing__label">${label}</span>
         <span class="score-chip score-chip--${chipBand} counter-pairing__score">${val}</span>
-        <span class="counter-pairing__detail">Atk ${esc(String(atkDisplay))} / Def ${esc(String(defDisplay))}</span>
+        <span class="counter-pairing__detail">${detail}</span>
         ${estMark}
       </div>
     `.trim();

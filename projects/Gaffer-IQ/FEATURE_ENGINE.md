@@ -238,6 +238,19 @@ counterMatchup = Σ (pairingScore(p) * PAIRING_WEIGHT(p)) / Σ PAIRING_WEIGHT(p)
 - **MODEL:** uses minutes-weighting so likely starters drive the score, not fringe squad players. If a unit can't be assembled (missing data), fall back to team-level `strength_attack`/`strength_defence` and flag `estimated: true`.
 - This metric is **asymmetric**: A's attack vs B's defence is a different number from B's attack vs A's defence. Each team's composite uses *its own* attacking counter-matchup.
 
+**Defending Counters (`calcCounterMatchupMirrored`) — UI-explanatory only, Phase 4:**
+The Matchup Analyser shows two labelled sections per team card: **Attacking Counters** (`calcCounterMatchup`, above — this team's attack vs the opponent's defence) and **Defending Counters** — the same interaction, re-read from the defending side, so a viewer can see "my defence vs their attack" without mentally inverting the other team's card.
+
+`calcCounterMatchupMirrored(attackingResult)` takes an *already-computed* `calcCounterMatchup` result (the opponent's attack against this team's defence) and derives each mirrored pairing as:
+```
+mirroredPairing(p).value = 100 - attackingPairing(p).value
+```
+This is **not** a second independent `50 + edge * SENSITIVITY` calculation — it is arithmetically derived from the same computed edge, so `attackingValue + mirroredValue === 100` **exactly**, by construction, for every pairing and for the aggregate. The identity holds even through `clamp(0,100,...)`: for any real `y`, `100 - clamp(0,100,y) === clamp(0,100,100-y)` (trivial by cases: `y<0` → `100-0=100` and `clamp(100-y)=clamp(>100)=100`; `y>100` → `100-100=0` and `clamp(100-y)=clamp(<0)=0`; `0≤y≤100` → both sides equal `100-y`). Verified numerically against real (non-synthetic-formula) pairing data: `stVsCb (67.590909) + cbVsSt (32.409091) = 100.0000000000`, `wmVsFb (54.216756) + fbVsWm (45.783244) = 100.0000000000`, `cmVsCbDm (56.703717) + cbDmVsCm (43.296283) = 100.0000000000`, aggregate `61.177534 + 38.822466 = 100.0000000000`.
+
+Pairing key mirrors (`cbVsSt`, `fbVsWm`, `cbDmVsCm` for role-mode; `cbVsFwd`, `fbVsWideMid`, `cbMidVsCam` for the element-type fallback) live in `engine/counter.js`'s `MIRRORED_PAIRING_KEYS`.
+
+**Composite score: unaffected.** `scoreFixture`'s `WEIGHTS.counterMatchup` still consumes only `calcCounterMatchup`'s aggregate `value` (§8.2) — the mirrored pairings do not feed the composite score, weight, or confidence calculation anywhere. This is a display-only addition to the Matchup Analyser.
+
 ---
 
 ## 8. The composite matchup score (`engine/composite.js → scoreFixture`)

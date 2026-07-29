@@ -301,6 +301,74 @@ export function calcCounterMatchup(teamA, teamB, ctx) {
   };
 }
 
+// ─── Defending Counters (mirrored pairings) ──────────────────────────────────
+
+// Attacking pairing key → its defending mirror. Covers both the role-mode keys
+// (ROLE_ATTACK_GROUPS/ROLE_DEFENCE_GROUPS) and the element-fallback keys
+// (ELEMENT_ATTACK_GROUPS/ELEMENT_DEFENCE_GROUPS) — either can be the active
+// mode depending on ICT data availability, so both need a mirror.
+const MIRRORED_PAIRING_KEYS = {
+  stVsCb:      'cbVsSt',
+  wmVsFb:      'fbVsWm',
+  cmVsCbDm:    'cbDmVsCm',
+  fwdVsCb:     'cbVsFwd',
+  wideMidVsFb: 'fbVsWideMid',
+  camVsCbMid:  'cbMidVsCam',
+};
+
+/**
+ * Derive "Defending Counters" from an already-computed calcCounterMatchup()
+ * result — the same attack-vs-defence interaction, re-read from the defending
+ * side. NOT a second independent calculation: each mirrored pairing's value
+ * is exactly `100 - attackingPairing.value`, so the two are guaranteed to sum
+ * to 100 by construction (see FEATURE_ENGINE.md §7.2). This holds even
+ * through clamp(0,100,...): 100 - clamp(0,100,y) === clamp(0,100,100-y) for
+ * every real y, so the identity survives the attacking side's own clamping.
+ *
+ * Call with the OPPONENT's attacking result to get THIS team's defending
+ * pairings — e.g. for home team's "my defence vs their attack" section, pass
+ * awayTeam's calcCounterMatchup(awayTeam, homeTeam, ctx) result.
+ *
+ * @param {{pairings: Object, estimated: boolean}} attackingResult
+ *   output of calcCounterMatchup (or composite.js's breakdown.counterMatchup,
+ *   same shape) for the OTHER team's attack against this team's defence.
+ * @returns {{value: number, estimated: boolean, pairings: Object}}
+ *   value: 0–100, higher = better defensively for the team this mirror is for.
+ */
+export function calcCounterMatchupMirrored(attackingResult) {
+  const pairings = {};
+  let weightedSum = 0;
+  let totalWeight = 0;
+
+  for (const [key, p] of Object.entries(attackingResult.pairings)) {
+    const mirroredKey = MIRRORED_PAIRING_KEYS[key] ?? `${key}Mirrored`;
+    const mirroredValue = 100 - p.value;
+
+    pairings[mirroredKey] = {
+      value:         mirroredValue,
+      weight:        p.weight,
+      estimated:     p.estimated,
+      attackForm:    p.attackForm,
+      defenceForm:   p.defenceForm,
+      attackerCount: p.attackerCount,
+      defenderCount: p.defenderCount,
+    };
+
+    weightedSum += mirroredValue * p.weight;
+    totalWeight += p.weight;
+  }
+
+  const value = totalWeight === 0
+    ? 50
+    : clamp(0, 100, weightedSum / totalWeight);
+
+  return {
+    value,
+    estimated: attackingResult.estimated || totalWeight === 0,
+    pairings,
+  };
+}
+
 // ─── Phase 4-2: individual player-vs-player duels ────────────────────────────
 
 // MODEL: a baseline 4-4-2 used to pick a likely starting XI by minutes security
