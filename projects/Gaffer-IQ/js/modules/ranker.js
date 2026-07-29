@@ -12,7 +12,7 @@
  */
 
 import { store } from '../store.js';
-import { HORIZONS, RANKER_CHUNK_SIZE } from '../config.js';
+import { HORIZONS, RANKER_CHUNK_SIZE, PRICE_FILTER_MIN, PRICE_FILTER_MAX, PRICE_FILTER_STEP, BANDS } from '../config.js';
 import { buildScoreContext, scorePlayer } from '../engine/composite.js';
 import { fetchPlayerSummary } from '../api.js';
 import { normalisePlayerSummary } from '../engine/normalise.js';
@@ -36,7 +36,6 @@ let _tbody              = null;
 let _loading            = null;
 let _teamSelect         = null;
 let _priceSelect        = null;
-let _vsToggle           = null;
 let _priceChangeToggle  = null;
 
 // Scored rows rebuilt on data:ready or horizon:changed; cached so filter and
@@ -49,11 +48,11 @@ let _computeId = 0;
 
 // Active filter / sort / display state.
 let _activePosSet    = new Set(['GKP', 'DEF', 'MID', 'FWD']);
-let _activePriceBand = 'all';
+let _activePriceBand = 'all';      // 'all' | numeric-string minimum price threshold
 let _activeTeamId    = 'all';
-let _sortBy          = 'value';    // 'value' | 'valueScore' | 'price'
+let _activeMinSecSet = new Set(MIN_SEC_LEVELS.map(l => l.label)); // all levels active by default
+let _sortBy          = 'value';    // 'value' | 'costPerPoint' | 'price' | 'minutesSecurity'
 let _sortDesc        = true;
-let _showVs          = false;      // false = projected value; true = £/pt (valueScore)
 let _showPriceChange = false;      // true = show price change indicator column
 
 // In-flight lazy loads keyed by playerId so concurrent clicks on the same
@@ -91,6 +90,19 @@ function buildCtx() {
   });
 }
 
+/**
+ * Map a 0–100 value to a band string, reading thresholds from config so this
+ * render helper stays in sync with the engine. Not analytical — display only.
+ * Mirrors the identical helper in modules/matchup.js (CONVENTIONS.md §5.2).
+ */
+function bandFromValue(v) {
+  if (v >= BANDS.great)   return 'great';
+  if (v >= BANDS.good)    return 'good';
+  if (v >= BANDS.neutral) return 'neutral';
+  if (v >= BANDS.tough)   return 'tough';
+  return 'brutal';
+}
+
 /** Return the label+band object for a 0–1 minutesSecurity value. */
 function minSecLevel(ms) {
   const v = ms ?? 0;
@@ -100,14 +112,31 @@ function minSecLevel(ms) {
   return MIN_SEC_LEVELS[MIN_SEC_LEVELS.length - 1];
 }
 
-/** Price-band filter — returns true when `price` belongs to `band`. */
+/**
+ * Price filter — `band` is either 'all' (unrestricted — includes players both
+ * below PRICE_FILTER_MIN and above PRICE_FILTER_MAX) or a numeric-string
+ * minimum-price threshold, e.g. '6.5' meaning "£6.5m and above".
+ */
 function priceInBand(price, band) {
-  if (band === 'all')     return true;
-  if (band === 'budget')  return price <= 5.0;
-  if (band === 'mid')     return price > 5.0  && price <= 8.0;
-  if (band === 'premium') return price > 8.0  && price <= 10.0;
-  if (band === 'elite')   return price > 10.0;
-  return true;
+  if (band === 'all') return true;
+  return price >= parseFloat(band);
+}
+
+/**
+ * Populate the price <select> with 'All Prices' plus a generated run of
+ * minimum-price thresholds from PRICE_FILTER_MIN to PRICE_FILTER_MAX in
+ * PRICE_FILTER_STEP increments (config-driven — see config.js §11).
+ */
+function populatePriceFilter() {
+  if (!_priceSelect) return;
+  const options = ['<option value="all">All Prices</option>'];
+  // Round to 1dp to avoid floating-point drift (4.0 + 0.5 + 0.5 + ... ).
+  const steps = Math.round((PRICE_FILTER_MAX - PRICE_FILTER_MIN) / PRICE_FILTER_STEP);
+  for (let i = 0; i <= steps; i++) {
+    const price = Math.round((PRICE_FILTER_MIN + i * PRICE_FILTER_STEP) * 10) / 10;
+    options.push(`<option value="${price}">£${price.toFixed(1)}m+</option>`);
+  }
+  _priceSelect.innerHTML = options.join('');
 }
 
 /** First upcoming unplayed fixture for `teamId`, GW ascending. */
@@ -188,21 +217,52 @@ async function rebuildRowsChunked() {
 // ─── Filter and sort ──────────────────────────────────────────────────────────
 
 function applyFilters(rows) {
-  return rows.filter(({ player }) => {
+  return rows.filter(({ player, score }) => {
     if (!_activePosSet.has(player.position))          return false;
     if (!priceInBand(player.price, _activePriceBand)) return false;
     if (_activeTeamId !== 'all' &&
         String(player.teamId) !== _activeTeamId)      return false;
+    const ms = score.breakdown?.form?.minutesSecurity ?? 0;
+    if (!_activeMinSecSet.has(minSecLevel(ms).label)) return false;
     return true;
   });
 }
 
+/**
+ * Rank every row in `rows` by nextFixtureScore (descending), independent of
+ * whatever column the table is currently sorted by — "next-fixture rank" is a
+ * standing among the CURRENTLY-FILTERED players, not the whole ~700-player
+ * pool, since that's the set the user is actually choosing among.
+ * @returns {Map<number, number>} playerId → 1-based rank
+ */
+function buildNextFixtureRanks(rows) {
+  const ranked = rows.slice()
+    .sort((a, b) => b.score.nextFixtureScore.value - a.score.nextFixtureScore.value);
+  const rankById = new Map();
+  ranked.forEach((row, i) => rankById.set(row.player.id, i + 1));
+  return rankById;
+}
+
 function applySort(rows) {
   return rows.slice().sort((a, b) => {
+    // costPerPoint can be null (no scoring record) — nulls always sort last,
+    // regardless of sort direction, rather than comparing as 0.
+    if (_sortBy === 'costPerPoint') {
+      const av = a.score.costPerPoint, bv = b.score.costPerPoint;
+      if (av === null && bv === null) return 0;
+      if (av === null) return 1;
+      if (bv === null) return -1;
+      return _sortDesc ? (bv - av) : (av - bv);
+    }
     let av, bv;
-    if (_sortBy === 'valueScore') { av = a.score.valueScore; bv = b.score.valueScore; }
-    else if (_sortBy === 'price') { av = a.player.price;     bv = b.player.price; }
-    else                          { av = a.score.value;      bv = b.score.value; }
+    if (_sortBy === 'price') {
+      av = a.player.price; bv = b.player.price;
+    } else if (_sortBy === 'minutesSecurity') {
+      av = a.score.breakdown?.form?.minutesSecurity ?? 0;
+      bv = b.score.breakdown?.form?.minutesSecurity ?? 0;
+    } else {
+      av = a.score.value; bv = b.score.value;
+    }
     return _sortDesc ? (bv - av) : (av - bv);
   });
 }
@@ -235,17 +295,30 @@ function buildFixtureStrip(perGw) {
  * Build a single <tr> HTML string for one player row.
  * minutesSecurity is read from score.breakdown.form (set by composite.js's
  * scorePlayer) to avoid a second calcPlayerForm call per row.
+ *
+ * @param {{player: Player, team: Team, score: object}} row
+ * @param {Map<number, number>} nextFixtureRankById  from buildNextFixtureRanks
  */
-function buildRow({ player, team, score }) {
+function buildRow({ player, team, score }, nextFixtureRankById) {
   const statusMark = player.status !== 'available'
     ? `<span class="ranker-status-badge" title="${esc(player.statusNote || player.status)}">!</span>`
     : '';
   const ms       = score.breakdown?.form?.minutesSecurity ?? 0;
   const lvl      = minSecLevel(ms);
-  const dispVal  = _showVs
-    ? score.valueScore.toFixed(2)
-    : String(Math.round(score.value));
   const estClass = isScoreEstimated(score) ? ' score-chip--estimated' : '';
+
+  const costPerPointDisplay = score.costPerPoint !== null
+    ? `£${esc(score.costPerPoint.toFixed(2))}`
+    : '<span class="ranker-no-fixtures">—</span>';
+
+  const avgPtsEstMark = score.avgPointsPerGw.estimated
+    ? '<span class="ranker-est-mark" title="Estimated — season totals ÷ estimated games played, no per-GW history loaded yet">~</span>'
+    : '';
+
+  const nfScore    = score.nextFixtureScore;
+  const nfRank     = nextFixtureRankById?.get(player.id);
+  const nfBand     = bandFromValue(Math.round(nfScore.value));
+  const nfEstClass = nfScore.estimated ? ' score-chip--estimated' : '';
 
   return `
     <tr class="ranker-table__row" data-player-id="${player.id}"
@@ -264,7 +337,18 @@ function buildRow({ player, team, score }) {
         £${esc(player.price.toFixed(1))}
       </td>
       <td class="ranker-table__td ranker-table__td--value">
-        <span class="score-chip score-chip--${esc(score.band)}${estClass}">${esc(dispVal)}</span>
+        <span class="score-chip score-chip--${esc(score.band)}${estClass}">${Math.round(score.value)}</span>
+      </td>
+      <td class="ranker-table__td ranker-table__td--cost-per-point">
+        ${costPerPointDisplay}
+      </td>
+      <td class="ranker-table__td ranker-table__td--avg-pts">
+        ${score.avgPointsPerGw.value.toFixed(1)}${avgPtsEstMark}
+      </td>
+      <td class="ranker-table__td ranker-table__td--next-fixture"
+          title="Fixture + counter-matchup favourability, excluding form">
+        <span class="score-chip score-chip--${esc(nfBand)}${nfEstClass}">${Math.round(nfScore.value)}</span>
+        ${nfRank ? `<span class="ranker-rank-tag">#${nfRank}</span>` : ''}
       </td>
       <td class="ranker-table__td ranker-table__td--fixtures">
         ${buildFixtureStrip(score.perGw)}
@@ -279,9 +363,13 @@ function buildRow({ player, team, score }) {
 
 // ─── Price change helpers ─────────────────────────────────────────────────────
 
-/** Dynamic column count: 7 base + 1 when the price change column is visible. */
+/**
+ * Dynamic column count: 10 base (Player, Team, Pos, Price, Value, Cost/Pt,
+ * Avg Pts, Next Fixture, Fixtures, Min) + 1 when the price change column is
+ * visible.
+ */
 function colCount() {
-  return _showPriceChange ? 8 : 7;
+  return _showPriceChange ? 11 : 10;
 }
 
 /**
@@ -314,8 +402,6 @@ function buildPriceChangeCell(player) {
 function renderThead() {
   const horizonKey = store.getActiveHorizon();
   const horizon    = HORIZONS[horizonKey] ?? HORIZONS.GW1;
-  const sortCol    = _showVs ? 'valueScore' : 'value';
-  const valueLabel = _showVs ? '£/pt' : 'Value';
 
   function thSortable(label, col) {
     const active = _sortBy === col;
@@ -334,9 +420,12 @@ function renderThead() {
       ${thStatic('Team',        'team')}
       ${thStatic('Pos',         'pos')}
       ${thSortable('Price',     'price')}
-      ${thSortable(valueLabel,  sortCol)}
+      ${thSortable('Value',     'value')}
+      ${thSortable('Cost/Pt',   'costPerPoint')}
+      ${thStatic('Avg Pts/GW',  'avg-pts')}
+      ${thStatic('Next Fixture', 'next-fixture')}
       ${thStatic(horizon.label, 'fixtures')}
-      ${thStatic('Min',         'min')}
+      ${thSortable('Min',       'minutesSecurity')}
       ${_showPriceChange ? thStatic('£↑↓', 'price-change') : ''}
     </tr>
   `;
@@ -356,14 +445,17 @@ function renderTable() {
   }
 
   const filtered = applyFilters(_rows);
-  const sorted   = applySort(filtered);
 
-  if (sorted.length === 0) {
+  if (filtered.length === 0) {
     _tbody.innerHTML = `<tr><td class="ranker-table__empty" colspan="${colCount()}">No players match the current filters.</td></tr>`;
     return;
   }
 
-  _tbody.innerHTML = sorted.map(buildRow).join('');
+  // Ranked among the filtered set, independent of the active sort column.
+  const nextFixtureRankById = buildNextFixtureRanks(filtered);
+  const sorted = applySort(filtered);
+
+  _tbody.innerHTML = sorted.map(row => buildRow(row, nextFixtureRankById)).join('');
 }
 
 // ─── Lazy loading ─────────────────────────────────────────────────────────────
@@ -463,8 +555,9 @@ export function initRanker() {
   _loading            = root.querySelector('#ranker-loading');
   _teamSelect         = root.querySelector('#ranker-team');
   _priceSelect        = root.querySelector('#ranker-price');
-  _vsToggle           = root.querySelector('#ranker-vs-toggle');
   _priceChangeToggle  = root.querySelector('#ranker-price-change-toggle');
+
+  populatePriceFilter();
 
   // ── Position filter toggle buttons ──────────────────────────────────────
   root.querySelectorAll('.ranker-pos-btn').forEach(btn => {
@@ -484,6 +577,24 @@ export function initRanker() {
     });
   });
 
+  // ── Minutes-security filter toggle buttons (mirrors position buttons) ───
+  root.querySelectorAll('.ranker-minsec-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const lvl = btn.dataset.minsec;
+      if (_activeMinSecSet.has(lvl)) {
+        // Keep at least one level active so the table is never empty.
+        if (_activeMinSecSet.size > 1) {
+          _activeMinSecSet.delete(lvl);
+          btn.classList.remove('is-active');
+        }
+      } else {
+        _activeMinSecSet.add(lvl);
+        btn.classList.add('is-active');
+      }
+      renderTable();
+    });
+  });
+
   // ── Price and team filters ───────────────────────────────────────────────
   _priceSelect?.addEventListener('change', () => {
     _activePriceBand = _priceSelect.value;
@@ -492,17 +603,6 @@ export function initRanker() {
 
   _teamSelect?.addEventListener('change', () => {
     _activeTeamId = _teamSelect.value;
-    renderTable();
-  });
-
-  // ── Value / £pt display toggle ───────────────────────────────────────────
-  _vsToggle?.addEventListener('click', () => {
-    _showVs               = !_showVs;
-    _vsToggle.textContent = _showVs ? 'Show Value' : 'Show £/pt';
-    _vsToggle.setAttribute('aria-pressed', String(_showVs));
-    // Keep sort column aligned with the currently displayed metric.
-    if (_showVs  && _sortBy === 'value')      _sortBy = 'valueScore';
-    if (!_showVs && _sortBy === 'valueScore') _sortBy = 'value';
     renderTable();
   });
 

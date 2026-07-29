@@ -555,7 +555,8 @@
   gap: var(--space-1);
 }
 
-.ranker-pos-btn {
+.ranker-pos-btn,
+.ranker-minsec-btn {
   background: var(--color-surface-raised);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -570,13 +571,15 @@
   text-transform: uppercase;
 }
 
-.ranker-pos-btn.is-active {
+.ranker-pos-btn.is-active,
+.ranker-minsec-btn.is-active {
   background: var(--color-accent-muted);
   border-color: var(--color-accent);
   color: var(--color-accent);
 }
 
-.ranker-pos-btn:hover:not(.is-active) {
+.ranker-pos-btn:hover:not(.is-active),
+.ranker-minsec-btn:hover:not(.is-active) {
   border-color: var(--color-muted);
   color: var(--color-text);
 }
@@ -730,13 +733,32 @@
 }
 
 /* Column-specific widths */
-.ranker-table__td--name    { min-width: 9rem; font-weight: 500; }
-.ranker-table__td--team    { white-space: nowrap; color: var(--color-muted); }
-.ranker-table__td--pos     { white-space: nowrap; }
-.ranker-table__td--price   { font-variant-numeric: tabular-nums; white-space: nowrap; }
-.ranker-table__td--value   { white-space: nowrap; }
-.ranker-table__td--fixtures{ white-space: nowrap; }
-.ranker-table__td--min     { white-space: nowrap; }
+.ranker-table__td--name          { min-width: 9rem; font-weight: 500; }
+.ranker-table__td--team          { white-space: nowrap; color: var(--color-muted); }
+.ranker-table__td--pos           { white-space: nowrap; }
+.ranker-table__td--price         { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ranker-table__td--value         { white-space: nowrap; }
+.ranker-table__td--cost-per-point{ font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ranker-table__td--avg-pts       { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ranker-table__td--next-fixture  { white-space: nowrap; }
+.ranker-table__td--fixtures      { white-space: nowrap; }
+.ranker-table__td--min           { white-space: nowrap; }
+
+/* Estimated marker for Avg Pts/GW — mirrors .breakdown-row__est (matchup.js)
+   and .counter-pairing__est (matchup.js) for the same "~" convention. */
+.ranker-est-mark {
+  font-size: var(--font-size-xs);
+  color: var(--band-tough);
+  font-weight: 700;
+  cursor: default;
+}
+
+/* Next-fixture rank tag, shown beside its score chip */
+.ranker-rank-tag {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  margin-left: var(--space-1);
+}
 
 /* Player rows — interactive */
 .ranker-table__row {
@@ -2521,6 +2543,14 @@
 
   /* Minutes security badge: hidden on mobile — too much noise */
   .ranker-table__td--min {
+    display: none;
+  }
+
+  /* Cost/Pt, Avg Pts/GW, Next Fixture: hidden on mobile, same reasoning as
+     Team/Min above — the compact card keeps only Value + fixture strip. */
+  .ranker-table__td--cost-per-point,
+  .ranker-table__td--avg-pts,
+  .ranker-table__td--next-fixture {
     display: none;
   }
 

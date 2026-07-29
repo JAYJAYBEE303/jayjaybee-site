@@ -450,15 +450,58 @@ export function scoreOverHorizon(team, horizon, ctx) {
 // ─── §10  Player projection ───────────────────────────────────────────────────
 
 /**
+ * Average FPL points per gameweek this season. Prefers real per-GW history
+ * (already lazily loaded via a player-summary fetch — never bulk-fetched, see
+ * ARCHITECTURE.md §3 rule 7); falls back to season totals ÷ an estimated games-
+ * played count (minutes / 90) when no summary is loaded, flagged estimated.
+ *
+ * Pure: depends only on `player` and `ctx.playerSummariesById` (already part
+ * of every ctx built by buildScoreContext) — no new network access.
+ *
+ * @param {Player} player
+ * @param {object} ctx
+ * @returns {{value: number, estimated: boolean}}
+ *   value: average points per GW. estimated: true when derived from season
+ *   totals rather than real per-GW history.
+ */
+export function calcAvgPointsPerGw(player, ctx) {
+  const summary = ctx.playerSummariesById?.[player.id];
+  const history  = summary?.history;
+  if (history && history.length > 0) {
+    const totalPoints = history.reduce((s, g) => s + (g.points || 0), 0);
+    return { value: totalPoints / history.length, estimated: false };
+  }
+
+  const minutes = player.totals?.minutes ?? 0;
+  const points  = player.totals?.points  ?? 0;
+  if (minutes <= 0) return { value: 0, estimated: true };
+  // MODEL: 90 minutes ≈ one game played. Coarser than real per-GW history
+  // (doesn't distinguish a sub appearance from a full 90) but avoids inventing
+  // a "games played" field the FPL bootstrap payload doesn't provide.
+  const gamesPlayed = Math.max(1, minutes / 90);
+  return { value: points / gamesPlayed, estimated: true };
+}
+
+/**
  * Player projection over a horizon: blends player form, team fixture quality,
  * and position-specific counter-matchup edge. See FEATURE_ENGINE.md §10.
  *
  * @param {Player}  player
  * @param {{label: string, gws: number}} horizon
  * @param {object}  ctx   output of buildScoreContext
- * @returns {{ value: number, band: string, perGw: Array, breakdown: object, valueScore: number }}
+ * @returns {{ value: number, band: string, perGw: Array, breakdown: object,
+ *             valueScore: number, avgPointsPerGw: {value:number, estimated:boolean},
+ *             costPerPoint: number|null, nextFixtureScore: {value:number, estimated:boolean} }}
  *   value: 0–100, higher = better projected value. Direction: higher = better.
  *   valueScore: value / price — points-per-million proxy for budget-aware ranking.
+ *   costPerPoint: price / avgPointsPerGw — money spent per point, the INVERSE
+ *   ratio direction from valueScore. Never merge these: valueScore answers
+ *   "how much projected score do I get per pound", costPerPoint answers "how
+ *   much does each point actually cost". null when avgPointsPerGw is 0 (never
+ *   NaN/Infinity — a player with no scoring record has no meaningful cost).
+ *   nextFixtureScore: 0–100 blend of just fixture + counter (excludes form),
+ *   answering "how favourable is this player's next fixture", derived from the
+ *   SAME horizonResult/counterEdge already computed below — not a new metric.
  *   See FEATURE_ENGINE.md §10.
  */
 export function scorePlayer(player, horizon, ctx) {
@@ -468,6 +511,7 @@ export function scorePlayer(player, horizon, ctx) {
 
   const team = ctx.teamsById[player.teamId];
   if (!team) {
+    const avgPointsPerGw = calcAvgPointsPerGw(player, ctx);
     return {
       value: 50, band: bandFromValue(50), perGw: [],
       breakdown: {
@@ -476,6 +520,10 @@ export function scorePlayer(player, horizon, ctx) {
         counter: { value: 50, weight: PROJ_COUNTER, estimated: true },
       },
       valueScore: player.price > 0 ? 50 / player.price : 0,
+      avgPointsPerGw,
+      costPerPoint: (player.price > 0 && avgPointsPerGw.value > 0)
+        ? player.price / avgPointsPerGw.value : null,
+      nextFixtureScore: { value: 50, estimated: true },
     };
   }
 
@@ -489,7 +537,8 @@ export function scorePlayer(player, horizon, ctx) {
   const gwSet    = new Set(gwWindow);
   const teamFixturesByGw = fixturesForTeamInWindow(team, gwSet, ctx);
 
-  const counterEdge = calcPlayerCounterEdge(player, gwWindow, teamFixturesByGw, ctx);
+  const counterEdge    = calcPlayerCounterEdge(player, gwWindow, teamFixturesByGw, ctx);
+  const avgPointsPerGw = calcAvgPointsPerGw(player, ctx);
 
   const value = clamp(0, 100,
     (PROJ_FORM    * formResult.value)
@@ -514,6 +563,19 @@ export function scorePlayer(player, horizon, ctx) {
       counter: { value: counterEdge.value,   weight: PROJ_COUNTER, estimated: counterEdge.estimated },
     },
     valueScore: player.price > 0 ? value / player.price : 0,
+    avgPointsPerGw,
+    costPerPoint: (player.price > 0 && avgPointsPerGw.value > 0)
+      ? player.price / avgPointsPerGw.value : null,
+    // Fixture + counter only (excludes form) — "is his NEXT FIXTURE good",
+    // not "is he in form". Re-normalised over just these two weights since
+    // PROJ_FORM is dropped from the blend. Reuses horizonResult/counterEdge
+    // computed above; not a new independent calculation.
+    nextFixtureScore: {
+      value: clamp(0, 100,
+        ((PROJ_FIXTURE * horizonResult.value) + (PROJ_COUNTER * counterEdge.value))
+        / (PROJ_FIXTURE + PROJ_COUNTER)),
+      estimated: counterEdge.estimated,
+    },
   };
 }
 

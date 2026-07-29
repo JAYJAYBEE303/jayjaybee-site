@@ -57,14 +57,17 @@
             <button class="ranker-pos-btn is-active" data-pos="FWD" type="button">FWD</button>
           </div>
 
+          <div class="ranker-controls__pos-group" role="group" aria-label="Filter by minutes security">
+            <button class="ranker-minsec-btn is-active" data-minsec="Nailed"   type="button">Nailed</button>
+            <button class="ranker-minsec-btn is-active" data-minsec="Likely"   type="button">Likely</button>
+            <button class="ranker-minsec-btn is-active" data-minsec="Rotation" type="button">Rotation</button>
+            <button class="ranker-minsec-btn is-active" data-minsec="Risk"     type="button">Risk</button>
+          </div>
+
           <div class="ranker-controls__select-wrap">
             <label class="ranker-controls__label" for="ranker-price">Price</label>
             <select class="ranker-select" id="ranker-price">
-              <option value="all">All prices</option>
-              <option value="budget">≤ £5.0m</option>
-              <option value="mid">£5.1m – £8.0m</option>
-              <option value="premium">£8.1m – £10.0m</option>
-              <option value="elite">≥ £10.1m</option>
+              <option value="all">All Prices</option>
             </select>
           </div>
 
@@ -74,9 +77,6 @@
               <option value="all">All teams</option>
             </select>
           </div>
-
-          <button class="ranker-toggle-btn" id="ranker-vs-toggle"
-                  type="button" aria-pressed="false">Show £/pt</button>
 
           <button class="ranker-toggle-btn" id="ranker-price-change-toggle"
                   type="button" aria-pressed="false">Price Changes</button>
@@ -90,7 +90,7 @@
           <table class="ranker-table">
             <thead id="ranker-thead"></thead>
             <tbody id="ranker-tbody">
-              <tr><td class="ranker-table__empty" colspan="7">Loading FPL data…</td></tr>
+              <tr><td class="ranker-table__empty" colspan="10">Loading FPL data…</td></tr>
             </tbody>
           </table>
         </div>

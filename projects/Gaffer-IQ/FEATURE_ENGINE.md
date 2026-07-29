@@ -358,7 +358,13 @@ playerProjection(player, horizon) =
 ```
 - Defaults: `PROJ_FORM = 0.45`, `PROJ_FIXTURE = 0.35`, `PROJ_COUNTER = 0.20` (`config.js`).
 - `playerCounterEdge` pulls the specific pairing the player participates in (a striker gets the FWD-vs-CB pairing of each fixture in the horizon), so the counter-matchup is personalised to his role, not just his team's average.
-- Output: `{ value, band, perGw, breakdown, valueScore }` where `valueScore = value / price` (points-per-million proxy) for budget-aware ranking.
+- Output: `{ value, band, perGw, breakdown, valueScore, avgPointsPerGw, costPerPoint, nextFixtureScore }` where `valueScore = value / price` (points-per-million proxy) for budget-aware ranking.
+
+**Phase 5 additions (Player Ranker):**
+
+- **`avgPointsPerGw` (`calcAvgPointsPerGw(player, ctx)`)** — `{ value, estimated }`, average FPL points per gameweek this season. Prefers real per-GW `history[]` from an already-loaded player summary (mean of `history[].points`, `estimated: false`); falls back to `player.totals.points ÷ max(1, player.totals.minutes / 90)` when no summary is loaded (`estimated: true`, 90 minutes ≈ one game). **Never triggers a bulk player-summary fetch** — uses only `ctx.playerSummariesById`, which is populated lazily as the user clicks into players elsewhere in the app (ARCHITECTURE.md §3 rule 7).
+- **`costPerPoint`** — `player.price / avgPointsPerGw.value`, or `null` when `avgPointsPerGw.value` is 0 (never `NaN`/`Infinity`; the ranker displays `null` as "—"). **This is the inverse ratio direction from `valueScore`** (money spent per point vs. points per million) — the two must never be merged or treated as the same figure. `valueScore` answers "how much projected score do I get per pound"; `costPerPoint` answers "how much does each point actually cost".
+- **`nextFixtureScore`** — `{ value, estimated }`, a 0–100 blend of *only* `breakdown.fixture.value` and `breakdown.counter.value` (form excluded), re-normalised over `PROJ_FIXTURE + PROJ_COUNTER` since `PROJ_FORM` drops out of the blend: `(PROJ_FIXTURE × fixture.value + PROJ_COUNTER × counter.value) / (PROJ_FIXTURE + PROJ_COUNTER)`. Answers "is this player's next fixture favourable", independent of whether he's personally in form. Derived from the SAME `horizonResult`/`counterEdge` values `scorePlayer` already computes — not a new metric. The Ranker shows this alongside a rank position among the currently-filtered player set (not the full ~700), since a bare rank number without its underlying score isn't explainable on its own.
 
 ---
 
@@ -367,7 +373,7 @@ playerProjection(player, horizon) =
 | Module | Primary engine call | What it shows |
 |---|---|---|
 | **Matchup Analyser** (`modules/matchup.js`) | `scoreFixture(team, fixture)` for **both** sides | Full side-by-side breakdown of one fixture: each sub-metric, the counter-matchup pairings, style clash, confidence. The "view source" for any score elsewhere. |
-| **Player Ranker** (`modules/ranker.js`) | `rankPlayers(players, horizon)` → sorts by `scorePlayer().value` (and `valueScore` toggle) | Ranked, filterable table (by position, price, team) of projected value over the active horizon, with a per-GW fixture strip per player. |
+| **Player Ranker** (`modules/ranker.js`) | `rankPlayers(players, horizon)` → sortable by `value`, `costPerPoint`, `price`, or `minutesSecurity` | Ranked, filterable table (position, price threshold, team, minutes-security) of projected value over the active horizon — permanent Value and Cost/Pt columns, Avg Pts/GW, Next Fixture (rank + score), and a per-GW fixture strip per player. |
 | **GW Dashboard** (`modules/dashboard.js`) | `scorePlayer(p, HORIZON.GW1)` for owned squad + `event/<gw>/live` | Captaincy pick (top projection in squad), start/bench order, risk flags (low minutesSecurity, brutal band, low confidence), and live points when the GW is in progress. Horizon-locked to GW1. |
 | **Transfer Planner** (`modules/planner.js`) | `rankPlayers` over horizon + current squad + constraints | For each candidate out→in swap, computes Δ projected horizon score; ranks transfers by gain per cost, respecting budget and free transfers (−4 hit modelled). Surfaces the moves that most raise total projected score over the horizon. |
 
