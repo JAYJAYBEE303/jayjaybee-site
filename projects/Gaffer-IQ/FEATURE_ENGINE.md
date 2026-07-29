@@ -214,6 +214,8 @@ playerForm = clamp(0,100, rawPlayerForm)
 - `xgOverlay` lets the ranker spot players over/under-performing their underlying numbers (regression candidates). Returned in the breakdown for the UI.
 - Normalisation for `per90Output` and `xgOverlay` is **position-relative** (a FWD's per-90 points distribution differs from a DEF's).
 
+> Note: `W_MINUTES` here is **not** the whole of the model's minutes handling. It makes minutes-security part of the *form* read; §7.3 additionally makes playing likelihood a first-class term in the player projection (§10). The double-counting is deliberate — see §10.
+
 ### 7.2 Position counter-matchup score (`engine/counter.js → calcCounterMatchup`)
 **Purpose:** The signature Gaffer IQ metric. Asks: *given the positions involved, how does one team's attacking unit match up against the specific defensive unit it will face?* Phase 1 is **position-based only** (per project scope), not individual player-vs-player tracking.
 
@@ -255,6 +257,32 @@ Pairing key mirrors (`cbVsSt`, `fbVsWm`, `cbDmVsCm` for role-mode; `cbVsFwd`, `f
 
 **Composite score: unaffected.** `scoreFixture`'s `WEIGHTS.counterMatchup` still consumes only `calcCounterMatchup`'s aggregate `value` (§8.2) — the mirrored pairings do not feed the composite score, weight, or confidence calculation anywhere. This is a display-only addition to the Matchup Analyser.
 
+**Pairing → named players (`duelsForPairing`).** Each pairing row in the Matchup Analyser carries an info disclosure listing the actual players behind its score. `duelsForPairing(duels, pairingKey)` is a pure filter over an existing `calcIndividualDuels` result (§7.4) — it deliberately does **not** re-identify players, so the info panel can never disagree with the Individual Duels section on the same card. A `PAIRING_ROLE_ALIAS` table collapses all three key families (role-mode `stVsCb…`, element-fallback `fwdVsCb…`, defending mirrors `cbVsSt…`) onto the canonical role-mode key, then filters duels whose `attacker.role` and `defender.role` both fall in that pairing's `ROLE_ATTACK_GROUPS`/`ROLE_DEFENCE_GROUPS`. For a **defending** pairing the relevant duels are the **opponent's** attacking duels, since a defending pairing is their attack against this team's defence. Returns `[]` when duels are unavailable (no summaries / no ICT data), which the UI renders as an explicit "no player data available" state rather than a blank panel.
+
+---
+
+## 7.3 Playing likelihood (`engine/form.js → calcPlayingLikelihood`)
+
+**Purpose:** answer "will this player actually be on the pitch next gameweek?" as a standalone 0–100 metric, so the player projection (§10) can weight it directly rather than relying on it leaking through the form term.
+
+**Inputs — two independent necessary conditions:**
+```
+startShare   = minutesSecurity * 100          # backward: has he been starting?
+availability = chance_of_playing_next_round   # forward: is he fit and permitted?
+               ?? STATUS_PLAY_CHANCE[status]  # fallback when FPL gives null
+
+playingLikelihood = min(startShare, availability)      # 0–100, higher = better
+```
+- **MODEL: `min()`, not a weighted blend.** Either condition alone can rule a player out, so the binding constraint is what matters. A nailed starter who is injured cannot play (→ ~0). A fully fit squad player still won't start (→ his low start share). Averaging the two would wrongly rescue *both* cases — which was precisely the Ranker failure this metric exists to fix: fringe players carrying scores they had no route to delivering.
+- **`availability` prefers FPL's own `chance_of_playing_next_round`** — a real percentage FPL publishes from press-conference news, not a proxy. Normalised onto `Player.chanceOfPlayingNext` (see `ARCHITECTURE.md` §8). It is `null` for the majority of players because FPL populates it **only when there is news**, so `null` means *"no doubt reported"*, never *"no data"* — hence the status fallback rather than an `estimated` flag.
+- **`STATUS_PLAY_CHANCE`** (`config.js`) maps the internal status string when FPL gives no number: `available: 100`, `doubtful: 50`, `injured / suspended / unavailable: 0`. Doubtful sits at the midpoint because FPL's own scale for a flagged player is 25/50/75; when it declines to give a number, halfway is the honest read.
+- **`estimated`** is inherited from the `calcPlayerForm` result passed in: without per-GW history, `minutesSecurity` is the crude season-minutes proxy, so `startShare` is only as good as that.
+- Takes an already-computed `PlayerForm` as its second argument rather than recomputing — `scorePlayer` and `engine/chips.js` both already hold one, so this avoids doubling the work per player.
+
+### 7.4 Individual player-vs-player duels (`engine/counter.js → calcIndividualDuels`)
+
+Supplementary to §7.2's position-group aggregate: pairs specific players (a striker against the centre-back he will most likely face) using a likely XI picked by `minutesSecurity` against a 4-4-2 baseline, then scores that single duel with the same `50 + edge * COUNTER_SENSITIVITY` shape. Returns the top 5 by absolute form differential. Consumed by the Matchup Analyser's Individual Duels section and, via `duelsForPairing` (§7.2), by the per-pairing info disclosures. Does not feed the composite.
+
 ---
 
 ## 8. The composite matchup score (`engine/composite.js → scoreFixture`)
@@ -264,31 +292,44 @@ This is where everything combines into the single 0–100 number (per team, per 
 ### 8.1 Default weights (`config.js → WEIGHTS`)
 ```
 WEIGHTS = {
-  baseDifficulty:  0.25,   // strength priors — the dependable floor
-  counterMatchup:  0.25,   // the signature metric — position form mismatches
-  teamForm:        0.20,   // recent trajectory, opponent-adjusted
-  homeAway:        0.15,   // venue performance this season
-  styleClash:      0.12,   // stylistic interaction — Understat xG-backed (Phase 3A)
+  baseDifficulty:  0.33,   // strength priors — the dependable floor
+  counterMatchup:  0.22,   // the signature metric — position form mismatches
+  teamForm:        0.18,   // recent trajectory, opponent-adjusted
+  homeAway:        0.13,   // venue performance this season
+  styleClash:      0.11,   // stylistic interaction — Understat xG-backed (Phase 3A)
   history:         0.03    // H2H nudge (thin data, low trust)
 }   // sums to 1.00
 ```
 Rationale for the ordering:
-- **Base difficulty (0.25) and counter-matchup (0.25):** the joint floor of the model — always available, robust strength priors plus the signature position-form mismatch metric. Base difficulty was 0.30 in Phase 1 and reduced to 0.25 in Phase 3A to free room for the now-evidenced style weight.
-- **Form (0.20)** and **home/away (0.15):** strong, well-evidenced signals.
-- **Style (0.12):** raised from 0.07 to 0.12 in Phase 3A once real Understat xG / xGA replaced the Phase 1 goals/clean-sheet proxies. Still modest because style interactions are genuinely noisy, but no longer speculative.
+- **Base difficulty (0.33):** by a clear margin the largest weight. Opponent quality is the only sub-metric that is *never* estimated — it is available from day one of a season and does not degrade when player summaries or Understat data are missing. It was 0.30 in Phase 1, cut to 0.25 in Phase 3A to fund the style weight, and raised to **0.33** once it became clear the composite was under-weighting the single most decisive input. **The other five weights were scaled down proportionally (×0.67/0.75 ≈ 0.8933)**, so their relative ordering is untouched and the total still lands on exactly 1.00:
+
+  | Weight | Before | After |
+  |---|---|---|
+  | `baseDifficulty` | 0.25 | **0.33** |
+  | `counterMatchup` | 0.25 | 0.22 |
+  | `teamForm` | 0.20 | 0.18 |
+  | `homeAway` | 0.15 | 0.13 |
+  | `styleClash` | 0.12 | 0.11 |
+  | `history` | 0.03 | 0.03 |
+
+- **Counter-matchup (0.22):** still the signature metric and the largest of the secondaries.
+- **Form (0.18)** and **home/away (0.13):** strong, well-evidenced signals.
+- **Style (0.11):** raised from 0.07 to 0.12 in Phase 3A once real Understat xG / xGA replaced the Phase 1 goals/clean-sheet proxies, then scaled to 0.11 here. Still modest because style interactions are genuinely noisy, but no longer speculative.
 - **History (0.03):** deliberately small — H2H data is thin and football H2H is weakly predictive.
+
+> **The base-difficulty weight and the §8.6 stacking penalty are a matched pair.** Raising base difficulty to 0.33 on its own would make a strong favourite's score nearly immovable — no realistic combination of secondary metrics could shift it. §8.6 is what restores the ability of *several* bad secondary signals to tip a fixture, without letting any *single* one do so. Do not tune one without re-checking the other.
 
 ### 8.2 Combination
 ```
-score(team, fixture) =
-    WEIGHTS.baseDifficulty * baseDifficulty
+linearValue =
+    WEIGHTS.baseDifficulty * invert(baseDifficulty)   # §2 direction exception
   + WEIGHTS.counterMatchup * counterMatchup
   + WEIGHTS.teamForm       * teamForm
   + WEIGHTS.homeAway       * homeAway
   + WEIGHTS.styleClash     * styleClash
   + WEIGHTS.history        * history          # all sub-metrics already 0–100
 
-value = clamp(0, 100, score)
+value = clamp(0, 100, linearValue - stackingPenalty)   # §8.6
 ```
 
 ### 8.3 Confidence handling
@@ -317,11 +358,65 @@ CompositeScore = {
     counterMatchup: { value: 81, weight: 0.25, estimated: false },
     teamForm:       { value: 70, weight: 0.20, estimated: false },
     homeAway:       { value: 75, weight: 0.15, estimated: false },
-    styleClash:     { value: 55, weight: 0.12, estimated: false },
+    styleClash:     { value: 55, weight: 0.11, estimated: false },
     history:        { value: 50, weight: 0.03, estimated: true  }
+  },
+  stacking: {                    // §8.6 — adjustment ACROSS sub-metrics
+    linearValue: 76.4,           // weighted sum before the penalty
+    penalty: 3.4,                // points deducted
+    stackIndex: 0.27,            // 0–1 severity-weighted share
+    countUnfavourable: 2,        // secondaries below the pivot
+    consideredWeight: 0.67,      // non-estimated secondary weight in play
+    pivot: 45
   }
 }
 ```
+
+---
+
+## 8.6 Stacking penalty (`engine/composite.js → calcStackingPenalty`)
+
+**Purpose:** make the composite behave *conditionally* rather than purely linearly, so a fixture that looks good on the dependable signal stays good when one thing goes wrong, but genuinely tips when several go wrong together.
+
+**The problem with a plain weighted sum.** It degrades linearly: the first poor secondary metric costs a favourite exactly as much as the third does. Real fixtures don't work that way. A side facing a weak opponent still has a strong chance if only one factor is against them — but they genuinely lose that chance when a poor venue record, poor form *and* a losing counter-matchup all arrive at once. A linear model cannot express "resilient to one, vulnerable to three."
+
+**Formula:**
+```
+STACK_METRICS = [counterMatchup, teamForm, homeAway, styleClash, history]
+                # baseDifficulty EXCLUDED — see below
+
+for each m in STACK_METRICS:
+    if m.estimated:            skip entirely (do not count its weight)
+    consideredWeight += m.weight
+    if m.value >= STACK_PIVOT: continue           # metric is fine
+    shortfallWeighted += m.weight * (STACK_PIVOT - m.value) / STACK_PIVOT
+
+stackIndex     = clamp(0, 1, shortfallWeighted / consideredWeight)      # 0–1
+stackingPenalty = STACK_MAX_PENALTY * (stackIndex ^ STACK_CURVE)        # 0–45
+```
+- `STACK_PIVOT` = **45**, `STACK_CURVE` = **2.0**, `STACK_MAX_PENALTY` = **45** (`config.js`).
+- **The exponent is the mechanism.** Above 1 it makes the punishment *curve* rather than *ramp*. At 2.0 the three-unfavourable case takes roughly **9.8×** the penalty of the one-unfavourable case, despite its stack index being only ~3× larger. Lower toward 1.0 to make secondary metrics bite earlier and more linearly.
+- **Same shape and same reasoning as `calcTenurePenalty` (§2.1)** — `MAX * (deficit ^ CURVE)`, curve 2.0. The engine deliberately keeps one idiom for "punish genuine stacking, not incidental single dips."
+
+**Why `baseDifficulty` is excluded:** it is the reading the resilience is measured *relative to*, not one of the things that can pile up against a team. Including it would mean a hard fixture penalised itself twice — once through its own 0.33 weight and again through the stack.
+
+**Why `STACK_PIVOT` sits below 50:** every estimated sub-metric falls back to exactly 50 (§8.3). A pivot at or above 50 would penalise the entire league whenever data is thin — i.e. most of pre-season.
+
+**Why estimated metrics are excluded entirely** (rather than passed through at 50, as §8.3 does for the weighted sum): §1 rule 3 — *absence of information is not evidence of a hard fixture*. A data gap must never manufacture a penalty. The remaining non-estimated weights are re-normalised via `consideredWeight`, so a fixture with only two loaded secondaries is judged on those two, not diluted by three unknowns.
+
+**Worked behaviour** (strong home favourite, `baseDifficulty` 25 = weak opponent, weights as §8.1):
+
+| Scenario | Secondaries below pivot | Linear sum | `stackIndex` | Penalty | Final | Band |
+|---|---|---|---|---|---|---|
+| One weak secondary (`homeAway` 20) | 1 of 5 | 58.82 | 0.108 | **−0.52** | **58.30** | neutral |
+| Three weak (`homeAway` 20, `teamForm` 25, `counter` 30) | 3 of 5 | 46.00 | 0.337 | **−5.10** | **40.90** | tough |
+| All five mildly weak (all at 40) | 5 of 5 | — | 0.111 | **−0.56** | — | — |
+| All five at 0 (total collapse) | 5 of 5 | — | 1.000 | **−45.00** | — | — |
+| Pre-season, all estimated | 0 (skipped) | — | 0.000 | **0.00** | — | — |
+
+The favourite keeps its edge on one bad metric (costs 0.52) but drops **17.40 points and a full band** once three stack. Note the fourth row: *widespread but mild* weakness stays near-free — a merely mediocre side is not the "stacked against them" case, and the curve is what keeps those two situations distinct.
+
+**Explainability:** the adjustment is reported on `CompositeScore.stacking` (see §8.5), not inside `breakdown`, because it is an interaction *across* sub-metrics and has no weight of its own in `WEIGHTS`. Any gap between `stacking.linearValue` and `value` is fully accounted for by `stacking.penalty`.
 
 ---
 
@@ -356,13 +451,41 @@ horizonScore = (AGG_METHOD == 'mean') ? aggregateMean
 Bridges team fixture scores to player-level decisions (consumed by ranker, dashboard, planner).
 ```
 playerProjection(player, horizon) =
-    PROJ_FORM   * player.form.value                    # is HE in form & nailed?
+    PROJ_FORM   * player.form.value                    # is HE in form?
   + PROJ_FIXTURE* teamHorizonScore(player.teamId)      # are the FIXTURES good?
   + PROJ_COUNTER* playerCounterEdge(player, horizon)   # does HIS position matchup favour him?
+  + PROJ_MINUTES* playingLikelihood(player)            # will he actually START? (§7.3)
 ```
-- Defaults: `PROJ_FORM = 0.45`, `PROJ_FIXTURE = 0.35`, `PROJ_COUNTER = 0.20` (`config.js`).
+- Defaults: `PROJ_FORM = 0.36`, `PROJ_FIXTURE = 0.28`, `PROJ_COUNTER = 0.16`, `PROJ_MINUTES = 0.20` (`config.js`). **Sums to 1.00.**
 - `playerCounterEdge` pulls the specific pairing the player participates in (a striker gets the FWD-vs-CB pairing of each fixture in the horizon), so the counter-matchup is personalised to his role, not just his team's average.
 - Output: `{ value, band, perGw, breakdown, valueScore, avgPointsPerGw, costPerPoint, nextFixtureScore }` where `valueScore = value / price` (points-per-million proxy) for budget-aware ranking.
+
+**`PROJ_MINUTES` — playing likelihood as a first-class term.**
+
+Minutes-security previously reached the composite only *indirectly*, through `W_MINUTES` inside `calcPlayerForm` (§7.1). That gave it just `0.45 × 0.30 ≈ 13.5%` of the score — enough to nudge, not enough to stop a high-per-90 rotation risk out-ranking a nailed starter. The Ranker showed exactly that failure. `PROJ_MINUTES` promotes it to a term of its own, sourced from §7.3.
+
+The three existing weights were scaled down proportionally (**×0.80**) to make room, so the total still lands on exactly 1.00:
+
+| Weight | Before | After |
+|---|---|---|
+| `PROJ_FORM` | 0.45 | 0.36 |
+| `PROJ_FIXTURE` | 0.35 | 0.28 |
+| `PROJ_COUNTER` | 0.20 | 0.16 |
+| `PROJ_MINUTES` | — | **0.20** |
+
+- **MODEL: this deliberately double-counts minutes.** `W_MINUTES` still sits inside the form term, so total minutes influence is now ≈33%. That is intended, not an oversight: minutes matter twice over in FPL — once as evidence a player is actually performing, and again as the probability he takes the pitch at all. Reducing `W_MINUTES` to compensate was **rejected** because `calcPlayerForm` also feeds `engine/counter.js`'s unit-form reads and the Individual Duels (§7.4), so lowering it would silently move counter-matchup numbers too.
+- Measured effect on a player held at form 62 / fixture 70 / counter 60, varying only minutes-security: the Guaranteed-vs-Risk spread attributable to this input rises from **0.00 → 16.00 points**. A rotation punt on 67.1 drops to 59.7 while a nailed starter on 64.4 rises to 70.5 — i.e. the two swap rank. Worked table:
+
+  | `minutesSecurity` | Playing likelihood | Score before | Score after | Δ |
+  |---|---|---|---|---|
+  | 0.15 | 15 | 64.40 | 54.52 | −9.88 |
+  | 0.30 | 30 | 64.40 | 57.52 | −6.88 |
+  | 0.50 | 50 | 64.40 | 61.52 | −2.88 |
+  | 0.75 | 75 | 64.40 | 66.52 | +2.12 |
+  | 0.95 | 95 | 64.40 | 70.52 | +6.12 |
+
+- Reported on `breakdown.minutes` as `{ value, weight, estimated, startShare, availability, availabilitySource }`. Both halves are exposed so the UI can distinguish *benched* (low `startShare`) from *injured* (low `availability`) — they score alike but mean different things.
+- **`engine/chips.js` inlines this same four-term blend** for single-fixture chip evaluation. Any change to the `PROJ_*` set must land there too, or chip advice silently diverges from the Ranker/Dashboard/Planner.
 
 **Phase 5 additions (Player Ranker):**
 
@@ -376,12 +499,14 @@ playerProjection(player, horizon) =
 
 | Module | Primary engine call | What it shows |
 |---|---|---|
-| **Matchup Analyser** (`modules/matchup.js`) | `scoreFixture(team, fixture)` for **both** sides | Full side-by-side breakdown of one fixture: each sub-metric, the counter-matchup pairings, style clash, confidence. The "view source" for any score elsewhere. |
+| **Matchup Analyser** (`modules/matchup.js`) | `scoreFixture(team, fixture)` for **both** sides | Full side-by-side breakdown of one fixture: each sub-metric, the counter-matchup pairings (each with an info disclosure naming the players behind it, via `duelsForPairing` §7.2), style clash, confidence. The "view source" for any score elsewhere. |
 | **Player Ranker** (`modules/ranker.js`) | `rankPlayers(players, horizon)` → sortable by `value`, `costPerPoint`, `price`, or `minutesSecurity` | Ranked, filterable table (position, price threshold, team, minutes-security) of projected value over the active horizon — permanent Value and Cost/Pt columns, Avg Pts/GW, Next Fixture (rank + score), and a per-GW fixture strip per player. |
 | **GW Dashboard** (`modules/dashboard.js`) | `scorePlayer(p, HORIZON.GW1)` for owned squad + `event/<gw>/live` | Captaincy pick (top projection in squad), start/bench order, risk flags (low minutesSecurity, brutal band, low confidence), and live points when the GW is in progress. Horizon-locked to GW1. |
 | **Transfer Planner** (`modules/planner.js`) | `rankPlayers` over horizon + current squad + constraints | For each candidate out→in swap, computes Δ projected horizon score; ranks transfers by gain per cost, respecting budget and free transfers (−4 hit modelled). Surfaces the moves that most raise total projected score over the horizon. |
 
 All four read the **same** scores and breakdowns. No module recomputes a metric. If a module needs a number the engine doesn't expose, add it to the engine and its breakdown — never inline it (see `CONVENTIONS.md` §11).
+
+Because Ranker, Dashboard and Planner all obtain player scores from `scorePlayer`, engine-level changes to the `PROJ_*` blend (such as `PROJ_MINUTES`, §10) propagate to all three with no per-module code. `engine/chips.js` is the **one** exception — it inlines the same blend for single-fixture chip evaluation and must be updated in lockstep.
 
 ---
 

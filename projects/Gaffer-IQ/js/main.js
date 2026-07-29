@@ -7,7 +7,10 @@
  * See ARCHITECTURE.md §4 for the module loading strategy.
  */
 
-import { HORIZONS } from './config.js';
+import {
+  HORIZONS, WEIGHTS,
+  PROJ_FORM, PROJ_FIXTURE, PROJ_COUNTER, PROJ_MINUTES,
+} from './config.js';
 import { store } from './store.js';
 import {
   fetchBootstrap, fetchFixtures, fetchPlayerSummary,
@@ -16,9 +19,11 @@ import {
 import { normaliseSeason, normalisePlayerSummary } from './engine/normalise.js';
 import { buildScoreContext, scoreFixture, scoreOverHorizon, scorePlayer, rankPlayers } from './engine/composite.js';
 import { calcBaseDifficulty, calcHomeAwaySplit, calcFixtureHistory } from './engine/fixtures.js';
-import { calcTeamForm, calcPlayerForm } from './engine/form.js';
+import { calcTeamForm, calcPlayerForm, calcPlayingLikelihood } from './engine/form.js';
 import { calcStyleProfile, calcStyleClash } from './engine/style.js';
-import { calcCounterMatchup, calcIndividualDuels } from './engine/counter.js';
+import {
+  calcCounterMatchup, calcIndividualDuels, duelsForPairing,
+} from './engine/counter.js';
 
 import { initMatchup }      from './modules/matchup.js';
 import { initRanker }       from './modules/ranker.js';
@@ -209,10 +214,133 @@ window.__engine = {
   buildScoreContext,
   loadPlayerSummary,
   calcBaseDifficulty, calcHomeAwaySplit, calcFixtureHistory,
-  calcTeamForm, calcPlayerForm,
+  calcTeamForm, calcPlayerForm, calcPlayingLikelihood,
   calcStyleProfile, calcStyleClash,
   calcCounterMatchup,
-  calcIndividualDuels,
+  calcIndividualDuels, duelsForPairing,
+};
+
+/**
+ * Console-runnable model checks, exposed alongside window.__engine for the same
+ * reason: GAFFER_IQ_TESTING_ROADMAP.md's verification steps are run by hand in
+ * the browser (F12), which is the only place the engine has real data to chew on.
+ *
+ * Each returns a plain object and logs a readable table. Run window.__verify.all()
+ * after any config.js weight change — see GAFFER_IQ_TESTING_ROADMAP.md.
+ */
+window.__verify = {
+  /** Both weight tables must sum to exactly 1.00 (FEATURE_ENGINE.md §8.1, §10). */
+  weights() {
+    const EPS = 1e-9;
+    const fixtureSum = Object.values(WEIGHTS).reduce((a, b) => a + b, 0);
+    const projSum    = PROJ_FORM + PROJ_FIXTURE + PROJ_COUNTER + PROJ_MINUTES;
+    const rows = [
+      { table: 'WEIGHTS (scoreFixture)', sum: fixtureSum, pass: Math.abs(fixtureSum - 1) < EPS },
+      { table: 'PROJ_* (scorePlayer)',   sum: projSum,    pass: Math.abs(projSum - 1) < EPS },
+    ];
+    console.table(rows);
+    const pass = rows.every(r => r.pass);
+    console.log(pass ? '✅ weight sums OK' : '❌ WEIGHT SUM BROKEN — fix config.js');
+    return { pass, rows };
+  },
+
+  /**
+   * Playing-likelihood impact across the whole player pool: how many players
+   * move, and the biggest movers. Compares the live four-term score against the
+   * three-term score it would have had before PROJ_MINUTES existed.
+   */
+  playingLikelihood(limit = 10) {
+    const ctx = window.__engine.context();
+    if (!ctx) { console.warn('No data loaded yet.'); return null; }
+    const horizon = HORIZONS.GW1;
+    const rows = [];
+    for (const p of store.getPlayers()) {
+      let s;
+      try { s = scorePlayer(p, horizon, ctx); } catch { continue; }
+      const b = s.breakdown;
+      if (!b.minutes) continue;
+      // Re-normalise the three original terms to sum to 1 so the comparison is
+      // like-for-like rather than just smaller because a weight was removed.
+      const oldW = PROJ_FORM + PROJ_FIXTURE + PROJ_COUNTER;
+      const before =
+        ((PROJ_FORM * b.form.value) + (PROJ_FIXTURE * b.fixture.value)
+         + (PROJ_COUNTER * b.counter.value)) / oldW;
+      rows.push({
+        player: p.name,
+        playing: Math.round(b.minutes.value),
+        before: Math.round(before * 10) / 10,
+        after: Math.round(s.value * 10) / 10,
+        delta: Math.round((s.value - before) * 10) / 10,
+      });
+    }
+    rows.sort((a, b) => a.delta - b.delta);
+    console.log(`Scored ${rows.length} players. Biggest DOWNGRADES (unlikely starters):`);
+    console.table(rows.slice(0, limit));
+    console.log('Biggest UPGRADES (nailed starters):');
+    console.table(rows.slice(-limit).reverse());
+    const moved = rows.filter(r => Math.abs(r.delta) >= 1).length;
+    console.log(`${moved} of ${rows.length} players moved by ≥1 point.`);
+    return rows;
+  },
+
+  /** Stacking penalty actually firing on real fixtures (FEATURE_ENGINE.md §8.6). */
+  stacking(limit = 10) {
+    const ctx = window.__engine.context();
+    if (!ctx) { console.warn('No data loaded yet.'); return null; }
+    const rows = [];
+    for (const f of ctx.fixtures) {
+      for (const teamId of [f.homeTeamId, f.awayTeamId]) {
+        const team = ctx.teamsById[teamId];
+        if (!team) continue;
+        let s;
+        try { s = scoreFixture(team, f, ctx); } catch { continue; }
+        if (!s.stacking) continue;
+        rows.push({
+          gw: f.gw,
+          team: team.shortName,
+          linear: Math.round(s.stacking.linearValue * 10) / 10,
+          penalty: Math.round(s.stacking.penalty * 10) / 10,
+          final: Math.round(s.value * 10) / 10,
+          badMetrics: s.stacking.countUnfavourable,
+          band: s.band,
+        });
+      }
+    }
+    rows.sort((a, b) => b.penalty - a.penalty);
+    console.log('Fixtures where secondary metrics stack up most:');
+    console.table(rows.slice(0, limit));
+    const firing = rows.filter(r => r.penalty > 0.5).length;
+    console.log(`${firing} of ${rows.length} team-fixtures took a penalty > 0.5 pts.`);
+    return rows;
+  },
+
+  /** Named players behind each counter-matchup pairing, for one fixture. */
+  pairingPlayers(fixtureId) {
+    const ctx = window.__engine.context();
+    const f = fixtureId ? store.getFixture(fixtureId) : ctx?.fixtures?.[0];
+    if (!ctx || !f) { console.warn('No fixture available.'); return null; }
+    const home = ctx.teamsById[f.homeTeamId];
+    const away = ctx.teamsById[f.awayTeamId];
+    const duels = calcIndividualDuels(home, away, ctx);
+    const pairings = scoreFixture(home, f, ctx).breakdown.counterMatchup.pairings;
+    const out = {};
+    for (const key of Object.keys(pairings)) {
+      out[key] = duelsForPairing(duels, key)
+        .map(d => `${d.attacker.name} (${d.attacker.role}) vs `
+                + `${d.defender.name} (${d.defender.role}) → ${Math.round(d.duelScore)}`);
+    }
+    console.log(`${home.shortName} attacking pairings vs ${away.shortName}:`);
+    console.log(out);
+    return out;
+  },
+
+  all() {
+    const w = this.weights();
+    this.stacking(5);
+    this.playingLikelihood(5);
+    this.pairingPlayers();
+    return w.pass;
+  },
 };
 
 // ─── Kick off ─────────────────────────────────────────────────────────────────

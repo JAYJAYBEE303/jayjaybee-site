@@ -206,6 +206,37 @@ const team = window.__store.getTeams()[0];
 window.__engine.scoreOverHorizon(team, window.__horizons.GW6, ctx);
 ```
 
+### Model checks (`window.__verify`)
+
+Run these after **any** `config.js` weight change. `weights()` is a hard contract
+check; the other three are directional sanity checks against live data.
+
+```js
+// Everything at once — returns true only if the weight sums are exact
+window.__verify.all()
+
+// Both weight tables must sum to exactly 1.00 (FEATURE_ENGINE.md §8.1, §10)
+window.__verify.weights()
+
+// Stacking penalty (§8.6): which fixtures have several secondary metrics
+// stacking against them, and what the penalty costs each one.
+window.__verify.stacking()
+
+// Playing likelihood (§7.3 / §10): biggest downgrades and upgrades across the
+// whole player pool vs the pre-PROJ_MINUTES three-term score.
+window.__verify.playingLikelihood()
+
+// Named players behind each counter-matchup pairing, for one fixture
+// (defaults to the first fixture in ctx; pass a fixtureId to pick another).
+window.__verify.pairingPlayers()
+```
+
+**Expected, and what to do if not:**
+- `weights()` → both rows `pass: true`. If not, `config.js` is broken; the composite is silently mis-scaled. Fix before trusting any other number.
+- `stacking()` → most team-fixtures show `penalty: 0` early in the season (metrics are estimated, so they're excluded by design). Penalties appearing on fixtures with `badMetrics: 0` would mean the pivot/estimated logic is wrong.
+- `playingLikelihood()` → downgrades should be dominated by low-`playing` players and upgrades by high-`playing` ones. A player with `playing: 0` (injured/suspended) showing a positive delta means the `min()` in §7.3 is inverted.
+- `pairingPlayers()` → real names once summaries are cached. All-empty arrays before you've browsed the Ranker is normal, not a bug (ICT/summary data loads lazily).
+
 ---
 
 ## End of Season Review

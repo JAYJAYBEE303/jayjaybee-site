@@ -9,14 +9,17 @@
 
 import {
   WEIGHTS, BANDS, CONFIDENCE_FLOOR, LEAGUE_AVG_STRENGTH,
+  STACK_PIVOT, STACK_CURVE, STACK_MAX_PENALTY,
   HORIZON_DECAY, AGG_METHOD, W_MEAN, W_MIN, BLANK_GW_VALUE,
-  PROJ_FORM, PROJ_FIXTURE, PROJ_COUNTER,
+  PROJ_FORM, PROJ_FIXTURE, PROJ_COUNTER, PROJ_MINUTES,
 } from '../config.js';
 import { clamp, invert } from '../util.js';
 import {
   calcBaseDifficulty, calcHomeAwaySplit, calcFixtureHistory,
 } from './fixtures.js';
-import { calcTeamForm, calcPlayerForm, buildUnderstatPlayerLookup } from './form.js';
+import {
+  calcTeamForm, calcPlayerForm, calcPlayingLikelihood, buildUnderstatPlayerLookup,
+} from './form.js';
 import { calcStyleClash, buildXgProfilesByTeamId } from './style.js';
 import { calcCounterMatchup } from './counter.js';
 
@@ -105,6 +108,70 @@ function bandFromValue(value) {
   return 'brutal';
 }
 
+// ─── §8.6  Stacking penalty ───────────────────────────────────────────────────
+
+// The secondary metrics that can stack against a team. baseDifficulty is
+// deliberately absent: it is the reading the resilience is measured RELATIVE TO,
+// not one of the things that can pile up against it. Kept here rather than in
+// config.js because it is structural (which metrics are secondary), not a
+// tunable — same call as ROLE_ATTACK_GROUPS in counter.js.
+const STACK_METRICS = ['counterMatchup', 'teamForm', 'homeAway', 'styleClash', 'history'];
+
+/**
+ * How much to deduct from a fixture's weighted composite because MULTIPLE
+ * secondary metrics are simultaneously unfavourable.
+ *
+ * MODEL: the plain weighted sum degrades linearly — the first poor secondary
+ * metric costs a favourite as much as the third does. Real fixtures don't work
+ * that way: a side facing a weak opponent still has a good chance if only one
+ * thing is against them, but genuinely loses it when a poor venue record, poor
+ * form AND a losing counter-matchup arrive together. Each metric's shortfall
+ * below STACK_PIVOT is weight-averaged into a 0–1 stackIndex, then raised to
+ * STACK_CURVE, so one dip barely registers while three compound sharply.
+ * Same shape as calcTenurePenalty (§2.1), deliberately — the engine keeps one
+ * idiom for "punish genuine stacking, not incidental single dips".
+ *
+ * MODEL: estimated sub-metrics are excluded entirely and the remaining weights
+ * re-normalised. FEATURE_ENGINE.md §1 rule 3 — absence of information is not
+ * evidence of a bad fixture, so a data gap must never manufacture a penalty.
+ * With STACK_PIVOT below 50, a metric sitting on its neutral-50 fallback also
+ * contributes nothing even if it is somehow flagged non-estimated.
+ *
+ * @param {object} breakdown  scoreFixture's breakdown, pre-penalty
+ * @returns {{penalty: number, stackIndex: number, countUnfavourable: number,
+ *            consideredWeight: number}}
+ *   penalty: 0–STACK_MAX_PENALTY, points to SUBTRACT from the composite.
+ *   See FEATURE_ENGINE.md §8.6.
+ */
+function calcStackingPenalty(breakdown) {
+  let shortfallWeighted = 0;
+  let consideredWeight  = 0;
+  let countUnfavourable = 0;
+
+  for (const key of STACK_METRICS) {
+    const m = breakdown[key];
+    // A data gap is not evidence of badness — skip without counting its weight.
+    if (!m || m.estimated) continue;
+    consideredWeight += m.weight;
+    if (m.value >= STACK_PIVOT) continue;
+    countUnfavourable++;
+    // Normalised severity: 0 at the pivot, 1 at a floored-zero metric.
+    shortfallWeighted += m.weight * ((STACK_PIVOT - m.value) / STACK_PIVOT);
+  }
+
+  if (consideredWeight === 0) {
+    return { penalty: 0, stackIndex: 0, countUnfavourable: 0, consideredWeight: 0 };
+  }
+
+  const stackIndex = clamp(0, 1, shortfallWeighted / consideredWeight);
+  return {
+    penalty: STACK_MAX_PENALTY * (stackIndex ** STACK_CURVE),
+    stackIndex,
+    countUnfavourable,
+    consideredWeight,
+  };
+}
+
 /**
  * Score a single fixture from ONE team's perspective. Every sub-metric is
  * computed at 0–100 (higher = better for `team`), then weighted-summed with
@@ -165,14 +232,26 @@ export function scoreFixture(team, fixture, ctx) {
   // stored as the opponent's strength (higher = harder) because the UI shows it
   // that way, so it is inverted here before weighting. Removing this invert()
   // would make facing Man City *raise* a team's score. See FEATURE_ENGINE.md §2.
-  const value = clamp(0, 100,
+  const linearValue =
       (WEIGHTS.baseDifficulty * invert(base.value))
     + (WEIGHTS.counterMatchup * counter.value)
     + (WEIGHTS.teamForm       * form.value)
     + (WEIGHTS.homeAway       * venue.value)
     + (WEIGHTS.styleClash     * style.value)
-    + (WEIGHTS.history        * history.value),
-  );
+    + (WEIGHTS.history        * history.value);
+
+  // §8.6 conditional term. Built from the same sub-metric shapes the breakdown
+  // below reports, so it needs their { value, weight, estimated } triples — hence
+  // the small intermediate object rather than reading the breakdown after the fact.
+  const stack = calcStackingPenalty({
+    counterMatchup: { value: counter.value, weight: WEIGHTS.counterMatchup, estimated: counter.estimated },
+    teamForm:       { value: form.value,    weight: WEIGHTS.teamForm,       estimated: form.estimated },
+    homeAway:       { value: venue.value,   weight: WEIGHTS.homeAway,       estimated: venue.estimated },
+    styleClash:     { value: style.value,   weight: WEIGHTS.styleClash,     estimated: style.estimated },
+    history:        { value: history.value, weight: WEIGHTS.history,        estimated: history.estimated },
+  });
+
+  const value = clamp(0, 100, linearValue - stack.penalty);
 
   // MODEL: confidence = weighted share of non-estimated sub-metrics. Estimated
   // metrics still contribute their (fallback) value to `value` so the weights
@@ -190,6 +269,18 @@ export function scoreFixture(team, fixture, ctx) {
     band:         bandFromValue(value),
     confidence,
     provisional:  confidence < CONFIDENCE_FLOOR,
+    // §8.6 — the conditional adjustment, exposed so the UI can explain any gap
+    // between the weighted sum and the final value. Sits alongside `breakdown`
+    // rather than inside it because it is an adjustment ACROSS sub-metrics, not
+    // a sub-metric of its own (it has no weight in WEIGHTS).
+    stacking: {
+      linearValue,                                    // weighted sum before the penalty
+      penalty:           stack.penalty,               // points deducted
+      stackIndex:        stack.stackIndex,            // 0–1 severity-weighted share
+      countUnfavourable: stack.countUnfavourable,     // how many secondaries below the pivot
+      consideredWeight:  stack.consideredWeight,      // non-estimated secondary weight in play
+      pivot:             STACK_PIVOT,
+    },
     breakdown: {
       baseDifficulty: {
         // Reported as stored — the opponent's strength, higher = harder. The
@@ -530,6 +621,7 @@ export function scorePlayer(player, horizon, ctx) {
         form:    { value: 50, weight: PROJ_FORM,    estimated: true },
         fixture: { value: 50, weight: PROJ_FIXTURE, estimated: true },
         counter: { value: 50, weight: PROJ_COUNTER, estimated: true },
+        minutes: { value: 50, weight: PROJ_MINUTES, estimated: true },
       },
       valueScore: player.price > 0 ? 50 / player.price : 0,
       avgPointsPerGw,
@@ -551,11 +643,14 @@ export function scorePlayer(player, horizon, ctx) {
 
   const counterEdge    = calcPlayerCounterEdge(player, gwWindow, teamFixturesByGw, ctx);
   const avgPointsPerGw = calcAvgPointsPerGw(player, ctx);
+  // §7.3 — reuses formResult so minutesSecurity isn't recomputed.
+  const playing        = calcPlayingLikelihood(player, formResult);
 
   const value = clamp(0, 100,
     (PROJ_FORM    * formResult.value)
   + (PROJ_FIXTURE * horizonResult.value)
-  + (PROJ_COUNTER * counterEdge.value),
+  + (PROJ_COUNTER * counterEdge.value)
+  + (PROJ_MINUTES * playing.value),
   );
 
   return {
@@ -573,6 +668,16 @@ export function scorePlayer(player, horizon, ctx) {
       },
       fixture: { value: horizonResult.value, weight: PROJ_FIXTURE, estimated: false },
       counter: { value: counterEdge.value,   weight: PROJ_COUNTER, estimated: counterEdge.estimated },
+      minutes: {
+        value:              playing.value,
+        weight:             PROJ_MINUTES,
+        estimated:          playing.estimated,
+        // Both halves exposed so the UI can say WHY a player scores low here:
+        // benched (low startShare) reads differently from injured (low availability).
+        startShare:         playing.startShare,
+        availability:       playing.availability,
+        availabilitySource: playing.availabilitySource,
+      },
     },
     valueScore: player.price > 0 ? value / player.price : 0,
     avgPointsPerGw,

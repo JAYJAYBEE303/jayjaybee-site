@@ -162,6 +162,13 @@ export function normalisePlayer(raw) {
     ownership: parseFloat(raw.selected_by_percent) || 0,
     status: STATUS_MAP[raw.status] || 'available',
     statusNote: raw.news || null,
+    // FPL's own forward-looking playing chance (0–100), set from press-conference
+    // news. null for most players because FPL populates it only when there IS
+    // news — so null means "no doubt reported", NOT "no data". Consumed by
+    // engine/form.js → calcPlayingLikelihood, which falls back to STATUS_PLAY_CHANCE.
+    chanceOfPlayingNext: typeof raw.chance_of_playing_next_round === 'number'
+      ? raw.chance_of_playing_next_round
+      : null,
     totals: {
       points:      raw.total_points || 0,
       minutes:     raw.minutes || 0,

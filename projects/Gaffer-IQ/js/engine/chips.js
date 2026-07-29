@@ -16,11 +16,11 @@ import {
   FH_TOP_TEAMS, FH_BLANK_WEIGHT, FH_BLANK_THRESHOLD,
   BB_MIN_DOUBLES,
   HORIZON_DECAY, W_MEAN, W_MIN, BLANK_GW_VALUE,
-  PROJ_FORM, PROJ_FIXTURE, PROJ_COUNTER,
+  PROJ_FORM, PROJ_FIXTURE, PROJ_COUNTER, PROJ_MINUTES,
 } from '../config.js';
 import { clamp } from '../util.js';
 import { scoreFixture } from './composite.js';
-import { calcPlayerForm } from './form.js';
+import { calcPlayerForm, calcPlayingLikelihood } from './form.js';
 import { calcCounterMatchup } from './counter.js';
 
 // ─── Internal helpers ────────────────────────────────────────────────────────
@@ -328,6 +328,11 @@ export function scoreTripleCaptainTiming(player, horizon, ctx) {
   const cached    = makeFxCache();
   const startGw   = ctx.currentGw;
   const playerForm = calcPlayerForm(player, ctx);
+  // Must mirror scorePlayer's blend exactly — this function inlines the same
+  // four-term projection for a SINGLE fixture rather than a horizon, so any
+  // change to the PROJ_* set has to land here too or chip advice silently
+  // diverges from the Ranker/Dashboard/Planner. See FEATURE_ENGINE.md §10.
+  const playing = calcPlayingLikelihood(player, playerForm);
 
   let best = null;
   for (let off = 0; off < CHIP_PLAN_HORIZON; off++) {
@@ -359,7 +364,8 @@ export function scoreTripleCaptainTiming(player, horizon, ctx) {
       const single =
           (PROJ_FORM    * playerForm.value)
         + (PROJ_FIXTURE * fxScore.value)
-        + (PROJ_COUNTER * counterValue);
+        + (PROJ_COUNTER * counterValue)
+        + (PROJ_MINUTES * playing.value);
       projected += clamp(0, 100, single);
     }
 

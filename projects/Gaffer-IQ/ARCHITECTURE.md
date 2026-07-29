@@ -322,6 +322,11 @@ Team {
 Player {
   id, name, teamId, position,            // position ∈ { GKP, DEF, MID, FWD }
   price, ownership, status,              // status: available/injured/doubtful
+  chanceOfPlayingNext,                   // FPL's own 0–100 playing chance, or null.
+                                         //   null = "no news reported", NOT "no data" —
+                                         //   FPL populates it only when there IS news.
+                                         //   engine/form.js → calcPlayingLikelihood
+                                         //   falls back to STATUS_PLAY_CHANCE[status].
   totals: { points, minutes, goals, assists, xG, xA, cleanSheets },
   history: [ GwStat, ... ],              // per-GW, populated lazily from element-summary
   // derived:
@@ -344,9 +349,19 @@ CompositeScore {
   confidence,            // 0–1, weighted share of non-estimated sub-metrics
   breakdown: {           // each sub-metric's normalised contribution, for transparency
     baseDifficulty, homeAway, teamForm, styleClash, counterMatchup, history
+  },
+  stacking: {            // conditional adjustment ACROSS sub-metrics — FEATURE_ENGINE.md §8.6
+    linearValue,         //   the weighted sum BEFORE the penalty
+    penalty,             //   points deducted because several secondaries stacked up
+    stackIndex,          //   0–1 severity-weighted share of unfavourable secondaries
+    countUnfavourable,   //   how many secondaries fell below the pivot
+    consideredWeight,    //   non-estimated secondary weight actually in play
+    pivot                //   the threshold used (config: STACK_PIVOT)
   }
 }
 ```
+
+> `stacking` sits alongside `breakdown` rather than inside it because it is an interaction *between* sub-metrics, not a sub-metric itself — it carries no weight in `WEIGHTS`. `value === clamp(0, 100, stacking.linearValue - stacking.penalty)` always holds, so any gap between the weighted sum and the final score is fully explainable.
 
 > `CompositeScore.breakdown` is mandatory: every score the UI shows must be explainable by drilling into its components. "Why is this fixture green?" must always be answerable. This is a core product principle, not a nice-to-have.
 

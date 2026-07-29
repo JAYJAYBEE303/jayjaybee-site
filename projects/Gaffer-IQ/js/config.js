@@ -350,17 +350,55 @@ export const COUNTER_FALLBACK_EDGE = { min: -300, max: 300 };
 // Weights for all sub-metrics. Must sum to 1.00.
 // See FEATURE_ENGINE.md §8.1 for the rationale behind each weight.
 // MODEL: styleClash weight raised from 0.07 to 0.12 — now backed by real
-// Understat xG data (Phase 3A). baseDifficulty reduced from 0.30 to 0.25
-// to compensate, keeping the total at 1.00 and leaving the dependable floor
-// still the largest single weight.
+// Understat xG data (Phase 3A).
+// MODEL: baseDifficulty raised 0.25 → 0.33. Opponent quality is the single most
+// dependable signal available (never estimated, present from day one), and the
+// composite was under-weighting it relative to how much it actually decides
+// results. The other five weights were scaled down proportionally (×0.67/0.75)
+// so the total still lands on exactly 1.00 and their relative ordering is
+// unchanged. Pairs with the stacking penalty below: a bigger base weight alone
+// would make a favourite's score nearly immovable, which is why the conditional
+// term exists. See FEATURE_ENGINE.md §8.1.
 export const WEIGHTS = {
-  baseDifficulty: 0.25,   // strength priors — always available, the dependable floor
-  counterMatchup: 0.25,   // the signature metric — position form mismatches
-  teamForm:       0.20,   // recent trajectory, opponent-quality adjusted
-  homeAway:       0.15,   // venue performance this season
-  styleClash:     0.12,   // stylistic interaction — Understat xG-backed (Phase 3A)
+  baseDifficulty: 0.33,   // strength priors — always available, the dependable floor
+  counterMatchup: 0.22,   // the signature metric — position form mismatches
+  teamForm:       0.18,   // recent trajectory, opponent-quality adjusted
+  homeAway:       0.13,   // venue performance this season
+  styleClash:     0.11,   // stylistic interaction — Understat xG-backed (Phase 3A)
   history:        0.03,   // H2H nudge — deliberately tiny; data is thin and weakly predictive
 };
+
+// ─── §8.6  Stacking penalty (conditional interaction across sub-metrics) ─────
+
+// MODEL: a plain weighted sum degrades LINEARLY — the first poor secondary
+// metric costs a favourite exactly as much as the third does. Real fixtures do
+// not behave that way. A side facing a weak opponent still has a good chance if
+// only one thing is against them; they genuinely lose that chance when a poor
+// venue record, poor form AND a losing counter-matchup arrive together. These
+// three constants encode that asymmetry so the composite stays resilient to a
+// single dip but tips sharply once several stack up.
+// See FEATURE_ENGINE.md §8.6.
+
+// Value a secondary metric must fall BELOW before it counts as unfavourable.
+// MODEL: deliberately under 50, because every estimated sub-metric falls back to
+// exactly 50 (§8.3). A pivot at or above 50 would penalise the entire league
+// whenever data is thin — which is most of pre-season.
+export const STACK_PIVOT = 45;
+
+// Exponent applied to the 0–1 stack index before scaling by STACK_MAX_PENALTY.
+// MODEL: the exponent IS the mechanism. Above 1 it makes the punishment curve
+// rather than ramp, so one unfavourable metric barely registers while three
+// compound sharply. 2.0 gives a ~9.8x penalty ratio between the three-bad and
+// one-bad cases. Same exponent and same reasoning as TENURE_CURVE (§2.1) —
+// the engine keeps one idiom for "punish genuine stacking, not single dips".
+// Lower toward 1.0 to make secondary metrics bite earlier and more linearly.
+export const STACK_CURVE = 2.0;
+
+// Maximum points deductible, reached only when every non-estimated secondary
+// metric sits at 0. MODEL: sized to move a score a full band or more in a
+// genuine collapse while leaving mild, widespread mediocrity almost free —
+// all five secondaries at 40 (just under the pivot) costs ~0.6 points.
+export const STACK_MAX_PENALTY = 45;
 
 // Minimum weighted share of non-estimated sub-metrics before the UI renders
 // a provisional indicator. Score is still produced; only the badge changes.
@@ -407,10 +445,38 @@ export const BLANK_GW_VALUE = 40;
 
 // ─── §10  Player projection ───────────────────────────────────────────────────
 
-// Weights for the three components of the player projection score (must sum to 1).
-export const PROJ_FORM    = 0.45;   // player's own form and availability
-export const PROJ_FIXTURE = 0.35;   // team's horizon fixture score
-export const PROJ_COUNTER = 0.20;   // player's position counter-matchup edge
+// Weights for the four components of the player projection score (must sum to 1).
+// MODEL: PROJ_MINUTES added as a first-class input because minutes-security was
+// previously reaching the composite only indirectly, via W_MINUTES inside
+// calcPlayerForm — worth just 0.45 × 0.30 ≈ 13.5% of the score, which was not
+// enough leverage to stop a high-per-90 rotation risk out-ranking a nailed
+// starter. The three existing weights were scaled down proportionally (×0.80)
+// to make room, so the total still lands on exactly 1.00.
+// MODEL: this deliberately DOUBLE-COUNTS minutes (W_MINUTES inside form, plus
+// this term), taking total minutes influence to roughly 33%. That is intended,
+// not an oversight: minutes matter twice over in FPL — once as evidence a player
+// is actually performing, and again as the probability he starts at all. Reducing
+// W_MINUTES to compensate was rejected because calcPlayerForm also feeds
+// counter.js's unit-form reads and the Individual Duels, so it would silently
+// move counter-matchup numbers too. See FEATURE_ENGINE.md §10.
+export const PROJ_FORM    = 0.36;   // player's own form and availability
+export const PROJ_FIXTURE = 0.28;   // team's horizon fixture score
+export const PROJ_COUNTER = 0.16;   // player's position counter-matchup edge
+export const PROJ_MINUTES = 0.20;   // playing likelihood — will he actually start?
+
+// Fallback playing-chance percentage per internal status string, used by
+// calcPlayingLikelihood ONLY when FPL's own chance_of_playing_next_round is
+// null (which is the normal case — FPL populates it only when there is news).
+// MODEL: 'doubtful' sits at the midpoint because FPL's own scale for a flagged
+// player is 25/50/75; when it declines to give a number, halfway is the honest
+// read. Suspended and injured are hard zeros — they cannot start.
+export const STATUS_PLAY_CHANCE = {
+  available:   100,
+  doubtful:     50,
+  injured:       0,
+  suspended:     0,
+  unavailable:   0,
+};
 
 // ─── Phase 4-3  Chip planning ────────────────────────────────────────────────
 

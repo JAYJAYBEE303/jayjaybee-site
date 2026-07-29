@@ -10,6 +10,7 @@ import {
   FORM_WINDOW_GWS, RECENCY_DECAY, W_FORM_GD, LEAGUE_AVG_STRENGTH,
   PLAYER_FORM_GWS, W_RETURNS, W_MINUTES, W_UNDERLYING, AVAIL_PENALTY,
   PLAYER_PER90_ANCHORS, PLAYER_XG_ANCHORS, SEASON_GWS,
+  STATUS_PLAY_CHANCE,
 } from '../config.js';
 import { clamp, normaliseLinear, safeDiv } from '../util.js';
 
@@ -352,5 +353,54 @@ export function calcPlayerForm(player, ctx) {
     xgEstimated,
     estimated: false,
     mode,
+  };
+}
+
+// ─── §7.3  Playing likelihood ─────────────────────────────────────────────────
+
+/**
+ * How likely this player is to actually be on the pitch next gameweek.
+ *
+ * MODEL: two independent necessary conditions, combined with min() rather than a
+ * weighted blend, because either one alone can rule a player out:
+ *   startShare   — backward evidence. Has he been starting? (minutesSecurity)
+ *   availability — forward evidence. Is he fit and permitted to play?
+ * A nailed starter who is injured cannot play (min → ~0). A fully fit squad
+ * player still will not start (min → his low start share). Averaging the two
+ * would wrongly rescue both cases, which is exactly the failure the Ranker
+ * showed: fringe players carrying high scores they could not deliver on.
+ *
+ * MODEL: availability prefers FPL's own chance_of_playing_next_round, which is a
+ * real percentage FPL sets from press-conference news — a genuine forward-looking
+ * signal, not a proxy. It is null for the majority of players (FPL populates it
+ * only when there IS news), so a null falls back to STATUS_PLAY_CHANCE keyed on
+ * the player's status. Null therefore means "no news", not "no data".
+ *
+ * @param {Player} player
+ * @param {{minutesSecurity: number, estimated: boolean}} formResult
+ *   an already-computed calcPlayerForm result — passed in rather than recomputed
+ *   so callers that already hold one (scorePlayer, chips.js) don't double the work.
+ * @returns {{value: number, estimated: boolean, startShare: number,
+ *            availability: number, availabilitySource: 'fpl'|'status'}}
+ *   value: 0–100, higher = more likely to play. Direction: higher = better.
+ *   See FEATURE_ENGINE.md §7.3.
+ */
+export function calcPlayingLikelihood(player, formResult) {
+  const startShare = clamp(0, 100, (formResult?.minutesSecurity ?? 0) * 100);
+
+  const fplChance = player?.chanceOfPlayingNext;
+  const hasFplChance = typeof fplChance === 'number' && Number.isFinite(fplChance);
+  const availability = hasFplChance
+    ? clamp(0, 100, fplChance)
+    : (STATUS_PLAY_CHANCE[player?.status] ?? STATUS_PLAY_CHANCE.available);
+
+  return {
+    value: Math.min(startShare, availability),
+    // Inherits form's estimated flag: without per-GW history, minutesSecurity is
+    // the crude season-minutes proxy, so startShare is only as good as that.
+    estimated: Boolean(formResult?.estimated),
+    startShare,
+    availability,
+    availabilitySource: hasFplChance ? 'fpl' : 'status',
   };
 }
