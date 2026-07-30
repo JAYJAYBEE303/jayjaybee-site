@@ -251,7 +251,7 @@ modules/*  ──▶  read scores, render DOM for the active horizon
 
 ### Fetch strategy
 - On app load, `api.js` fetches `bootstrap-static/` and `fixtures/` **once** and hands them to `store`. These two payloads power almost everything.
-- `element-summary/<id>/` is fetched **lazily and on demand** (e.g. when the user opens a player in the ranker or expands a matchup), then cached in `store`. Never bulk-fetch all ~700 players' summaries on load — that's ~700 requests; it's slow and abusive to the API.
+- `element-summary/<id>/` is fetched **lazily and on demand** (e.g. when the user opens a player in the ranker or expands a matchup), then cached in `store`. Never bulk-fetch all ~700 players' summaries on load — that's ~700 requests; it's slow and abusive to the API. **Sanctioned exception:** the Ranker's "Last Season" Avg Pts/GW toggle (FEATURE_ENGINE.md §10.1) does load every summary, but only on an explicit button click, staggered into small chunks with a yield between each — never automatically on load.
 - `event/<gw>/live/` is fetched only by the dashboard, only when viewing the current/in-progress GW.
 
 ### Caching (the `store`)
@@ -456,5 +456,5 @@ Dependency direction is strictly: `modules → engine → normalise → store �
 4. No analytical logic in modules; it all lives in `engine/`.
 5. Only `api.js` performs network I/O.
 6. Every displayed score must be explainable via its `breakdown`.
-7. No bulk-fetching every player summary on load.
+7. No bulk-fetching every player summary on load (an explicit, user-clicked, chunked bulk load is a sanctioned exception — FEATURE_ENGINE.md §10.1).
 8. Horizons, weights, and thresholds are configured in `config.js`, never hard-coded in engine logic.

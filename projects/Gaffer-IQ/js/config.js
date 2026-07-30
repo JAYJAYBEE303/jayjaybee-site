@@ -541,6 +541,15 @@ export const BB_MIN_DOUBLES = 2;
 // 700 players at 50/chunk = 14 chunks ≈ 14 yielded frames.
 export const RANKER_CHUNK_SIZE = 50;
 
+// Number of player-summary FETCHES (real network requests, not synchronous
+// scoring) run concurrently per chunk when the Ranker's "Last Season" Avg
+// Pts/GW toggle triggers a full-pool load. Deliberately smaller than
+// RANKER_CHUNK_SIZE — these hit the FPL API through the proxy, not just CPU —
+// so a lower concurrency is more considerate to the upstream API even though
+// this is now an explicit, user-triggered action rather than an on-load fetch.
+// See FEATURE_ENGINE.md §10.1.
+export const SUMMARY_FETCH_CHUNK_SIZE = 20;
+
 // Ranker price filter (Phase 5A): a single "maximum price" threshold selector,
 // generated from this range rather than hardcoded <option> strings. Each value
 // means "show players priced at or below this" — "All Prices" (handled

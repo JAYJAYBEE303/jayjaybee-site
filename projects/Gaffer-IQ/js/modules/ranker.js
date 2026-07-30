@@ -3,9 +3,12 @@
  * Layer: module. Owns the DOM for the Player Ranker view.
  * Side effects: DOM writes only. Reads from store; calls engine functions.
  * Renders a sortable, filterable table of players ranked by projected value
- * over the active horizon. Lazy-loads player summaries on click — never
- * bulk-fetches all ~700 players. No analytical logic lives here; all scoring
- * delegated to engine/composite.js.
+ * over the active horizon. Lazy-loads player summaries on click. The
+ * "Avg Pts/GW source" toggle is the one exception to "never bulk-fetch": an
+ * explicit click on "Last Season" triggers a chunked, staggered load of every
+ * player's summary (FEATURE_ENGINE.md §10.1) — deliberate and user-triggered,
+ * never automatic. No analytical logic lives here; all scoring delegated to
+ * engine/composite.js.
  * See ARCHITECTURE.md §10, FEATURE_ENGINE.md §11, ROADMAP.md Phase 2B.
  *
  * Subscriptions: data:ready, horizon:changed
@@ -13,10 +16,13 @@
 
 import { store } from '../store.js';
 import {
-  HORIZONS, RANKER_CHUNK_SIZE, PRICE_FILTER_MIN, PRICE_FILTER_MAX, PRICE_FILTER_STEP, BANDS,
+  HORIZONS, RANKER_CHUNK_SIZE, SUMMARY_FETCH_CHUNK_SIZE,
+  PRICE_FILTER_MIN, PRICE_FILTER_MAX, PRICE_FILTER_STEP, BANDS,
   RANK_ELITE_COUNT_BY_POS, RANK_STRONG_COUNT_BY_POS,
 } from '../config.js';
-import { buildScoreContext, scorePlayer, attachRankTiers } from '../engine/composite.js';
+import {
+  buildScoreContext, scorePlayer, attachRankTiers, calcLastSeasonAvgPointsPerGw,
+} from '../engine/composite.js';
 import { fetchPlayerSummary } from '../api.js';
 import { normalisePlayerSummary } from '../engine/normalise.js';
 import { calcPriceChangeRisk } from '../engine/prices.js';
@@ -39,6 +45,18 @@ let _tbody              = null;
 let _loading            = null;
 let _teamSelect         = null;
 let _priceSelect        = null;
+let _avgPtsToggle       = null;
+
+// 'current' | 'lastSeason' — explicit, user-toggled Avg Pts/GW source
+// (FEATURE_ENGINE.md §10.1). Never switches itself; the button is the only
+// way this changes.
+let _avgPtsMode = 'current';
+
+// Incremented on every "Last Season" toggle-on; the in-flight chunked bulk
+// loader checks its captured value still matches before continuing each
+// chunk, so switching back to "This Season" (or toggling on again) cancels
+// the previous run rather than racing it.
+let _summaryLoadRunId = 0;
 
 // Scored rows rebuilt on data:ready or horizon:changed; cached so filter and
 // sort changes do not re-invoke the engine.
@@ -277,12 +295,36 @@ function buildNextFixtureRanks(rows) {
   return rankById;
 }
 
-function applySort(rows) {
+/**
+ * @param {Array} rows
+ * @param {Map<number,{avg:number|null,cost:number|null}>} [lastSeasonByPlayerId]
+ *   from buildLastSeasonLookup — present only when _avgPtsMode==='lastSeason'.
+ *   When present, sorting by 'avgPointsPerGw'/'costPerPoint' follows the
+ *   DISPLAYED (last-season) values instead of the current-season ones, so the
+ *   sort arrow never contradicts what's actually on screen.
+ */
+function applySort(rows, lastSeasonByPlayerId = null) {
   return rows.slice().sort((a, b) => {
-    // costPerPoint can be null (no scoring record) — nulls always sort last,
+    // costPerPoint can be null (no scoring record, or — in 'lastSeason' mode —
+    // no past-season data / not loaded yet) — nulls always sort last,
     // regardless of sort direction, rather than comparing as 0.
     if (_sortBy === 'costPerPoint') {
-      const av = a.score.costPerPoint, bv = b.score.costPerPoint;
+      const av = lastSeasonByPlayerId
+        ? lastSeasonByPlayerId.get(a.player.id)?.cost ?? null
+        : a.score.costPerPoint;
+      const bv = lastSeasonByPlayerId
+        ? lastSeasonByPlayerId.get(b.player.id)?.cost ?? null
+        : b.score.costPerPoint;
+      if (av === null && bv === null) return 0;
+      if (av === null) return 1;
+      if (bv === null) return -1;
+      return _sortDesc ? (bv - av) : (av - bv);
+    }
+    // Same null-sorts-last treatment as costPerPoint above, for the same
+    // reason: in 'lastSeason' mode a player may have no past-season data yet.
+    if (_sortBy === 'avgPointsPerGw' && lastSeasonByPlayerId) {
+      const av = lastSeasonByPlayerId.get(a.player.id)?.avg ?? null;
+      const bv = lastSeasonByPlayerId.get(b.player.id)?.avg ?? null;
       if (av === null && bv === null) return 0;
       if (av === null) return 1;
       if (bv === null) return -1;
@@ -312,6 +354,31 @@ function applySort(rows) {
     }
     return _sortDesc ? (bv - av) : (av - bv);
   });
+}
+
+/**
+ * Precompute each player's 'lastSeason' avg/cost ONCE per render (not once
+ * per sort comparison, and not once per row) — cheap lookups thereafter for
+ * both applySort and buildRow. Only built while _avgPtsMode==='lastSeason'.
+ * @param {Array} rows
+ * @param {object} ctx
+ * @returns {Map<number, {avg:number|null, cost:number|null, seasonName:string|null, loaded:boolean}>}
+ */
+function buildLastSeasonLookup(rows, ctx) {
+  const map = new Map();
+  for (const { player } of rows) {
+    const loaded = Boolean(ctx.playerSummariesById?.[player.id]);
+    const lastSeason = calcLastSeasonAvgPointsPerGw(player, ctx);
+    const cost = (lastSeason && player.price > 0 && lastSeason.value > 0)
+      ? player.price / lastSeason.value : null;
+    map.set(player.id, {
+      avg:        lastSeason?.value ?? null,
+      cost,
+      seasonName: lastSeason?.seasonName ?? null,
+      loaded,
+    });
+  }
+  return map;
 }
 
 // ─── Build: HTML fragments ────────────────────────────────────────────────────
@@ -346,8 +413,13 @@ function buildFixtureStrip(perGw) {
  * @param {{player: Player, team: Team, score: object, rankTier: string|null}} row
  *   rankTier from attachRankTiers, computed against the FULL pool (FEATURE_ENGINE.md §13)
  * @param {Map<number, number>} nextFixtureRankById  from buildNextFixtureRanks
+ * @param {Map<number, object>|null} lastSeasonByPlayerId  from buildLastSeasonLookup,
+ *   present only when the "Avg Pts/GW source" toggle is set to 'lastSeason'.
+ *   When present, it overrides both the Avg Pts/GW and Cost/Pt cells below —
+ *   the toggle is explicit, so the displayed figures must match its label
+ *   exactly, not silently fall back to current-season numbers.
  */
-function buildRow({ player, team, score, rankTier }, nextFixtureRankById) {
+function buildRow({ player, team, score, rankTier }, nextFixtureRankById, lastSeasonByPlayerId) {
   const statusMark = player.status !== 'available'
     ? `<span class="ranker-status-badge" title="${esc(player.statusNote || player.status)}">!</span>`
     : '';
@@ -355,25 +427,47 @@ function buildRow({ player, team, score, rankTier }, nextFixtureRankById) {
   const lvl      = minSecLevel(ms);
   const estClass = isScoreEstimated(score) ? ' score-chip--estimated' : '';
 
-  // avgPointsPerGw.source === 'lastSeason' is the temporary pre-season
-  // fallback (FEATURE_ENGINE.md §10.1) — distinct tooltip so it reads as
-  // "last season's number", not the ordinary "thin current-season data" case.
-  const avgPts = score.avgPointsPerGw;
-  const avgPtsTitle = avgPts.source === 'lastSeason'
-    ? `Estimated — no current-season data yet, showing ${esc(avgPts.seasonName ?? 'last season')}'s average instead`
-    : 'Estimated — season totals ÷ estimated games played, no per-GW history loaded yet';
-  const avgPtsEstMark = avgPts.estimated
-    ? `<span class="ranker-est-mark" title="${avgPtsTitle}">~</span>`
-    : '';
+  let avgPtsDisplay, costPerPointDisplay;
 
-  // Cost/Pt is DERIVED from avgPointsPerGw (price ÷ avgPointsPerGw.value) —
-  // when that input is estimated (including via the pre-season fallback
-  // above), flag the derived figure too, for the same explainability reason.
-  const costPerPointDisplay = score.costPerPoint !== null
-    ? `£${esc(score.costPerPoint.toFixed(2))}m${avgPts.estimated
-        ? `<span class="ranker-est-mark" title="Derived from an estimated Avg Pts/GW — ${avgPtsTitle}">~</span>`
-        : ''}`
-    : '<span class="ranker-no-fixtures">—</span>';
+  if (lastSeasonByPlayerId) {
+    // 'lastSeason' mode (FEATURE_ENGINE.md §10.1) — three distinct states per
+    // player, not just loaded/unloaded: still loading (bulk fetch in flight),
+    // loaded but no past-season record at all (a definitive "—", not an
+    // estimate), or loaded with a real last-season figure (always flagged ~,
+    // since by definition it isn't this season's number).
+    const ls = lastSeasonByPlayerId.get(player.id);
+    if (!ls?.loaded) {
+      avgPtsDisplay = '<span class="ranker-no-fixtures" title="Loading last season’s data…">…</span>';
+      costPerPointDisplay = '<span class="ranker-no-fixtures" title="Loading last season’s data…">…</span>';
+    } else if (ls.avg === null) {
+      avgPtsDisplay = '<span class="ranker-no-fixtures" title="No past-season data for this player">—</span>';
+      costPerPointDisplay = '<span class="ranker-no-fixtures" title="No past-season data for this player">—</span>';
+    } else {
+      const seasonLabel = esc(ls.seasonName ?? 'last season');
+      const title = `${seasonLabel}'s average — not this season's`;
+      avgPtsDisplay = `${ls.avg.toFixed(1)}<span class="ranker-est-mark" title="${title}">~</span>`;
+      costPerPointDisplay = ls.cost !== null
+        ? `£${esc(ls.cost.toFixed(2))}m<span class="ranker-est-mark" title="Derived from ${title}">~</span>`
+        : '<span class="ranker-no-fixtures" title="No past-season data for this player">—</span>';
+    }
+  } else {
+    // 'current' mode — unchanged from before the toggle existed.
+    const avgPts = score.avgPointsPerGw;
+    const avgPtsTitle = 'Estimated — season totals ÷ estimated games played, no per-GW history loaded yet';
+    const avgPtsEstMark = avgPts.estimated
+      ? `<span class="ranker-est-mark" title="${avgPtsTitle}">~</span>`
+      : '';
+    avgPtsDisplay = `${avgPts.value.toFixed(1)}${avgPtsEstMark}`;
+
+    // Cost/Pt is DERIVED from avgPointsPerGw (price ÷ avgPointsPerGw.value) —
+    // when that input is estimated, flag the derived figure too, for the same
+    // explainability reason.
+    costPerPointDisplay = score.costPerPoint !== null
+      ? `£${esc(score.costPerPoint.toFixed(2))}m${avgPts.estimated
+          ? `<span class="ranker-est-mark" title="Derived from an estimated Avg Pts/GW — ${avgPtsTitle}">~</span>`
+          : ''}`
+      : '<span class="ranker-no-fixtures">—</span>';
+  }
 
   const nfScore    = score.nextFixtureScore;
   const nfRank     = nextFixtureRankById?.get(player.id);
@@ -404,7 +498,7 @@ function buildRow({ player, team, score, rankTier }, nextFixtureRankById) {
         ${costPerPointDisplay}
       </td>
       <td class="ranker-table__td ranker-table__td--avg-pts">
-        ${score.avgPointsPerGw.value.toFixed(1)}${avgPtsEstMark}
+        ${avgPtsDisplay}
       </td>
       <td class="ranker-table__td ranker-table__td--next-fixture"
           title="Fixture + counter-matchup favourability, excluding form">
@@ -474,6 +568,11 @@ function renderThead() {
     return `<th class="ranker-table__th" data-col="${esc(col)}">${esc(label)}</th>`;
   }
 
+  // Cost/Pt and Avg Pts/GW both switch source with the toggle (FEATURE_ENGINE.md
+  // §10.1) — labelling them here means the meaning is clear even scrolled away
+  // from the toggle button itself.
+  const seasonSuffix = _avgPtsMode === 'lastSeason' ? ' (last season)' : '';
+
   _thead.innerHTML = `
     <tr>
       ${thSortable('Player',    'name')}
@@ -481,8 +580,8 @@ function renderThead() {
       ${thStatic('Pos',         'pos')}
       ${thSortable('Price',     'price')}
       ${thSortable('Value',     'value')}
-      ${thSortable('Cost/Pt',   'costPerPoint')}
-      ${thSortable('Avg Pts/GW', 'avgPointsPerGw')}
+      ${thSortable(`Cost/Pt${seasonSuffix}`,   'costPerPoint')}
+      ${thSortable(`Avg Pts/GW${seasonSuffix}`, 'avgPointsPerGw')}
       ${thSortable('Next Fixture', 'nextFixtureScore')}
       ${thStatic(horizon.label, 'fixtures')}
       ${thSortable('Playtime',  'minutesSecurity')}
@@ -513,9 +612,17 @@ function renderTable() {
 
   // Ranked among the filtered set, independent of the active sort column.
   const nextFixtureRankById = buildNextFixtureRanks(filtered);
-  const sorted = applySort(filtered);
 
-  _tbody.innerHTML = sorted.map(row => buildRow(row, nextFixtureRankById)).join('');
+  // Only built in 'lastSeason' mode. buildCtx() is safe to call unconditionally
+  // here — _rows is only ever populated after rebuildRowsChunked has already
+  // built (and required a non-null) ctx once, so the season is guaranteed loaded.
+  const lastSeasonByPlayerId = _avgPtsMode === 'lastSeason'
+    ? buildLastSeasonLookup(filtered, buildCtx())
+    : null;
+
+  const sorted = applySort(filtered, lastSeasonByPlayerId);
+
+  _tbody.innerHTML = sorted.map(row => buildRow(row, nextFixtureRankById, lastSeasonByPlayerId)).join('');
 }
 
 // ─── Lazy loading ─────────────────────────────────────────────────────────────
@@ -542,6 +649,44 @@ async function ensurePlayerSummary(playerId) {
     await _pendingLoads.get(playerId);
   } finally {
     _pendingLoads.delete(playerId);
+  }
+}
+
+/**
+ * Fetch every player's element-summary in chunks of SUMMARY_FETCH_CHUNK_SIZE,
+ * yielding between chunks — mirrors rebuildRowsChunked's chunk/yield pattern,
+ * reusing the same `ensurePlayerSummary` lazy-loader the row-click path uses
+ * (so a player already loaded via a click is not re-fetched). Re-renders after
+ * every chunk so rows fill in progressively instead of all at once at the end.
+ *
+ * This IS an explicit bulk fetch of all ~700 players — but triggered only by
+ * the user clicking "Last Season" on the Avg Pts/GW toggle, not automatically
+ * on load, which is what ARCHITECTURE.md's no-bulk-fetch rule actually
+ * targets. See FEATURE_ENGINE.md §10.1.
+ *
+ * Guarded by _summaryLoadRunId: if the user switches back to 'current' (or
+ * re-triggers 'lastSeason') mid-load, the stale run's captured id no longer
+ * matches _summaryLoadRunId and the loop quietly stops after its current chunk.
+ */
+async function loadAllSummariesChunked() {
+  const runId   = ++_summaryLoadRunId;
+  const players = store.getPlayers();
+
+  for (let i = 0; i < players.length; i += SUMMARY_FETCH_CHUNK_SIZE) {
+    if (runId !== _summaryLoadRunId) return;
+
+    const chunk = players.slice(i, i + SUMMARY_FETCH_CHUNK_SIZE);
+    await Promise.all(chunk.map(p =>
+      ensurePlayerSummary(p.id).catch(err => {
+        console.warn('[ranker] summary fetch failed:', p.id, err.message ?? err);
+      })
+    ));
+
+    if (runId !== _summaryLoadRunId) return;
+    renderTable();
+
+    // Yield so the browser can paint the progressive render and process input.
+    await new Promise(resolve => setTimeout(resolve, 0));
   }
 }
 
@@ -576,6 +721,31 @@ async function onPlayerClick(playerId) {
     store.emit('player:selected', { fixtureId: nextFixture.id });
   }
   window.location.hash = 'matchup';
+}
+
+/**
+ * Toggle handler for the "Avg Pts/GW source" button (FEATURE_ENGINE.md §10.1).
+ * Switching to 'lastSeason' re-renders immediately (showing the loading
+ * placeholder for every row) then kicks off the chunked bulk load. Switching
+ * back to 'current' just bumps _summaryLoadRunId to cancel any in-flight load
+ * and re-renders — no fetch needed, current-season data is already in `_rows`.
+ */
+function onAvgPtsToggleClick() {
+  if (_avgPtsMode === 'current') {
+    _avgPtsMode = 'lastSeason';
+    _avgPtsToggle.classList.add('is-active');
+    _avgPtsToggle.textContent = 'Last Season';
+    _avgPtsToggle.setAttribute('aria-pressed', 'true');
+    renderTable();
+    loadAllSummariesChunked();
+  } else {
+    _avgPtsMode = 'current';
+    _summaryLoadRunId++;
+    _avgPtsToggle.classList.remove('is-active');
+    _avgPtsToggle.textContent = 'This Season';
+    _avgPtsToggle.setAttribute('aria-pressed', 'false');
+    renderTable();
+  }
 }
 
 function onDataReady() {
@@ -615,6 +785,7 @@ export function initRanker() {
   _loading            = root.querySelector('#ranker-loading');
   _teamSelect         = root.querySelector('#ranker-team');
   _priceSelect        = root.querySelector('#ranker-price');
+  _avgPtsToggle       = root.querySelector('#ranker-avgpts-toggle');
 
   populatePriceFilter();
 
@@ -664,6 +835,8 @@ export function initRanker() {
     _activeTeamId = _teamSelect.value;
     renderTable();
   });
+
+  _avgPtsToggle?.addEventListener('click', onAvgPtsToggleClick);
 
   // ── Header sort — event delegation on <thead> ────────────────────────────
   _thead.addEventListener('click', e => {

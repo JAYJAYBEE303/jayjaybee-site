@@ -791,6 +791,40 @@
   border-color: var(--color-accent);
 }
 
+/* ─── Avg Pts/GW source toggle — mirrors .planner-hit-toggle's pattern ───── */
+
+.ranker-avgpts-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.ranker-avgpts-toggle {
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-muted);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+
+/* Active = "Last Season" mode. Accent (not a band colour) — this is a data
+   SOURCE switch, not a good/bad signal, so it shouldn't borrow band meaning. */
+.ranker-avgpts-toggle.is-active {
+  background: var(--color-accent-muted);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.ranker-avgpts-toggle:hover:not(.is-active) {
+  border-color: var(--color-muted);
+  color: var(--color-text);
+}
+
 /* ─── Loading state ─────────────────────────────────────────────────────── */
 
 .ranker-loading {

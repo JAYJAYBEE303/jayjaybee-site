@@ -632,13 +632,16 @@ export function scoreOverHorizon(team, horizon, ctx) {
 // ─── §10  Player projection ───────────────────────────────────────────────────
 
 /**
- * Average FPL points per gameweek this season. Prefers real per-GW history
+ * Average FPL points per gameweek THIS season. Prefers real per-GW history
  * (already lazily loaded via a player-summary fetch — never bulk-fetched, see
  * ARCHITECTURE.md §3 rule 7): FPL's history payload has one entry per elapsed
  * gameweek regardless of whether the player featured (0 minutes/0 points for
  * a blank week), so totalPoints / history.length is already a true weekly
  * average. Falls back to season totals ÷ elapsed gameweeks when no summary
- * is loaded, flagged estimated.
+ * is loaded, flagged estimated. Pre-season (`elapsedGws <= 0`), this is
+ * genuinely 0 for every player — real, not a bug. See `calcLastSeasonAvgPointsPerGw`
+ * for the explicit, user-toggled "show last season instead" view (Ranker
+ * only) rather than any automatic substitution here.
  *
  * MODEL: the fallback divides by gameweeks ELAPSED THIS SEASON
  * (ctx.playedFixtures, deduplicated by gw), not by games the player actually
@@ -648,36 +651,15 @@ export function scoreOverHorizon(team, horizon, ctx) {
  * branch above already does. Dividing by games played instead would make
  * fringe/rotation players who had one big week look like elite performers.
  *
- * PRE-SEASON FALLBACK (temporary — see FEATURE_ENGINE.md §10.1): when
- * `elapsedGws <= 0` (literally no fixture anywhere has finished this season
- * yet — the exact signal the final fallback below already computes, reused
- * rather than inventing a new "is it pre-season" check), season totals are
- * genuinely all zero for every player and the ordinary fallback would return
- * a flat 0. Instead, if this player's summary is already loaded (lazily, as
- * normal) and carries `historyPast`, use their most recent PAST season's
- * points ÷ SEASON_GWS as a temporary stand-in, flagged both `estimated: true`
- * and `source: 'lastSeason'` so callers can render a distinct tooltip.
- *
- * Self-disabling, two ways, with NO manual toggle:
- *   - PER-PLAYER: the instant this player's own summary loads real per-GW
- *     `history` entries, the branch above this one already takes over —
- *     independent of every other player, and independent of `elapsedGws`.
- *   - GLOBAL: the instant a single fixture anywhere finishes, `elapsedGws`
- *     becomes ≥ 1 and this whole branch stops firing for EVERY player —
- *     including one who never plays and would otherwise show a stale
- *     last-season number forever. Once the season is genuinely underway, an
- *     unused player's true 0 is real information, not a gap to fill.
- *
  * Pure: depends only on `player` and ctx (playerSummariesById, playedFixtures
  * — both already part of every ctx built by buildScoreContext) — no new
- * network access, no bulk fetch (ARCHITECTURE.md §12 non-goal 7).
+ * network access.
  *
  * @param {Player} player
  * @param {object} ctx
- * @returns {{value: number, estimated: boolean, source?: string, seasonName?: string}}
- *   value: average points per GW. estimated: true when not derived from real
- *   per-GW history. source: 'lastSeason' only on the pre-season fallback path;
- *   seasonName: which past season it came from (e.g. '2024/25'), same case.
+ * @returns {{value: number, estimated: boolean}}
+ *   value: average points per GW. estimated: true when derived from season
+ *   totals rather than real per-GW history.
  */
 export function calcAvgPointsPerGw(player, ctx) {
   const summary = ctx.playerSummariesById?.[player.id];
@@ -687,31 +669,58 @@ export function calcAvgPointsPerGw(player, ctx) {
     return { value: totalPoints / history.length, estimated: false };
   }
 
-  const elapsedGws = new Set((ctx.playedFixtures || []).map(f => f.gw)).size;
-
-  if (elapsedGws <= 0) {
-    const historyPast = summary?.historyPast;
-    const lastSeason = (historyPast || []).reduce(
-      (latest, s) => (!latest || s.seasonName > latest.seasonName) ? s : latest,
-      null,
-    );
-    if (lastSeason) {
-      return {
-        value:      lastSeason.points / SEASON_GWS,
-        estimated:  true,
-        source:     'lastSeason',
-        seasonName: lastSeason.seasonName,
-      };
-    }
-    // Genuinely nothing to go on yet (summary not lazily loaded for this
-    // player at all) — same as the pre-existing behaviour before this
-    // fallback existed. Resolves itself the moment the summary loads,
-    // whichever branch above then applies.
-    return { value: 0, estimated: true };
-  }
-
-  const points = player.totals?.points ?? 0;
+  const points      = player.totals?.points ?? 0;
+  const elapsedGws  = new Set((ctx.playedFixtures || []).map(f => f.gw)).size;
+  if (elapsedGws <= 0) return { value: 0, estimated: true };
   return { value: points / elapsedGws, estimated: true };
+}
+
+/**
+ * Average points per GW from the player's most recent PAST season (not this
+ * season). Powers the Ranker's explicit "Last Season" Avg Pts/GW toggle
+ * (FEATURE_ENGINE.md §10.1) — a deliberate, user-triggered alternative VIEW,
+ * not an automatic fallback baked into `calcAvgPointsPerGw` above. Kept as a
+ * fully separate function so the ordinary current-season metric never
+ * silently substitutes anything: callers choose explicitly which one to show.
+ *
+ * MODEL: divides by the fixed SEASON_GWS (config.js, 38), not by games that
+ * player actually appeared in that past season — same reasoning as the
+ * current-season fallback above (a fringe player's one good stretch
+ * shouldn't read as elite sustained output).
+ *
+ * Sourced from `historyPast` (`normalisePlayerSummary` — the SAME lazily-
+ * loaded `element-summary` fetch that already provides current-season
+ * `history[]`; no new endpoint, no new fetch shape). Returns `null` when this
+ * player's summary hasn't been loaded yet (caller should render a loading
+ * state, not a definitive dash) or when it's loaded but genuinely carries no
+ * past seasons (caller should then render a definitive "no data" dash).
+ *
+ * Pure: depends only on `player.id` and `ctx.playerSummariesById` — no
+ * network access itself; the Ranker is responsible for triggering the lazy
+ * load beforehand (see `ensurePlayerSummary` / the chunked bulk loader).
+ *
+ * @param {Player} player
+ * @param {object} ctx
+ * @returns {{value: number, seasonName: string}|null}
+ *   null: summary not loaded yet, OR loaded with no past-season history.
+ *   Callers distinguish the two by checking whether the summary itself
+ *   exists (`ctx.playerSummariesById[player.id]`).
+ */
+export function calcLastSeasonAvgPointsPerGw(player, ctx) {
+  const summary = ctx.playerSummariesById?.[player.id];
+  const historyPast = summary?.historyPast;
+  if (!historyPast || historyPast.length === 0) return null;
+
+  const lastSeason = historyPast.reduce(
+    (latest, s) => (!latest || s.seasonName > latest.seasonName) ? s : latest,
+    null,
+  );
+  if (!lastSeason) return null;
+
+  return {
+    value:      lastSeason.points / SEASON_GWS,
+    seasonName: lastSeason.seasonName,
+  };
 }
 
 /**
@@ -722,7 +731,7 @@ export function calcAvgPointsPerGw(player, ctx) {
  * @param {{label: string, gws: number}} horizon
  * @param {object}  ctx   output of buildScoreContext
  * @returns {{ value: number, band: string, perGw: Array, breakdown: object,
- *             valueScore: number, avgPointsPerGw: {value:number, estimated:boolean, source?:string, seasonName?:string},
+ *             valueScore: number, avgPointsPerGw: {value:number, estimated:boolean},
  *             costPerPoint: number|null, nextFixtureScore: {value:number, estimated:boolean} }}
  *   value: 0–100, higher = better projected value. Direction: higher = better.
  *   valueScore: value / price — points-per-million proxy for budget-aware ranking.

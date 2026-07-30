@@ -81,6 +81,16 @@
                 <option value="all">All teams</option>
               </select>
             </div>
+
+            <!-- Avg Pts/GW source toggle: explicit switch, not automatic —
+                 see FEATURE_ENGINE.md §10.1. "Last Season" triggers a chunked
+                 background load of every player's summary (bounded, staggered,
+                 not a single bulk request — see SUMMARY_FETCH_CHUNK_SIZE). -->
+            <div class="ranker-avgpts-wrap">
+              <label class="ranker-controls__label" for="ranker-avgpts-toggle">Avg Pts/GW source</label>
+              <button class="ranker-avgpts-toggle" id="ranker-avgpts-toggle"
+                      type="button" aria-pressed="false">This Season</button>
+            </div>
           </aside>
 
           <div class="ranker-main">
