@@ -12,7 +12,7 @@ import {
   STACK_PIVOT, STACK_CURVE, STACK_MAX_PENALTY, RELATIVE_EDGE_SENSITIVITY,
   HORIZON_DECAY, AGG_METHOD, W_MEAN, W_MIN, BLANK_GW_VALUE,
   PROJ_FORM, PROJ_FIXTURE, PROJ_COUNTER, PROJ_MINUTES,
-  RANK_TOP_COUNT, RANK_TOP_PERCENTILE, RANK_BOTTOM_PERCENTILE,
+  RANK_ELITE_COUNT_BY_POS, RANK_STRONG_COUNT_BY_POS, RANK_BOTTOM_PERCENTILE,
 } from '../config.js';
 import { clamp, invert } from '../util.js';
 import {
@@ -806,39 +806,52 @@ export function rankPlayers(players, horizon, ctx) {
 // ─── Rank-relative colouring ──────────────────────────────────────────────────
 
 /**
- * Classify a player's position in an already-sorted (descending by value) pool
- * into a rank tier, or null if they don't fall into any standout tier. This is
- * a SEPARATE axis from `score.band` (§8.4): band classifies a score against the
- * fixed 0–100 scale; tier classifies a player against the CURRENT POOL, so a
- * strong pick still stands out even in a season where absolute scores run low
- * (or vice versa). Only the standout tiers get a colour override — everyone
- * else keeps their existing band colour. See FEATURE_ENGINE.md §13.
+ * Classify a player into a rank tier, or null if they don't fall into any
+ * standout tier. This is a SEPARATE axis from `score.band` (§8.4): band
+ * classifies a score against the fixed 0–100 scale; tier classifies a player
+ * against the CURRENT POOL, so a strong pick still stands out even in a
+ * season where absolute scores run low (or vice versa). Only the standout
+ * tiers get a colour override — everyone else keeps their existing band
+ * colour. See FEATURE_ENGINE.md §13.
  *
  * Precedence (most to least specific), each tier evaluated in order and the
  * first match wins:
- *   1. 'topCount'        — index < RANK_TOP_COUNT (a fixed count, not a percentage)
- *   2. 'topPercentile'    — index < poolSize * RANK_TOP_PERCENTILE
+ *   1. 'positionElite'    — positionIndex < RANK_ELITE_COUNT_BY_POS[position]
+ *   2. 'positionStrong'   — positionIndex < RANK_STRONG_COUNT_BY_POS[position]
  *   3. 'bottomPercentile' — index >= poolSize * (1 - RANK_BOTTOM_PERCENTILE)
- * A top-count player is always also within the top percentile, and the top
- * percentile is always within the bottom percentile's complement — the
- * fixed-count tier is checked first specifically because it is the most
- * exclusive, "definitely worth squad consideration" signal, and would
- * otherwise be silently absorbed into the percentile tier.
+ * A position-elite player is always also position-strong (the elite count is
+ * always ≤ the strong count for every position) — elite is checked first
+ * specifically because it is the more exclusive, "definitely worth squad
+ * consideration" signal, and would otherwise be silently absorbed into the
+ * wider tier.
+ *
+ * MODEL: the two "worth considering" tiers are PER-POSITION — `positionIndex`
+ * is this player's 0-based rank among players of their OWN position only, not
+ * the whole pool. A pool-wide ranking systematically buried Forwards (fewer
+ * of them, and not reliably higher-scoring) under cheap Defenders that post a
+ * similar composite score — ranking each position against its own peers is
+ * what actually surfaces good picks per position, which is the point of the
+ * feature. `bottomPercentile` stays pool-wide by contrast: there's no
+ * equivalent "hidden gem" concern to correct for at the bottom.
  *
  * MODEL: tier names describe their ROLE (mirroring the RANK_* config constant
- * names), not the current threshold number — RANK_TOP_COUNT/RANK_TOP_PERCENTILE
- * are tunable (FEATURE_ENGINE.md §13), and a name baked to a specific number
- * (e.g. 'top30') would silently go stale the next time either is retuned.
+ * names), not the current threshold numbers — those are tunable
+ * (FEATURE_ENGINE.md §13), and a name baked to a specific figure would
+ * silently go stale the next time any of them are retuned.
  *
- * @param {number} index     0-based rank in the sorted pool (0 = best)
- * @param {number} poolSize  total size of the pool `index` was ranked within
- * @returns {'topCount'|'topPercentile'|'bottomPercentile'|null}
+ * @param {number} index          0-based rank in the whole sorted pool (0 = best)
+ * @param {number} poolSize       total size of the pool `index` was ranked within
+ * @param {number} positionIndex  0-based rank among players of the SAME position only
+ * @param {string} position       the player's position (GKP/DEF/MID/FWD)
+ * @returns {'positionElite'|'positionStrong'|'bottomPercentile'|null}
  */
-export function calcRankTier(index, poolSize) {
-  if (!(poolSize > 0) || index < 0 || index >= poolSize) return null;
-  if (index < RANK_TOP_COUNT) return 'topCount';
-  if (index < poolSize * RANK_TOP_PERCENTILE) return 'topPercentile';
-  if (index >= poolSize * (1 - RANK_BOTTOM_PERCENTILE)) return 'bottomPercentile';
+export function calcRankTier(index, poolSize, positionIndex, position) {
+  const eliteCount  = RANK_ELITE_COUNT_BY_POS[position]  ?? 0;
+  const strongCount = RANK_STRONG_COUNT_BY_POS[position] ?? 0;
+  if (positionIndex < eliteCount)  return 'positionElite';
+  if (positionIndex < strongCount) return 'positionStrong';
+  if (poolSize > 0 && index >= 0 && index < poolSize
+      && index >= poolSize * (1 - RANK_BOTTOM_PERCENTILE)) return 'bottomPercentile';
   return null;
 }
 
@@ -849,13 +862,25 @@ export function calcRankTier(index, poolSize) {
  * carries the same { player, score, ... } shape plus extra fields that pass
  * through unchanged). Pure: returns a new array, never mutates the input.
  *
+ * Derives each player's per-position rank in a single pass: since `sortedRows`
+ * is already sorted descending pool-wide, counting occurrences of each
+ * position as we go — advancing that position's counter only when we meet
+ * another player of it — reproduces the same descending order restricted to
+ * one position, without a second sort.
+ *
  * @param {{player: Player, score: object}[]} sortedRows
  * @returns {{player: Player, score: object, rankTier: string|null}[]}
  */
 export function attachRankTiers(sortedRows) {
   const poolSize = sortedRows.length;
-  return sortedRows.map((row, index) => ({
-    ...row,
-    rankTier: calcRankTier(index, poolSize),
-  }));
+  const positionCounts = {};
+  return sortedRows.map((row, index) => {
+    const position = row.player?.position;
+    const positionIndex = positionCounts[position] ?? 0;
+    positionCounts[position] = positionIndex + 1;
+    return {
+      ...row,
+      rankTier: calcRankTier(index, poolSize, positionIndex, position),
+    };
+  });
 }

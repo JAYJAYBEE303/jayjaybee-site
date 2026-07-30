@@ -14,7 +14,7 @@
 import { store } from '../store.js';
 import {
   HORIZONS, RANKER_CHUNK_SIZE, PRICE_FILTER_MIN, PRICE_FILTER_MAX, PRICE_FILTER_STEP, BANDS,
-  RANK_TOP_COUNT, RANK_TOP_PERCENTILE,
+  RANK_ELITE_COUNT_BY_POS, RANK_STRONG_COUNT_BY_POS,
 } from '../config.js';
 import { buildScoreContext, scorePlayer, attachRankTiers } from '../engine/composite.js';
 import { fetchPlayerSummary } from '../api.js';
@@ -108,19 +108,29 @@ function bandFromValue(v) {
  *  suffix, or '' when the player isn't in any standout tier (keeps their
  *  existing band colour). See FEATURE_ENGINE.md §13. */
 function rankTierClass(rankTier) {
-  if (rankTier === 'topCount')        return ' score-chip--rank-green';
-  if (rankTier === 'topPercentile')    return ' score-chip--rank-light-green';
+  if (rankTier === 'positionElite')    return ' score-chip--rank-green';
+  if (rankTier === 'positionStrong')   return ' score-chip--rank-light-green';
   if (rankTier === 'bottomPercentile') return ' score-chip--rank-red';
   return '';
 }
 
-// Built from the live config constants (not hardcoded numbers) so this never
-// goes stale if RANK_TOP_COUNT/RANK_TOP_PERCENTILE are retuned.
-const RANK_TIER_TITLES = {
-  topCount:        `Top ${RANK_TOP_COUNT} players in the game`,
-  topPercentile:    `Top ${Math.round(RANK_TOP_PERCENTILE * 100)}% of players in the game`,
-  bottomPercentile: 'Bottom half of players in the game',
-};
+/** Human label for a position, used only in the rank-tier tooltip below. */
+const POSITION_LABELS = { GKP: 'goalkeepers', DEF: 'defenders', MID: 'midfielders', FWD: 'forwards' };
+
+/**
+ * Tooltip text for a rank-tier chip. positionElite/positionStrong's counts
+ * are PER-POSITION (RANK_ELITE_COUNT_BY_POS/RANK_STRONG_COUNT_BY_POS), so the
+ * text must read the player's own position rather than a single fixed string
+ * — built from the live config constants, not hardcoded numbers, so this
+ * never goes stale if either table is retuned.
+ */
+function rankTierTitle(rankTier, position) {
+  const posLabel = POSITION_LABELS[position] ?? 'players';
+  if (rankTier === 'positionElite')  return `Top ${RANK_ELITE_COUNT_BY_POS[position]} ${posLabel} in the game`;
+  if (rankTier === 'positionStrong') return `Top ${RANK_STRONG_COUNT_BY_POS[position]} ${posLabel} in the game`;
+  if (rankTier === 'bottomPercentile') return 'Bottom half of players in the game';
+  return '';
+}
 
 /** Return the label+band object for a 0–1 minutesSecurity value. */
 function minSecLevel(ms) {
@@ -376,7 +386,7 @@ function buildRow({ player, team, score, rankTier }, nextFixtureRankById) {
       </td>
       <td class="ranker-table__td ranker-table__td--value">
         <span class="score-chip score-chip--${esc(score.band)}${estClass}${rankTierClass(rankTier)}"
-              title="${rankTier ? esc(RANK_TIER_TITLES[rankTier]) : ''}">${Math.round(score.value)}</span>
+              title="${rankTier ? esc(rankTierTitle(rankTier, player.position)) : ''}">${Math.round(score.value)}</span>
       </td>
       <td class="ranker-table__td ranker-table__td--cost-per-point">
         ${costPerPointDisplay}

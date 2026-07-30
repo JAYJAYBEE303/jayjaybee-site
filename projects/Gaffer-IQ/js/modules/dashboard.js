@@ -64,7 +64,7 @@ let _importInFlight = false;
 let _scores = new Map();
 
 /**
- * Map<playerId, 'topCount'|'topPercentile'|'bottomPercentile'|null> — EVERY player's standing
+ * Map<playerId, 'positionElite'|'positionStrong'|'bottomPercentile'|null> — EVERY player's standing
  * against the full pool (FEATURE_ENGINE.md §13), not just the squad. null
  * until computed. Deliberately NOT rebuilt on every squad edit: the ranking
  * depends only on ctx/horizon, not on squad membership, so recomputing it on
@@ -135,8 +135,8 @@ function esc(str) {
  *  existing band colour). Mirrors the identical helper in modules/ranker.js.
  *  See FEATURE_ENGINE.md §13. */
 function rankTierClass(rankTier) {
-  if (rankTier === 'topCount')        return ' score-chip--rank-green';
-  if (rankTier === 'topPercentile')    return ' score-chip--rank-light-green';
+  if (rankTier === 'positionElite')    return ' score-chip--rank-green';
+  if (rankTier === 'positionStrong')   return ' score-chip--rank-light-green';
   if (rankTier === 'bottomPercentile') return ' score-chip--rank-red';
   return '';
 }

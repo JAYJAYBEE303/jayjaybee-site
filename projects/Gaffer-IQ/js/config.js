@@ -617,21 +617,27 @@ export const PRICE_BUY_NOW_SCORE_MIN = 55;
 // ─── Rank-relative player colouring (Ranker / Planner / Dashboard) ───────────
 
 // MODEL: this is a SEPARATE colouring axis from BANDS (§8.4) — BANDS classifies
-// a score against the fixed 0–100 scale; these three classify a player against
+// a score against the fixed 0–100 scale; these tiers classify a player against
 // the CURRENT POOL, so "worth strongly considering" pops out regardless of how
 // the absolute scale happens to be distributed this season. Precedence, most
-// to least specific: RANK_TOP_COUNT > RANK_TOP_PERCENTILE > RANK_BOTTOM_PERCENTILE.
-// A player outside all three keeps their existing BANDS colour — this system
-// only overrides colour for the standout tiers, not the unremarkable middle.
-// See FEATURE_ENGINE.md §13.
+// to least specific: RANK_ELITE_COUNT_BY_POS > RANK_STRONG_COUNT_BY_POS >
+// RANK_BOTTOM_PERCENTILE. A player outside all three keeps their existing
+// BANDS colour — this system only overrides colour for the standout tiers,
+// not the unremarkable middle. See FEATURE_ENGINE.md §13.
 
-// Fixed-count top tier (not a percentage) — the flagship "definitely worth
-// squad consideration" group. Takes precedence over the percentile tier below
-// even though a top-15 player is always also in the top 20%.
-export const RANK_TOP_COUNT = 15;
+// MODEL: the two "worth considering" tiers are PER-POSITION fixed counts, not
+// pool-wide — a pool-wide count/percentile systematically buried Forwards (few
+// slots, expensive, ~50 in the game) under cheap Defenders (many slots, ~100+
+// in the game) that post a similar composite score. Ranking each position
+// against its own peers, not the other three positions, is what actually
+// surfaces "good picks I might be missing" per position — which is the point
+// of the feature. GKP/FWD get their own (smaller) counts because there are
+// far fewer of them in a valid squad (2 and 3 respectively, vs 5 for DEF/MID).
+export const RANK_ELITE_COUNT_BY_POS  = { GKP: 2, DEF: 5,  MID: 5,  FWD: 3 };
+export const RANK_STRONG_COUNT_BY_POS = { GKP: 5, DEF: 15, MID: 15, FWD: 8 };
 
-// Percentile tiers, each 0–1. RANK_TOP_PERCENTILE: fraction of the pool (by
-// rank) considered a genuinely strong pick. RANK_BOTTOM_PERCENTILE: fraction
-// of the pool, counted from the bottom, considered weak enough to flag red.
-export const RANK_TOP_PERCENTILE = 0.20;
+// Fraction of the pool, counted from the bottom, considered weak enough to
+// flag red. Deliberately still POOL-WIDE (not per-position) — unlike the two
+// tiers above, there's no "hidden gem" concern to correct for at the bottom;
+// a weak player is weak regardless of what position he shares the flag with.
 export const RANK_BOTTOM_PERCENTILE = 0.50;
