@@ -344,13 +344,13 @@ value = clamp(0, 100, 50 + edge * RELATIVE_EDGE_SENSITIVITY)
 ### 8.4 Bands (`config.js → BANDS`)
 `value` maps to a band string (drives colour everywhere — see `CONVENTIONS.md` §5.2):
 ```
-85–100 → 'great'
-68–84  → 'good'
-46–67  → 'neutral'
-30–45  → 'tough'
- 0–29  → 'brutal'
+67–100 → 'great'
+58–66  → 'good'
+43–57  → 'neutral'
+34–42  → 'tough'
+ 0–33  → 'brutal'
 ```
-Band thresholds are config, not literals, so the palette can be re-calibrated after observing a season's distribution.
+Band thresholds are config, not literals, so the palette can be re-calibrated after observing a season's distribution. Retuned narrower/lower than the original 85/68/46/30 split (which pushed too much of the pool into 'neutral') after observing actual score distributions.
 
 ### 8.5 Output shape (matches `ARCHITECTURE.md` §8)
 ```js

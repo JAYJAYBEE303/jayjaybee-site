@@ -429,10 +429,10 @@ export const CONFIDENCE_FLOOR = 0.6;
 // Band thresholds — lower bound of each band (inclusive).
 // See FEATURE_ENGINE.md §8.4. CSS modifier classes must match these strings.
 export const BANDS = {
-  great:   85,
-  good:    68,
-  neutral: 46,
-  tough:   30,
+  great:   67,
+  good:    58,
+  neutral: 43,
+  tough:   34,
   brutal:   0,
 };
 
