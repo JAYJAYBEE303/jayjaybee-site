@@ -486,6 +486,14 @@ export const PROJ_FIXTURE = 0.28;   // team's horizon fixture score
 export const PROJ_COUNTER = 0.16;   // player's position counter-matchup edge
 export const PROJ_MINUTES = 0.20;   // playing likelihood — will he actually start?
 
+// How far `expectedPoints` (a real points-scale captaincy/TC projection,
+// FEATURE_ENGINE.md §10) swings avgPointsPerGw based on next-fixture quality.
+// MODEL: nextFixtureScore of 50 (neutral) applies a ×1.0 multiplier; 100 (best
+// possible fixture) applies ×(1 + EXPECTED_PTS_FIXTURE_SWING); 0 (worst) applies
+// ×(1 − EXPECTED_PTS_FIXTURE_SWING). 0.5 was chosen so a great/awful fixture can
+// meaningfully swing the pick without ever driving the multiplier negative.
+export const EXPECTED_PTS_FIXTURE_SWING = 0.5;
+
 // Fallback playing-chance percentage per internal status string, used by
 // calcPlayingLikelihood ONLY when FPL's own chance_of_playing_next_round is
 // null (which is the normal case — FPL populates it only when there is news).

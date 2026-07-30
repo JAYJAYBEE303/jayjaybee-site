@@ -519,7 +519,7 @@ playerProjection(player, horizon) =
 ```
 - Defaults: `PROJ_FORM = 0.36`, `PROJ_FIXTURE = 0.28`, `PROJ_COUNTER = 0.16`, `PROJ_MINUTES = 0.20` (`config.js`). **Sums to 1.00.**
 - `playerCounterEdge` pulls the specific pairing the player participates in (a striker gets the FWD-vs-CB pairing of each fixture in the horizon), so the counter-matchup is personalised to his role, not just his team's average.
-- Output: `{ value, band, perGw, breakdown, valueScore, avgPointsPerGw, costPerPoint, nextFixtureScore }` where `valueScore = value / price` (points-per-million proxy) for budget-aware ranking.
+- Output: `{ value, band, perGw, breakdown, valueScore, avgPointsPerGw, costPerPoint, nextFixtureScore, expectedPoints }` where `valueScore = value / price` (points-per-million proxy) for budget-aware ranking. `expectedPoints` is a separate, real points-scale projection — see §10.2 — never conflate it with `value`.
 
 **`PROJ_MINUTES` — playing likelihood as a first-class term.**
 
@@ -581,6 +581,24 @@ Sorting by Avg Pts/GW or Cost/Pt while in "Last Season" mode sorts by these same
 
 Confirms the same underlying arithmetic as before — only how (and when) it's surfaced has changed: a real `0` is always available on the default tab, and the last-season figure is only ever shown when the user explicitly asks for it.
 
+### 10.2 `expectedPoints` — real points-scale projection for captaincy/TC (`calcExpectedPoints`)
+
+**Problem this fixes:** the Dashboard's captaincy pick and the Planner's Triple Captain candidate pick both used to rank the owned squad by `score.value` — the same 0–100 composite the Ranker uses to compare players *within* a position. That composite does not scale with a position's actual scoring ceiling (a forward's good game is worth more raw FPL points than a defender's good game), so a defender in great form with an easy fixture could out-rank a genuinely higher-scoring midfielder/forward for the armband — exactly backwards from "captain whoever is predicted to score the most points."
+
+**The fix:** `scorePlayer` now also returns `expectedPoints: { value, estimated }`, computed by `calcExpectedPoints(avgPointsPerGw, nextFixtureScore, playing)`:
+
+```
+expectedPoints.value = avgPointsPerGw.value
+                      * (1 + EXPECTED_PTS_FIXTURE_SWING * (nextFixtureScore.value − 50) / 50)
+                      * (playing.value / 100)
+```
+
+- `avgPointsPerGw.value` (§10 above) is a real points figure that already reflects each position's true scoring ceiling — forwards/mids naturally average more points per gameweek than defenders — so no separate per-position scaling is needed.
+- The fixture-quality term scales that average by up to `± EXPECTED_PTS_FIXTURE_SWING` (config.js, default `0.5`): a `nextFixtureScore` of 50 (neutral) applies ×1.0, 100 (best possible) applies ×1.5, 0 (worst) applies ×0.5.
+- The playing-likelihood term (`playing.value / 100`, §7.3) suppresses the projection for anyone unlikely to start, so a high season-average player who's now injured/benched doesn't still look like the best captain pick.
+- **`value` and `expectedPoints` are two different axes and must never be merged**: `value` (0–100) answers "how good a pick is this player right now, relative to others at his position" (Ranker's job); `expectedPoints` (real points) answers "how many points will he actually score" (captaincy/TC's job).
+- **Callers:** `modules/dashboard.js → renderDecisions()` picks the XI's `expectedPoints.value` max as captain (and shows it on the Captain Pick card, "Predicted X.X pts"); `modules/planner.js → pickTcCandidate()` picks the squad's `expectedPoints.value` max as the Triple Captain candidate. Neither reads `score.value` for this decision anymore.
+
 ---
 
 ## 11. How the engine feeds each module
@@ -589,8 +607,8 @@ Confirms the same underlying arithmetic as before — only how (and when) it's s
 |---|---|---|
 | **Matchup Analyser** (`modules/matchup.js`) | `scoreFixture(team, fixture)` for **both** sides | Full side-by-side breakdown of one fixture: each sub-metric, the counter-matchup pairings (each with an info disclosure naming the players behind it, via `duelsForPairing` §7.2), style clash, confidence. The "view source" for any score elsewhere. Since §8.7, the two cards' `value`s are guaranteed to sum to 100 — a genuinely relative read of the matchup, not two independent absolute scores. |
 | **Player Ranker** (`modules/ranker.js`) | `rankPlayers(players, horizon)` → sortable by `value`, `costPerPoint`, `price`, or `minutesSecurity` | Ranked, filterable table (position, price threshold, team, minutes-security) of projected value over the active horizon — permanent Value and Cost/Pt columns, Avg Pts/GW, Next Fixture (rank + score), and a per-GW fixture strip per player. |
-| **GW Dashboard** (`modules/dashboard.js`) | `scorePlayer(p, HORIZON.GW1)` for owned squad + `event/<gw>/live` | Captaincy pick (top projection in squad), start/bench order, risk flags (low minutesSecurity, brutal band, low confidence), and live points when the GW is in progress. Horizon-locked to GW1. |
-| **Transfer Planner** (`modules/planner.js`) | `rankPlayers` over horizon + current squad + constraints | For each candidate out→in swap, computes Δ projected horizon score; ranks transfers by gain per cost, respecting budget and free transfers (−4 hit modelled). Surfaces the moves that most raise total projected score over the horizon. |
+| **GW Dashboard** (`modules/dashboard.js`) | `scorePlayer(p, HORIZON.GW1)` for owned squad + `event/<gw>/live` | Captaincy pick (top `expectedPoints`, §10.2, in squad), start/bench order, risk flags (low minutesSecurity, brutal band, low confidence), and live points when the GW is in progress. Horizon-locked to GW1. |
+| **Transfer Planner** (`modules/planner.js`) | `rankPlayers` over horizon + current squad + constraints | For each candidate out→in swap, computes Δ projected horizon score; ranks transfers by gain per cost, respecting budget and free transfers (−4 hit modelled). Surfaces the moves that most raise total projected score over the horizon. Triple Captain candidate picked by top `expectedPoints` (§10.2), same as Dashboard captaincy. |
 
 All four read the **same** scores and breakdowns. No module recomputes a metric. If a module needs a number the engine doesn't expose, add it to the engine and its breakdown — never inline it (see `CONVENTIONS.md` §11).
 

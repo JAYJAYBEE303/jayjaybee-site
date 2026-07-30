@@ -1465,6 +1465,13 @@
   margin-left: var(--space-1);
 }
 
+.dash-captain__predicted {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  font-weight: 400;
+  margin-left: var(--space-1);
+}
+
 /* ─── Starting XI and Bench lists ────────────────────────────────────────── */
 
 .dash-xi,

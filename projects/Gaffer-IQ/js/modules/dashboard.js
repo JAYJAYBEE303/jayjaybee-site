@@ -766,8 +766,14 @@ function renderDecisions() {
 
   const { xi, bench } = pickStartingXI(scoredSquad);
 
+  // Captaincy picks the highest real points-scale projection (expectedPoints),
+  // NOT the 0-100 composite `score.value` — that composite is a normalised
+  // quality score meant for within-position comparisons and does not scale
+  // with a position's actual scoring ceiling, so it can rank a merely-solid
+  // defender above a genuinely higher-scoring midfielder/forward. See
+  // calcExpectedPoints in engine/composite.js and FEATURE_ENGINE.md §10.2.
   const captainEntry = xi.reduce(
-    (best, e) => (!best || e.score.value > best.score.value ? e : best),
+    (best, e) => (!best || e.score.expectedPoints.value > best.score.expectedPoints.value ? e : best),
     null,
   );
   const captainId = captainEntry?.player.id ?? null;
@@ -801,6 +807,12 @@ function renderCaptainBlock(entry) {
   // Live pts for captain: show raw and doubled value.
   const captainLiveHtml = buildLivePtsHtml(player.id, true);
 
+  // Real points-scale projection driving the pick itself — see the reasoning
+  // in renderDecisions() for why this (not score.value) selects the captain.
+  const predictedHtml = score.expectedPoints
+    ? `<span class="dash-captain__predicted" title="Projected FPL points for the upcoming game, fixture- and playing-time-adjusted">Predicted ${score.expectedPoints.value.toFixed(1)} pts</span>`
+    : '';
+
   return `
     <div class="dash-captain">
       <div class="dash-captain__header">
@@ -811,6 +823,7 @@ function renderCaptainBlock(entry) {
             ${esc(player.name)}${statusMark}
             <span class="dash-captain__price">£${price}m</span>
             ${team ? `<span class="dash-captain__team">${esc(team.shortName)}</span>` : ''}
+            ${predictedHtml}
           </div>
         </div>
         <div class="dash-captain__score-wrap">

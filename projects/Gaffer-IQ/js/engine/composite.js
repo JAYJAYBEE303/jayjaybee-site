@@ -11,7 +11,7 @@ import {
   WEIGHTS, BANDS, CONFIDENCE_FLOOR, LEAGUE_AVG_STRENGTH,
   STACK_PIVOT, STACK_CURVE, STACK_MAX_PENALTY, RELATIVE_EDGE_SENSITIVITY,
   HORIZON_DECAY, AGG_METHOD, W_MEAN, W_MIN, BLANK_GW_VALUE,
-  PROJ_FORM, PROJ_FIXTURE, PROJ_COUNTER, PROJ_MINUTES,
+  PROJ_FORM, PROJ_FIXTURE, PROJ_COUNTER, PROJ_MINUTES, EXPECTED_PTS_FIXTURE_SWING,
   RANK_ELITE_COUNT_BY_POS, RANK_STRONG_COUNT_BY_POS, RANK_TOP_PERCENTILE, RANK_BOTTOM_PERCENTILE,
   SEASON_GWS,
 } from '../config.js';
@@ -724,6 +724,36 @@ export function calcLastSeasonAvgPointsPerGw(player, ctx) {
 }
 
 /**
+ * Real points-scale projection used for captaincy / Triple Captain decisions:
+ * how many FPL points is this player actually expected to score next,
+ * scaled by how good his next fixture is and how likely he is to start?
+ *
+ * This is deliberately NOT `scorePlayer`'s 0–100 `value` — that composite is a
+ * normalised quality score (FEATURE_ENGINE.md §10) meant for comparing players
+ * WITHIN a position, so a defender in great form with an easy fixture can
+ * outscore a middling forward even though the forward's actual point ceiling
+ * is far higher. `expectedPoints` stays on the real points scale (from
+ * `avgPointsPerGw`, which already reflects each position's true scoring
+ * ceiling — forwards/mids naturally average more than defenders) so captaincy
+ * picks the player predicted to score the most points, full stop, regardless
+ * of position or price. See FEATURE_ENGINE.md §10.2.
+ *
+ * @param {{value: number, estimated: boolean}} avgPointsPerGw
+ * @param {{value: number}} nextFixtureScore  0–100, fixture+counter blend
+ * @param {{value: number, estimated: boolean}} playing  0–100 playing likelihood
+ * @returns {{value: number, estimated: boolean}}
+ *   value: expected FPL points for the upcoming game (real points scale, not 0–100).
+ */
+export function calcExpectedPoints(avgPointsPerGw, nextFixtureScore, playing) {
+  const fixtureMultiplier = 1 + EXPECTED_PTS_FIXTURE_SWING * ((nextFixtureScore.value - 50) / 50);
+  const minutesMultiplier = playing.value / 100;
+  return {
+    value:     avgPointsPerGw.value * fixtureMultiplier * minutesMultiplier,
+    estimated: avgPointsPerGw.estimated || playing.estimated,
+  };
+}
+
+/**
  * Player projection over a horizon: blends player form, team fixture quality,
  * and position-specific counter-matchup edge. See FEATURE_ENGINE.md §10.
  *
@@ -732,7 +762,8 @@ export function calcLastSeasonAvgPointsPerGw(player, ctx) {
  * @param {object}  ctx   output of buildScoreContext
  * @returns {{ value: number, band: string, perGw: Array, breakdown: object,
  *             valueScore: number, avgPointsPerGw: {value:number, estimated:boolean},
- *             costPerPoint: number|null, nextFixtureScore: {value:number, estimated:boolean} }}
+ *             costPerPoint: number|null, nextFixtureScore: {value:number, estimated:boolean},
+ *             expectedPoints: {value:number, estimated:boolean} }}
  *   value: 0–100, higher = better projected value. Direction: higher = better.
  *   valueScore: value / price — points-per-million proxy for budget-aware ranking.
  *   costPerPoint: price / avgPointsPerGw — money spent per point, the INVERSE
@@ -743,6 +774,9 @@ export function calcLastSeasonAvgPointsPerGw(player, ctx) {
  *   nextFixtureScore: 0–100 blend of just fixture + counter (excludes form),
  *   answering "how favourable is this player's next fixture", derived from the
  *   SAME horizonResult/counterEdge already computed below — not a new metric.
+ *   expectedPoints: real points-scale captaincy/TC projection (avgPointsPerGw
+ *   scaled by nextFixtureScore and playing likelihood) — NOT the same axis as
+ *   `value`; see calcExpectedPoints above and FEATURE_ENGINE.md §10.2.
  *   See FEATURE_ENGINE.md §10.
  */
 export function scorePlayer(player, horizon, ctx) {
@@ -766,6 +800,7 @@ export function scorePlayer(player, horizon, ctx) {
       costPerPoint: (player.price > 0 && avgPointsPerGw.value > 0)
         ? player.price / avgPointsPerGw.value : null,
       nextFixtureScore: { value: 50, estimated: true },
+      expectedPoints: calcExpectedPoints(avgPointsPerGw, { value: 50 }, { value: 50, estimated: true }),
     };
   }
 
@@ -790,6 +825,17 @@ export function scorePlayer(player, horizon, ctx) {
   + (PROJ_COUNTER * counterEdge.value)
   + (PROJ_MINUTES * playing.value),
   );
+
+  // Fixture + counter only (excludes form) — "is his NEXT FIXTURE good", not
+  // "is he in form". Re-normalised over just these two weights since PROJ_FORM
+  // is dropped from the blend. Reused below by expectedPoints so both metrics
+  // agree on what "a good fixture" means.
+  const nextFixtureScore = {
+    value: clamp(0, 100,
+      ((PROJ_FIXTURE * horizonResult.value) + (PROJ_COUNTER * counterEdge.value))
+      / (PROJ_FIXTURE + PROJ_COUNTER)),
+    estimated: counterEdge.estimated,
+  };
 
   return {
     value,
@@ -821,16 +867,8 @@ export function scorePlayer(player, horizon, ctx) {
     avgPointsPerGw,
     costPerPoint: (player.price > 0 && avgPointsPerGw.value > 0)
       ? player.price / avgPointsPerGw.value : null,
-    // Fixture + counter only (excludes form) — "is his NEXT FIXTURE good",
-    // not "is he in form". Re-normalised over just these two weights since
-    // PROJ_FORM is dropped from the blend. Reuses horizonResult/counterEdge
-    // computed above; not a new independent calculation.
-    nextFixtureScore: {
-      value: clamp(0, 100,
-        ((PROJ_FIXTURE * horizonResult.value) + (PROJ_COUNTER * counterEdge.value))
-        / (PROJ_FIXTURE + PROJ_COUNTER)),
-      estimated: counterEdge.estimated,
-    },
+    nextFixtureScore,
+    expectedPoints: calcExpectedPoints(avgPointsPerGw, nextFixtureScore, playing),
   };
 }
 

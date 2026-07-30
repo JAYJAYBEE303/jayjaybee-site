@@ -801,12 +801,18 @@ function pickBenchPlayerIds() {
 /**
  * Pick the highest-projected player in the current squad as the Triple Captain
  * candidate. Returns null when the squad is empty or no scores exist yet.
+ *
+ * Ranks by `expectedPoints` (real points-scale projection), NOT the 0-100
+ * composite `score.value` — same reasoning as the dashboard captaincy pick:
+ * the composite is a within-position quality score and doesn't scale with a
+ * position's actual scoring ceiling. See calcExpectedPoints in
+ * engine/composite.js and FEATURE_ENGINE.md §10.2.
  */
 function pickTcCandidate() {
   let bestId = null;
   let bestVal = -Infinity;
   for (const id of store.getSquad()) {
-    const v = _scores.get(id)?.value;
+    const v = _scores.get(id)?.expectedPoints?.value;
     if (typeof v === 'number' && v > bestVal) {
       bestVal = v;
       bestId  = id;
