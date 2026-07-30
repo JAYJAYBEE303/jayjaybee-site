@@ -344,10 +344,14 @@ Fixture {
 }
 
 CompositeScore {
-  value,                 // 0–100, higher = easier/better for the team in question
+  value,                 // 0–100, higher = easier/better for the team in question.
+                         //   RELATIVE to the fixture's other team since §8.7 — see below.
   band,                  // 'great' | 'good' | 'neutral' | 'tough' | 'brutal'
-  confidence,            // 0–1, weighted share of non-estimated sub-metrics
-  breakdown: {           // each sub-metric's normalised contribution, for transparency
+  confidence,            // 0–1; min() of both teams' own confidence since §8.7 —
+                         //   `value` depends on both sides' reads, so it is only as
+                         //   trustworthy as the less-certain of the two.
+  breakdown: {           // each sub-metric's normalised contribution, for transparency.
+                         //   Still this team's OWN read (unchanged by §8.7) — see note below.
     baseDifficulty, homeAway, teamForm, styleClash, counterMatchup, history
   },
   stacking: {            // conditional adjustment ACROSS sub-metrics — FEATURE_ENGINE.md §8.6
@@ -357,13 +361,21 @@ CompositeScore {
     countUnfavourable,   //   how many secondaries fell below the pivot
     consideredWeight,    //   non-estimated secondary weight actually in play
     pivot                //   the threshold used (config: STACK_PIVOT)
+  },
+  relative: {            // the §8.7 zero-sum step — FEATURE_ENGINE.md §8.7
+    ownRawValue,         //   this team's independent pre-relative composite (what
+                         //     `value` meant before §8.7 — breakdown + stacking still
+                         //     explain exactly this number, unchanged)
+    opponentRawValue,    //   the opponent's own independent pre-relative composite
+    edge,                //   ownRawValue − opponentRawValue — drives the final split
+    sensitivity          //   config: RELATIVE_EDGE_SENSITIVITY
   }
 }
 ```
 
-> `stacking` sits alongside `breakdown` rather than inside it because it is an interaction *between* sub-metrics, not a sub-metric itself — it carries no weight in `WEIGHTS`. `value === clamp(0, 100, stacking.linearValue - stacking.penalty)` always holds, so any gap between the weighted sum and the final score is fully explainable.
+> `stacking` sits alongside `breakdown` because it is an interaction *between* sub-metrics, not a sub-metric itself. `relative` sits alongside both because it is an interaction *between the two teams' totals*, not a property of one team's own metrics. **`relative.ownRawValue === clamp(0, 100, stacking.linearValue − stacking.penalty)` always holds** — `breakdown` and `stacking` together still fully explain `ownRawValue`. The final `value` is then `clamp(0, 100, 50 + relative.edge × relative.sensitivity)`, which is **not** the same number as `ownRawValue` whenever the opponent's own read differs from this team's — the gap between them is exactly what `relative` explains. See FEATURE_ENGINE.md §8.7 for why `value` and the opponent's own `value` for the same fixture are guaranteed to sum to 100, and for the worked examples showing this doesn't flatten every fixture toward 50/50.
 
-> `CompositeScore.breakdown` is mandatory: every score the UI shows must be explainable by drilling into its components. "Why is this fixture green?" must always be answerable. This is a core product principle, not a nice-to-have.
+> `CompositeScore.breakdown` (plus, since §8.7, `relative`) is mandatory: every score the UI shows must be explainable by drilling into its components. "Why is this fixture green?" must always be answerable. This is a core product principle, not a nice-to-have.
 
 ---
 

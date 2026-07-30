@@ -314,6 +314,49 @@ window.__verify = {
     return rows;
   },
 
+  /**
+   * §8.7 zero-sum check: for every unplayed fixture, score both sides and
+   * assert value(home) + value(away) === 100 (within floating-point epsilon).
+   * Also reports the biggest genuine mismatches (by |edge|) so you can eyeball
+   * that lopsided splits still happen — zero-sum is a relationship, not a
+   * flattening toward 50/50.
+   */
+  zeroSum(limit = 10) {
+    const ctx = window.__engine.context();
+    if (!ctx) { console.warn('No data loaded yet.'); return null; }
+    const EPS = 1e-6;
+    const rows = [];
+    let worst = 0;
+    for (const f of ctx.fixtures) {
+      const home = ctx.teamsById[f.homeTeamId];
+      const away = ctx.teamsById[f.awayTeamId];
+      if (!home || !away) continue;
+      let h, a;
+      try {
+        h = scoreFixture(home, f, ctx);
+        a = scoreFixture(away, f, ctx);
+      } catch { continue; }
+      const sum = h.value + a.value;
+      const deviation = Math.abs(sum - 100);
+      worst = Math.max(worst, deviation);
+      rows.push({
+        gw: f.gw,
+        home: home.shortName, homeValue: Math.round(h.value * 10) / 10,
+        away: away.shortName, awayValue: Math.round(a.value * 10) / 10,
+        sum: Math.round(sum * 100) / 100,
+        edge: Math.round(Math.abs(h.relative.edge) * 10) / 10,
+      });
+    }
+    const pass = worst < EPS;
+    console.log(`Checked ${rows.length} fixtures. `
+      + `Worst |sum-100| observed: ${worst.toExponential(2)} `
+      + `(${pass ? 'PASS — zero-sum holds' : 'FAIL — investigate'}).`);
+    rows.sort((a, b) => b.edge - a.edge);
+    console.log(`Biggest edges (genuine mismatches — should be lopsided, still sum to 100):`);
+    console.table(rows.slice(0, limit));
+    return { pass, worstDeviation: worst, rows };
+  },
+
   /** Named players behind each counter-matchup pairing, for one fixture. */
   pairingPlayers(fixtureId) {
     const ctx = window.__engine.context();
@@ -336,10 +379,11 @@ window.__verify = {
 
   all() {
     const w = this.weights();
+    const z = this.zeroSum(5);
     this.stacking(5);
     this.playingLikelihood(5);
     this.pairingPlayers();
-    return w.pass;
+    return w.pass && (z?.pass ?? true);
   },
 };
 

@@ -400,6 +400,28 @@ export const STACK_CURVE = 2.0;
 // all five secondaries at 40 (just under the pivot) costs ~0.6 points.
 export const STACK_MAX_PENALTY = 45;
 
+// ─── §8.7  Relative (zero-sum) composite ─────────────────────────────────────
+
+// MODEL: every sub-metric above (baseDifficulty, teamForm, homeAway, styleClash,
+// counterMatchup, history) is computed independently per team against a fixed
+// scale — nothing compares team A's read to team B's. Two strong teams both
+// read as "facing a tough opponent" and both get punished for it; two weak
+// teams both read as "facing a soft opponent" and both get rewarded — despite
+// neither pairing having a real edge. scoreFixture corrects this in one final
+// step: each team's pre-relative composite (everything above, unchanged) is
+// compared against the SAME fixture's opponent read, and the final value is
+// derived from their signed difference so the two teams' totals are guaranteed
+// to sum to exactly 100 — see FEATURE_ENGINE.md §8.7.
+//
+// MODEL: 0.5 is not an arbitrary softening constant — at exactly 0.5, a raw
+// edge spanning the full possible range (-100 to +100, i.e. one side reads 100
+// and the other 0) maps to the full output range (0 to 100) with the clamp
+// never engaging before the mathematical extremes. Raising this above 0.5
+// would make smaller real edges reach the 0/100 boundary sooner (a harsher,
+// more binary read of any given gap); it does not change the zero-sum
+// guarantee itself, which holds at any value via clamp(v)+clamp(100-v)≡100.
+export const RELATIVE_EDGE_SENSITIVITY = 0.5;
+
 // Minimum weighted share of non-estimated sub-metrics before the UI renders
 // a provisional indicator. Score is still produced; only the badge changes.
 export const CONFIDENCE_FLOOR = 0.6;

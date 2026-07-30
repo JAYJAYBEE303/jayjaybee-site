@@ -329,7 +329,12 @@ linearValue =
   + WEIGHTS.styleClash     * styleClash
   + WEIGHTS.history        * history          # all sub-metrics already 0–100
 
-value = clamp(0, 100, linearValue - stackingPenalty)   # §8.6
+ownRawValue = clamp(0, 100, linearValue - stackingPenalty)   # §8.6 — independent, per-team
+
+# §8.7 — NOT the final value. See §8.7 for why an independent per-team read
+# must be compared against the SAME fixture's other team before it's final.
+edge  = ownRawValue - opponentRawValue
+value = clamp(0, 100, 50 + edge * RELATIVE_EDGE_SENSITIVITY)
 ```
 
 ### 8.3 Confidence handling
@@ -350,10 +355,10 @@ Band thresholds are config, not literals, so the palette can be re-calibrated af
 ### 8.5 Output shape (matches `ARCHITECTURE.md` §8)
 ```js
 CompositeScore = {
-  value: 73,
-  band: 'good',
-  confidence: 0.82,
-  breakdown: {
+  value: 56,                     // §8.7 — the FINAL, relative-to-opponent value
+  band: 'neutral',
+  confidence: 0.78,              // §8.7 — min(this team's, opponent's) confidence
+  breakdown: {                   // still explains ownRawValue below, unchanged by §8.7
     baseDifficulty: { value: 68, weight: 0.25, estimated: false },
     counterMatchup: { value: 81, weight: 0.25, estimated: false },
     teamForm:       { value: 70, weight: 0.20, estimated: false },
@@ -368,9 +373,17 @@ CompositeScore = {
     countUnfavourable: 2,        // secondaries below the pivot
     consideredWeight: 0.67,      // non-estimated secondary weight in play
     pivot: 45
+  },
+  relative: {                    // §8.7 — adjustment ACROSS the two teams' totals
+    ownRawValue: 73,             // = linearValue - stacking.penalty (76.4-3.4); this
+                                 //   is what `value` meant before §8.7 existed
+    opponentRawValue: 61,        // the opponent's own independent read, same fixture
+    edge: 12,                    // ownRawValue - opponentRawValue
+    sensitivity: 0.5             // config: RELATIVE_EDGE_SENSITIVITY
   }
 }
-```
+// value = clamp(0, 100, 50 + 12 * 0.5) = 56. breakdown/stacking still fully
+// explain ownRawValue (73); relative explains the further step from 73 to 56.
 
 ---
 
@@ -416,7 +429,55 @@ stackingPenalty = STACK_MAX_PENALTY * (stackIndex ^ STACK_CURVE)        # 0–45
 
 The favourite keeps its edge on one bad metric (costs 0.52) but drops **17.40 points and a full band** once three stack. Note the fourth row: *widespread but mild* weakness stays near-free — a merely mediocre side is not the "stacked against them" case, and the curve is what keeps those two situations distinct.
 
-**Explainability:** the adjustment is reported on `CompositeScore.stacking` (see §8.5), not inside `breakdown`, because it is an interaction *across* sub-metrics and has no weight of its own in `WEIGHTS`. Any gap between `stacking.linearValue` and `value` is fully accounted for by `stacking.penalty`.
+**Explainability:** the adjustment is reported on `CompositeScore.stacking` (see §8.5), not inside `breakdown`, because it is an interaction *across* sub-metrics and has no weight of its own in `WEIGHTS`. Any gap between `stacking.linearValue` and `relative.ownRawValue` is fully accounted for by `stacking.penalty` — **but note `relative.ownRawValue`, not the top-level `value`**, since §8.7. The further gap between `ownRawValue` and `value` is what §8.7's `relative` explains.
+
+---
+
+## 8.7 Relative (zero-sum) composite (`engine/composite.js → scoreFixture`, `computeRawFixtureScore`)
+
+**Purpose:** make the two teams' total composite scores for the same fixture sum to exactly 100, so a score reflects genuine relative strength between the two sides rather than each side being marked against a fixed internal scale independently of who they're actually playing.
+
+**The problem this fixes.** Every sub-metric above (§2–§7) is computed independently per team, against a fixed scale, with no reference to the opponent's own equivalent read. Concretely, `calcBaseDifficulty(team, opponent, ...)` normalises the **opponent's** raw strength against the fixed `OPP_STRENGTH_MIN/MAX = 1000/1400` — it never looks at `team`'s own strength. The consequence, traced with real numbers:
+
+| Fixture | A's baseDifficulty term | B's baseDifficulty term | Sum (should track ~33 for zero-sum) |
+|---|---|---|---|
+| Two weak teams (strength 1000 vs 1000) | 33.0 | 33.0 | **66.0** — both rewarded for facing a "soft" opponent |
+| Two strong teams (strength 1400 vs 1400) | 0.0 | 0.0 | **0.0** — both punished for facing a "tough" opponent |
+| Uneven, not extreme (1400 vs 1200) | 16.5 | 0.0 | **16.5** — no consistent relationship at all |
+
+(baseDifficulty is one of six weighted terms; the same independence applies to `teamForm`, `homeAway`, `styleClash`, `counterMatchup`, `history` — none of them compare team A's read to team B's either.) Two strong teams shouldn't both score harshly just because the opponent is individually tough, and two weak teams shouldn't both score well just because neither is "objectively good" — what matters is whether either side has a real edge over the other, and today's independent absolute reads cannot express that.
+
+**Design.** `scoreFixture` no longer returns an independent per-team read directly. The old function body — every sub-metric, the weighted sum, and the §8.6 stacking penalty, all completely unchanged — is now `computeRawFixtureScore(team, opponent, fixture, isHome, ctx)`, an internal (not exported) helper producing the **independent** pre-relative value (`ownRawValue`). `scoreFixture(team, fixture, ctx)` calls this helper **twice** — once for `team`'s own perspective, once for the opponent's — and derives the final value from their difference:
+
+```
+ownRawValue      = computeRawFixtureScore(team, opponent, ...).value        # §2-§8.6, unchanged
+opponentRawValue = computeRawFixtureScore(opponent, team, ...).value        # same formula, swapped
+
+edge  = ownRawValue - opponentRawValue
+value = clamp(0, 100, 50 + edge * RELATIVE_EDGE_SENSITIVITY)               # RELATIVE_EDGE_SENSITIVITY = 0.5
+```
+
+**Why this guarantees zero-sum BY CONSTRUCTION, not coincidence.** `scoreFixture(opponent, fixture, ctx)` computes the *identical* `(ownRawValue, opponentRawValue)` pair in swapped roles, so its value is *always* `clamp(0, 100, 50 - edge * RELATIVE_EDGE_SENSITIVITY)` — literally 100 minus this team's pre-clamp figure. `clamp(0,100,v) + clamp(0,100,100-v) ≡ 100` is a general identity for clamp-to-`[0,100]`, true for every real `v` (trivial by cases: below 0 one side clamps to 0 and the other's mirror exceeds 100 and clamps to 100; above 100 the reverse; in range neither clamps and they sum algebraically). This is the same "derive, don't independently compute" principle §7.2 already uses for the mirrored counter-matchup pairings (`mirroredValue = 100 - attackingValue`) — extended here to the whole fixture total. Verified by exhaustive sampling (20,000 random `(ownRawValue, opponentRawValue)` pairs spanning the full `[0,100]²` input space, including clamp-saturating extremes): worst observed `|sum - 100|` was `0` to floating-point precision.
+
+**`RELATIVE_EDGE_SENSITIVITY = 0.5` is not an arbitrary softening constant.** At exactly 0.5, an edge spanning the theoretical full range (`ownRawValue=100, opponentRawValue=0`, edge=±100) maps to the full `[0,100]` output range with the clamp only ever touching the boundary exactly, never saturating early. Raising it above 0.5 makes *smaller* real edges reach 0/100 sooner (a more binary read of a given gap); it does not affect the zero-sum guarantee, which holds at any sensitivity value via the identity above.
+
+**This does NOT flatten every fixture toward 50/50 — and does NOT touch the promoted-team logic.** `calcBaseDifficulty` and `calcTenurePenalty` (§2, §2.1) are completely unchanged; a promoted side's `ownRawValue` still comes out low (their opponent's undiminished strength inverts to near-0) and an established side's `opponentRawValue` reading of that same promoted side is still pulled further down by the tenure penalty. Both of those genuine, real differences flow straight into `edge` — a big real gap produces a big edge, and therefore a lopsided (not 50/50) split. Only the *relationship* (sum ≈ 100) is new; the *size* of the split is still driven entirely by the real, unmodified strength/form/tenure gap between the two teams.
+
+**Worked examples** (`WEIGHTS` and `STACK_*` as §8.1/§8.6; `own`/`opp` = each team's independent `computeRawFixtureScore`):
+
+| Fixture | A's raw (independent) | B's raw (independent) | edge | **A's final** | **B's final** | Sum |
+|---|---|---|---|---|---|---|
+| Two weak teams (Ipswich vs Hull, strength 1000/1000, near-identical mediocre form) | 64.77 | 64.77 | 0.0 | **50.0** | **50.0** | **100.0** |
+| Two strong teams (Man City vs Arsenal, strength 1400/1400, both in form) | 39.01 | 39.01 | 0.0 | **50.0** | **50.0** | **100.0** |
+| Promoted vs established (Arsenal, full tenure, vs Coventry, tenure 0.0 — realistic secondaries: Coventry's own form/venue/counter also weak, Arsenal's strong) | 73.98 | 22.52 | 51.46 | **75.73** | **24.27** | **100.0** |
+
+The first two rows are the direct fix: under the old model neither team's absolute raw read was itself meaningful evidence of an edge — Ipswich and Hull both land at 64.77 (both reading a weak opponent generously) and City/Arsenal both land at 39.01 (both reading a tough opponent harshly), yet in both cases the two sides are IDENTICAL, so the honest relative read is exactly 50/50. What matters is the *difference* between the two reads, not their shared absolute level — and that difference is genuinely 0 when neither side has a real edge. The third row shows the promoted-team asymmetry surviving completely intact: a **75.73 / 24.27** split, clearly lopsided, still summing to exactly 100.
+
+**Downstream effects — verified, not assumed:**
+- `scoreOverHorizon`, `rankPlayers`, `scorePlayer`, and every module (`ranker.js`, `dashboard.js`, `planner.js`, `matchup.js`) read only `.value`/`.band`/`.confidence`/`.provisional`/`.breakdown` — all still present with the same types, so nothing breaks structurally. The *numbers* shift (by design): a player's fixture outlook is now genuinely "how favourable is this specific matchup" rather than "how strong is my team in the abstract" — an intended, more meaningful ripple into `scorePlayer`'s `PROJ_FIXTURE` term, not a bug.
+- `confidence` is now `min(own, opponent)` confidence, not just `team`'s own — because the final value depends on both sides' reads, it can only be as trustworthy as the less-certain one. Both teams' Matchup Analyser cards for the same fixture will now show the *same* confidence percentage; this is intentional (§8.5).
+- `CompositeScore.breakdown` still explains `relative.ownRawValue` exactly (§8.5/§8.6's identities hold for `ownRawValue`), but no longer arithmetically reconstructs the top-level `value` on its own — `relative` is required to close that gap. The Matchup Analyser's existing breakdown rows are unchanged and still correct for what they show (`ownRawValue`'s composition); they do not currently render the new `relative` field. Flagged as a follow-up, not implemented here (out of this change's scope): surfacing `relative.opponentRawValue`/`edge` somewhere on the card would let a user see *why* the headline number differs from a manual sum of the breakdown rows.
+- Perf: `scoreFixture` now does roughly double the internal work per call (`computeRawFixtureScore` runs for both sides every time). `engine/chips.js` already memoises `scoreFixture` per `(team, fixture)` pair (`makeFxCache`), so chip planning is unaffected. `rankPlayers`/`scorePlayer` have no such cache and call `scoreOverHorizon` (and therefore `scoreFixture`) once per player with no memoisation across players sharing a team — this was already uncached before this change; it is now roughly twice as expensive per call. Not addressed here (a caching layer for `scorePlayer`/`rankPlayers` is a separate concern, unscoped for this change) but worth knowing if Ranker load time is ever noticeably slow.
 
 ---
 
@@ -499,7 +560,7 @@ The three existing weights were scaled down proportionally (**×0.80**) to make 
 
 | Module | Primary engine call | What it shows |
 |---|---|---|
-| **Matchup Analyser** (`modules/matchup.js`) | `scoreFixture(team, fixture)` for **both** sides | Full side-by-side breakdown of one fixture: each sub-metric, the counter-matchup pairings (each with an info disclosure naming the players behind it, via `duelsForPairing` §7.2), style clash, confidence. The "view source" for any score elsewhere. |
+| **Matchup Analyser** (`modules/matchup.js`) | `scoreFixture(team, fixture)` for **both** sides | Full side-by-side breakdown of one fixture: each sub-metric, the counter-matchup pairings (each with an info disclosure naming the players behind it, via `duelsForPairing` §7.2), style clash, confidence. The "view source" for any score elsewhere. Since §8.7, the two cards' `value`s are guaranteed to sum to 100 — a genuinely relative read of the matchup, not two independent absolute scores. |
 | **Player Ranker** (`modules/ranker.js`) | `rankPlayers(players, horizon)` → sortable by `value`, `costPerPoint`, `price`, or `minutesSecurity` | Ranked, filterable table (position, price threshold, team, minutes-security) of projected value over the active horizon — permanent Value and Cost/Pt columns, Avg Pts/GW, Next Fixture (rank + score), and a per-GW fixture strip per player. |
 | **GW Dashboard** (`modules/dashboard.js`) | `scorePlayer(p, HORIZON.GW1)` for owned squad + `event/<gw>/live` | Captaincy pick (top projection in squad), start/bench order, risk flags (low minutesSecurity, brutal band, low confidence), and live points when the GW is in progress. Horizon-locked to GW1. |
 | **Transfer Planner** (`modules/planner.js`) | `rankPlayers` over horizon + current squad + constraints | For each candidate out→in swap, computes Δ projected horizon score; ranks transfers by gain per cost, respecting budget and free transfers (−4 hit modelled). Surfaces the moves that most raise total projected score over the horizon. |

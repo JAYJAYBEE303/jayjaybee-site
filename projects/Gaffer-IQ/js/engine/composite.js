@@ -9,7 +9,7 @@
 
 import {
   WEIGHTS, BANDS, CONFIDENCE_FLOOR, LEAGUE_AVG_STRENGTH,
-  STACK_PIVOT, STACK_CURVE, STACK_MAX_PENALTY,
+  STACK_PIVOT, STACK_CURVE, STACK_MAX_PENALTY, RELATIVE_EDGE_SENSITIVITY,
   HORIZON_DECAY, AGG_METHOD, W_MEAN, W_MIN, BLANK_GW_VALUE,
   PROJ_FORM, PROJ_FIXTURE, PROJ_COUNTER, PROJ_MINUTES,
 } from '../config.js';
@@ -173,47 +173,29 @@ function calcStackingPenalty(breakdown) {
 }
 
 /**
- * Score a single fixture from ONE team's perspective. Every sub-metric is
- * computed at 0–100 (higher = better for `team`), then weighted-summed with
- * `WEIGHTS` from config.js. Estimated sub-metrics pass through at their
- * fallback (typically 50) and lower the composite's confidence rather than
- * being dropped — dropping silently re-weights the rest (FEATURE_ENGINE.md §8.3).
+ * Compute team's INDEPENDENT (pre-relative) fixture composite — every existing
+ * sub-metric, weighted-summed with `WEIGHTS`, less the §8.6 stacking penalty.
+ * This is exactly what `scoreFixture`'s `value` meant before §8.7: an absolute
+ * 0–100 read of `team`'s own metrics against `opponent`, with NO comparison to
+ * `opponent`'s own independent read. scoreFixture calls this once per side of
+ * the same fixture and derives the final, relative value from the pair — see
+ * scoreFixture's own doc block for why.
  *
- * Asymmetric: scoreFixture(home, fixture, ctx) and scoreFixture(away, fixture, ctx)
- * are not complementary — venue, form, and counter-matchup all read differently
- * for each side.
+ * Not exported: an absolute fixture read is not itself a useful public value
+ * post-§8.7 (see the trace in FEATURE_ENGINE.md §8.7 for why two independent
+ * absolute reads don't sum to 100) — only the derived relative value is.
  *
- * @param {Team} team       team whose perspective we score from
+ * @param {Team} team       team whose perspective this reads from
+ * @param {Team} opponent
  * @param {Fixture} fixture
+ * @param {boolean} isHome  true if `team` is the home side
  * @param {object} ctx      output of buildScoreContext
- * @returns {CompositeScore}
- *   value: 0–100, higher = easier/better fixture for `team`. Direction: higher = better.
- *   band: 'great' | 'good' | 'neutral' | 'tough' | 'brutal' (see BANDS in config).
- *   confidence: 0–1; weighted share of non-estimated sub-metrics.
- *   provisional: true when confidence < CONFIDENCE_FLOOR — UI hatches/greys the score.
- *   breakdown: per sub-metric { value, weight, estimated, ...extras }.
- *   See ARCHITECTURE.md §8 and FEATURE_ENGINE.md §8 for the contract.
+ * @returns {{value: number, band: string, confidence: number, provisional: boolean,
+ *            stacking: object, breakdown: object}}
+ *   value: 0–100, higher = better for `team`, BEFORE the relative step.
  */
-export function scoreFixture(team, fixture, ctx) {
-  if (!team || !fixture) {
-    throw new TypeError('scoreFixture: both team and fixture are required');
-  }
-  if (!ctx || !ctx.teamsById) {
-    throw new TypeError('scoreFixture: ctx (from buildScoreContext) is required');
-  }
-  const isHome = fixture.homeTeamId === team.id;
-  const isAway = fixture.awayTeamId === team.id;
-  if (!isHome && !isAway) {
-    throw new TypeError(
-      `scoreFixture: team ${team.id} is not in fixture ${fixture.id} ` +
-      `(home=${fixture.homeTeamId}, away=${fixture.awayTeamId})`,
-    );
-  }
-  const opponentId = isHome ? fixture.awayTeamId : fixture.homeTeamId;
-  const opponent = ctx.teamsById[opponentId];
-  if (!opponent) {
-    throw new TypeError(`scoreFixture: opponent team ${opponentId} missing from ctx`);
-  }
+function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
+  const opponentId = opponent.id;
 
   // team's own FDR for this fixture — the fallback calcBaseDifficulty uses
   // when FPL's granular strength fields aren't published yet (see fixtures.js).
@@ -270,7 +252,7 @@ export function scoreFixture(team, fixture, ctx) {
     confidence,
     provisional:  confidence < CONFIDENCE_FLOOR,
     // §8.6 — the conditional adjustment, exposed so the UI can explain any gap
-    // between the weighted sum and the final value. Sits alongside `breakdown`
+    // between the weighted sum and this raw value. Sits alongside `breakdown`
     // rather than inside it because it is an adjustment ACROSS sub-metrics, not
     // a sub-metric of its own (it has no weight in WEIGHTS).
     stacking: {
@@ -327,6 +309,109 @@ export function scoreFixture(team, fixture, ctx) {
         meetings:   history.meetings,
         pointsForA: history.pointsForA,
       },
+    },
+  };
+}
+
+/**
+ * Score a single fixture from ONE team's perspective — RELATIVE to the same
+ * fixture's other team, so the two teams' totals are guaranteed to sum to
+ * exactly 100 (§8.7).
+ *
+ * MODEL (§8.7): every sub-metric above is computed independently per team
+ * against a fixed scale, so two independent computeRawFixtureScore reads for
+ * the same fixture do NOT sum to 100 in general (two strong teams both read as
+ * "facing a tough opponent" and both get punished for it; two weak teams both
+ * read as "facing a soft opponent" and both get rewarded). This function fixes
+ * that by computing BOTH sides' raw reads and deriving the final value from
+ * their signed difference — "derive, don't independently compute", the same
+ * principle §7.2's mirrored counter pairings already use:
+ *
+ *   edge  = rawOwn − rawOpponent
+ *   value = clamp(0, 100, 50 + edge * RELATIVE_EDGE_SENSITIVITY)
+ *
+ * scoreFixture(opponent, fixture, ctx) computes the identical (rawOwn,
+ * rawOpponent) pair in swapped order, so its value is ALWAYS
+ * clamp(0, 100, 50 − edge * RELATIVE_EDGE_SENSITIVITY) — literally 100 minus
+ * this value before clamping. `clamp(0,100,v) + clamp(0,100,100−v) ≡ 100` for
+ * every real `v` (trivial by cases on the three clamp regions), so the two
+ * teams' totals sum to exactly 100 BY CONSTRUCTION, not by coincidence —
+ * verified for the full input range in FEATURE_ENGINE.md §8.7.
+ *
+ * This does NOT flatten every fixture toward 50/50: a genuine strength gap
+ * (e.g. a promoted side's low, tenure-uninflated baseDifficulty reading against
+ * an established side's high one) still produces a large edge and therefore a
+ * lopsided split — it just now sums to 100 rather than landing wherever two
+ * unrelated absolute reads happen to fall. See the worked examples in
+ * FEATURE_ENGINE.md §8.7.
+ *
+ * Asymmetric perspective, symmetric total: scoreFixture(home, fixture, ctx) and
+ * scoreFixture(away, fixture, ctx) still read differently per side (venue, form,
+ * counter-matchup are each team's own) — only their TOTALS are now complementary.
+ *
+ * @param {Team} team       team whose perspective we score from
+ * @param {Fixture} fixture
+ * @param {object} ctx      output of buildScoreContext
+ * @returns {CompositeScore}
+ *   value: 0–100, higher = easier/better fixture for `team`. Direction: higher = better.
+ *   band: 'great' | 'good' | 'neutral' | 'tough' | 'brutal' (see BANDS in config).
+ *   confidence: 0–1; the WEAKER (min) of the two sides' own confidence — the
+ *     final value depends on both raw reads, so it can only be as trustworthy
+ *     as the less-certain of the two.
+ *   provisional: true when confidence < CONFIDENCE_FLOOR — UI hatches/greys the score.
+ *   breakdown: `team`'s own per sub-metric { value, weight, estimated, ...extras }
+ *     — unchanged in meaning; still explains `team`'s own raw read.
+ *   relative: the new §8.7 adjustment — { ownRawValue, opponentRawValue, edge,
+ *     sensitivity } — explains how the final value was derived from the pair.
+ *   See ARCHITECTURE.md §8 and FEATURE_ENGINE.md §8, §8.7 for the contract.
+ */
+export function scoreFixture(team, fixture, ctx) {
+  if (!team || !fixture) {
+    throw new TypeError('scoreFixture: both team and fixture are required');
+  }
+  if (!ctx || !ctx.teamsById) {
+    throw new TypeError('scoreFixture: ctx (from buildScoreContext) is required');
+  }
+  const isHome = fixture.homeTeamId === team.id;
+  const isAway = fixture.awayTeamId === team.id;
+  if (!isHome && !isAway) {
+    throw new TypeError(
+      `scoreFixture: team ${team.id} is not in fixture ${fixture.id} ` +
+      `(home=${fixture.homeTeamId}, away=${fixture.awayTeamId})`,
+    );
+  }
+  const opponentId = isHome ? fixture.awayTeamId : fixture.homeTeamId;
+  const opponent = ctx.teamsById[opponentId];
+  if (!opponent) {
+    throw new TypeError(`scoreFixture: opponent team ${opponentId} missing from ctx`);
+  }
+
+  const own = computeRawFixtureScore(team, opponent, fixture, isHome, ctx);
+  const opp = computeRawFixtureScore(opponent, team, fixture, !isHome, ctx);
+
+  const edge  = own.value - opp.value;
+  const value = clamp(0, 100, 50 + (edge * RELATIVE_EDGE_SENSITIVITY));
+
+  // MODEL: min(), not own.confidence alone — the final value is a function of
+  // BOTH raw reads, so if either side rests on heavily estimated data the
+  // relative result is only as trustworthy as the weaker of the two.
+  const confidence = Math.min(own.confidence, opp.confidence);
+
+  return {
+    value,
+    band:         bandFromValue(value),
+    confidence,
+    provisional:  confidence < CONFIDENCE_FLOOR,
+    stacking:     own.stacking,
+    breakdown:    own.breakdown,
+    // §8.7 — explains the relative step itself, alongside (not inside)
+    // `breakdown`, since it's an adjustment ACROSS the two teams' totals,
+    // not a sub-metric of `team`'s own.
+    relative: {
+      ownRawValue:      own.value,       // team's pre-relative composite (old 'value')
+      opponentRawValue: opp.value,       // opponent's own pre-relative composite
+      edge,                              // signed difference driving the split
+      sensitivity:      RELATIVE_EDGE_SENSITIVITY,
     },
   };
 }

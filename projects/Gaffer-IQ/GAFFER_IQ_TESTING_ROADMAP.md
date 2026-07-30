@@ -218,6 +218,11 @@ window.__verify.all()
 // Both weight tables must sum to exactly 1.00 (FEATURE_ENGINE.md §8.1, §10)
 window.__verify.weights()
 
+// Zero-sum composite (§8.7): scores BOTH sides of every unplayed fixture and
+// asserts value(home) + value(away) === 100. Also lists the biggest genuine
+// mismatches by edge, so you can confirm lopsided splits still happen.
+window.__verify.zeroSum()
+
 // Stacking penalty (§8.6): which fixtures have several secondary metrics
 // stacking against them, and what the penalty costs each one.
 window.__verify.stacking()
@@ -233,6 +238,7 @@ window.__verify.pairingPlayers()
 
 **Expected, and what to do if not:**
 - `weights()` → both rows `pass: true`. If not, `config.js` is broken; the composite is silently mis-scaled. Fix before trusting any other number.
+- `zeroSum()` → `pass: true`, worst deviation on the order of `1e-13` or smaller (floating-point noise, not a real gap). A `FAIL` here means `computeRawFixtureScore`/`scoreFixture`'s relative step (§8.7) has been broken — check nobody re-clamped or re-derived `value` after the `50 ± edge*sensitivity` step. The biggest-edges table should still show clearly lopsided (not ~50/50) rows for real mismatches — if every row converges toward 50, `RELATIVE_EDGE_SENSITIVITY` may have been zeroed or the edge miscomputed.
 - `stacking()` → most team-fixtures show `penalty: 0` early in the season (metrics are estimated, so they're excluded by design). Penalties appearing on fixtures with `badMetrics: 0` would mean the pivot/estimated logic is wrong.
 - `playingLikelihood()` → downgrades should be dominated by low-`playing` players and upgrades by high-`playing` ones. A player with `playing: 0` (injured/suspended) showing a positive delta means the `min()` in §7.3 is inverted.
 - `pairingPlayers()` → real names once summaries are cached. All-empty arrays before you've browsed the Ranker is normal, not a bug (ICT/summary data loads lazily).
