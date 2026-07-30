@@ -948,11 +948,11 @@
 .ranker-table__td--cost-per-point{ font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ranker-table__td--avg-pts       { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ranker-table__td--next-fixture  { white-space: nowrap; }
-/* The fixture strip's width scales with the active horizon (1/3/6 GWs) and can
-   exceed its column's fixed share on a 6-GW horizon — rather than let that
-   blow out the whole table's width again, this cell scrolls internally; every
-   other column stays fully visible regardless of the active horizon. */
-.ranker-table__td--fixtures      { white-space: nowrap; overflow-x: auto; }
+/* The fixture strip's cell count scales with the active horizon (1/3/6 GWs);
+   .ranker-fixtures/.pgw-cell (below) handle fitting that into this column's
+   fixed width by shrinking cells together on a 6-GW horizon, so this td
+   itself needs no special overflow handling. */
+.ranker-table__td--fixtures      { white-space: nowrap; }
 .ranker-table__td--min           { white-space: nowrap; }
 
 /* Estimated marker for Avg Pts/GW — mirrors .breakdown-row__est (matchup.js)
@@ -1058,20 +1058,32 @@
 
 /* ─── Fixture strip inside table cell ────────────────────────────────────── */
 
-/* Reuses .pgw-cell / .pgw-cell--<band> from the matchup card; the container
-   here is inline so it sits naturally inside a <td>. */
+/* Reuses .pgw-cell / .pgw-cell--<band> from the matchup card. Fills the td's
+   full (fixed, %-based — see the table-layout:fixed rules above) width, so
+   the strip always fits its column instead of overflowing it — critical here
+   since cell COUNT varies with the active horizon (1 for "This GW" vs 6 for
+   "Next 6 GWs"), but the column's width does not. */
 .ranker-fixtures {
-  display: inline-flex;
+  display: flex;
   flex-wrap: nowrap;
   gap: 2px;
   align-items: center;
+  width: 100%;
 }
 
-/* Compact sizing for table context — narrower than the matchup card strip */
+/* flex-basis 28px (this table's compact size, vs. the matchup card's 36px)
+   with flex-shrink allowed: with room to spare (1-3 GWs) every cell renders
+   at its natural 28px, same as before; on a 6-GW horizon, where 6 cells at
+   28px+gaps would exceed most column widths, they shrink together to fit —
+   never overflowing the column, never triggering a scrollbar. flex-grow:0
+   keeps a lone GW1 cell at 28px too, rather than stretching to fill the
+   whole column. */
 .ranker-fixtures .pgw-cell {
-  width: 28px;
+  flex: 0 1 28px;
+  min-width: 0;
   height: 20px;
   font-size: 0.65rem;
+  overflow: hidden; /* safety net on a very narrow viewport — clip rather than spill */
 }
 
 .ranker-no-fixtures {
