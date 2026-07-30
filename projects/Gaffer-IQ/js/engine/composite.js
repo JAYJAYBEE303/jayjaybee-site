@@ -816,23 +816,29 @@ export function rankPlayers(players, horizon, ctx) {
  *
  * Precedence (most to least specific), each tier evaluated in order and the
  * first match wins:
- *   1. 'top30'    — index < RANK_TOP_COUNT (a fixed count, not a percentage)
- *   2. 'top10'    — index < poolSize * RANK_TOP_PERCENTILE
- *   3. 'bottom50' — index >= poolSize * (1 - RANK_BOTTOM_PERCENTILE)
- * A top-30 player is always also within the top 10%, and the top 10% is always
- * within the top 50% — the fixed-count tier is checked first specifically
- * because it is the most exclusive, "definitely worth squad consideration"
- * signal, and would otherwise be silently absorbed into the percentile tier.
+ *   1. 'topCount'        — index < RANK_TOP_COUNT (a fixed count, not a percentage)
+ *   2. 'topPercentile'    — index < poolSize * RANK_TOP_PERCENTILE
+ *   3. 'bottomPercentile' — index >= poolSize * (1 - RANK_BOTTOM_PERCENTILE)
+ * A top-count player is always also within the top percentile, and the top
+ * percentile is always within the bottom percentile's complement — the
+ * fixed-count tier is checked first specifically because it is the most
+ * exclusive, "definitely worth squad consideration" signal, and would
+ * otherwise be silently absorbed into the percentile tier.
+ *
+ * MODEL: tier names describe their ROLE (mirroring the RANK_* config constant
+ * names), not the current threshold number — RANK_TOP_COUNT/RANK_TOP_PERCENTILE
+ * are tunable (FEATURE_ENGINE.md §13), and a name baked to a specific number
+ * (e.g. 'top30') would silently go stale the next time either is retuned.
  *
  * @param {number} index     0-based rank in the sorted pool (0 = best)
  * @param {number} poolSize  total size of the pool `index` was ranked within
- * @returns {'top30'|'top10'|'bottom50'|null}
+ * @returns {'topCount'|'topPercentile'|'bottomPercentile'|null}
  */
 export function calcRankTier(index, poolSize) {
   if (!(poolSize > 0) || index < 0 || index >= poolSize) return null;
-  if (index < RANK_TOP_COUNT) return 'top30';
-  if (index < poolSize * RANK_TOP_PERCENTILE) return 'top10';
-  if (index >= poolSize * (1 - RANK_BOTTOM_PERCENTILE)) return 'bottom50';
+  if (index < RANK_TOP_COUNT) return 'topCount';
+  if (index < poolSize * RANK_TOP_PERCENTILE) return 'topPercentile';
+  if (index >= poolSize * (1 - RANK_BOTTOM_PERCENTILE)) return 'bottomPercentile';
   return null;
 }
 

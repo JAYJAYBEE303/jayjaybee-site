@@ -89,7 +89,7 @@ let _allowExtraHit = false;
 let _scores = new Map();
 
 /**
- * Map<playerId, 'top30'|'top10'|'bottom50'|null> — every player's standing
+ * Map<playerId, 'topCount'|'topPercentile'|'bottomPercentile'|null> — every player's standing
  * against the full pool (FEATURE_ENGINE.md §13), keyed by whichever horizon
  * last built it. null until computed. Rebuilding this depends on horizon (a
  * player's score, and therefore rank, differs by horizon) but NOT on squad
@@ -157,9 +157,9 @@ function isScoreEstimated(score) {
  *  existing band colour). Mirrors the identical helper in modules/ranker.js.
  *  See FEATURE_ENGINE.md §13. */
 function rankTierClass(rankTier) {
-  if (rankTier === 'top30')    return ' score-chip--rank-green';
-  if (rankTier === 'top10')    return ' score-chip--rank-lime';
-  if (rankTier === 'bottom50') return ' score-chip--rank-red';
+  if (rankTier === 'topCount')        return ' score-chip--rank-green';
+  if (rankTier === 'topPercentile')    return ' score-chip--rank-light-green';
+  if (rankTier === 'bottomPercentile') return ' score-chip--rank-red';
   return '';
 }
 

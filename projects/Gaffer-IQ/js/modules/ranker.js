@@ -12,7 +12,10 @@
  */
 
 import { store } from '../store.js';
-import { HORIZONS, RANKER_CHUNK_SIZE, PRICE_FILTER_MIN, PRICE_FILTER_MAX, PRICE_FILTER_STEP, BANDS } from '../config.js';
+import {
+  HORIZONS, RANKER_CHUNK_SIZE, PRICE_FILTER_MIN, PRICE_FILTER_MAX, PRICE_FILTER_STEP, BANDS,
+  RANK_TOP_COUNT, RANK_TOP_PERCENTILE,
+} from '../config.js';
 import { buildScoreContext, scorePlayer, attachRankTiers } from '../engine/composite.js';
 import { fetchPlayerSummary } from '../api.js';
 import { normalisePlayerSummary } from '../engine/normalise.js';
@@ -105,16 +108,18 @@ function bandFromValue(v) {
  *  suffix, or '' when the player isn't in any standout tier (keeps their
  *  existing band colour). See FEATURE_ENGINE.md §13. */
 function rankTierClass(rankTier) {
-  if (rankTier === 'top30')    return ' score-chip--rank-green';
-  if (rankTier === 'top10')    return ' score-chip--rank-lime';
-  if (rankTier === 'bottom50') return ' score-chip--rank-red';
+  if (rankTier === 'topCount')        return ' score-chip--rank-green';
+  if (rankTier === 'topPercentile')    return ' score-chip--rank-light-green';
+  if (rankTier === 'bottomPercentile') return ' score-chip--rank-red';
   return '';
 }
 
+// Built from the live config constants (not hardcoded numbers) so this never
+// goes stale if RANK_TOP_COUNT/RANK_TOP_PERCENTILE are retuned.
 const RANK_TIER_TITLES = {
-  top30:    'Top 30 players in the game',
-  top10:    'Top 10% of players in the game',
-  bottom50: 'Bottom half of players in the game',
+  topCount:        `Top ${RANK_TOP_COUNT} players in the game`,
+  topPercentile:    `Top ${Math.round(RANK_TOP_PERCENTILE * 100)}% of players in the game`,
+  bottomPercentile: 'Bottom half of players in the game',
 };
 
 /** Return the label+band object for a 0–1 minutesSecurity value. */

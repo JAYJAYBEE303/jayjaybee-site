@@ -34,17 +34,19 @@
 
   /* --- Rank-relative colour (pool-percentile tiers, NOT a 0-100 band —
      see FEATURE_ENGINE.md §13). Bottom-50% reuses --band-brutal and the
-     top-30-fixed-count tier reuses --band-great below; lime is the one
-     genuinely new colour needed, for the top-10%-percentile tier. */
-  --band-lime: #a3e635;
+     top-15-fixed-count tier reuses --band-great below; light-green is the
+     one genuinely new colour needed, for the top-20%-percentile tier. A
+     soft/desaturated green rather than a true lime — lime read too bright
+     against this dark palette. */
+  --band-light-green: #6fcf78;
 
   /* --- Band background tints (card/chip backgrounds) --------------------- */
-  --band-great-bg:   rgba(31, 140, 72,  0.15);
-  --band-good-bg:    rgba(63, 185, 80,  0.12);
-  --band-neutral-bg: rgba(110, 118, 129, 0.10);
-  --band-tough-bg:   rgba(210, 153, 34,  0.12);
-  --band-brutal-bg:  rgba(248, 81,  73,  0.12);
-  --band-lime-bg:    rgba(163, 230, 53,  0.14);
+  --band-great-bg:       rgba(31, 140, 72,  0.15);
+  --band-good-bg:        rgba(63, 185, 80,  0.12);
+  --band-neutral-bg:     rgba(110, 118, 129, 0.10);
+  --band-tough-bg:       rgba(210, 153, 34,  0.12);
+  --band-brutal-bg:      rgba(248, 81,  73,  0.12);
+  --band-light-green-bg: rgba(111, 207, 120, 0.13);
 
   /* --- Spacing scale (4-point grid) -------------------------------------- */
   --space-1:  4px;

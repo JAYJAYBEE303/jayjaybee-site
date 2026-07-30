@@ -235,11 +235,12 @@
    FEATURE_ENGINE.md §13). Rendered ALONGSIDE a .score-chip--{band} class, never
    instead of it — these rules come after the five band rules above so they win
    the cascade at equal specificity, without needing !important or JS to strip
-   the band class. 'top30'/'bottom50' reuse the great/brutal colours (same hex,
-   named per their rank meaning here); 'top10' is the one new colour, lime. */
-.score-chip--rank-green { background: var(--band-great-bg);  color: var(--band-great); }
-.score-chip--rank-lime  { background: var(--band-lime-bg);   color: var(--band-lime); }
-.score-chip--rank-red   { background: var(--band-brutal-bg); color: var(--band-brutal); }
+   the band class. 'top15'/'bottom50' reuse the great/brutal colours (same hex,
+   named per their rank meaning here); 'top20' is the one new colour, a soft
+   light-green distinct from both existing greens. */
+.score-chip--rank-green       { background: var(--band-great-bg);       color: var(--band-great); }
+.score-chip--rank-light-green { background: var(--band-light-green-bg); color: var(--band-light-green); }
+.score-chip--rank-red         { background: var(--band-brutal-bg);      color: var(--band-brutal); }
 
 /* Estimated compact chip — dashed border in the band's own colour, ~ prefix. */
 .score-chip--estimated {

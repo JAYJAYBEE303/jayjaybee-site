@@ -627,11 +627,11 @@ export const PRICE_BUY_NOW_SCORE_MIN = 55;
 
 // Fixed-count top tier (not a percentage) — the flagship "definitely worth
 // squad consideration" group. Takes precedence over the percentile tier below
-// even though a top-30 player is always also in the top 10%.
-export const RANK_TOP_COUNT = 30;
+// even though a top-15 player is always also in the top 20%.
+export const RANK_TOP_COUNT = 15;
 
 // Percentile tiers, each 0–1. RANK_TOP_PERCENTILE: fraction of the pool (by
 // rank) considered a genuinely strong pick. RANK_BOTTOM_PERCENTILE: fraction
 // of the pool, counted from the bottom, considered weak enough to flag red.
-export const RANK_TOP_PERCENTILE = 0.10;
+export const RANK_TOP_PERCENTILE = 0.20;
 export const RANK_BOTTOM_PERCENTILE = 0.50;
