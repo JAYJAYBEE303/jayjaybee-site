@@ -709,6 +709,18 @@
   gap: var(--space-6);
   padding: 0 var(--space-4) var(--space-8);
   align-items: start;
+  /* Break out of .app-main's max-width:1400px + margin:0 auto centering
+     (layout.css) — that cap, minus its own padding and this shell's 300px
+     sidebar, left well under 1028px for the table even before subtracting
+     anything else. No table min-width (below) can fix a problem that's
+     actually in the ancestor container. width:100vw + these negative
+     margins is the standard technique for escaping a centered ancestor's
+     max-width, letting the Ranker (and only the Ranker) use the full
+     browser width when the table needs it. */
+  width: 100vw;
+  max-width: 100vw;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
 }
 
 @media (max-width: 900px) {
