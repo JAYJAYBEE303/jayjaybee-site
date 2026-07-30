@@ -643,7 +643,7 @@ export const PRICE_BUY_NOW_SCORE_MIN = 55;
 // of the feature. GKP/FWD get their own (smaller) counts because there are
 // far fewer of them in a valid squad (2 and 3 respectively, vs 5 for DEF/MID).
 export const RANK_ELITE_COUNT_BY_POS  = { GKP: 2, DEF: 5,  MID: 5,  FWD: 3 };
-export const RANK_STRONG_COUNT_BY_POS = { GKP: 5, DEF: 15, MID: 15, FWD: 8 };
+export const RANK_STRONG_COUNT_BY_POS = { GKP: 8, DEF: 20, MID: 20, FWD: 12 };
 
 // Fraction of the pool, counted from the bottom, considered weak enough to
 // flag red. Deliberately still POOL-WIDE (not per-position) — unlike the two

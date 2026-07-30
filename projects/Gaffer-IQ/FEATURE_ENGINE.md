@@ -616,7 +616,7 @@ Because Ranker, Dashboard and Planner all obtain player scores from `scorePlayer
 **Tiers and precedence** (`config.js`):
 ```
 RANK_ELITE_COUNT_BY_POS  = { GKP: 2, DEF: 5,  MID: 5,  FWD: 3 }   # fixed count, per position
-RANK_STRONG_COUNT_BY_POS = { GKP: 5, DEF: 15, MID: 15, FWD: 8 }   # fixed count, per position
+RANK_STRONG_COUNT_BY_POS = { GKP: 8, DEF: 20, MID: 20, FWD: 12 }  # fixed count, per position
 RANK_BOTTOM_PERCENTILE   = 0.50                                  # fraction of the pool, POOL-WIDE
 
 calcRankTier(index, poolSize, positionIndex, position):
