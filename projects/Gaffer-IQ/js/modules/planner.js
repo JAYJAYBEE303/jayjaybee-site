@@ -159,7 +159,9 @@ function isScoreEstimated(score) {
 function rankTierClass(rankTier) {
   if (rankTier === 'positionElite')    return ' score-chip--rank-green';
   if (rankTier === 'positionStrong')   return ' score-chip--rank-light-green';
+  if (rankTier === 'topPercentile')    return ' score-chip--rank-neutral';
   if (rankTier === 'bottomPercentile') return ' score-chip--rank-red';
+  if (rankTier === 'midPercentile')    return ' score-chip--rank-yellow';
   return '';
 }
 

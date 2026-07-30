@@ -645,8 +645,16 @@ export const PRICE_BUY_NOW_SCORE_MIN = 55;
 export const RANK_ELITE_COUNT_BY_POS  = { GKP: 2, DEF: 5,  MID: 5,  FWD: 3 };
 export const RANK_STRONG_COUNT_BY_POS = { GKP: 8, DEF: 20, MID: 20, FWD: 12 };
 
+// Fraction of the pool, counted from the top, considered comfortably good
+// enough to flag neutral/grey even without qualifying for a position-based
+// green tier above. POOL-WIDE like RANK_BOTTOM_PERCENTILE below, for the same
+// reason: this is just "clearing a bar", not a per-position "hidden gem" check.
+export const RANK_TOP_PERCENTILE = 0.25;
+
 // Fraction of the pool, counted from the bottom, considered weak enough to
 // flag red. Deliberately still POOL-WIDE (not per-position) — unlike the two
-// tiers above, there's no "hidden gem" concern to correct for at the bottom;
-// a weak player is weak regardless of what position he shares the flag with.
-export const RANK_BOTTOM_PERCENTILE = 0.50;
+// green tiers above, there's no "hidden gem" concern to correct for at the
+// bottom; a weak player is weak regardless of what position he shares the
+// flag with. Everyone between RANK_TOP_PERCENTILE and here (and outside both
+// green tiers) falls into the middle "yellow" tier — see FEATURE_ENGINE.md §13.
+export const RANK_BOTTOM_PERCENTILE = 0.40;

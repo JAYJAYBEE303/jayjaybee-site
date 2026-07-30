@@ -12,7 +12,7 @@ import {
   STACK_PIVOT, STACK_CURVE, STACK_MAX_PENALTY, RELATIVE_EDGE_SENSITIVITY,
   HORIZON_DECAY, AGG_METHOD, W_MEAN, W_MIN, BLANK_GW_VALUE,
   PROJ_FORM, PROJ_FIXTURE, PROJ_COUNTER, PROJ_MINUTES,
-  RANK_ELITE_COUNT_BY_POS, RANK_STRONG_COUNT_BY_POS, RANK_BOTTOM_PERCENTILE,
+  RANK_ELITE_COUNT_BY_POS, RANK_STRONG_COUNT_BY_POS, RANK_TOP_PERCENTILE, RANK_BOTTOM_PERCENTILE,
   SEASON_GWS,
 } from '../config.js';
 import { clamp, invert } from '../util.js';
@@ -858,33 +858,45 @@ export function rankPlayers(players, horizon, ctx) {
 // ─── Rank-relative colouring ──────────────────────────────────────────────────
 
 /**
- * Classify a player into a rank tier, or null if they don't fall into any
- * standout tier. This is a SEPARATE axis from `score.band` (§8.4): band
- * classifies a score against the fixed 0–100 scale; tier classifies a player
- * against the CURRENT POOL, so a strong pick still stands out even in a
- * season where absolute scores run low (or vice versa). Only the standout
- * tiers get a colour override — everyone else keeps their existing band
- * colour. See FEATURE_ENGINE.md §13.
+ * Classify a player into a rank tier. This is a SEPARATE axis from
+ * `score.band` (§8.4): band classifies a score against the fixed 0–100
+ * scale; tier classifies a player against the CURRENT POOL, so a strong pick
+ * still stands out even in a season where absolute scores run low (or vice
+ * versa). Every player gets a tier now (see below) — this fully supersedes
+ * `score.band`'s colour for wherever a rank tier is rendered; `null` is only
+ * a defensive fallback for a malformed/empty pool, not a normal outcome.
+ * See FEATURE_ENGINE.md §13.
  *
  * Precedence (most to least specific), each tier evaluated in order and the
  * first match wins:
  *   1. 'positionElite'    — positionIndex < RANK_ELITE_COUNT_BY_POS[position]
  *   2. 'positionStrong'   — positionIndex < RANK_STRONG_COUNT_BY_POS[position]
- *   3. 'bottomPercentile' — index >= poolSize * (1 - RANK_BOTTOM_PERCENTILE)
+ *   3. 'topPercentile'    — index < poolSize * RANK_TOP_PERCENTILE
+ *   4. 'bottomPercentile' — index >= poolSize * (1 - RANK_BOTTOM_PERCENTILE)
+ *   5. 'midPercentile'    — everyone else
  * A position-elite player is always also position-strong (the elite count is
  * always ≤ the strong count for every position) — elite is checked first
  * specifically because it is the more exclusive, "definitely worth squad
  * consideration" signal, and would otherwise be silently absorbed into the
  * wider tier.
  *
- * MODEL: the two "worth considering" tiers are PER-POSITION — `positionIndex`
- * is this player's 0-based rank among players of their OWN position only, not
- * the whole pool. A pool-wide ranking systematically buried Forwards (fewer
- * of them, and not reliably higher-scoring) under cheap Defenders that post a
- * similar composite score — ranking each position against its own peers is
- * what actually surfaces good picks per position, which is the point of the
- * feature. `bottomPercentile` stays pool-wide by contrast: there's no
- * equivalent "hidden gem" concern to correct for at the bottom.
+ * MODEL: the two green "worth considering" tiers are PER-POSITION —
+ * `positionIndex` is this player's 0-based rank among players of their OWN
+ * position only, not the whole pool. A pool-wide ranking systematically
+ * buried Forwards (fewer of them, and not reliably higher-scoring) under
+ * cheap Defenders that post a similar composite score — ranking each
+ * position against its own peers is what actually surfaces good picks per
+ * position, which is the point of the feature. `topPercentile` and
+ * `bottomPercentile` stay pool-wide by contrast: there's no equivalent
+ * "hidden gem" concern to correct for outside the green tiers, just "clearing
+ * a bar" either way.
+ *
+ * MODEL: `topPercentile` and `bottomPercentile` can overlap the green tiers'
+ * rank range for a thin position (e.g. GKP's top 8 already covers more than
+ * 25% of all goalkeepers) — harmless, since green is checked first and always
+ * wins; `topPercentile` only actually shows (grey) for positions/pool shapes
+ * where the pool-wide top-25% cutoff reaches deeper than that position's own
+ * green cutoff.
  *
  * MODEL: tier names describe their ROLE (mirroring the RANK_* config constant
  * names), not the current threshold numbers — those are tunable
@@ -895,16 +907,17 @@ export function rankPlayers(players, horizon, ctx) {
  * @param {number} poolSize       total size of the pool `index` was ranked within
  * @param {number} positionIndex  0-based rank among players of the SAME position only
  * @param {string} position       the player's position (GKP/DEF/MID/FWD)
- * @returns {'positionElite'|'positionStrong'|'bottomPercentile'|null}
+ * @returns {'positionElite'|'positionStrong'|'topPercentile'|'bottomPercentile'|'midPercentile'|null}
  */
 export function calcRankTier(index, poolSize, positionIndex, position) {
   const eliteCount  = RANK_ELITE_COUNT_BY_POS[position]  ?? 0;
   const strongCount = RANK_STRONG_COUNT_BY_POS[position] ?? 0;
   if (positionIndex < eliteCount)  return 'positionElite';
   if (positionIndex < strongCount) return 'positionStrong';
-  if (poolSize > 0 && index >= 0 && index < poolSize
-      && index >= poolSize * (1 - RANK_BOTTOM_PERCENTILE)) return 'bottomPercentile';
-  return null;
+  if (poolSize <= 0 || index < 0 || index >= poolSize) return null;
+  if (index < poolSize * RANK_TOP_PERCENTILE)           return 'topPercentile';
+  if (index >= poolSize * (1 - RANK_BOTTOM_PERCENTILE)) return 'bottomPercentile';
+  return 'midPercentile';
 }
 
 /**

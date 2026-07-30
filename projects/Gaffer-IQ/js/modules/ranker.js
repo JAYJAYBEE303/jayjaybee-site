@@ -19,6 +19,7 @@ import {
   HORIZONS, RANKER_CHUNK_SIZE, SUMMARY_FETCH_CHUNK_SIZE,
   PRICE_FILTER_MIN, PRICE_FILTER_MAX, PRICE_FILTER_STEP, BANDS,
   RANK_ELITE_COUNT_BY_POS, RANK_STRONG_COUNT_BY_POS,
+  RANK_TOP_PERCENTILE, RANK_BOTTOM_PERCENTILE,
 } from '../config.js';
 import {
   buildScoreContext, scorePlayer, attachRankTiers, calcLastSeasonAvgPointsPerGw,
@@ -123,12 +124,15 @@ function bandFromValue(v) {
 }
 
 /** rankTier (composite.js → calcRankTier) → the .score-chip--rank-* modifier
- *  suffix, or '' when the player isn't in any standout tier (keeps their
- *  existing band colour). See FEATURE_ENGINE.md §13. */
+ *  suffix. Every player gets one of the five now (calcRankTier only returns
+ *  null for a malformed/empty pool), so '' is effectively unreachable in
+ *  practice — kept as a safe fallback, not a normal case. See FEATURE_ENGINE.md §13. */
 function rankTierClass(rankTier) {
   if (rankTier === 'positionElite')    return ' score-chip--rank-green';
   if (rankTier === 'positionStrong')   return ' score-chip--rank-light-green';
+  if (rankTier === 'topPercentile')    return ' score-chip--rank-neutral';
   if (rankTier === 'bottomPercentile') return ' score-chip--rank-red';
+  if (rankTier === 'midPercentile')    return ' score-chip--rank-yellow';
   return '';
 }
 
@@ -140,13 +144,21 @@ const POSITION_LABELS = { GKP: 'goalkeepers', DEF: 'defenders', MID: 'midfielder
  * are PER-POSITION (RANK_ELITE_COUNT_BY_POS/RANK_STRONG_COUNT_BY_POS), so the
  * text must read the player's own position rather than a single fixed string
  * — built from the live config constants, not hardcoded numbers, so this
- * never goes stale if either table is retuned.
+ * never goes stale if either table is retuned. topPercentile/bottomPercentile
+ * are POOL-WIDE (not per-position — see calcRankTier's JSDoc), so their text
+ * doesn't mention a position; midPercentile's implied width (100% minus the
+ * other two) is likewise derived from config, not a hardcoded "35%".
  */
 function rankTierTitle(rankTier, position) {
   const posLabel = POSITION_LABELS[position] ?? 'players';
   if (rankTier === 'positionElite')  return `Top ${RANK_ELITE_COUNT_BY_POS[position]} ${posLabel} in the game`;
   if (rankTier === 'positionStrong') return `Top ${RANK_STRONG_COUNT_BY_POS[position]} ${posLabel} in the game`;
-  if (rankTier === 'bottomPercentile') return 'Bottom half of players in the game';
+  if (rankTier === 'topPercentile')    return `Top ${Math.round(RANK_TOP_PERCENTILE * 100)}% of players in the game`;
+  if (rankTier === 'bottomPercentile') return `Bottom ${Math.round(RANK_BOTTOM_PERCENTILE * 100)}% of players in the game`;
+  if (rankTier === 'midPercentile') {
+    const midPct = Math.round((1 - RANK_TOP_PERCENTILE - RANK_BOTTOM_PERCENTILE) * 100);
+    return `Middle ${midPct}% of players in the game`;
+  }
   return '';
 }
 

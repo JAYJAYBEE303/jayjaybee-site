@@ -235,12 +235,18 @@
    FEATURE_ENGINE.md §13). Rendered ALONGSIDE a .score-chip--{band} class, never
    instead of it — these rules come after the five band rules above so they win
    the cascade at equal specificity, without needing !important or JS to strip
-   the band class. 'top15'/'bottom50' reuse the great/brutal colours (same hex,
-   named per their rank meaning here); 'top20' is the one new colour, a soft
-   light-green distinct from both existing greens. */
+   the band class. Every player now gets exactly one of these five (calcRankTier
+   no longer returns null except for a malformed/empty pool), so in practice
+   this block fully determines colour, not just for a handful of standouts.
+   rank-neutral/rank-yellow are their OWN classes (not a reuse of .score-chip--
+   neutral/.score-chip--tough directly) specifically so their cascade position
+   here — after ALL FIVE band classes, not just some — is guaranteed regardless
+   of which band a given player's own absolute score happens to carry. */
 .score-chip--rank-green       { background: var(--band-great-bg);       color: var(--band-great); }
 .score-chip--rank-light-green { background: var(--band-light-green-bg); color: var(--band-light-green); }
 .score-chip--rank-red         { background: var(--band-brutal-bg);      color: var(--band-brutal); }
+.score-chip--rank-neutral     { background: var(--band-neutral-bg);     color: var(--band-neutral); }
+.score-chip--rank-yellow      { background: var(--band-tough-bg);       color: var(--band-tough); }
 
 /* Estimated compact chip — dashed border in the band's own colour, ~ prefix. */
 .score-chip--estimated {
