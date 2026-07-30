@@ -355,13 +355,25 @@ function buildRow({ player, team, score, rankTier }, nextFixtureRankById) {
   const lvl      = minSecLevel(ms);
   const estClass = isScoreEstimated(score) ? ' score-chip--estimated' : '';
 
-  const costPerPointDisplay = score.costPerPoint !== null
-    ? `£${esc(score.costPerPoint.toFixed(2))}m`
-    : '<span class="ranker-no-fixtures">—</span>';
-
-  const avgPtsEstMark = score.avgPointsPerGw.estimated
-    ? '<span class="ranker-est-mark" title="Estimated — season totals ÷ estimated games played, no per-GW history loaded yet">~</span>'
+  // avgPointsPerGw.source === 'lastSeason' is the temporary pre-season
+  // fallback (FEATURE_ENGINE.md §10.1) — distinct tooltip so it reads as
+  // "last season's number", not the ordinary "thin current-season data" case.
+  const avgPts = score.avgPointsPerGw;
+  const avgPtsTitle = avgPts.source === 'lastSeason'
+    ? `Estimated — no current-season data yet, showing ${esc(avgPts.seasonName ?? 'last season')}'s average instead`
+    : 'Estimated — season totals ÷ estimated games played, no per-GW history loaded yet';
+  const avgPtsEstMark = avgPts.estimated
+    ? `<span class="ranker-est-mark" title="${avgPtsTitle}">~</span>`
     : '';
+
+  // Cost/Pt is DERIVED from avgPointsPerGw (price ÷ avgPointsPerGw.value) —
+  // when that input is estimated (including via the pre-season fallback
+  // above), flag the derived figure too, for the same explainability reason.
+  const costPerPointDisplay = score.costPerPoint !== null
+    ? `£${esc(score.costPerPoint.toFixed(2))}m${avgPts.estimated
+        ? `<span class="ranker-est-mark" title="Derived from an estimated Avg Pts/GW — ${avgPtsTitle}">~</span>`
+        : ''}`
+    : '<span class="ranker-no-fixtures">—</span>';
 
   const nfScore    = score.nextFixtureScore;
   const nfRank     = nextFixtureRankById?.get(player.id);
