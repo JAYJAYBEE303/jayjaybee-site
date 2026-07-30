@@ -345,6 +345,16 @@ export const ROLE_CLASSIFY_THRESHOLDS = {
 // priors compress for the average-team attack-vs-defence spread).
 export const COUNTER_FALLBACK_EDGE = { min: -300, max: 300 };
 
+// How the combined Counter-Matchup score (engine/counter.js →
+// calcCombinedCounterMatchup) blends a team's Attacking Counters (its attack
+// vs the opponent's defence) with its Defending Counters (its defence vs the
+// opponent's attack, via calcCounterMatchupMirrored). MODEL: even 50/50 split
+// — a team's counter-matchup quality is exactly as much about resisting the
+// opponent's attack as it is about beating their defence, and neither one is
+// a more "primary" read than the other. Must sum to 1.00. See FEATURE_ENGINE.md §7.2.
+export const COUNTER_ATTACK_WEIGHT  = 0.5;
+export const COUNTER_DEFENCE_WEIGHT = 0.5;
+
 // ─── §8  Composite matchup score ─────────────────────────────────────────────
 
 // Weights for all sub-metrics. Must sum to 1.00.
@@ -359,12 +369,23 @@ export const COUNTER_FALLBACK_EDGE = { min: -300, max: 300 };
 // unchanged. Pairs with the stacking penalty below: a bigger base weight alone
 // would make a favourite's score nearly immovable, which is why the conditional
 // term exists. See FEATURE_ENGINE.md §8.1.
+// MODEL: counterMatchup raised 0.22 → 0.28. It used to reflect ONLY a team's
+// attack vs the opponent's defence — a team's own defensive quality against
+// THIS opponent's attack earned no direct credit on its own card, only an
+// indirect, heavily-diluted one via the opponent's raw score in the §8.7
+// relative step. Now that the metric blends both pairings (§7.2), it carries
+// twice the underlying signal it used to, so its weight was raised to match —
+// otherwise a genuinely elite defence (e.g. a title-contender with a merely
+// "mid" attack) would still barely register on its own composite. The other
+// four non-baseDifficulty weights were trimmed to compensate (baseDifficulty
+// itself also trimmed slightly), preserving relative ordering, so the total
+// still lands on exactly 1.00. See FEATURE_ENGINE.md §7.2 and §8.1.
 export const WEIGHTS = {
-  baseDifficulty: 0.33,   // strength priors — always available, the dependable floor
-  counterMatchup: 0.22,   // the signature metric — position form mismatches
-  teamForm:       0.18,   // recent trajectory, opponent-quality adjusted
+  baseDifficulty: 0.30,   // strength priors — always available, the dependable floor
+  counterMatchup: 0.28,   // attacking AND defending pairings blended (§7.2)
+  teamForm:       0.16,   // recent trajectory, opponent-quality adjusted
   homeAway:       0.13,   // venue performance this season
-  styleClash:     0.11,   // stylistic interaction — Understat xG-backed (Phase 3A)
+  styleClash:     0.10,   // stylistic interaction — Understat xG-backed (Phase 3A)
   history:        0.03,   // H2H nudge — deliberately tiny; data is thin and weakly predictive
 };
 

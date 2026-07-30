@@ -19,6 +19,8 @@ import {
   ROLE_PAIRING_WEIGHTS,
   ROLE_CLASSIFY_THRESHOLDS,
   COUNTER_FALLBACK_EDGE,
+  COUNTER_ATTACK_WEIGHT,
+  COUNTER_DEFENCE_WEIGHT,
   BANDS,
 } from '../config.js';
 import { clamp, normaliseLinear } from '../util.js';
@@ -366,6 +368,48 @@ export function calcCounterMatchupMirrored(attackingResult) {
     value,
     estimated: attackingResult.estimated || totalWeight === 0,
     pairings,
+  };
+}
+
+/**
+ * Blend a team's Attacking Counters (its attack vs the opponent's defence,
+ * `calcCounterMatchup(team, opponent, ctx)`) with its Defending Counters (its
+ * defence vs the opponent's attack, `calcCounterMatchupMirrored(calcCounterMatchup
+ * (opponent, team, ctx))`) into the single Counter-Matchup figure the fixture
+ * composite weights (`WEIGHTS.counterMatchup`, engine/composite.js).
+ *
+ * MODEL: before this, the composite's Counter-Matchup term reflected ONLY a
+ * team's own attacking prowess against the opponent's defence — its defensive
+ * strength against THIS opponent's attack earned no direct credit on its own
+ * card, only an indirect, heavily-diluted one via the opponent's raw score in
+ * the §8.7 zero-sum relative step. A team with an elite defence but a
+ * middling attack had that defensive quality essentially invisible to its own
+ * composite. See FEATURE_ENGINE.md §7.2.
+ *
+ * Keeps `pairings` as the ATTACKING pairings, unblended, so existing
+ * consumers keep working unchanged: the Matchup Analyser's Attacking Counters
+ * rows read straight from `pairings`, and its `calcCounterMatchupMirrored(...)`
+ * call for the Defending Counters section still mirrors pure attacking data
+ * (preserving the `attackingValue + mirroredValue === 100` identity).
+ *
+ * @param {{value: number, estimated: boolean, pairings: Object}} attackingCounter
+ *   this team's attack vs the opponent's defence.
+ * @param {{value: number, estimated: boolean}} defendingCounter
+ *   this team's defence vs the opponent's attack (already mirrored).
+ * @returns {{value: number, estimated: boolean, pairings: Object,
+ *            attackingValue: number, defendingValue: number}}
+ *   value: 0–100, blend of attackingCounter.value and defendingCounter.value.
+ *   attackingValue/defendingValue: the two unblended inputs, exposed so the
+ *   UI can explain the blend (ARCHITECTURE.md §12 rule 6).
+ */
+export function calcCombinedCounterMatchup(attackingCounter, defendingCounter) {
+  return {
+    value: clamp(0, 100,
+      (COUNTER_ATTACK_WEIGHT * attackingCounter.value) + (COUNTER_DEFENCE_WEIGHT * defendingCounter.value)),
+    estimated:      attackingCounter.estimated || defendingCounter.estimated,
+    pairings:       attackingCounter.pairings,
+    attackingValue: attackingCounter.value,
+    defendingValue: defendingCounter.value,
   };
 }
 

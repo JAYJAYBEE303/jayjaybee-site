@@ -403,6 +403,8 @@ function buildBreakdownRows(breakdown, venue) {
     const barEstClass = m.estimated ? ' breakdown-row__bar--estimated' : '';
     const labelTitle = key === 'baseDifficulty'
       ? ' title="Shows the OPPONENT\'s strength — a high number means a tougher opponent for this team. The bar colour reflects how good this fixture is for this team, same as every other row."'
+      : key === 'counterMatchup'
+      ? ` title="${esc(`Blend of Attacking Counters (${Math.round(m.attackingValue)} — this team's attack vs the opponent's defence) and Defending Counters (${Math.round(m.defendingValue)} — this team's defence vs the opponent's attack). See the sections below for the pairing-level detail.`)}"`
       : '';
     const label = key === 'homeAway'
       ? (venue === 'Home' ? 'Home Advantage' : 'Away Disadvantage')

@@ -255,7 +255,18 @@ This is **not** a second independent `50 + edge * SENSITIVITY` calculation — i
 
 Pairing key mirrors (`cbVsSt`, `fbVsWm`, `cbDmVsCm` for role-mode; `cbVsFwd`, `fbVsWideMid`, `cbMidVsCam` for the element-type fallback) live in `engine/counter.js`'s `MIRRORED_PAIRING_KEYS`.
 
-**Composite score: unaffected.** `scoreFixture`'s `WEIGHTS.counterMatchup` still consumes only `calcCounterMatchup`'s aggregate `value` (§8.2) — the mirrored pairings do not feed the composite score, weight, or confidence calculation anywhere. This is a display-only addition to the Matchup Analyser.
+**Composite score: now blended (`engine/counter.js → calcCombinedCounterMatchup`).** Originally the mirrored pairings above were display-only — `scoreFixture`'s `WEIGHTS.counterMatchup` consumed only `calcCounterMatchup`'s attacking `value`, so a team's own defensive quality against this opponent's attack earned no direct credit on its own composite (only an indirect, heavily-diluted one via the opponent's raw score in the §8.7 relative step — see the worked Man City/Bournemouth example below). A team with an elite defence but a "mid" attack had that defensive strength essentially invisible to its own card.
+
+`computeRawFixtureScore` (`engine/composite.js`) now computes both directions and blends them:
+```
+attackingCounter = calcCounterMatchup(team, opponent, ctx)                          # team's attack vs opponent's defence
+defendingCounter = calcCounterMatchupMirrored(calcCounterMatchup(opponent, team, ctx)) # team's defence vs opponent's attack
+counter = calcCombinedCounterMatchup(attackingCounter, defendingCounter)
+        = clamp(0, 100, COUNTER_ATTACK_WEIGHT * attackingCounter.value + COUNTER_DEFENCE_WEIGHT * defendingCounter.value)
+```
+`COUNTER_ATTACK_WEIGHT = COUNTER_DEFENCE_WEIGHT = 0.5` (`config.js`) — an even split; neither pairing is a more "primary" read than the other. `counter.pairings` stays the unblended **attacking** pairings (so the Matchup Analyser's Attacking Counters rows and its `calcCounterMatchupMirrored` call for Defending Counters keep reading pure attacking data, preserving the sum-to-100 identity above). The unblended inputs are exposed as `breakdown.counterMatchup.attackingValue`/`.defendingValue` so the blend stays explainable (ARCHITECTURE.md §12 rule 6) — the Matchup Analyser's Score Breakdown row shows both in a tooltip.
+
+**MODEL — a subtlety worth stating plainly:** because `defendingCounter` is *entirely derived* from the opponent's own `attackingCounter` (`100 - opponentAttackingValue`), blending it into a team's raw composite at the SAME total `WEIGHTS.counterMatchup` would be a no-op for the final §8.7 relative score's linear term — the algebra collapses back to exactly `WEIGHTS.counterMatchup * (attackingA - attackingB)` regardless of the attack/defence split chosen, since the two teams' raw composites both end up encoding the identical `attackingA`/`attackingB` pair either way. Blending alone only changes what's *displayed* per side (now honest about both pairings) and slightly perturbs the nonlinear §8.6 stacking penalty (which reads the raw `counter.value`, not the linear edge). To make defensive strength genuinely move the final predicted score — not just the breakdown display — `WEIGHTS.counterMatchup` itself was raised (§8.1) so the now-doubled underlying signal carries proportionally more real weight in the composite.
 
 **Pairing → named players (`duelsForPairing`).** Each pairing row in the Matchup Analyser carries an info disclosure listing the actual players behind its score. `duelsForPairing(duels, pairingKey)` is a pure filter over an existing `calcIndividualDuels` result (§7.4) — it deliberately does **not** re-identify players, so the info panel can never disagree with the Individual Duels section on the same card. A `PAIRING_ROLE_ALIAS` table collapses all three key families (role-mode `stVsCb…`, element-fallback `fwdVsCb…`, defending mirrors `cbVsSt…`) onto the canonical role-mode key, then filters duels whose `attacker.role` and `defender.role` both fall in that pairing's `ROLE_ATTACK_GROUPS`/`ROLE_DEFENCE_GROUPS`. For a **defending** pairing the relevant duels are the **opponent's** attacking duels, since a defending pairing is their attack against this team's defence. Returns `[]` when duels are unavailable (no summaries / no ICT data), which the UI renders as an explicit "no player data available" state rather than a blank panel.
 
@@ -292,29 +303,31 @@ This is where everything combines into the single 0–100 number (per team, per 
 ### 8.1 Default weights (`config.js → WEIGHTS`)
 ```
 WEIGHTS = {
-  baseDifficulty:  0.33,   // strength priors — the dependable floor
-  counterMatchup:  0.22,   // the signature metric — position form mismatches
-  teamForm:        0.18,   // recent trajectory, opponent-adjusted
+  baseDifficulty:  0.30,   // strength priors — the dependable floor
+  counterMatchup:  0.28,   // attacking AND defending pairings blended (§7.2)
+  teamForm:        0.16,   // recent trajectory, opponent-adjusted
   homeAway:        0.13,   // venue performance this season
-  styleClash:      0.11,   // stylistic interaction — Understat xG-backed (Phase 3A)
+  styleClash:      0.10,   // stylistic interaction — Understat xG-backed (Phase 3A)
   history:         0.03    // H2H nudge (thin data, low trust)
 }   // sums to 1.00
 ```
 Rationale for the ordering:
-- **Base difficulty (0.33):** by a clear margin the largest weight. Opponent quality is the only sub-metric that is *never* estimated — it is available from day one of a season and does not degrade when player summaries or Understat data are missing. It was 0.30 in Phase 1, cut to 0.25 in Phase 3A to fund the style weight, and raised to **0.33** once it became clear the composite was under-weighting the single most decisive input. **The other five weights were scaled down proportionally (×0.67/0.75 ≈ 0.8933)**, so their relative ordering is untouched and the total still lands on exactly 1.00:
+- **Base difficulty (0.30):** the largest single weight. Opponent quality is the only sub-metric that is *never* estimated — it is available from day one of a season and does not degrade when player summaries or Understat data are missing. History: 0.30 in Phase 1, cut to 0.25 in Phase 3A to fund the style weight, raised to 0.33 once it became clear the composite was under-weighting the single most decisive input, then trimmed slightly to **0.30** to help fund the counter-matchup rise below.
+- **Counter-matchup (0.28):** raised from 0.22. Previously `WEIGHTS.counterMatchup` consumed only a team's own attack vs the opponent's defence (`calcCounterMatchup`) — its own defensive quality against this opponent's attack earned no direct credit on its own composite, only an indirect, heavily-diluted one via the opponent's raw score in the §8.7 relative step. A team with an elite defence but a "mid" attack had that defensive strength essentially invisible to its own card. Now that the metric blends both pairings (`calcCombinedCounterMatchup`, §7.2), it carries roughly twice the underlying signal it used to, so its weight was raised to match — otherwise the blend would be a no-op for the final score (see the §7.2 "subtlety" note on why blending alone, without a weight change, cancels out algebraically in the relative step). It's now nearly as large as base difficulty, reflecting that Gaffer IQ's signature metric should matter close to as much as raw opponent strength.
+
+  **The other four weights were trimmed to compensate**, preserving relative ordering, so the total still lands on exactly 1.00:
 
   | Weight | Before | After |
   |---|---|---|
-  | `baseDifficulty` | 0.25 | **0.33** |
-  | `counterMatchup` | 0.25 | 0.22 |
-  | `teamForm` | 0.20 | 0.18 |
-  | `homeAway` | 0.15 | 0.13 |
-  | `styleClash` | 0.12 | 0.11 |
+  | `baseDifficulty` | 0.33 | 0.30 |
+  | `counterMatchup` | 0.22 | **0.28** |
+  | `teamForm` | 0.18 | 0.16 |
+  | `homeAway` | 0.13 | 0.13 |
+  | `styleClash` | 0.11 | 0.10 |
   | `history` | 0.03 | 0.03 |
 
-- **Counter-matchup (0.22):** still the signature metric and the largest of the secondaries.
-- **Form (0.18)** and **home/away (0.13):** strong, well-evidenced signals.
-- **Style (0.11):** raised from 0.07 to 0.12 in Phase 3A once real Understat xG / xGA replaced the Phase 1 goals/clean-sheet proxies, then scaled to 0.11 here. Still modest because style interactions are genuinely noisy, but no longer speculative.
+- **Form (0.16)** and **home/away (0.13):** strong, well-evidenced signals.
+- **Style (0.10):** raised from 0.07 to 0.12 in Phase 3A once real Understat xG / xGA replaced the Phase 1 goals/clean-sheet proxies, then trimmed to 0.10 here. Still modest because style interactions are genuinely noisy, but no longer speculative.
 - **History (0.03):** deliberately small — H2H data is thin and football H2H is weakly predictive.
 
 > **The base-difficulty weight and the §8.6 stacking penalty are a matched pair.** Raising base difficulty to 0.33 on its own would make a strong favourite's score nearly immovable — no realistic combination of secondary metrics could shift it. §8.6 is what restores the ability of *several* bad secondary signals to tip a fixture, without letting any *single* one do so. Do not tune one without re-checking the other.
@@ -417,7 +430,7 @@ stackingPenalty = STACK_MAX_PENALTY * (stackIndex ^ STACK_CURVE)        # 0–45
 
 **Why estimated metrics are excluded entirely** (rather than passed through at 50, as §8.3 does for the weighted sum): §1 rule 3 — *absence of information is not evidence of a hard fixture*. A data gap must never manufacture a penalty. The remaining non-estimated weights are re-normalised via `consideredWeight`, so a fixture with only two loaded secondaries is judged on those two, not diluted by three unknowns.
 
-**Worked behaviour** (strong home favourite, `baseDifficulty` 25 = weak opponent, weights as §8.1):
+**Worked behaviour** (strong home favourite, `baseDifficulty` 25 = weak opponent, weights as §8.1 — note: these specific decimals predate the §7.2 counter-matchup blend/reweight and are kept as-is; the stacking-curve mechanism they illustrate is unaffected by that change, only the exact numbers would shift slightly under the current weights):
 
 | Scenario | Secondaries below pivot | Linear sum | `stackIndex` | Penalty | Final | Band |
 |---|---|---|---|---|---|---|
@@ -463,7 +476,7 @@ value = clamp(0, 100, 50 + edge * RELATIVE_EDGE_SENSITIVITY)               # REL
 
 **This does NOT flatten every fixture toward 50/50 — and does NOT touch the promoted-team logic.** `calcBaseDifficulty` and `calcTenurePenalty` (§2, §2.1) are completely unchanged; a promoted side's `ownRawValue` still comes out low (their opponent's undiminished strength inverts to near-0) and an established side's `opponentRawValue` reading of that same promoted side is still pulled further down by the tenure penalty. Both of those genuine, real differences flow straight into `edge` — a big real gap produces a big edge, and therefore a lopsided (not 50/50) split. Only the *relationship* (sum ≈ 100) is new; the *size* of the split is still driven entirely by the real, unmodified strength/form/tenure gap between the two teams.
 
-**Worked examples** (`WEIGHTS` and `STACK_*` as §8.1/§8.6; `own`/`opp` = each team's independent `computeRawFixtureScore`):
+**Worked examples** (`WEIGHTS` and `STACK_*` as §8.1/§8.6; `own`/`opp` = each team's independent `computeRawFixtureScore` — note: these specific decimals predate the §7.2 counter-matchup blend/reweight and are kept as-is; the zero-sum identity they illustrate is unaffected by that change, only the exact numbers would shift slightly under the current weights):
 
 | Fixture | A's raw (independent) | B's raw (independent) | edge | **A's final** | **B's final** | Sum |
 |---|---|---|---|---|---|---|
@@ -478,6 +491,7 @@ The first two rows are the direct fix: under the old model neither team's absolu
 - `confidence` is now `min(own, opponent)` confidence, not just `team`'s own — because the final value depends on both sides' reads, it can only be as trustworthy as the less-certain one. Both teams' Matchup Analyser cards for the same fixture will now show the *same* confidence percentage; this is intentional (§8.5).
 - `CompositeScore.breakdown` still explains `relative.ownRawValue` exactly (§8.5/§8.6's identities hold for `ownRawValue`), but no longer arithmetically reconstructs the top-level `value` on its own — `relative` is required to close that gap. The Matchup Analyser's existing breakdown rows are unchanged and still correct for what they show (`ownRawValue`'s composition); they do not currently render the new `relative` field. Flagged as a follow-up, not implemented here (out of this change's scope): surfacing `relative.opponentRawValue`/`edge` somewhere on the card would let a user see *why* the headline number differs from a manual sum of the breakdown rows.
 - Perf: `scoreFixture` now does roughly double the internal work per call (`computeRawFixtureScore` runs for both sides every time). `engine/chips.js` already memoises `scoreFixture` per `(team, fixture)` pair (`makeFxCache`), so chip planning is unaffected. `rankPlayers`/`scorePlayer` have no such cache and call `scoreOverHorizon` (and therefore `scoreFixture`) once per player with no memoisation across players sharing a team — this was already uncached before this change; it is now roughly twice as expensive per call. Not addressed here (a caching layer for `scorePlayer`/`rankPlayers` is a separate concern, unscoped for this change) but worth knowing if Ranker load time is ever noticeably slow.
+- **Further perf note (§7.2 counter-matchup blend):** `computeRawFixtureScore` itself now calls `calcCounterMatchup` twice per side (once for the attacking read, once for the opponent's attacking read that feeds the defending mirror) instead of once, roughly doubling the counter-matchup-specific cost on top of the doubling above. Same reasoning applies: no caching added, not addressed here, worth knowing if Ranker load time grows noticeably.
 
 ---
 

@@ -23,7 +23,9 @@ import {
   calcTeamForm, calcPlayerForm, calcPlayingLikelihood, buildUnderstatPlayerLookup,
 } from './form.js';
 import { calcStyleClash, buildXgProfilesByTeamId } from './style.js';
-import { calcCounterMatchup } from './counter.js';
+import {
+  calcCounterMatchup, calcCounterMatchupMirrored, calcCombinedCounterMatchup,
+} from './counter.js';
 
 /**
  * Build the assembly context every engine function consumes. Pure — derives
@@ -205,7 +207,13 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
   const base    = calcBaseDifficulty(team, opponent, isHome, fdrForTeam);
   const venue   = calcHomeAwaySplit(team, isHome, ctx);
   const form    = calcTeamForm(team, ctx);
-  const counter = calcCounterMatchup(team, opponent, ctx);
+  // Counter-Matchup blends BOTH pairings so a team's own defensive quality
+  // against this opponent's attack earns direct credit on its own composite,
+  // not just an indirect one via the opponent's raw score in §8.7. See
+  // calcCombinedCounterMatchup (engine/counter.js) and FEATURE_ENGINE.md §7.2.
+  const attackingCounter = calcCounterMatchup(team, opponent, ctx);
+  const defendingCounter = calcCounterMatchupMirrored(calcCounterMatchup(opponent, team, ctx));
+  const counter = calcCombinedCounterMatchup(attackingCounter, defendingCounter);
   const style   = calcStyleClash(team, opponent, ctx);
   const history = calcFixtureHistory(team.id, opponentId, ctx);
 
@@ -282,6 +290,11 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
         weight:    WEIGHTS.counterMatchup,
         estimated: counter.estimated,
         pairings:  counter.pairings,
+        // Unblended inputs so the UI can explain the blend (ARCHITECTURE.md §12
+        // rule 6) — attackingValue: this team's attack vs the opponent's
+        // defence; defendingValue: this team's defence vs the opponent's attack.
+        attackingValue: counter.attackingValue,
+        defendingValue: counter.defendingValue,
       },
       teamForm: {
         value:     form.value,
