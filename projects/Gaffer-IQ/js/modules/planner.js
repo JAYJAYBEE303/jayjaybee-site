@@ -11,7 +11,7 @@
 
 import { store } from '../store.js';
 import { HORIZONS, PRICE_BUY_NOW_CONFIDENCE, PRICE_BUY_NOW_SCORE_MIN } from '../config.js';
-import { buildScoreContext, scorePlayer } from '../engine/composite.js';
+import { buildScoreContext, scorePlayer, rankPlayers, attachRankTiers } from '../engine/composite.js';
 import { calcPriceChangeRisk } from '../engine/prices.js';
 import {
   scoreWildcardTiming, scoreFreeHitTiming,
@@ -88,6 +88,17 @@ let _allowExtraHit = false;
 /** Map<playerId, scorePlayer result> — rebuilt on squad/horizon changes. */
 let _scores = new Map();
 
+/**
+ * Map<playerId, 'top30'|'top10'|'bottom50'|null> — every player's standing
+ * against the full pool (FEATURE_ENGINE.md §13), keyed by whichever horizon
+ * last built it. null until computed. Rebuilding this depends on horizon (a
+ * player's score, and therefore rank, differs by horizon) but NOT on squad
+ * membership, so it is invalidated on data:ready/horizon:changed only — not
+ * re-scored on every add/remove, which would cost ~700 scorePlayer calls per
+ * click for no reason.
+ */
+let _rankTierByPlayerId = null;
+
 /** Set<chipId> of chips the user has marked as already used this season. */
 let _chipsUsed = new Set();
 
@@ -139,6 +150,17 @@ function esc(str) {
  */
 function isScoreEstimated(score) {
   return Boolean(score?.breakdown?.form?.estimated || score?.breakdown?.counter?.estimated);
+}
+
+/** rankTier (composite.js → calcRankTier) → the .score-chip--rank-* modifier
+ *  suffix, or '' when the player isn't in any standout tier (keeps their
+ *  existing band colour). Mirrors the identical helper in modules/ranker.js.
+ *  See FEATURE_ENGINE.md §13. */
+function rankTierClass(rankTier) {
+  if (rankTier === 'top30')    return ' score-chip--rank-green';
+  if (rankTier === 'top10')    return ' score-chip--rank-lime';
+  if (rankTier === 'bottom50') return ' score-chip--rank-red';
+  return '';
 }
 
 /** Build the engine scoring context from the current store state. */
@@ -238,6 +260,27 @@ function scoreSquad() {
     } catch (err) {
       console.warn('[planner] scorePlayer failed for player', id, err?.message ?? err);
     }
+  }
+  ensureRankTiers(ctx, horizon);
+}
+
+/**
+ * Rank tier (FEATURE_ENGINE.md §13) needs a player's standing against the
+ * FULL player pool, not just the squad or the swap candidates a single search
+ * happens to touch — "top 30 in the game" has to mean the same thing here as
+ * on the Ranker/Dashboard. Cached because it depends only on ctx/horizon, not
+ * on squad membership: re-scoring ~700 players on every add/remove click
+ * would be wasted work. _rankTierByPlayerId is invalidated by the caller
+ * (onDataReady/onHorizonChanged) whenever the inputs it depends on change.
+ */
+function ensureRankTiers(ctx, horizon) {
+  if (_rankTierByPlayerId !== null) return;
+  try {
+    const ranked = attachRankTiers(rankPlayers(store.getPlayers(), horizon, ctx));
+    _rankTierByPlayerId = new Map(ranked.map(r => [r.player.id, r.rankTier]));
+  } catch (err) {
+    console.warn('[planner] full-pool rank computation failed', err?.message ?? err);
+    _rankTierByPlayerId = new Map();
   }
 }
 
@@ -408,7 +451,7 @@ function renderPlayerProjection(player, score, team, direction) {
           </div>
         </div>
       </div>
-      <span class="score-chip score-chip--${esc(score?.band ?? 'neutral')}${isScoreEstimated(score) ? ' score-chip--estimated' : ''}">${Math.round(score?.value ?? 0)}</span>
+      <span class="score-chip score-chip--${esc(score?.band ?? 'neutral')}${isScoreEstimated(score) ? ' score-chip--estimated' : ''}${rankTierClass(_rankTierByPlayerId?.get(player.id))}">${Math.round(score?.value ?? 0)}</span>
     </div>
   `.trim();
 }
@@ -629,7 +672,7 @@ function renderSquadPanel() {
         const score = _scores.get(player.id);
         const team  = store.getTeam(player.teamId);
         const chip  = score
-          ? `<span class="score-chip score-chip--${esc(score.band)}">${Math.round(score.value)}</span>`
+          ? `<span class="score-chip score-chip--${esc(score.band)}${rankTierClass(_rankTierByPlayerId?.get(player.id))}">${Math.round(score.value)}</span>`
           : '';
         return `
           <div class="dash-squad-slot dash-squad-slot--filled">
@@ -1168,6 +1211,8 @@ function wireDom() {
 
 function onDataReady() {
   wireDom();          // no-op after first call
+  // Force a fresh full-pool rank computation for the new data (see ensureRankTiers).
+  _rankTierByPlayerId = null;
   _dataReady = true;
   scoreSquad();
   renderSquadPanel();
@@ -1177,6 +1222,9 @@ function onDataReady() {
 
 function onHorizonChanged() {
   if (!_dataReady) return;
+  // Rank tiers depend on horizon (a player's score, and therefore rank,
+  // differs by horizon) — force a fresh computation alongside the re-score.
+  _rankTierByPlayerId = null;
   // Re-score squad against the new horizon and re-compute transfer
   // recommendations + chip timing (chips depend on the same fixture data).
   scoreSquad();

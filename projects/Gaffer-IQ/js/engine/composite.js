@@ -12,6 +12,7 @@ import {
   STACK_PIVOT, STACK_CURVE, STACK_MAX_PENALTY, RELATIVE_EDGE_SENSITIVITY,
   HORIZON_DECAY, AGG_METHOD, W_MEAN, W_MIN, BLANK_GW_VALUE,
   PROJ_FORM, PROJ_FIXTURE, PROJ_COUNTER, PROJ_MINUTES,
+  RANK_TOP_COUNT, RANK_TOP_PERCENTILE, RANK_BOTTOM_PERCENTILE,
 } from '../config.js';
 import { clamp, invert } from '../util.js';
 import {
@@ -800,4 +801,55 @@ export function rankPlayers(players, horizon, ctx) {
   return players
     .map(p => ({ player: p, score: scorePlayer(p, horizon, ctx) }))
     .sort((a, b) => b.score.value - a.score.value);
+}
+
+// ─── Rank-relative colouring ──────────────────────────────────────────────────
+
+/**
+ * Classify a player's position in an already-sorted (descending by value) pool
+ * into a rank tier, or null if they don't fall into any standout tier. This is
+ * a SEPARATE axis from `score.band` (§8.4): band classifies a score against the
+ * fixed 0–100 scale; tier classifies a player against the CURRENT POOL, so a
+ * strong pick still stands out even in a season where absolute scores run low
+ * (or vice versa). Only the standout tiers get a colour override — everyone
+ * else keeps their existing band colour. See FEATURE_ENGINE.md §13.
+ *
+ * Precedence (most to least specific), each tier evaluated in order and the
+ * first match wins:
+ *   1. 'top30'    — index < RANK_TOP_COUNT (a fixed count, not a percentage)
+ *   2. 'top10'    — index < poolSize * RANK_TOP_PERCENTILE
+ *   3. 'bottom50' — index >= poolSize * (1 - RANK_BOTTOM_PERCENTILE)
+ * A top-30 player is always also within the top 10%, and the top 10% is always
+ * within the top 50% — the fixed-count tier is checked first specifically
+ * because it is the most exclusive, "definitely worth squad consideration"
+ * signal, and would otherwise be silently absorbed into the percentile tier.
+ *
+ * @param {number} index     0-based rank in the sorted pool (0 = best)
+ * @param {number} poolSize  total size of the pool `index` was ranked within
+ * @returns {'top30'|'top10'|'bottom50'|null}
+ */
+export function calcRankTier(index, poolSize) {
+  if (!(poolSize > 0) || index < 0 || index >= poolSize) return null;
+  if (index < RANK_TOP_COUNT) return 'top30';
+  if (index < poolSize * RANK_TOP_PERCENTILE) return 'top10';
+  if (index >= poolSize * (1 - RANK_BOTTOM_PERCENTILE)) return 'bottom50';
+  return null;
+}
+
+/**
+ * Attach a `rankTier` to every entry of an already-sorted (descending by
+ * value) scored-player array — the shape `rankPlayers` returns, or any
+ * caller's own equivalent (e.g. modules/ranker.js's chunked `_rows`, which
+ * carries the same { player, score, ... } shape plus extra fields that pass
+ * through unchanged). Pure: returns a new array, never mutates the input.
+ *
+ * @param {{player: Player, score: object}[]} sortedRows
+ * @returns {{player: Player, score: object, rankTier: string|null}[]}
+ */
+export function attachRankTiers(sortedRows) {
+  const poolSize = sortedRows.length;
+  return sortedRows.map((row, index) => ({
+    ...row,
+    rankTier: calcRankTier(index, poolSize),
+  }));
 }

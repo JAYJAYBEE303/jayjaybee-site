@@ -111,6 +111,7 @@ e.g. `<span class="score-pill score-pill--good">`. The band string in `Composite
 - All colours, spacing, radii, font sizes, and the five band colours are CSS custom properties declared in `:root` in `base.css`. Components reference `var(--…)` only. No raw hex or px-spacing literals in `components.css`/`layout.css` except inside `:root`.
 - Token naming: `--color-…`, `--space-…`, `--radius-…`, `--font-…`, `--band-…`. e.g. `--band-brutal`, `--space-2`, `--color-bg`.
 - No inline styles in HTML and no `style.foo =` in JS except for genuinely dynamic values (e.g. a computed bar width). Toggle classes, don't write style strings.
+- `--band-…` also covers the one non-`BANDS` colour added for rank-relative player colouring (`--band-lime` — see `FEATURE_ENGINE.md` §13): same naming convention, same `:root` location, even though it isn't one of the original five score bands. Extend this block for any future colour need before reaching for a raw hex anywhere else.
 
 ### 5.4 Layout
 - Flexbox/Grid only. No float layouts. No CSS frameworks (no Tailwind, no Bootstrap). Hand-written CSS, organised by the three files in `ARCHITECTURE.md` §3.

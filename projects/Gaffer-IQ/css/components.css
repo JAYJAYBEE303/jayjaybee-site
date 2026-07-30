@@ -231,6 +231,16 @@
 .score-chip--tough   { background: var(--band-tough-bg);   color: var(--band-tough); }
 .score-chip--brutal  { background: var(--band-brutal-bg);  color: var(--band-brutal); }
 
+/* Rank-relative tiers (pool-percentile, NOT the 0-100 band above — see
+   FEATURE_ENGINE.md §13). Rendered ALONGSIDE a .score-chip--{band} class, never
+   instead of it — these rules come after the five band rules above so they win
+   the cascade at equal specificity, without needing !important or JS to strip
+   the band class. 'top30'/'bottom50' reuse the great/brutal colours (same hex,
+   named per their rank meaning here); 'top10' is the one new colour, lime. */
+.score-chip--rank-green { background: var(--band-great-bg);  color: var(--band-great); }
+.score-chip--rank-lime  { background: var(--band-lime-bg);   color: var(--band-lime); }
+.score-chip--rank-red   { background: var(--band-brutal-bg); color: var(--band-brutal); }
+
 /* Estimated compact chip — dashed border in the band's own colour, ~ prefix. */
 .score-chip--estimated {
   border: 1px var(--estimated-border-style) currentColor;

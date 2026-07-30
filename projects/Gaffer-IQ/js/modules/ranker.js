@@ -13,7 +13,7 @@
 
 import { store } from '../store.js';
 import { HORIZONS, RANKER_CHUNK_SIZE, PRICE_FILTER_MIN, PRICE_FILTER_MAX, PRICE_FILTER_STEP, BANDS } from '../config.js';
-import { buildScoreContext, scorePlayer } from '../engine/composite.js';
+import { buildScoreContext, scorePlayer, attachRankTiers } from '../engine/composite.js';
 import { fetchPlayerSummary } from '../api.js';
 import { normalisePlayerSummary } from '../engine/normalise.js';
 import { calcPriceChangeRisk } from '../engine/prices.js';
@@ -100,6 +100,22 @@ function bandFromValue(v) {
   if (v >= BANDS.tough)   return 'tough';
   return 'brutal';
 }
+
+/** rankTier (composite.js → calcRankTier) → the .score-chip--rank-* modifier
+ *  suffix, or '' when the player isn't in any standout tier (keeps their
+ *  existing band colour). See FEATURE_ENGINE.md §13. */
+function rankTierClass(rankTier) {
+  if (rankTier === 'top30')    return ' score-chip--rank-green';
+  if (rankTier === 'top10')    return ' score-chip--rank-lime';
+  if (rankTier === 'bottom50') return ' score-chip--rank-red';
+  return '';
+}
+
+const RANK_TIER_TITLES = {
+  top30:    'Top 30 players in the game',
+  top10:    'Top 10% of players in the game',
+  bottom50: 'Bottom half of players in the game',
+};
 
 /** Return the label+band object for a 0–1 minutesSecurity value. */
 function minSecLevel(ms) {
@@ -206,7 +222,12 @@ async function rebuildRowsChunked() {
 
   // Sort descending by value, matching rankPlayers ordering.
   pending.sort((a, b) => b.score.value - a.score.value);
-  _rows = pending;
+  // Rank tier (FEATURE_ENGINE.md §13) is computed against the FULL unfiltered
+  // pool, before applyFilters() ever runs — "top 30 in the game" must mean the
+  // same thing regardless of which position/price/team pills are active, and
+  // must match what Dashboard/Planner (which have no filters at all) compute
+  // for the same players.
+  _rows = attachRankTiers(pending);
 
   if (_loading) _loading.classList.remove('is-visible');
   renderTable();
@@ -307,10 +328,11 @@ function buildFixtureStrip(perGw) {
  * minutesSecurity is read from score.breakdown.form (set by composite.js's
  * scorePlayer) to avoid a second calcPlayerForm call per row.
  *
- * @param {{player: Player, team: Team, score: object}} row
+ * @param {{player: Player, team: Team, score: object, rankTier: string|null}} row
+ *   rankTier from attachRankTiers, computed against the FULL pool (FEATURE_ENGINE.md §13)
  * @param {Map<number, number>} nextFixtureRankById  from buildNextFixtureRanks
  */
-function buildRow({ player, team, score }, nextFixtureRankById) {
+function buildRow({ player, team, score, rankTier }, nextFixtureRankById) {
   const statusMark = player.status !== 'available'
     ? `<span class="ranker-status-badge" title="${esc(player.statusNote || player.status)}">!</span>`
     : '';
@@ -348,7 +370,8 @@ function buildRow({ player, team, score }, nextFixtureRankById) {
         £${esc(player.price.toFixed(1))}m
       </td>
       <td class="ranker-table__td ranker-table__td--value">
-        <span class="score-chip score-chip--${esc(score.band)}${estClass}">${Math.round(score.value)}</span>
+        <span class="score-chip score-chip--${esc(score.band)}${estClass}${rankTierClass(rankTier)}"
+              title="${rankTier ? esc(RANK_TIER_TITLES[rankTier]) : ''}">${Math.round(score.value)}</span>
       </td>
       <td class="ranker-table__td ranker-table__td--cost-per-point">
         ${costPerPointDisplay}

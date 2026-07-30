@@ -577,3 +577,35 @@ Because Ranker, Dashboard and Planner all obtain player scores from `scorePlayer
 - **Sanity benchmark:** after any weight change, spot-check a handful of fixtures whose outcome is intuitively obvious (a top side at home to a bottom side should land 'great'; a poor side away to a top side should land 'brutal'). If it doesn't, the weights or a metric's direction is wrong.
 - **Backtesting (Phase 3):** persist each GW's pre-deadline scores and compare against actual points to calibrate weights empirically. Until then, weights are informed priors, explicitly documented here so they can be argued with.
 - **Direction bugs are the #1 risk.** A single inverted metric quietly poisons the composite. Every metric function must restate its direction in its JSDoc (`CONVENTIONS.md` §7.2).
+
+---
+
+## 13. Rank-relative player colouring (`engine/composite.js → calcRankTier`, `attachRankTiers`)
+
+**Purpose:** make the standout players — genuinely worth squad consideration, or genuinely not — visually pop in the Ranker, Dashboard, and Planner, regardless of how the absolute 0–100 scale happens to be distributed this season.
+
+**This is a SEPARATE axis from `BANDS` (§8.4), not a replacement.** `score.band` classifies a value against the fixed 0–100 scale — it answers "is this an objectively good score". `rankTier` classifies a player against the **current pool** — it answers "does this player stand out relative to everyone else right now". A season where scores cluster low (thin early-season data, most sub-metrics still estimated) would leave `BANDS` unable to distinguish the genuinely best players from the merely-average ones; `rankTier` still can, because it only cares about relative ordering.
+
+**Tiers and precedence** (`config.js`):
+```
+RANK_TOP_COUNT        = 30     # fixed count, not a percentage
+RANK_TOP_PERCENTILE   = 0.10   # top 10% of the pool
+RANK_BOTTOM_PERCENTILE = 0.50  # bottom 50% of the pool
+
+calcRankTier(index, poolSize):     # index: 0-based rank in a DESCENDING sort, 0 = best
+    if index < RANK_TOP_COUNT:                        return 'top30'
+    if index < poolSize * RANK_TOP_PERCENTILE:         return 'top10'
+    if index >= poolSize * (1 - RANK_BOTTOM_PERCENTILE): return 'bottom50'
+    else:                                              return null
+```
+The three tiers are checked **most-specific first**: `top30` before `top10` before `bottom50`, even though a top-30 player is always also within the top 10% (which is always within the top 50%). `top30` is the fixed-count, "definitely worth considering" flagship signal — checking it first stops it being silently absorbed into the wider percentile tier. **A player outside all three tiers (`rankTier === null`) keeps their existing `BANDS` colour unchanged** — this system only overrides colour for the standout tiers; the unremarkable middle (roughly the 10th–50th percentile) is not the point of the feature and is left alone.
+
+Verified against a realistic 700-player pool: `top30` is exactly 30 players (indices 0–29), `top10` is the next 40 (indices 30–69, completing the top 10%), `bottom50` is exactly the bottom 350 (indices 350–699), and the middle 280 are `null`. A pool smaller than `RANK_TOP_COUNT` (e.g. a heavily filtered view) degrades gracefully — everyone in it is `top30`, no error.
+
+**Colour tokens (`base.css`):** `bottom50` and `top30` reuse the existing `--band-brutal` (red) and `--band-great` (green) — no new hex for those two, per CONVENTIONS.md §5.3. `top10` needed a genuinely new colour distinct from both existing greens, so `--band-lime` (`#a3e635`) plus `--band-lime-bg` were added alongside the five existing band tokens, same naming convention. Rendered via three new CSS classes (`components.css`): `.score-chip--rank-green`, `.score-chip--rank-lime`, `.score-chip--rank-red` — deliberately **not** named after the `BANDS` classes they happen to share a colour with (`.score-chip--great` etc.), because they are a different classification mechanism and conflating the two in the DOM would make a future reader unable to tell "scored 85+" from "ranked top 30" just by reading the class name. A chip renders **both** its `BANDS` class and (when applicable) its rank-tier class together; the rank-tier rules are declared after the five band rules in `components.css` so they win the cascade at equal specificity, with no `!important` and no JS class-stripping needed.
+
+**Player pool scope — the FULL pool, not the currently-filtered view.** Ranker's rank tiers are computed against every loaded player (`store.getPlayers()`), **before** `applyFilters()` narrows the table for display — "top 30 in the game" must mean the same thing whether the position filter is set to "GKP only" or "all", and must match what Dashboard and Planner (which have no filters at all) compute for the same players. Dashboard and Planner each maintain a squad of ~15 players with no natural "pool" of their own, so both compute the same full-pool ranking `rankPlayers(store.getPlayers(), horizon, ctx)` + `attachRankTiers(...)` and cache a `playerId → rankTier` lookup, reused across squad edits.
+
+**Cost, and why it's cached, not recomputed per edit.** A full-pool ranking scores every loaded player — the same cost the Ranker already accepts as normal (it does this on every load/horizon change via chunked async scoring). The ranking depends only on `(ctx, horizon)`, **not** on squad membership, so Dashboard and Planner compute it **once** per data load (and, for Planner, once per horizon change — its horizon can change via the global switcher; Dashboard is locked to GW1 so only data-load invalidates it) and reuse the cached lookup across every subsequent squad add/remove. Recomputing on every edit would re-score ~700 players per click for no reason.
+
+**Where it's shown:** the single headline "Value" score chip in each module (Ranker's Value column; Dashboard's captain/XI/bench/squad-slot chips; Planner's squad-slot and transfer in/out candidate chips) — the number that represents overall player quality. Deliberately **not** applied to the Ranker's Next Fixture chip, the per-GW fixture strip, or the minutes-security badge: those are different, narrower metrics (fixture favourability, per-GW difficulty, playing time) with their own meaning, and colouring them by overall-value rank would misrepresent what they show.

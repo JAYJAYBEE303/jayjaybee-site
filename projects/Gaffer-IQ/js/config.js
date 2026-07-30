@@ -613,3 +613,25 @@ export const PRICE_BUY_NOW_CONFIDENCE = 0.5;
 // confidence for the "Buy now" badge. Guards against flagging a rising player
 // who has a brutal upcoming fixture run.
 export const PRICE_BUY_NOW_SCORE_MIN = 55;
+
+// ─── Rank-relative player colouring (Ranker / Planner / Dashboard) ───────────
+
+// MODEL: this is a SEPARATE colouring axis from BANDS (§8.4) — BANDS classifies
+// a score against the fixed 0–100 scale; these three classify a player against
+// the CURRENT POOL, so "worth strongly considering" pops out regardless of how
+// the absolute scale happens to be distributed this season. Precedence, most
+// to least specific: RANK_TOP_COUNT > RANK_TOP_PERCENTILE > RANK_BOTTOM_PERCENTILE.
+// A player outside all three keeps their existing BANDS colour — this system
+// only overrides colour for the standout tiers, not the unremarkable middle.
+// See FEATURE_ENGINE.md §13.
+
+// Fixed-count top tier (not a percentage) — the flagship "definitely worth
+// squad consideration" group. Takes precedence over the percentile tier below
+// even though a top-30 player is always also in the top 10%.
+export const RANK_TOP_COUNT = 30;
+
+// Percentile tiers, each 0–1. RANK_TOP_PERCENTILE: fraction of the pool (by
+// rank) considered a genuinely strong pick. RANK_BOTTOM_PERCENTILE: fraction
+// of the pool, counted from the bottom, considered weak enough to flag red.
+export const RANK_TOP_PERCENTILE = 0.10;
+export const RANK_BOTTOM_PERCENTILE = 0.50;

@@ -19,7 +19,7 @@
 
 import { store }       from '../store.js';
 import { HORIZONS, BANDS } from '../config.js';
-import { buildScoreContext, scorePlayer } from '../engine/composite.js';
+import { buildScoreContext, scorePlayer, rankPlayers, attachRankTiers } from '../engine/composite.js';
 import { fetchLivePoints }               from '../api.js';
 import { fetchAndMapSquad, loadSavedTeamId, saveTeamId, resolveImportGw } from '../squadImport.js';
 
@@ -62,6 +62,16 @@ let _importInFlight = false;
 
 /** Map<playerId, scorePlayer result> — rebuilt on data:ready + squad changes. */
 let _scores = new Map();
+
+/**
+ * Map<playerId, 'top30'|'top10'|'bottom50'|null> — EVERY player's standing
+ * against the full pool (FEATURE_ENGINE.md §13), not just the squad. null
+ * until computed. Deliberately NOT rebuilt on every squad edit: the ranking
+ * depends only on ctx/horizon, not on squad membership, so recomputing it on
+ * every add/remove would re-score ~700 players per click for no reason.
+ * Rebuilt once per data:ready (see onDataReady) and reused across squad edits.
+ */
+let _rankTierByPlayerId = null;
 
 /** Active position set for the search dropdown filter. */
 let _searchPosSet = new Set(['GKP', 'DEF', 'MID', 'FWD']);
@@ -118,6 +128,17 @@ function esc(str) {
     .replace(/</g,  '&lt;')
     .replace(/>/g,  '&gt;')
     .replace(/"/g,  '&quot;');
+}
+
+/** rankTier (composite.js → calcRankTier) → the .score-chip--rank-* modifier
+ *  suffix, or '' when the player isn't in any standout tier (keeps their
+ *  existing band colour). Mirrors the identical helper in modules/ranker.js.
+ *  See FEATURE_ENGINE.md §13. */
+function rankTierClass(rankTier) {
+  if (rankTier === 'top30')    return ' score-chip--rank-green';
+  if (rankTier === 'top10')    return ' score-chip--rank-lime';
+  if (rankTier === 'bottom50') return ' score-chip--rank-red';
+  return '';
 }
 
 /**
@@ -209,12 +230,14 @@ function buildScoreBreakdownRows(breakdown) {
  *
  * @param {Player} player
  * @param {object} score   scorePlayer result
+ * @param {string|null} [rankTier]  from _rankTierByPlayerId — this player's
+ *   standing against the FULL pool (FEATURE_ENGINE.md §13), not just the squad
  * @returns {string} HTML — '' if score is missing (not yet scored)
  */
-function buildBreakdownDetails(player, score) {
+function buildBreakdownDetails(player, score, rankTier = null) {
   if (!score) return '';
   const estClass = isScoreEstimated(score) ? ' score-chip--estimated' : '';
-  const chip     = `<span class="score-chip score-chip--${esc(score.band)}${estClass}">${Math.round(score.value)}</span>`;
+  const chip     = `<span class="score-chip score-chip--${esc(score.band)}${estClass}${rankTierClass(rankTier)}">${Math.round(score.value)}</span>`;
   const context  = buildFixtureContextLabel(score);
 
   return `
@@ -398,6 +421,27 @@ function scoreSquad() {
     } catch (err) {
       console.warn('[dashboard] scorePlayer failed for player', id, err.message ?? err);
     }
+  }
+  ensureRankTiers(ctx);
+}
+
+/**
+ * Rank tier (FEATURE_ENGINE.md §13) needs a player's standing against the
+ * FULL player pool, not just the 15-man squad — "top 30 in the game" has to
+ * mean the same thing here as on the Ranker/Planner. Computed once per data
+ * load and cached (see _rankTierByPlayerId) — the ranking doesn't depend on
+ * squad membership, so there's no reason to re-score ~700 players on every
+ * add/remove click. Same per-load cost the Ranker already accepts as normal;
+ * this module just doesn't pay it repeatedly.
+ */
+function ensureRankTiers(ctx) {
+  if (_rankTierByPlayerId !== null) return;
+  try {
+    const ranked = attachRankTiers(rankPlayers(store.getPlayers(), HORIZON, ctx));
+    _rankTierByPlayerId = new Map(ranked.map(r => [r.player.id, r.rankTier]));
+  } catch (err) {
+    console.warn('[dashboard] full-pool rank computation failed', err?.message ?? err);
+    _rankTierByPlayerId = new Map();
   }
 }
 
@@ -651,7 +695,7 @@ function renderSquadPanel() {
           <span class="dash-squad-slot__name">${esc(player.name)}</span>
           <span class="dash-squad-slot__team">${team ? esc(team.shortName) : '—'}</span>
           <span class="dash-squad-slot__price">£${price}m</span>
-          ${buildBreakdownDetails(player, score)}
+          ${buildBreakdownDetails(player, score, _rankTierByPlayerId?.get(player.id))}
           <button class="dash-squad-slot__remove"
                   data-remove-id="${player.id}"
                   type="button"
@@ -768,7 +812,7 @@ function renderCaptainBlock(entry) {
           </div>
         </div>
         <div class="dash-captain__score-wrap">
-          ${buildBreakdownDetails(player, score)}
+          ${buildBreakdownDetails(player, score, _rankTierByPlayerId?.get(player.id))}
           ${captainLiveHtml}
         </div>
       </div>
@@ -812,7 +856,7 @@ function renderPlayerRow(entry, captainId) {
       <span class="dash-player-row__team">${team ? esc(team.shortName) : '—'}</span>
       <span class="dash-player-row__price">£${price}m</span>
       <span class="dash-player-row__score">
-        ${buildBreakdownDetails(player, score)}
+        ${buildBreakdownDetails(player, score, _rankTierByPlayerId?.get(player.id))}
         ${liveHtml}
       </span>
       ${flags.length ? `<span class="dash-player-row__flags">${buildFlagChips(flags)}</span>` : ''}
@@ -1125,6 +1169,9 @@ function onDataReady() {
   stopLivePoll();
   _livePoints = null;
   _liveStale  = false;
+
+  // Force a fresh full-pool rank computation for the new data (see ensureRankTiers).
+  _rankTierByPlayerId = null;
 
   _dataReady = true;
   scoreSquad();
