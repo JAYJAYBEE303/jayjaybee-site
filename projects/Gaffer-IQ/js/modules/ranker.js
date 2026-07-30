@@ -41,6 +41,7 @@ const MIN_SEC_LEVELS = [
 
 // ─── Module-level state ───────────────────────────────────────────────────────
 
+let _table              = null;
 let _thead              = null;
 let _tbody              = null;
 let _loading            = null;
@@ -569,6 +570,10 @@ function renderThead() {
   const horizonKey = store.getActiveHorizon();
   const horizon    = HORIZONS[horizonKey] ?? HORIZONS.GW1;
 
+  // Lets components.css widen the fixtures column (and the table's min-width)
+  // only while GW6 is active — see .ranker-table[data-horizon="GW6"].
+  if (_table) _table.dataset.horizon = horizonKey;
+
   function thSortable(label, col) {
     const active = _sortBy === col;
     const icon   = active
@@ -792,6 +797,7 @@ function populateTeamFilter() {
  */
 export function initRanker() {
   const root          = document.querySelector('[data-module="ranker"]');
+  _table              = root.querySelector('.ranker-table');
   _thead              = root.querySelector('#ranker-thead');
   _tbody              = root.querySelector('#ranker-tbody');
   _loading            = root.querySelector('#ranker-loading');

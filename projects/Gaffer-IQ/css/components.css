@@ -873,18 +873,34 @@
 
 .ranker-table {
   width: 100%;
+  /* Floor beneath which nothing shrinks (see below) — comfortable for the
+     This-GW/Next-3-GWs horizons, where the fixtures column only ever needs
+     room for 1-3 cells. Next 6 GWs needs much more (see the
+     [data-horizon="GW6"] override below) — rather than permanently widen
+     the WHOLE table (and force scrolling even on the common 1/3-GW case) to
+     cover that one horizon's worst case, the table widens only while GW6 is
+     actually selected. Below whichever min-width is active, the surrounding
+     .ranker-table-wrap's overflow-x:auto takes over, same as any ordinary
+     responsive table. */
+  min-width: 1150px;
   border-collapse: collapse;
   font-size: var(--font-size-sm);
   table-layout: fixed;
 }
 
-/* Explicit per-column widths (percentages sum to 100) so the table always
-   fits its container instead of growing to content width — table-layout:fixed
+/* renderThead() (ranker.js) stamps the active horizon key onto the table
+   element itself specifically so this rule can target it. */
+.ranker-table[data-horizon="GW6"] {
+  min-width: 1500px;
+}
+
+/* Explicit per-column widths (percentages sum to 100) so proportions stay
+   consistent as the table grows past its min-width above — table-layout:fixed
    makes the browser respect these regardless of cell content, wrapping or
-   clipping instead of forcing a horizontal scroll on the whole table. Applied
-   via the same data-sort/data-col attributes thead already renders, so no new
-   markup is needed. Keyed on the <th> row specifically: fixed layout takes
-   column widths from the FIRST row's cells. */
+   clipping instead of silently reshuffling column widths. Applied via the
+   same data-sort/data-col attributes thead already renders, so no new markup
+   is needed. Keyed on the <th> row specifically: fixed layout takes column
+   widths from the FIRST row's cells. */
 .ranker-table__th[data-sort="name"]             { width: 17%; }
 .ranker-table__th[data-sort="team"]             { width: 6%; }
 .ranker-table__th[data-col="pos"]               { width: 5%; }
@@ -896,6 +912,16 @@
 .ranker-table__th[data-col="fixtures"]          { width: 12%; }
 .ranker-table__th[data-sort="minutesSecurity"]  { width: 9%; }
 .ranker-table__th[data-col="price-change"]      { width: 9%; }
+
+/* GW6-only reallocation: fixtures needs to grow from 12%→16% to fit 6 full-
+   size cells (16% of the 1500px min-width above, minus the td's own 24px
+   horizontal padding, = 216px content — the 6 cells + 5 gaps need 178px, a
+   comfortable margin). name gives up the matching 4 points, down to 13% —
+   but of a table that's now 350px wider, so this is still ~195px in
+   practice vs. ~196px at 17% of the narrower default table: essentially a
+   wash, not a real reduction. */
+.ranker-table[data-horizon="GW6"] .ranker-table__th[data-sort="name"] { width: 13%; }
+.ranker-table[data-horizon="GW6"] .ranker-table__th[data-col="fixtures"] { width: 16%; }
 
 /* Header cells */
 .ranker-table__th {
@@ -1058,32 +1084,28 @@
 
 /* ─── Fixture strip inside table cell ────────────────────────────────────── */
 
-/* Reuses .pgw-cell / .pgw-cell--<band> from the matchup card. Fills the td's
-   full (fixed, %-based — see the table-layout:fixed rules above) width, so
-   the strip always fits its column instead of overflowing it — critical here
-   since cell COUNT varies with the active horizon (1 for "This GW" vs 6 for
-   "Next 6 GWs"), but the column's width does not. */
+/* Reuses .pgw-cell / .pgw-cell--<band> from the matchup card; the container
+   here is inline so it sits naturally inside a <td>. Cells never shrink below
+   their natural size (see .pgw-cell below) — legibility over fitting a fixed
+   box, per explicit product decision. The table's min-width (above) is sized
+   with this column's worst case (6 GWs) already accounted for, and the
+   surrounding .ranker-table-wrap scrolls the whole table on narrower windows
+   rather than compressing this strip illegible. */
 .ranker-fixtures {
-  display: flex;
+  display: inline-flex;
   flex-wrap: nowrap;
   gap: 2px;
   align-items: center;
-  width: 100%;
 }
 
-/* flex-basis 28px (this table's compact size, vs. the matchup card's 36px)
-   with flex-shrink allowed: with room to spare (1-3 GWs) every cell renders
-   at its natural 28px, same as before; on a 6-GW horizon, where 6 cells at
-   28px+gaps would exceed most column widths, they shrink together to fit —
-   never overflowing the column, never triggering a scrollbar. flex-grow:0
-   keeps a lone GW1 cell at 28px too, rather than stretching to fill the
-   whole column. */
+/* Compact sizing for table context — narrower than the matchup card strip.
+   Fixed width, no flex-shrink: an earlier version let these shrink to fit a
+   6-GW horizon, which squeezed the team codes down to illegible/overlapping
+   text. Full size, always. */
 .ranker-fixtures .pgw-cell {
-  flex: 0 1 28px;
-  min-width: 0;
+  width: 28px;
   height: 20px;
   font-size: 0.65rem;
-  overflow: hidden; /* safety net on a very narrow viewport — clip rather than spill */
 }
 
 .ranker-no-fixtures {
