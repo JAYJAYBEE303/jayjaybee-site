@@ -12,7 +12,7 @@ import {
   W_OPP_ATTACK, W_OPP_DEFENCE, OPP_STRENGTH_MIN, OPP_STRENGTH_MAX,
   FDR_FALLBACK_VALUES,
   TENURE_MAX_PENALTY, TENURE_FLOOR, TENURE_CURVE,
-  W_PPG, W_GD, MIN_VENUE_GAMES,
+  MIN_VENUE_GAMES, W_VENUE_EFFECT,
   N_H2H,
 } from '../config.js';
 import { clamp, normaliseLinear } from '../util.js';
@@ -118,19 +118,15 @@ export function calcBaseDifficulty(team, opponent, isHome, fdrForTeam) {
 // ─── §3  Home/away split performance ─────────────────────────────────────────
 
 /**
- * Internal: aggregate every team's home & away results from this season's played
- * fixtures into a flat per-team venue-stats record. Pure helper; takes the played
- * subset to avoid re-filtering on every call.
+ * Internal: aggregate every team's home & away points-per-game from this
+ * season's played fixtures into a flat per-team venue-stats record. Pure
+ * helper; takes the played subset to avoid re-filtering on every call.
  *
  * @param {Fixture[]} playedFixtures
- * @returns {Object<number, {homePPG, awayPPG, homeGD, awayGD, homeGames, awayGames}>}
+ * @returns {Object<number, {homePPG, awayPPG, homeGames, awayGames}>}
  */
 function buildVenueStats(playedFixtures) {
-  const init = () => ({
-    homeGames: 0, awayGames: 0,
-    homePts:   0, awayPts:   0,
-    homeGd:    0, awayGd:    0,
-  });
+  const init = () => ({ homeGames: 0, awayGames: 0, homePts: 0, awayPts: 0 });
   const accum = {};
   for (const f of playedFixtures) {
     if (!f.result) continue;
@@ -139,10 +135,8 @@ function buildVenueStats(playedFixtures) {
     const hg = f.result.homeGoals;
     const ag = f.result.awayGoals;
     home.homeGames += 1;
-    home.homeGd    += hg - ag;
     home.homePts   += hg > ag ? 3 : hg === ag ? 1 : 0;
     away.awayGames += 1;
-    away.awayGd    += ag - hg;
     away.awayPts   += ag > hg ? 3 : hg === ag ? 1 : 0;
   }
   const out = {};
@@ -152,67 +146,137 @@ function buildVenueStats(playedFixtures) {
       awayGames: s.awayGames,
       homePPG:   s.homeGames ? s.homePts / s.homeGames : 0,
       awayPPG:   s.awayGames ? s.awayPts / s.awayGames : 0,
-      homeGD:    s.homeGames ? s.homeGd  / s.homeGames : 0,
-      awayGD:    s.awayGames ? s.awayGd  / s.awayGames : 0,
     };
   }
   return out;
 }
 
-function rawVenueValue(stats, isHome) {
-  if (!stats) return null;
-  const ppg = isHome ? stats.homePPG : stats.awayPPG;
-  const gd  = isHome ? stats.homeGD  : stats.awayGD;
-  return (W_PPG * ppg) + (W_GD * gd);
+/**
+ * Whether `stats` clears MIN_VENUE_GAMES at BOTH venues — venue sensitivity is
+ * a comparison of home vs away form, so a thin sample on either side makes the
+ * comparison meaningless, not just one half of it.
+ * @param {object|undefined} stats
+ * @returns {boolean}
+ */
+function hasUsableVenueSplit(stats) {
+  return !!stats && stats.homeGames >= MIN_VENUE_GAMES && stats.awayGames >= MIN_VENUE_GAMES;
 }
 
 /**
- * Home/away split performance for `team` playing at the relevant venue
- * this season (independent of the FPL strength prior, which calcBaseDifficulty
- * already captures). League-relative: each team's raw venue value is normalised
- * against the spread observed across all 20 teams at the same venue.
+ * Venue-sensitivity profile for `team`: how much its home form diverges from
+ * its away form, this season (VENUE_HISTORY_YEARS is not yet wired — see its
+ * config.js comment). This is a standalone read of ONE team, not a fixture
+ * read of two — see calcVenueEffect below for the fixture-level combination.
+ *
+ * MODEL: rawSplit = homePPG − awayPPG, SIGNED — a team can be stronger away
+ * (negative) as easily as at home. `value` (baseSensitivity) is the
+ * league-relative normalisation of |rawSplit|: it answers "how much does
+ * venue matter for this team", not "which way". Direction is preserved
+ * separately as `sign` for transparency, but calcVenueEffect deliberately
+ * ignores it (see that function's doc) — the fixture-level effect is
+ * magnitude-only by design, so `sign` is diagnostic, not consumed downstream.
+ *
+ * MODEL: below MIN_VENUE_GAMES at EITHER venue → neutral 50, flagged
+ * estimated. Hard cutoff, not a blend — matches every other thin-sample guard
+ * in this engine (calcTeamForm, calcFixtureHistory).
  *
  * @param {Team} team
- * @param {boolean} isHome
  * @param {object} ctx  must contain { playedFixtures: Fixture[], teamsById: object }
- * @returns {{value: number, estimated: boolean, gamesAtVenue: number}}
- *   value: 0–100, higher = better venue form for `team`. Direction: higher = better.
- *   See FEATURE_ENGINE.md §3.
+ * @returns {{value: number, estimated: boolean, homePPG: number, awayPPG: number,
+ *            rawSplit: number, sign: -1|0|1, homeGames: number, awayGames: number}}
+ *   value: 0–100 (baseSensitivity), higher = bigger home/away gap in EITHER
+ *   direction. See FEATURE_ENGINE.md §3.
  */
-export function calcHomeAwaySplit(team, isHome, ctx) {
+export function calcHomeAwaySplit(team, ctx) {
   const venueByTeam = buildVenueStats(ctx.playedFixtures || []);
   const stats = venueByTeam[team.id];
-  const gamesAtVenue = stats ? (isHome ? stats.homeGames : stats.awayGames) : 0;
+  const homeGames = stats?.homeGames ?? 0;
+  const awayGames = stats?.awayGames ?? 0;
 
-  // MODEL: too few games at this venue → 50, flag estimated. We don't blend the
-  // FPL strength prior in here because calcBaseDifficulty already carries it;
-  // double-counting would inflate the metric's leverage.
-  if (gamesAtVenue < MIN_VENUE_GAMES) {
-    return { value: 50, estimated: true, gamesAtVenue };
+  if (!hasUsableVenueSplit(stats)) {
+    return {
+      value: 50, estimated: true,
+      homePPG: stats?.homePPG ?? 0, awayPPG: stats?.awayPPG ?? 0,
+      rawSplit: 0, sign: 0,
+      homeGames, awayGames,
+    };
   }
 
-  // League-relative normalisation: bound by the observed spread of raw venue
-  // values across every team that has played at this venue.
-  const allValues = [];
+  const { homePPG, awayPPG } = stats;
+  const rawSplit = homePPG - awayPPG;
+
+  // League-relative: normalise this team's |rawSplit| against the spread of
+  // |rawSplit| across every OTHER team that also clears the threshold at both
+  // venues. team's own magnitude is always included (it passed the guard
+  // above), so this list is never empty.
+  const magnitudes = [];
   for (const t of Object.values(ctx.teamsById)) {
-    const r = rawVenueValue(venueByTeam[t.id], isHome);
-    if (r !== null) allValues.push(r);
+    const s = venueByTeam[t.id];
+    if (hasUsableVenueSplit(s)) magnitudes.push(Math.abs(s.homePPG - s.awayPPG));
   }
-  if (allValues.length === 0) {
-    return { value: 50, estimated: true, gamesAtVenue };
-  }
-
-  const raw = rawVenueValue(stats, isHome);
-  let min = allValues[0];
-  let max = allValues[0];
-  for (const v of allValues) {
+  let min = magnitudes[0];
+  let max = magnitudes[0];
+  for (const v of magnitudes) {
     if (v < min) min = v;
     if (v > max) max = v;
   }
+
   return {
-    value: normaliseLinear(raw, min, max),
+    value: normaliseLinear(Math.abs(rawSplit), min, max),
     estimated: false,
-    gamesAtVenue,
+    homePPG, awayPPG, rawSplit,
+    sign: Math.sign(rawSplit),
+    homeGames, awayGames,
+  };
+}
+
+/**
+ * Fixture-level venue effect: combines BOTH teams' standalone venue
+ * sensitivity (calcHomeAwaySplit) into a symmetric home boost / away penalty.
+ *
+ * MODEL: combinedMagnitude is a plain average of the two teams' baseSensitivity
+ * regardless of whether their signs agree — a team with a huge split paired
+ * with a perfectly neutral opponent (0) still produces a real, non-zero
+ * effect. This is a deliberate reading: "how much does venue matter in THIS
+ * fixture" is answered by either side being sensitive to venue, not by both.
+ *
+ * MODEL (confirmed simplification, stated explicitly per the brief driving
+ * this function): each team's own `sign` is IGNORED when sizing the
+ * boost/penalty. A team that is actually stronger away than home still
+ * contributes its full magnitude to the HOME side's boost, exactly as a
+ * traditionally home-strong team would. This is magnitude-only by design —
+ * the model is "large home/away splits amplify the standard structural home
+ * advantage", not "which way does each team's split point". `sign` remains
+ * on each team's profile (homeBase.sign / awayBase.sign) for transparency and
+ * future refinement, but calcVenueEffect does not read it.
+ *
+ * @param {Team} homeTeam
+ * @param {Team} awayTeam
+ * @param {object} ctx
+ * @returns {{homeBoost: number, awayPenalty: number, combinedMagnitude: number,
+ *            estimated: boolean, homeBase: object, awayBase: object}}
+ *   homeBoost: points to ADD to the home side's neutral 50 (>= 0).
+ *   awayPenalty: points to ADD to the away side's neutral 50 (<= 0) —
+ *   always exactly −homeBoost, so the two sides' venue.value totals mirror
+ *   the same neutral-50 gap on both cards. See FEATURE_ENGINE.md §3.
+ */
+export function calcVenueEffect(homeTeam, awayTeam, ctx) {
+  const homeBase = calcHomeAwaySplit(homeTeam, ctx);
+  const awayBase = calcHomeAwaySplit(awayTeam, ctx);
+
+  const combinedMagnitude = (homeBase.value + awayBase.value) / 2;
+  const homeBoost = combinedMagnitude * W_VENUE_EFFECT;
+
+  return {
+    homeBoost,
+    awayPenalty: -homeBoost,
+    combinedMagnitude,
+    // Either team's thin sample makes the WHOLE fixture-level effect
+    // speculative — absence of information on one side is not evidence the
+    // other side's reading should be trusted at full weight.
+    estimated: homeBase.estimated || awayBase.estimated,
+    homeBase,
+    awayBase,
   };
 }
 

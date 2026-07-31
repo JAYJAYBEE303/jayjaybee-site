@@ -407,6 +407,8 @@ function buildBreakdownRows(breakdown, venue) {
       ? ` title="${esc(`Blend of Attacking Counters (${Math.round(m.attackingValue)} — this team's attack vs the opponent's defence) and Defending Counters (${Math.round(m.defendingValue)} — this team's defence vs the opponent's attack). See the sections below for the pairing-level detail.`)}"`
       : key === 'styleClash'
       ? ` title="${esc(styleClashTooltip(m))}"`
+      : key === 'homeAway'
+      ? ` title="${esc(homeAwayTooltip(m, venue))}"`
       : '';
     const label = key === 'homeAway'
       ? (venue === 'Home' ? 'Home Advantage' : 'Away Disadvantage')
@@ -424,6 +426,30 @@ function buildBreakdownRows(breakdown, venue) {
       </div>
     `.trim();
   }).join('');
+}
+
+/**
+ * Tooltip for the Home Advantage / Away Disadvantage breakdown row. Names the
+ * actual PPG split behind the number, since the displayed value is now a
+ * fixture-level effect (both teams' venue sensitivity combined) rather than a
+ * standalone read of this team alone — see engine/fixtures.js calcVenueEffect.
+ *
+ * @param {object} m       breakdown.homeAway
+ * @param {'Home'|'Away'} venue
+ * @returns {string}       plain text; the caller escapes it.
+ */
+function homeAwayTooltip(m, venue) {
+  if (m.estimated) {
+    return 'Not enough games at one or both venues this season for either team '
+      + 'to read a reliable home/away split, so this sits at a neutral 50 and '
+      + 'does not affect the score.';
+  }
+  const own = venue === 'Home'
+    ? `This team: ${m.homePPG.toFixed(2)} PPG at home vs ${m.awayPPG.toFixed(2)} PPG away.`
+    : `This team: ${m.awayPPG.toFixed(2)} PPG away vs ${m.homePPG.toFixed(2)} PPG at home.`;
+  return `${own} Combined with the opponent's own split, whichever team shows the bigger `
+    + `home/away gap swings this row — home always gets a boost, away always a matching `
+    + `penalty, sized by how much venue has mattered for these two teams this season.`;
 }
 
 // Plain-English name for each style rule, keyed by the rule's two axes. Kept

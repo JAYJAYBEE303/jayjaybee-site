@@ -17,7 +17,7 @@ import {
 } from '../config.js';
 import { clamp, invert } from '../util.js';
 import {
-  calcBaseDifficulty, calcHomeAwaySplit, calcFixtureHistory,
+  calcBaseDifficulty, calcVenueEffect, calcFixtureHistory,
 } from './fixtures.js';
 import {
   calcTeamForm, calcPlayerForm, calcPlayingLikelihood, buildUnderstatPlayerLookup,
@@ -205,7 +205,24 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
   // when FPL's granular strength fields aren't published yet (see fixtures.js).
   const fdrForTeam = isHome ? fixture.fplDifficulty?.home : fixture.fplDifficulty?.away;
   const base    = calcBaseDifficulty(team, opponent, isHome, fdrForTeam);
-  const venue   = calcHomeAwaySplit(team, isHome, ctx);
+  // §3 (Phase 4): venue effect is fixture-level, not single-team — both sides'
+  // venue sensitivity feed a shared home boost / away penalty (calcVenueEffect,
+  // engine/fixtures.js). `venue` here is `team`'s own 0-100 read of that shared
+  // effect (50 + boost when team is home, 50 + penalty when away), reshaped to
+  // the same {value, estimated, gamesAtVenue} contract every other sub-metric
+  // and STACK_METRICS/confidence below already expect.
+  const venueEffect = isHome
+    ? calcVenueEffect(team, opponent, ctx)
+    : calcVenueEffect(opponent, team, ctx);
+  const venue = {
+    value:        clamp(0, 100, 50 + (isHome ? venueEffect.homeBoost : venueEffect.awayPenalty)),
+    estimated:    venueEffect.estimated,
+    gamesAtVenue: isHome ? venueEffect.homeBase.homeGames : venueEffect.awayBase.awayGames,
+    // Transparency fields (ARCHITECTURE.md §12 rule 6) — this team's own
+    // standalone venue-sensitivity read, not the combined fixture effect.
+    ownSplit: isHome ? venueEffect.homeBase : venueEffect.awayBase,
+    combinedMagnitude: venueEffect.combinedMagnitude,
+  };
   const form    = calcTeamForm(team, ctx);
   // Counter-Matchup blends BOTH pairings so a team's own defensive quality
   // against this opponent's attack earns direct credit on its own composite,
@@ -308,6 +325,14 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
         weight:       WEIGHTS.homeAway,
         estimated:    venue.estimated,
         gamesAtVenue: venue.gamesAtVenue,
+        // §3 (Phase 4) — this team's own home/away PPG split, and the shared
+        // fixture-level magnitude it was blended with, so the UI can explain
+        // WHY this venue reading is what it is (ARCHITECTURE.md §12 rule 6).
+        homePPG:           venue.ownSplit.homePPG,
+        awayPPG:           venue.ownSplit.awayPPG,
+        rawSplit:          venue.ownSplit.rawSplit,
+        sign:              venue.ownSplit.sign,
+        combinedMagnitude: venue.combinedMagnitude,
       },
       styleClash: {
         value:      style.value,

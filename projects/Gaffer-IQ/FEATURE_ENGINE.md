@@ -95,29 +95,50 @@ tenurePenalty = TENURE_MAX_PENALTY * (deficit ^ TENURE_CURVE)            # 0–4
 
 ---
 
-## 3. Home/away split performance (`engine/fixtures.js → calcHomeAwaySplit`)
+## 3. Home/away split performance (`engine/fixtures.js → calcHomeAwaySplit`, `calcVenueEffect`)
 
 **Purpose:** Capture that teams perform very differently by venue, beyond FPL's static home/away strength integers. A team may be a fortress at home and feeble away in *actual results* this season.
 
-**Inputs:** this season's played `fixtures[]` (results) and, for depth, player `history[]` venue splits. Computed per team:
-```
-homePPG  = points won per home game this season       # 3 win / 1 draw / 0 loss
-awayPPG  = points won per away game this season
-homeGD   = goal difference per home game
-awayGD   = goal difference per away game
-```
+### 3.1 Venue sensitivity — one team, standalone (`calcHomeAwaySplit(team, ctx)`)
 
-**Formula (for TEAM A playing at its relevant venue in this fixture):**
+**Inputs:** this season's played `fixtures[]` (results only — `ctx.playedFixtures`, the same scope §4's H2H already uses). Computed per team:
 ```
-venue = (A is home) ? 'home' : 'away'
-venuePPG = venue == 'home' ? homePPG : awayPPG
-venueGD  = venue == 'home' ? homeGD  : awayGD
+homePPG = points won per home game this season       # 3 win / 1 draw / 0 loss
+awayPPG = points won per away game this season
+```
+There is a `VENUE_HISTORY_YEARS` knob in `config.js` (default 5) reserved for when multi-season fixture loading lands — **not yet wired**. No multi-season fixture archive exists anywhere in this app today (`PL_SEASONS` is a team-name-per-season list, used only for tenure — see §2.1 — not results); `calcHomeAwaySplit` computes over the full current-season `playedFixtures`. Same category as `UNDERSTAT_SEASON`: a declared knob ahead of its data.
 
-rawVenue = (W_PPG * venuePPG) + (W_GD * venueGD)
-homeAwayScore = normaliseLinear(rawVenue, across all teams' venue values)
+**Formula:**
 ```
-- `W_PPG` / `W_GD` default **0.7 / 0.3** in `config.js`.
-- **MODEL:** early season (fewer than `MIN_VENUE_GAMES`, default 4, games at that venue) → blend with `baseDifficulty`'s venue component using a confidence weight that scales with games played, so a 1-game sample doesn't dominate. Below the minimum, lean on the FPL strength prior; flag `estimated: true`.
+rawSplit = homePPG − awayPPG                          # SIGNED: negative = stronger away
+baseSensitivity = normaliseLinear(|rawSplit|, across all teams' |rawSplit| values)
+sign = sign(rawSplit)                                  # -1, 0, +1 — stored for transparency only
+```
+`baseSensitivity` (returned as `value`) answers "how much does venue matter for this team, either direction" — a team that is a fortress at home and one that is a fortress away score identically here; only `sign`, which nothing downstream consumes, tells them apart.
+
+**MODEL:** below `MIN_VENUE_GAMES` (default 4) at **either** venue → neutral 50, flagged `estimated: true`. This is a **hard cutoff, not a blend** — matches every other thin-sample guard in this engine (`calcTeamForm`, `calcFixtureHistory`: "< 2 meetings → neutral 50, flagged"). An earlier version of this section (and a stale `config.js` comment) described a blend with the FPL-strength prior below the threshold; no such blend exists in the code, here or anywhere else in the file — corrected.
+
+### 3.2 Venue effect — the fixture (`calcVenueEffect(homeTeam, awayTeam, ctx)`)
+
+**Purpose:** venue sensitivity is a property of a team, but its *effect* is a property of a fixture — it takes both sides' sensitivity to say how much a home/away swing should matter here.
+
+```
+homeBase = calcHomeAwaySplit(homeTeam, ctx)
+awayBase = calcHomeAwaySplit(awayTeam, ctx)
+combinedMagnitude = (homeBase.value + awayBase.value) / 2
+homeBoost   =  combinedMagnitude * W_VENUE_EFFECT
+awayPenalty = -homeBoost
+```
+- `combinedMagnitude` is a **plain average of the two `baseSensitivity` values, regardless of whether their signs agree**. A team with a huge split paired with a perfectly neutral opponent still produces a real, non-zero effect — averaging with 0 halves it, it doesn't cancel it.
+- **CONFIRMED SIMPLIFICATION — magnitude-only, sign is ignored:** a team that is actually *stronger away than home* (`sign = -1`) still contributes its full `baseSensitivity` to the **home** side's boost when it happens to be playing at home, exactly as a traditionally home-strong team would. The model reads as "large home/away splits amplify the standard structural home advantage", not "which way does each team's split point". `homeBase.sign` / `awayBase.sign` remain on the return value for transparency and future refinement, but `calcVenueEffect` does not read them.
+- `W_VENUE_EFFECT` (default **0.25** in `config.js`) caps the swing at ±25 composite-scale points when both teams are maximally venue-sensitive (`combinedMagnitude = 100`) — comparable to §6.2 `STYLE_RULES`' ~30-point cap, so no single secondary metric structurally dominates.
+- **MODEL:** either team's thin sample (`estimated: true` from `calcHomeAwaySplit`) makes the whole fixture-level effect speculative — `calcVenueEffect.estimated = homeBase.estimated || awayBase.estimated`.
+
+**Composite wiring** (`engine/composite.js → computeRawFixtureScore`): for the team being scored,
+```
+venue.value = clamp(0, 100, 50 + (isHome ? homeBoost : awayPenalty))
+```
+so the two sides of one fixture are always symmetric around 50 — a large venue effect reads as roughly-but-not-exactly `x` / `100−x` (exact symmetry around 50, not a hard 100-sum like §7.2/§8.7's mirrored pairings, since this is an additive adjustment to a shared neutral point rather than a derived relative read). The "Home Advantage" / "Away Disadvantage" UI labels (`matchup.js`) are unchanged — they now read this recombined value instead of the old single-team, single-venue, league-relative-normalised number.
 
 ---
 

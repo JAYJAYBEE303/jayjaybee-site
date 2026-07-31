@@ -210,12 +210,35 @@ export const TEAM_NAME_ALIASES = {
 // ─── §3  Home/away split performance ─────────────────────────────────────────
 
 // Weights for points-per-game and goal-difference in the venue score (sum to 1).
+// Still consulted for other venue-aware reads; calcHomeAwaySplit itself no
+// longer uses W_GD (see below) — it compares home vs away PPG only.
 export const W_PPG = 0.7;
 export const W_GD  = 0.3;
 
-// Below this many games at a given venue, blend the data-driven score with the
-// FPL-strength prior so a 1-game sample doesn't dominate.
+// Below this many games at EITHER venue, calcHomeAwaySplit returns a flat
+// neutral 50, flagged estimated: true. This is a hard cutoff, not a blend —
+// correcting a stale comment here that previously claimed a blend with the
+// FPL-strength prior; no such blend exists anywhere in this file. The hard
+// cutoff matches every other thin-sample guard in the engine (calcTeamForm,
+// calcFixtureHistory: "< 2 meetings → neutral 50, flagged").
 export const MIN_VENUE_GAMES = 4;
+
+// How many seasons of home/away PPG history calcHomeAwaySplit should draw on.
+// NOT YET WIRED: no multi-season fixture archive is loaded anywhere in this
+// app (ctx.playedFixtures holds only the current season — the exact same
+// scope calcFixtureHistory's H2H already uses, see FEATURE_ENGINE.md §4).
+// Reserved for when multi-season fixture loading lands; until then
+// calcHomeAwaySplit computes over the full current-season playedFixtures.
+// Same category as UNDERSTAT_SEASON below — a declared knob ahead of its data.
+export const VENUE_HISTORY_YEARS = 5;
+
+// Scales calcVenueEffect's combined home/away-sensitivity magnitude (0-100)
+// into a composite-scale boost/penalty. At the ceiling (both teams maximally
+// venue-sensitive, combinedMagnitude=100) this caps the swing at 25 points on
+// either side of the neutral 50 that calcVenueEffect's boost/penalty is
+// applied against — comparable in scale to STYLE_RULES' ~30-point cap
+// (config.js §6), so no single secondary metric structurally dominates.
+export const W_VENUE_EFFECT = 0.25;
 
 // ─── §4  Fixture history / head-to-head ──────────────────────────────────────
 

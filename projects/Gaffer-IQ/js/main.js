@@ -18,7 +18,7 @@ import {
 } from './api.js';
 import { normaliseSeason, normalisePlayerSummary } from './engine/normalise.js';
 import { buildScoreContext, scoreFixture, scoreOverHorizon, scorePlayer, rankPlayers } from './engine/composite.js';
-import { calcBaseDifficulty, calcHomeAwaySplit, calcFixtureHistory } from './engine/fixtures.js';
+import { calcBaseDifficulty, calcHomeAwaySplit, calcVenueEffect, calcFixtureHistory } from './engine/fixtures.js';
 import { calcTeamForm, calcPlayerForm, calcPlayingLikelihood } from './engine/form.js';
 import { calcStyleProfile, calcStyleClash } from './engine/style.js';
 import {
@@ -213,7 +213,7 @@ window.__engine = {
   rankPlayers,
   buildScoreContext,
   loadPlayerSummary,
-  calcBaseDifficulty, calcHomeAwaySplit, calcFixtureHistory,
+  calcBaseDifficulty, calcHomeAwaySplit, calcVenueEffect, calcFixtureHistory,
   calcTeamForm, calcPlayerForm, calcPlayingLikelihood,
   calcStyleProfile, calcStyleClash,
   calcCounterMatchup,
