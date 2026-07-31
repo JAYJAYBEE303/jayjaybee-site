@@ -533,15 +533,18 @@ export const RELATIVE_EDGE_SENSITIVITY = 0.5;
 
 // Minimum weighted share of non-estimated sub-metrics before the UI renders
 // a provisional indicator. Score is still produced; only the badge changes.
-export const CONFIDENCE_FLOOR = 0.6;
+// MODEL: lowered 0.6 -> 0.5 — the provisional/hatched styling (matchup card,
+// score pill, perGw strip cells) should read as "less than half the score is
+// confident data", not trip at a stricter bar than that.
+export const CONFIDENCE_FLOOR = 0.5;
 
 // Band thresholds — lower bound of each band (inclusive).
 // See FEATURE_ENGINE.md §8.4. CSS modifier classes must match these strings.
 export const BANDS = {
-  great:   67,
-  good:    58,
-  neutral: 43,
-  tough:   34,
+  great:   75,
+  good:    61,
+  neutral: 40,
+  tough:   26,
   brutal:   0,
 };
 

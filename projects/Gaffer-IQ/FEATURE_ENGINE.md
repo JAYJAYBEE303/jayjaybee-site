@@ -439,7 +439,7 @@ value = clamp(0, 100, 50 + edge * RELATIVE_EDGE_SENSITIVITY)
 ```
 
 ### 8.3 Confidence handling
-- Each sub-metric reports `estimated: true|false`. The composite computes **confidence** = weighted share of non-estimated metrics FIRST. If confidence < `CONFIDENCE_FLOOR` (default 0.6), the UI shows the score as provisional (e.g. hatched/greyed) — the number is still produced, never hidden.
+- Each sub-metric reports `estimated: true|false`. The composite computes **confidence** = weighted share of non-estimated metrics FIRST. If confidence < `CONFIDENCE_FLOOR` (default 0.5), the UI shows the score as provisional (e.g. hatched/greyed) — the number is still produced, never hidden.
 - **MODEL:** estimated sub-metrics are **excluded entirely** from `linearValue`'s weighted sum, and the remaining non-estimated weights are **re-normalised** (divided by `confidence`) so they cover the full 0–1 range — e.g. a fixture where only 55% of the weight is non-estimated has that 55% scaled up to count as 100% of the score, exactly as `confidence` reports it. This replaced an earlier design where estimated metrics passed through at their fallback value (usually 50) and only lowered `confidence` without changing `value` — a genuinely unreliable reading no longer dilutes the score at full weight by masquerading as a neutral 50; it simply doesn't count.
 - `baseDifficulty` is never estimated (§8.1) — it's available from day one of a season and never degrades — so `confidence` is always > 0 and the division above never hits its zero-guard in practice.
 - `homeAway` is a deliberate exception: `calcHomeAwaySplit`/`calcVenueEffect` never flag `estimated` at all (§3.1), so Home Advantage / Away Disadvantage always counts toward both `confidence` and `linearValue`, even for a side with no usable venue history.
@@ -447,13 +447,13 @@ value = clamp(0, 100, 50 + edge * RELATIVE_EDGE_SENSITIVITY)
 ### 8.4 Bands (`config.js → BANDS`)
 `value` maps to a band string (drives colour everywhere — see `CONVENTIONS.md` §5.2):
 ```
-67–100 → 'great'
-58–66  → 'good'
-43–57  → 'neutral'
-34–42  → 'tough'
- 0–33  → 'brutal'
+75–100 → 'great'
+61–74  → 'good'
+40–60  → 'neutral'
+26–39  → 'tough'
+ 0–25  → 'brutal'
 ```
-Band thresholds are config, not literals, so the palette can be re-calibrated after observing a season's distribution. Retuned narrower/lower than the original 85/68/46/30 split (which pushed too much of the pool into 'neutral') after observing actual score distributions.
+Band thresholds are config, not literals, so the palette can be re-calibrated after observing a season's distribution. Symmetric around the neutral midpoint (50): 'good'/'tough' are each 14 points wide either side of 'neutral', 'great'/'brutal' cover the remaining tails equally. Retuned from an earlier narrower 67/58/43/34 split.
 
 ### 8.5 Output shape (matches `ARCHITECTURE.md` §8)
 ```js

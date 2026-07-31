@@ -265,16 +265,21 @@ function showStatus(msg) {
 /**
  * Build a row of coloured cells, one per scoreOverHorizon perGw entry.
  * Blank GWs render as '–' with a neutral colour; DGWs produce two adjacent cells.
+ * Low-confidence GWs (entry.provisional, same CONFIDENCE_FLOOR-gated flag the
+ * top score pill uses — score-pill--estimated) get the same dashed-border
+ * treatment here, via pgw-cell--estimated (already used by ranker.js's strip,
+ * just not previously wired up on this page).
  */
 function buildPerGwStrip(perGw) {
   if (!perGw || perGw.length === 0) return '';
   const cells = perGw.map(entry => {
     const bandClass = entry.isBlank ? 'neutral' : entry.band;
+    const estClass  = (!entry.isBlank && entry.provisional) ? ' pgw-cell--estimated' : '';
     const label = entry.isBlank
       ? `GW${entry.gw} (blank)`
-      : `GW${entry.gw} ${entry.opponent ?? ''} (${entry.venue ?? ''}) — ${Math.round(entry.value)}`;
+      : `GW${entry.gw} ${entry.opponent ?? ''} (${entry.venue ?? ''}) — ${Math.round(entry.value)}${entry.provisional ? ' (low confidence)' : ''}`;
     const display = entry.isBlank ? '–' : Math.round(entry.value);
-    return `<div class="pgw-cell pgw-cell--${esc(bandClass)}" title="${esc(label)}">${esc(String(display))}</div>`;
+    return `<div class="pgw-cell pgw-cell--${esc(bandClass)}${estClass}" title="${esc(label)}">${esc(String(display))}</div>`;
   }).join('');
   return `<div class="pgw-strip">${cells}</div>`;
 }
