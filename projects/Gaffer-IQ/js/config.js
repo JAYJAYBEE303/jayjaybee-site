@@ -240,11 +240,18 @@ export const VENUE_ROLLING_GAMES = 38;
 
 // Scales calcVenueEffect's combined home/away-sensitivity magnitude (0-100)
 // into a composite-scale boost/penalty. At the ceiling (both teams maximally
-// venue-sensitive, combinedMagnitude=100) this caps the swing at 25 points on
+// venue-sensitive, combinedMagnitude=100) this caps the swing at 50 points on
 // either side of the neutral 50 that calcVenueEffect's boost/penalty is
-// applied against — comparable in scale to STYLE_RULES' ~30-point cap
-// (config.js §6), so no single secondary metric structurally dominates.
-export const W_VENUE_EFFECT = 0.25;
+// applied against — i.e. the full 0-100 range is reachable.
+// MODEL: doubled 0.25 -> 0.5. In practice combinedMagnitude rarely nears the
+// ceiling, so observed values were clustering in ~50-75 (home) / ~25-50
+// (away) — the metric read as "always mild" even when it was near its own
+// max. Doubling stretches that observed range out to the full 0-100 (e.g. an
+// old reading of 68 becomes 86) without changing what drives it — this stays
+// a linear rescale, and homeAway is still only WEIGHTS.homeAway (0.10) of
+// the composite, so the wider spread doesn't change how much it can swing
+// the final score, just how clearly it reads on the card.
+export const W_VENUE_EFFECT = 0.5;
 
 // ─── §4  Fixture history / head-to-head ──────────────────────────────────────
 
