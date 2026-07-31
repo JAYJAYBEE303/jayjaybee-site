@@ -248,8 +248,14 @@ export const W_VENUE_EFFECT = 0.25;
 
 // ─── §4  Fixture history / head-to-head ──────────────────────────────────────
 
-// Maximum prior meetings to include in the H2H calculation.
-export const N_H2H = 4;
+// Maximum prior meetings to include in the H2H calculation. Sourced from
+// cross-season Understat fixture lists (UNDERSTAT_SEASON/PREV/PREV2 below —
+// see engine/fixtures.js calcFixtureHistory), falling back to this-season FPL
+// fixtures when Understat has no match for either team. Two teams meet twice
+// a season, so 3 seasons of Understat data realistically caps out around 6
+// meetings — N_H2H=6 reflects that ceiling rather than promising a depth the
+// data can't reach.
+export const N_H2H = 6;
 
 // ─── §5  Team form ────────────────────────────────────────────────────────────
 
@@ -667,8 +673,13 @@ export const PROXY_BASE = '/api/fpl';
 // Bump both of these every close season (this file has no automatic
 // "current season" derivation — same manual-maintenance category as
 // PL_SEASONS above, which needs the same yearly addition).
-export const UNDERSTAT_SEASON      = '2026';  // this season (2026/27)
-export const UNDERSTAT_PREV_SEASON = '2025';  // last completed season (2025/26)
+export const UNDERSTAT_SEASON       = '2026';  // this season (2026/27)
+export const UNDERSTAT_PREV_SEASON  = '2025';  // last completed season (2025/26)
+// One further season back, fetched ONLY to deepen calcFixtureHistory's
+// cross-season H2H window (N_H2H=6 above) — nothing else in the engine reads
+// it. calcHomeAwaySplit's rolling window intentionally stays on the two
+// seasons above (VENUE_ROLLING_GAMES=38 already covers close to a season).
+export const UNDERSTAT_PREV2_SEASON = '2024';  // two seasons ago (2024/25)
 // FPL team id -> Understat slug tables were removed here (Phase 3B): FPL's
 // numeric team.id is REASSIGNED every season as clubs are promoted/relegated
 // (see engine/normalise.js buildPlTenure's identical warning), so an id-keyed

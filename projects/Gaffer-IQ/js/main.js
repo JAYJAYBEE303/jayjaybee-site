@@ -12,7 +12,7 @@ import {
   PROJ_FORM, PROJ_FIXTURE, PROJ_COUNTER, PROJ_MINUTES,
 } from './config.js';
 import { store } from './store.js';
-import { UNDERSTAT_SEASON, UNDERSTAT_PREV_SEASON } from './config.js';
+import { UNDERSTAT_SEASON, UNDERSTAT_PREV_SEASON, UNDERSTAT_PREV2_SEASON } from './config.js';
 import {
   fetchBootstrap, fetchFixtures, fetchPlayerSummary,
   fetchLeagueXg, fetchTeamXg, ApiError,
@@ -55,13 +55,17 @@ async function loadInitialData({ force = false } = {}) {
     // — engine functions degrade to Phase 1 proxies when leagueXg is null.
     // Phase 3B: also fetches LAST season's leagueXg — purely so
     // calcHomeAwaySplit's rolling 38-game window has real matches before this
-    // season has enough of its own (see VENUE_ROLLING_GAMES, config.js). Its
-    // own allSettled slot: an outage on either season must not block the other.
-    const [bootstrapRes, fixturesRes, leagueXgRes, leagueXgPrevRes] = await Promise.allSettled([
+    // season has enough of its own (see VENUE_ROLLING_GAMES, config.js).
+    // Phase 4: fetches ONE season further back again, purely to deepen
+    // calcFixtureHistory's cross-season H2H window (N_H2H=6, config.js).
+    // Each season gets its own allSettled slot: an outage on any one must not
+    // block the others.
+    const [bootstrapRes, fixturesRes, leagueXgRes, leagueXgPrevRes, leagueXgPrev2Res] = await Promise.allSettled([
       fetchBootstrap(),
       fetchFixtures(),
       fetchLeagueXg(UNDERSTAT_SEASON),
       fetchLeagueXg(UNDERSTAT_PREV_SEASON),
+      fetchLeagueXg(UNDERSTAT_PREV2_SEASON),
     ]);
 
     if (bootstrapRes.status !== 'fulfilled') throw bootstrapRes.reason;
@@ -88,6 +92,15 @@ async function loadInitialData({ force = false } = {}) {
       // current-season-only (ctx.playedFixtures) when this is unavailable.
       console.warn('[Gaffer IQ] Understat previous-season xG unavailable — venue split uses this season only.',
         leagueXgPrevRes.reason?.message ?? leagueXgPrevRes.reason);
+    }
+
+    if (leagueXgPrev2Res.status === 'fulfilled') {
+      store.setLeagueXgPrev2(leagueXgPrev2Res.value);
+    } else {
+      // Same non-fatal treatment — calcFixtureHistory falls back to fewer
+      // cross-season meetings (or this-season FPL fixtures) when unavailable.
+      console.warn('[Gaffer IQ] Understat two-seasons-ago xG unavailable — H2H uses a shorter window.',
+        leagueXgPrev2Res.reason?.message ?? leagueXgPrev2Res.reason);
     }
 
     store.markDataReady();
@@ -220,6 +233,7 @@ window.__engine = {
       playerSummariesById: store.getAllPlayerSummaries(),
       leagueXg: store.getLeagueXg(),
       leagueXgPrev: store.getLeagueXgPrev(),
+      leagueXgPrev2: store.getLeagueXgPrev2(),
       currentGw: gwOverride ?? store.getCurrentGw() ?? store.getNextGw() ?? 1,
     });
   },

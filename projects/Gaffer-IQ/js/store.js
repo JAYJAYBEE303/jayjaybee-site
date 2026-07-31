@@ -31,6 +31,10 @@ const state = {
   // Nothing else in the engine reads this; Style Clash/calcStyleProfile stay
   // on the current season only.
   leagueXgPrev: null,
+  // Phase 4 — two seasons ago's leagueXg payload, fetched purely to deepen
+  // calcFixtureHistory's cross-season H2H window (N_H2H=6, config.js). Nothing
+  // else in the engine reads this.
+  leagueXgPrev2: null,
   teamXg: {},
   activeHorizon: 'GW1',
   // The user's squad: an ordered array of player IDs (max 15), shared by every
@@ -83,6 +87,7 @@ function getPlayerSummary(playerId)   { return state.playerSummaries[playerId] ?
 function getAllPlayerSummaries()       { return state.playerSummaries; }
 function getLeagueXg()                { return state.leagueXg; }
 function getLeagueXgPrev()            { return state.leagueXgPrev; }
+function getLeagueXgPrev2()           { return state.leagueXgPrev2; }
 function getTeamXg(teamSlug)          { return state.teamXg[teamSlug] ?? null; }
 function getActiveHorizon()           { return state.activeHorizon; }
 function getSquad()                   { return state.squad; }
@@ -114,6 +119,10 @@ function setLeagueXg(data) {
 
 function setLeagueXgPrev(data) {
   state.leagueXgPrev = data;
+}
+
+function setLeagueXgPrev2(data) {
+  state.leagueXgPrev2 = data;
 }
 
 function setTeamXg(teamSlug, data) {
@@ -151,6 +160,7 @@ function setError(err) {
   state.season = null;
   state.leagueXg = null;
   state.leagueXgPrev = null;
+  state.leagueXgPrev2 = null;
   state.lastRefreshAt = null;
   try { sessionStorage.removeItem(SS_KEY_SEASON); } catch { /* non-fatal */ }
   state.lastError = err;
@@ -166,6 +176,7 @@ function clearCache() {
   state.playerSummaries = {};
   state.leagueXg = null;
   state.leagueXgPrev = null;
+  state.leagueXgPrev2 = null;
   state.teamXg = {};
   state.lastRefreshAt = null;
   state.lastError = null;
@@ -205,9 +216,9 @@ export const store = {
   getSeason, getTeams, getTeam, getPlayers, getPlayer,
   getFixtures, getFixture, getPositions, getEvents,
   getCurrentGw, getNextGw, getPlayerSummary, getAllPlayerSummaries,
-  getLeagueXg, getLeagueXgPrev, getTeamXg,
+  getLeagueXg, getLeagueXgPrev, getLeagueXgPrev2, getTeamXg,
   getActiveHorizon, getSquad, getError, getLastRefreshAt, isFresh,
-  setSeason, setPlayerSummary, setLeagueXg, setLeagueXgPrev, setTeamXg,
+  setSeason, setPlayerSummary, setLeagueXg, setLeagueXgPrev, setLeagueXgPrev2, setTeamXg,
   setActiveHorizon, setSquad, setError, markDataReady,
   clearCache,
 };

@@ -399,30 +399,68 @@ export function calcVenueEffect(homeTeam, awayTeam, ctx) {
 // ─── §4  Fixture history (head-to-head) ──────────────────────────────────────
 
 /**
- * Head-to-head nudge: how A has fared against B in their recent meetings.
+ * Cross-season meetings between teamA and teamB, drawn from Understat's
+ * datesData (full-league fixture lists — every match, not just one team's),
+ * across ctx.leagueXg/leagueXgPrev/leagueXgPrev2. Matched by team NAME via
+ * canonicalClubKey, same resolver buildRollingVenueStatsByTeamId uses above —
+ * never by Understat's own numeric ids, which are as unstable as FPL's (see
+ * that function's doc block).
  *
- * MODEL: Phase 1 uses *this season's* meetings only — historyPast in
- * element-summary is per-player and noisy to aggregate to club level. The
- * weight on this metric is deliberately tiny (§8.1) precisely because the
- * data is thin and football H2H is weakly predictive; richer multi-season
- * depth is a Phase-4 stretch.
- *
- * @param {number} teamAId
- * @param {number} teamBId
- * @param {object} ctx  must contain { playedFixtures: Fixture[] }
- * @returns {{value: number, estimated: boolean, meetings: number, pointsForA: number}}
- *   value: 0–100, higher = A historically does well against B.
- *   Direction: higher = better for `teamA`.
- *   See FEATURE_ENGINE.md §4.
+ * @returns {{date: string, goalsForA: number, goalsAgainstA: number}[]}
+ *   Sorted oldest → newest. Empty when either team can't be name-matched, or
+ *   no meeting between them appears in the fetched seasons (thin overlap,
+ *   promoted side, or an Understat outage).
  */
-export function calcFixtureHistory(teamAId, teamBId, ctx) {
-  const played = ctx.playedFixtures || [];
+function buildCrossSeasonH2hMeetings(teamAId, teamBId, ctx) {
+  const teamsById = ctx.teamsById || {};
+  const teamA = teamsById[teamAId];
+  const teamB = teamsById[teamBId];
+  if (!teamA || !teamB) return [];
 
-  // Filter to meetings between A and B that have *numeric* scores. We guard
-  // against FPL fixtures flagged finished with null team_h_score/team_a_score
-  // (rescheduled / postponed games occasionally appear that way) — otherwise
-  // they'd silently inflate the denominator below and skew one side's ratio.
-  const meetings = played
+  const keysA = new Set([teamA.name, teamA.shortName].filter(Boolean).map(canonicalClubKey));
+  const keysB = new Set([teamB.name, teamB.shortName].filter(Boolean).map(canonicalClubKey));
+
+  const allDates = [
+    ...(ctx.leagueXg?.datesData || []),
+    ...(ctx.leagueXgPrev?.datesData || []),
+    ...(ctx.leagueXgPrev2?.datesData || []),
+  ];
+
+  const meetings = [];
+  for (const m of allDates) {
+    if (!m?.isResult || !m.h?.title || !m.a?.title) continue;
+    const hKey = canonicalClubKey(m.h.title);
+    const aKey = canonicalClubKey(m.a.title);
+    const aWasHome = keysA.has(hKey) && keysB.has(aKey);
+    const aWasAway = keysA.has(aKey) && keysB.has(hKey);
+    if (!aWasHome && !aWasAway) continue;
+
+    const hg = Number(m.goals?.h);
+    const ag = Number(m.goals?.a);
+    if (!Number.isFinite(hg) || !Number.isFinite(ag)) continue;
+
+    meetings.push({
+      date: m.datetime,
+      goalsForA:     aWasHome ? hg : ag,
+      goalsAgainstA: aWasHome ? ag : hg,
+    });
+  }
+  meetings.sort((x, y) => new Date(x.date) - new Date(y.date));
+  return meetings;
+}
+
+/**
+ * This-season-only fallback, sourced from ctx.playedFixtures (FPL fixtures) —
+ * used only when buildCrossSeasonH2hMeetings finds nothing, e.g. a promoted
+ * side Understat can't name-match yet. season.fixtures is already
+ * chronologically sorted (composite.js buildScoreContext doc), so no
+ * re-sorting is needed here.
+ *
+ * @returns {{date: undefined, goalsForA: number, goalsAgainstA: number}[]}
+ */
+function buildFplH2hMeetings(teamAId, teamBId, ctx) {
+  const played = ctx.playedFixtures || [];
+  return played
     .filter(f => {
       const isPair =
         (f.homeTeamId === teamAId && f.awayTeamId === teamBId) ||
@@ -432,27 +470,60 @@ export function calcFixtureHistory(teamAId, teamBId, ctx) {
       const ag = f.result?.awayGoals;
       return Number.isFinite(hg) && Number.isFinite(ag);
     })
-    .slice(-N_H2H);
+    .map(f => {
+      const aWasHome = f.homeTeamId === teamAId;
+      return {
+        goalsForA:     aWasHome ? f.result.homeGoals : f.result.awayGoals,
+        goalsAgainstA: aWasHome ? f.result.awayGoals : f.result.homeGoals,
+      };
+    });
+}
+
+/**
+ * Head-to-head nudge: how A has fared against B in their recent meetings,
+ * expressed as the % of available league points A actually took across those
+ * meetings (win=3, draw=1, loss=0, out of 3 per game) — NOT a mirrored/zero-
+ * sum split like calcStyleClash or calcVenueEffect. Two unevenly-matched
+ * sides' H2H values do not need to sum to 100: e.g. across 10 meetings where
+ * A won once and the other 9 were draws, A took 12/30 points (40) and B took
+ * 9/30 (30) — both numbers independently true, nothing to balance.
+ *
+ * MODEL: draws from real cross-season Understat fixture lists (up to N_H2H
+ * meetings, config.js) via buildCrossSeasonH2hMeetings, falling back to
+ * this-season-only FPL fixtures when Understat has no name match for either
+ * team (promoted side, outage). historyPast in element-summary is per-player
+ * and noisy to aggregate to club level, so it's not used here. The weight on
+ * this metric is deliberately tiny (§8.1) — football H2H is weakly
+ * predictive even with real data.
+ *
+ * @param {number} teamAId
+ * @param {number} teamBId
+ * @param {object} ctx  must contain { teamsById, leagueXg, leagueXgPrev,
+ *   leagueXgPrev2, playedFixtures }
+ * @returns {{value: number, estimated: boolean, meetings: number, pointsForA: number}}
+ *   value: 0–100, the % of available league points A took across the counted
+ *   meetings. Direction: higher = better for `teamA`.
+ *   See FEATURE_ENGINE.md §4.
+ */
+export function calcFixtureHistory(teamAId, teamBId, ctx) {
+  let meetings = buildCrossSeasonH2hMeetings(teamAId, teamBId, ctx).slice(-N_H2H);
+  if (meetings.length === 0) {
+    meetings = buildFplH2hMeetings(teamAId, teamBId, ctx).slice(-N_H2H);
+  }
 
   if (meetings.length < 2) {
-    // MODEL: < 2 meetings (promoted side, mid-season first leg) → neutral 50,
-    // flagged so confidence drops rather than the result quietly pretending
-    // we know something.
+    // MODEL: < 2 meetings (promoted side, mid-season first leg, or genuinely
+    // thin cross-season overlap) → neutral 50, flagged so confidence drops
+    // rather than the result quietly pretending we know something. This is
+    // also the ONLY gate on whether H2H contributes to composite confidence
+    // (composite.js §8.3 zeroes WEIGHTS.history's share whenever estimated).
     return { value: 50, estimated: true, meetings: meetings.length, pointsForA: 0 };
   }
 
-  // Perspective: pointsForA is the points teamA earned across these meetings.
-  // For each meeting we look up which side teamA was on, then compare *teamA's*
-  // goals against *teamB's* goals — never the reverse. This is symmetric:
-  // calling with (A,B) vs (B,A) yields each team's own points across the same
-  // set of fixtures (the slice is identical because the filter is symmetric).
   let pointsForA = 0;
-  for (const f of meetings) {
-    const aWasHome = f.homeTeamId === teamAId;
-    const goalsForA     = aWasHome ? f.result.homeGoals : f.result.awayGoals;
-    const goalsAgainstA = aWasHome ? f.result.awayGoals : f.result.homeGoals;
-    if (goalsForA > goalsAgainstA)      pointsForA += 3;
-    else if (goalsForA === goalsAgainstA) pointsForA += 1;
+  for (const m of meetings) {
+    if (m.goalsForA > m.goalsAgainstA)      pointsForA += 3;
+    else if (m.goalsForA === m.goalsAgainstA) pointsForA += 1;
   }
   const ratio = pointsForA / (3 * meetings.length);
   return {

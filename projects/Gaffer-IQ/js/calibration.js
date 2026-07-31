@@ -35,6 +35,7 @@ function saveSnapshot(gw) {
     playerSummariesById: store.getAllPlayerSummaries(),
     leagueXg: store.getLeagueXg(),
     leagueXgPrev: store.getLeagueXgPrev(),
+    leagueXgPrev2: store.getLeagueXgPrev2(),
     currentGw: gw,
   });
 
