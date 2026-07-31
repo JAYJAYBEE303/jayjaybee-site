@@ -382,30 +382,31 @@ This is where everything combines into the single 0–100 number (per team, per 
 ### 8.1 Default weights (`config.js → WEIGHTS`)
 ```
 WEIGHTS = {
-  baseDifficulty:  0.30,   // strength priors — the dependable floor
+  baseDifficulty:  0.35,   // strength priors — the dependable floor
   counterMatchup:  0.20,   // attacking AND defending pairings blended (§7.2)
   teamForm:        0.15,   // recent trajectory, opponent-adjusted
   history:         0.15,   // H2H nudge — real cross-season data (§4)
-  homeAway:        0.10,   // venue performance this season
+  homeAway:        0.05,   // venue performance this season
   styleClash:      0.10    // stylistic interaction — Understat xG-backed (Phase 3A)
 }   // sums to 1.00
 ```
 Rationale for the ordering:
-- **Base difficulty (0.30):** the largest single weight. Opponent quality is the only sub-metric that is *never* estimated — it is available from day one of a season and does not degrade when player summaries or Understat data are missing.
+- **Base difficulty (0.35):** the largest single weight, raised again from 0.30. Opponent quality is the only sub-metric that is *never* estimated — it is available from day one of a season and does not degrade when player summaries or Understat data are missing. The 5 points cut from home/away below were banked here rather than spread around, since it's the one weight §8.3's confidence renormalisation never has to discount.
 - **Counter-matchup (0.20):** Gaffer IQ's signature metric — blends both pairings (`calcCombinedCounterMatchup`, §7.2), so a team's own attack AND defence both earn direct credit on its own composite.
 - **Form (0.15)** and **H2H (0.15):** raised to parity once §4's `calcFixtureHistory` moved off this-season-only FPL fixtures onto real cross-season Understat match data (up to `N_H2H=8` real meetings across 4 seasons) — no longer thin enough to justify a token weight. Live-checked case: Fulham vs Chelsea's actual 4-2 record over 6 meetings now resolves to 67/33, not a flat 50/50.
-- **Home/away (0.10)** and **style (0.10):** real signals, still the two most granular/noisy inputs — venue splits and stylistic axis interactions both carry a wider natural spread of uncertainty than the four above.
+- **Home/away (0.05):** cut from 0.10. Still real, but the smallest of the six — even doubled sensitivity (§3.2's `W_VENUE_EFFECT`) makes it a clearer *read*, not a bigger *driver*, and this pass explicitly reduces how much it can move the score.
+- **Style (0.10):** real signal, the more granular/noisy of the remaining inputs — stylistic axis interactions carry a wider natural spread of uncertainty than form/H2H/base difficulty.
 
   Full history of this table (weights before the current pass, `config.js` §8.1):
 
-  | Weight | Phase 1 | Pre-rebalance | Current |
-  |---|---|---|---|
-  | `baseDifficulty` | 0.33 | 0.30 | 0.30 |
-  | `counterMatchup` | 0.22 | 0.28 | **0.20** |
-  | `teamForm` | 0.18 | 0.16 | **0.15** |
-  | `history` | 0.03 | 0.03 | **0.15** |
-  | `homeAway` | 0.13 | 0.13 | **0.10** |
-  | `styleClash` | 0.11 | 0.10 | **0.10** |
+  | Weight | Phase 1 | Pre-rebalance | Prior | Current |
+  |---|---|---|---|---|
+  | `baseDifficulty` | 0.33 | 0.30 | 0.30 | **0.35** |
+  | `counterMatchup` | 0.22 | 0.28 | 0.20 | 0.20 |
+  | `teamForm` | 0.18 | 0.16 | 0.15 | 0.15 |
+  | `history` | 0.03 | 0.03 | 0.15 | 0.15 |
+  | `homeAway` | 0.13 | 0.13 | 0.10 | **0.05** |
+  | `styleClash` | 0.11 | 0.10 | 0.10 | 0.10 |
 
 > **The base-difficulty weight and the §8.6 stacking penalty are a matched pair.** Raising base difficulty on its own would make a strong favourite's score nearly immovable — no realistic combination of secondary metrics could shift it. §8.6 is what restores the ability of *several* bad secondary signals to tip a fixture, without letting any *single* one do so. Do not tune one without re-checking the other.
 

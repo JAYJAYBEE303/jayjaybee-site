@@ -463,12 +463,17 @@ export const COUNTER_DEFENCE_WEIGHT = 0.5;
 // real cross-season Understat data instead of this-season-only FPL fixtures
 // — no longer thin enough to justify a token weight), homeAway 0.13→0.10.
 // baseDifficulty/styleClash unchanged. Still sums to 1.00. See FEATURE_ENGINE.md §8.1.
+// MODEL: homeAway 0.10→0.05, baseDifficulty 0.30→0.35. The freed 5 points
+// moved straight onto baseDifficulty rather than being spread around — it's
+// the one weight that's never estimated (§8.3), so it's the safest place to
+// bank a cut from a metric that was reading noisier than the others wanted
+// it to be. Still sums to 1.00. See FEATURE_ENGINE.md §8.1.
 export const WEIGHTS = {
-  baseDifficulty: 0.30,   // strength priors — always available, the dependable floor
+  baseDifficulty: 0.35,   // strength priors — always available, the dependable floor
   counterMatchup: 0.20,   // attacking AND defending pairings blended (§7.2)
   teamForm:       0.15,   // recent trajectory, opponent-quality adjusted
   history:        0.15,   // H2H nudge — raised now that it draws on real cross-season data (§4)
-  homeAway:       0.10,   // venue performance this season
+  homeAway:       0.05,   // venue performance this season
   styleClash:     0.10,   // stylistic interaction — Understat xG-backed (Phase 3A)
 };
 
