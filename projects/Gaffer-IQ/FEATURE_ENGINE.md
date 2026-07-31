@@ -101,12 +101,16 @@ tenurePenalty = TENURE_MAX_PENALTY * (deficit ^ TENURE_CURVE)            # 0–4
 
 ### 3.1 Venue sensitivity — one team, standalone (`calcHomeAwaySplit(team, ctx)`)
 
-**Inputs:** this season's played `fixtures[]` (results only — `ctx.playedFixtures`, the same scope §4's H2H already uses). Computed per team:
+**Inputs (Phase 3B — real cross-season data, replacing the earlier current-season-only design):** a rolling window of each team's most recent `VENUE_ROLLING_GAMES` matches (default **38** — one full PL season), sourced from real Understat match history via `buildRollingVenueStatsByTeamId` — spans the current season and, once that runs low, last season's tail, so the window reads as "roughly a full season" all year instead of resetting to nothing every August (the original complaint this phase fixes: the metric read flat/constant through preseason and early season). Falls back to the current-season-only FPL-fixtures reading (`ctx.playedFixtures`, same scope §4's H2H uses) for any team the rolling window doesn't cover — a genuine top-flight newcomer, or an Understat outage.
 ```
-homePPG = points won per home game this season       # 3 win / 1 draw / 0 loss
-awayPPG = points won per away game this season
+homePPG = points won per home game in the window       # 3 win / 1 draw / 0 loss
+awayPPG = points won per away game in the window
 ```
-There is a `VENUE_HISTORY_YEARS` knob in `config.js` (default 5) reserved for when multi-season fixture loading lands — **not yet wired**. No multi-season fixture archive exists anywhere in this app today (`PL_SEASONS` is a team-name-per-season list, used only for tenure — see §2.1 — not results); `calcHomeAwaySplit` computes over the full current-season `playedFixtures`. Same category as `UNDERSTAT_SEASON`: a declared knob ahead of its data.
+
+**Data source and the three bugs this phase fixed** (all confirmed live, 2026-07-31, not hypothetical):
+1. **The proxy was broken.** `api/fpl.js`'s Understat handler scraped `var teamsData = JSON.parse('...')` blocks out of Understat's page HTML — a scraping approach Understat's site no longer supports; that data now loads via the page's own internal `getLeagueData`/`getTeamData` XHR endpoints, confirmed by inspecting `document.scripts` (zero embedded JSON) against the network log (a `200 OK` XHR carrying the real payload). Every Understat call was returning `{"error":"parse_failed", detail:"No JSON.parse blocks found..."}`, silently, since some point after Phase 3A shipped — **independent of season**, so Style Clash's Understat axes had never received real data either. Fixed: the proxy now calls the real endpoints directly (`getLeagueData/EPL/{season}`, requires an `X-Requested-With: XMLHttpRequest` header and an explicit season — confirmed live, both endpoints 404 without one), and renames their `{teams, players, dates}` response to the client's existing `{teamsData, playersData, datesData}` contract, so no client code needed to change for this fix alone.
+2. **Team matching was id-keyed.** The old `UNDERSTAT_TEAM_SLUGS` table mapped FPL's numeric `team.id → Understat slug` — but FPL ids are **reassigned every season** as clubs are promoted/relegated (`engine/normalise.js buildPlTenure`'s doc block already states this, correctly, for the tenure system — the Understat table simply didn't follow its own codebase's rule). Fixed: Understat teams are now matched by **name** via `canonicalClubKey` (`engine/normalise.js`, exported and shared with `buildPlTenure`), reusing the existing `TEAM_NAME_ALIASES` table (one addition: Understat's short form `'Tottenham'`, not FPL's `'Spurs'`). Verified live against all 20 real 2025/26 Understat team titles and all 20 real current-season FPL teams — 17/20 matched (the 3 misses were genuine promoted newcomers with no prior top-flight Understat history, not a matching failure).
+3. **A stale `config.js` comment** claimed a blend with the FPL-strength prior below `MIN_VENUE_GAMES` — no such blend exists anywhere in this file; corrected to describe the actual hard cutoff.
 
 **Formula:**
 ```
@@ -116,7 +120,9 @@ sign = sign(rawSplit)                                  # -1, 0, +1 — stored fo
 ```
 `baseSensitivity` (returned as `value`) answers "how much does venue matter for this team, either direction" — a team that is a fortress at home and one that is a fortress away score identically here; only `sign`, which nothing downstream consumes, tells them apart.
 
-**MODEL:** below `MIN_VENUE_GAMES` (default 4) at **either** venue → neutral 50, flagged `estimated: true`. This is a **hard cutoff, not a blend** — matches every other thin-sample guard in this engine (`calcTeamForm`, `calcFixtureHistory`: "< 2 meetings → neutral 50, flagged"). An earlier version of this section (and a stale `config.js` comment) described a blend with the FPL-strength prior below the threshold; no such blend exists in the code, here or anywhere else in the file — corrected.
+**MODEL:** below `MIN_VENUE_GAMES` (default 4) at **either** venue, in EITHER source tried (rolling, then fallback) → neutral 50, flagged `estimated: true`. This is a **hard cutoff, not a blend** — matches every other thin-sample guard in this engine (`calcTeamForm`, `calcFixtureHistory`: "< 2 meetings → neutral 50, flagged").
+
+**MODEL — mixed-source normalisation pool:** the league-relative normalisation above may compare a team resolved from the 38-game rolling window against one on the thinner current-season fallback. Both report the same unit (points-per-game delta), just over different sample depths, so a fallback team reads slightly noisier against the pool, not wrongly-scaled — a deliberate simplification rather than maintaining two separate normalisation pools.
 
 ### 3.2 Venue effect — the fixture (`calcVenueEffect(homeTeam, awayTeam, ctx)`)
 

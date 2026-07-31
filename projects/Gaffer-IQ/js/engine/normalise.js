@@ -37,7 +37,7 @@ const STATUS_MAP = {
 // PL_SEASONS table in config.js. See FEATURE_ENGINE.md §2.1.
 
 /** Collapses a club name or short code to a comparable key: 'Nott'm Forest' → 'nottmforest'. */
-function normaliseClubKey(value) {
+export function normaliseClubKey(value) {
   return String(value ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
@@ -69,6 +69,23 @@ const CANONICAL_BY_ALIAS = (() => {
   return out;
 })();
 
+/**
+ * Resolves any club name/short-form to its canonical normalised key via
+ * TEAM_NAME_ALIASES, falling back to the value's own normalised form when it
+ * isn't a known alias (i.e. it's already canonical, or genuinely unmatched —
+ * the caller decides which). Shared by buildPlTenure below and by
+ * engine/style.js's Understat team matcher — both are the same class of
+ * problem (reconcile one source's club-name spelling against another's), and
+ * both must NEVER join on FPL's numeric team id (see buildPlTenure's doc).
+ *
+ * @param {string} value  a club name or short code, from any source
+ * @returns {string}      normalised canonical key, e.g. 'tottenhamhotspur'
+ */
+export function canonicalClubKey(value) {
+  const key = normaliseClubKey(value);
+  return CANONICAL_BY_ALIAS[key] ?? key;
+}
+
 // Denominator for the recency-weighted ratio: an ever-present club's total.
 const TENURE_TOTAL_WEIGHT = SEASONS_NEWEST_FIRST
   .reduce((sum, _label, seasonsAgo) => sum + (TENURE_RECENCY_DECAY ** seasonsAgo), 0);
@@ -92,9 +109,9 @@ const TENURE_TOTAL_WEIGHT = SEASONS_NEWEST_FIRST
  */
 export function buildPlTenure(name, shortName) {
   let clubKey = null;
-  for (const candidate of [normaliseClubKey(name), normaliseClubKey(shortName)]) {
-    if (!candidate) continue;
-    const resolved = CANONICAL_BY_ALIAS[candidate] ?? candidate;
+  for (const raw of [name, shortName]) {
+    if (!raw) continue;
+    const resolved = canonicalClubKey(raw);
     if (PL_PRESENCE_BY_CLUB[resolved]) {
       clubKey = resolved;
       break;

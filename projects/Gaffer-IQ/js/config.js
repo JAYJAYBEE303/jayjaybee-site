@@ -155,14 +155,19 @@ export const PL_SEASONS = {
 // FPL name / short-name variants → the canonical club name used in PL_SEASONS.
 // Keys are compared after normalisation (lowercased, non-alphanumerics stripped),
 // so "Nott'm Forest", "nottm forest" and "NFO" all resolve to the same entry.
-// MODEL: same reasoning as UNDERSTAT_TEAM_SLUGS — an explicit alias table beats
-// fuzzy matching, which fails exactly on the clubs whose FPL short name diverges
-// most from their full name (Spurs ↔ Tottenham, Man Utd ↔ Manchester United).
+// MODEL: an explicit alias table beats fuzzy matching, which fails exactly on
+// the clubs whose short name diverges most from their full name (Spurs ↔
+// Tottenham, Man Utd ↔ Manchester United). Also the join key for matching
+// Understat teams by name (engine/style.js, via canonicalClubKey below) —
+// same table, same resolver, both call sites need the exact same aliases.
 export const TEAM_NAME_ALIASES = {
   // FPL `name` short forms
   'man city':        'Manchester City',
   'man utd':         'Manchester United',
   'spurs':           'Tottenham Hotspur',
+  // Understat's team.title uses this short form (not 'Spurs') — verified live
+  // against getLeagueData/EPL/2025.
+  'tottenham':       'Tottenham Hotspur',
   'nottm forest':    'Nottingham Forest',
   'newcastle':       'Newcastle United',
   'brighton':        'Brighton & Hove Albion',
@@ -223,14 +228,15 @@ export const W_GD  = 0.3;
 // calcFixtureHistory: "< 2 meetings → neutral 50, flagged").
 export const MIN_VENUE_GAMES = 4;
 
-// How many seasons of home/away PPG history calcHomeAwaySplit should draw on.
-// NOT YET WIRED: no multi-season fixture archive is loaded anywhere in this
-// app (ctx.playedFixtures holds only the current season — the exact same
-// scope calcFixtureHistory's H2H already uses, see FEATURE_ENGINE.md §4).
-// Reserved for when multi-season fixture loading lands; until then
-// calcHomeAwaySplit computes over the full current-season playedFixtures.
-// Same category as UNDERSTAT_SEASON below — a declared knob ahead of its data.
-export const VENUE_HISTORY_YEARS = 5;
+// How many of a team's most recent PL matches calcHomeAwaySplit's rolling
+// window covers — a full season's worth, so it reads as "this season, topped
+// up with last season's tail" for most of the year rather than resetting to
+// nothing every August. Sourced from Understat (real cross-season match
+// history: h_a, scored, missed, date — see engine/fixtures.js), NOT
+// ctx.playedFixtures, which only ever holds the current season. Falls back to
+// current-season-only (the FPL-fixtures path) when Understat data is
+// unavailable for a team (promoted sides, or an Understat outage).
+export const VENUE_ROLLING_GAMES = 38;
 
 // Scales calcVenueEffect's combined home/away-sensitivity magnitude (0-100)
 // into a composite-scale boost/penalty. At the ceiling (both teams maximally
@@ -652,40 +658,25 @@ export const PRICE_FILTER_STEP = 0.5;
 // Proxy endpoint the frontend calls; the function forwards to FPL_BASE server-side.
 export const PROXY_BASE = '/api/fpl';
 
-// ─── Phase 3A — Understat (external xG) ──────────────────────────────────────
+// ─── Phase 3A/3B — Understat (external xG) ───────────────────────────────────
 
-// Understat season slug to fetch single-team pages against. The proxy validates
-// this against /^\d{4}$/ so any change here must remain four digits.
-export const UNDERSTAT_SEASON = '2024';
-
-// FPL team id → Understat URL slug. Understat slugs use underscores for spaces
-// and the club's *full* name (e.g. 'Manchester_City', not 'Man City'). The id
-// ordering follows FPL's alphabetical-by-full-name convention for 2024-25.
-// MODEL: matching Understat → FPL by slug rather than free-text title avoids
-// fuzzy-match failures around clubs whose FPL short name differs from their
-// Understat title (Spurs ↔ Tottenham, Man Utd ↔ Manchester_United, etc.).
-export const UNDERSTAT_TEAM_SLUGS = {
-   1: 'Arsenal',
-   2: 'Aston_Villa',
-   3: 'Bournemouth',
-   4: 'Brentford',
-   5: 'Brighton',
-   6: 'Chelsea',
-   7: 'Crystal_Palace',
-   8: 'Everton',
-   9: 'Fulham',
-  10: 'Ipswich',
-  11: 'Leicester',
-  12: 'Liverpool',
-  13: 'Manchester_City',
-  14: 'Manchester_United',
-  15: 'Newcastle_United',
-  16: 'Nottingham_Forest',
-  17: 'Southampton',
-  18: 'Tottenham',
-  19: 'West_Ham',
-  20: 'Wolverhampton_Wanderers',
-};
+// Understat season year, both start-year label (e.g. '2026' = the 2026/27
+// season) and REQUIRED on every Understat proxy call — confirmed live
+// (2026-07-31) that Understat's real endpoints 404 without an explicit
+// season, there is no "current season" default to omit it and fall back to.
+// Bump both of these every close season (this file has no automatic
+// "current season" derivation — same manual-maintenance category as
+// PL_SEASONS above, which needs the same yearly addition).
+export const UNDERSTAT_SEASON      = '2026';  // this season (2026/27)
+export const UNDERSTAT_PREV_SEASON = '2025';  // last completed season (2025/26)
+// FPL team id -> Understat slug tables were removed here (Phase 3B): FPL's
+// numeric team.id is REASSIGNED every season as clubs are promoted/relegated
+// (see engine/normalise.js buildPlTenure's identical warning), so an id-keyed
+// table drifts out of correctness every summer with no error to catch it —
+// confirmed as the actual live cause of every Understat team lookup silently
+// missing before this fix. Understat teams are now matched by NAME via
+// canonicalClubKey (engine/normalise.js), the same TEAM_NAME_ALIASES-backed
+// resolver buildPlTenure already used correctly. See engine/style.js.
 
 // Cache TTL for the league-level Understat payload, in milliseconds.
 // Understat refreshes daily at most; 1h is a safe ceiling for a session.

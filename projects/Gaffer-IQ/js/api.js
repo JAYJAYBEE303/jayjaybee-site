@@ -209,20 +209,27 @@ export async function fetchEntryInfo(teamId) {
 // ROADMAP.md §3A. Do not call store.setError() for Understat failures.
 
 /**
- * Fetches the Understat league page for the EPL. The proxy extracts the
- * embedded JSON blocks (typically `teamsData`, `datesData`, `playersData`)
- * and returns them keyed by variable name.
+ * Fetches Understat's full-league data for one PL season. The proxy calls
+ * Understat's real getLeagueData endpoint server-side and renames its
+ * {teams, players, dates} response to {teamsData, playersData, datesData}.
  *
- * @returns {Promise<object>}  e.g. { teamsData: {...}, datesData: [...], playersData: [...] }
- * @throws {ApiError}  with message "Understat league xG unavailable: …"
+ * @param {string} season  four-digit start-year, e.g. '2026' for 2026/27 —
+ *   REQUIRED, Understat has no "current season" default (confirmed live).
+ *   Use config.js UNDERSTAT_SEASON / UNDERSTAT_PREV_SEASON.
+ * @returns {Promise<object>}  { teamsData: {...}, datesData: [...], playersData: [...] }
+ * @throws {ApiError}  with message "Understat league xG unavailable for <season>: …"
  */
-export async function fetchLeagueXg() {
+export async function fetchLeagueXg(season) {
+  if (typeof season !== 'string' || !/^\d{4}$/.test(season)) {
+    throw new ApiError(`Invalid Understat season: ${season}`, { path: 'understat-league' });
+  }
+  const path = `league/EPL/${season}`;
   try {
-    return await callProxy('league/EPL', 'understat');
+    return await callProxy(path, 'understat');
   } catch (err) {
     throw new ApiError(
-      `Understat league xG unavailable: ${err.message}`,
-      { upstreamStatus: err.upstreamStatus ?? null, path: 'league/EPL' },
+      `Understat league xG unavailable for ${season}: ${err.message}`,
+      { upstreamStatus: err.upstreamStatus ?? null, path },
     );
   }
 }

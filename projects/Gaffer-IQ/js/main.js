@@ -12,6 +12,7 @@ import {
   PROJ_FORM, PROJ_FIXTURE, PROJ_COUNTER, PROJ_MINUTES,
 } from './config.js';
 import { store } from './store.js';
+import { UNDERSTAT_SEASON, UNDERSTAT_PREV_SEASON } from './config.js';
 import {
   fetchBootstrap, fetchFixtures, fetchPlayerSummary,
   fetchLeagueXg, fetchTeamXg, ApiError,
@@ -52,10 +53,15 @@ async function loadInitialData({ force = false } = {}) {
     // so it loads alongside bootstrap/fixtures rather than lazily. Wrapped in
     // Promise.allSettled so an Understat outage doesn't break the FPL pipeline
     // — engine functions degrade to Phase 1 proxies when leagueXg is null.
-    const [bootstrapRes, fixturesRes, leagueXgRes] = await Promise.allSettled([
+    // Phase 3B: also fetches LAST season's leagueXg — purely so
+    // calcHomeAwaySplit's rolling 38-game window has real matches before this
+    // season has enough of its own (see VENUE_ROLLING_GAMES, config.js). Its
+    // own allSettled slot: an outage on either season must not block the other.
+    const [bootstrapRes, fixturesRes, leagueXgRes, leagueXgPrevRes] = await Promise.allSettled([
       fetchBootstrap(),
       fetchFixtures(),
-      fetchLeagueXg(),
+      fetchLeagueXg(UNDERSTAT_SEASON),
+      fetchLeagueXg(UNDERSTAT_PREV_SEASON),
     ]);
 
     if (bootstrapRes.status !== 'fulfilled') throw bootstrapRes.reason;
@@ -73,6 +79,15 @@ async function loadInitialData({ force = false } = {}) {
       // ROADMAP.md §3A — this path is intentionally non-fatal; no store.setError().
       console.warn('[Gaffer IQ] Understat league xG unavailable — falling back to FPL proxies.',
         leagueXgRes.reason?.message ?? leagueXgRes.reason);
+    }
+
+    if (leagueXgPrevRes.status === 'fulfilled') {
+      store.setLeagueXgPrev(leagueXgPrevRes.value);
+    } else {
+      // Same non-fatal treatment — calcHomeAwaySplit falls back to
+      // current-season-only (ctx.playedFixtures) when this is unavailable.
+      console.warn('[Gaffer IQ] Understat previous-season xG unavailable — venue split uses this season only.',
+        leagueXgPrevRes.reason?.message ?? leagueXgPrevRes.reason);
     }
 
     store.markDataReady();
@@ -204,6 +219,7 @@ window.__engine = {
     return buildScoreContext(season, {
       playerSummariesById: store.getAllPlayerSummaries(),
       leagueXg: store.getLeagueXg(),
+      leagueXgPrev: store.getLeagueXgPrev(),
       currentGw: gwOverride ?? store.getCurrentGw() ?? store.getNextGw() ?? 1,
     });
   },

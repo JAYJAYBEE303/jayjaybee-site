@@ -20,10 +20,17 @@ const SS_KEY_SQUAD = 'gafferiq_squad';
 const state = {
   season: null,         // see engine/normalise.js → normaliseSeason output
   playerSummaries: {},  // playerId → normalised PlayerSummary
-  // Phase 3A — Understat (external xG). leagueXg is the league/EPL payload
-  // (teamsData/datesData/playersData) shared by every engine call; teamXg
-  // is a per-team lazy cache keyed by Understat slug.
+  // Phase 3A — Understat (external xG). leagueXg is the CURRENT season's
+  // league/EPL payload (teamsData/datesData/playersData) shared by every
+  // engine call; teamXg is a per-team lazy cache keyed by Understat slug.
   leagueXg: null,
+  // Phase 3B — last season's leagueXg payload, same shape, fetched alongside
+  // the current season purely so calcHomeAwaySplit's rolling 38-game window
+  // (engine/fixtures.js) has real matches to draw on before the current
+  // season has enough of its own — see VENUE_ROLLING_GAMES, config.js.
+  // Nothing else in the engine reads this; Style Clash/calcStyleProfile stay
+  // on the current season only.
+  leagueXgPrev: null,
   teamXg: {},
   activeHorizon: 'GW1',
   // The user's squad: an ordered array of player IDs (max 15), shared by every
@@ -75,6 +82,7 @@ function getNextGw()                  { return state.season?.nextGw ?? null; }
 function getPlayerSummary(playerId)   { return state.playerSummaries[playerId] ?? null; }
 function getAllPlayerSummaries()       { return state.playerSummaries; }
 function getLeagueXg()                { return state.leagueXg; }
+function getLeagueXgPrev()            { return state.leagueXgPrev; }
 function getTeamXg(teamSlug)          { return state.teamXg[teamSlug] ?? null; }
 function getActiveHorizon()           { return state.activeHorizon; }
 function getSquad()                   { return state.squad; }
@@ -102,6 +110,10 @@ function setPlayerSummary(playerId, summary) {
 
 function setLeagueXg(data) {
   state.leagueXg = data;
+}
+
+function setLeagueXgPrev(data) {
+  state.leagueXgPrev = data;
 }
 
 function setTeamXg(teamSlug, data) {
@@ -138,6 +150,7 @@ function setError(err) {
   // and will be re-fetched on demand after a successful reload.
   state.season = null;
   state.leagueXg = null;
+  state.leagueXgPrev = null;
   state.lastRefreshAt = null;
   try { sessionStorage.removeItem(SS_KEY_SEASON); } catch { /* non-fatal */ }
   state.lastError = err;
@@ -152,6 +165,7 @@ function clearCache() {
   state.season = null;
   state.playerSummaries = {};
   state.leagueXg = null;
+  state.leagueXgPrev = null;
   state.teamXg = {};
   state.lastRefreshAt = null;
   state.lastError = null;
@@ -191,9 +205,9 @@ export const store = {
   getSeason, getTeams, getTeam, getPlayers, getPlayer,
   getFixtures, getFixture, getPositions, getEvents,
   getCurrentGw, getNextGw, getPlayerSummary, getAllPlayerSummaries,
-  getLeagueXg, getTeamXg,
+  getLeagueXg, getLeagueXgPrev, getTeamXg,
   getActiveHorizon, getSquad, getError, getLastRefreshAt, isFresh,
-  setSeason, setPlayerSummary, setLeagueXg, setTeamXg,
+  setSeason, setPlayerSummary, setLeagueXg, setLeagueXgPrev, setTeamXg,
   setActiveHorizon, setSquad, setError, markDataReady,
   clearCache,
 };

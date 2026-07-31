@@ -23,8 +23,9 @@
  * All outputs: 0–100, higher = favourable for the team being scored.
  */
 
-import { STYLE_RULES, STYLE_ANCHORS, MIN_VENUE_GAMES, UNDERSTAT_TEAM_SLUGS } from '../config.js';
+import { STYLE_RULES, STYLE_ANCHORS, MIN_VENUE_GAMES } from '../config.js';
 import { clamp, invert, normaliseLinear } from '../util.js';
+import { canonicalClubKey } from './normalise.js';
 
 // ─── §6.1  Style profile ─────────────────────────────────────────────────────
 
@@ -59,18 +60,28 @@ export function buildXgProfilesByTeamId(leagueXg, teamsById) {
   if (!leagueXg || !leagueXg.teamsData) return null;
 
   const understatTeams = Object.values(leagueXg.teamsData);
-  // Understat title is space-separated ('Manchester City'); UNDERSTAT_TEAM_SLUGS
-  // uses the same name with underscores. Convert once and match by title.
-  const findUnderstatTeam = (slug) => {
-    const target = slug.replace(/_/g, ' ');
-    return understatTeams.find(t => t && t.title === target) || null;
+  // Matched by NAME (canonicalClubKey, shared with buildPlTenure), never by
+  // FPL's numeric team.id — ids are reassigned every season as clubs are
+  // promoted/relegated (engine/normalise.js buildPlTenure's doc block), which
+  // is exactly what silently broke the previous id-keyed UNDERSTAT_TEAM_SLUGS
+  // table season over season. Index Understat's teams by canonical key once;
+  // O(teams) not O(teams²).
+  const understatByKey = {};
+  for (const t of understatTeams) {
+    if (t && t.title) understatByKey[canonicalClubKey(t.title)] = t;
+  }
+  const findUnderstatTeam = (team) => {
+    for (const raw of [team.name, team.shortName]) {
+      if (!raw) continue;
+      const hit = understatByKey[canonicalClubKey(raw)];
+      if (hit) return hit;
+    }
+    return null;
   };
 
   const rawByTeamId = {};
   for (const team of Object.values(teamsById)) {
-    const slug = UNDERSTAT_TEAM_SLUGS[team.id];
-    if (!slug) continue;
-    const up = findUnderstatTeam(slug);
+    const up = findUnderstatTeam(team);
     if (!up || !Array.isArray(up.history) || up.history.length === 0) continue;
 
     let xgSum = 0;

@@ -34,6 +34,7 @@ function saveSnapshot(gw) {
   const ctx = buildScoreContext(season, {
     playerSummariesById: store.getAllPlayerSummaries(),
     leagueXg: store.getLeagueXg(),
+    leagueXgPrev: store.getLeagueXgPrev(),
     currentGw: gw,
   });
 

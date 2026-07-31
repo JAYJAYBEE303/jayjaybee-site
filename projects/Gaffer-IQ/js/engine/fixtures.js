@@ -6,16 +6,22 @@
  * All outputs: 0–100. Higher = easier/better for the team being scored, EXCEPT
  * calcBaseDifficulty, which is stored higher = HARDER — see its own doc block
  * and FEATURE_ENGINE.md §1 rule 2 / §2 for why.
+ *
+ * Phase 3B: calcHomeAwaySplit's venue split prefers a rolling cross-season
+ * window built from Understat match history (buildRollingVenueStatsByTeamId)
+ * over the current-season-only FPL-fixtures reading, when available — see
+ * that function's doc and FEATURE_ENGINE.md §3.1.
  */
 
 import {
   W_OPP_ATTACK, W_OPP_DEFENCE, OPP_STRENGTH_MIN, OPP_STRENGTH_MAX,
   FDR_FALLBACK_VALUES,
   TENURE_MAX_PENALTY, TENURE_FLOOR, TENURE_CURVE,
-  MIN_VENUE_GAMES, W_VENUE_EFFECT,
+  MIN_VENUE_GAMES, VENUE_ROLLING_GAMES, W_VENUE_EFFECT,
   N_H2H,
 } from '../config.js';
 import { clamp, normaliseLinear } from '../util.js';
+import { canonicalClubKey } from './normalise.js';
 
 // ─── §2  Base fixture difficulty ─────────────────────────────────────────────
 
@@ -163,10 +169,108 @@ function hasUsableVenueSplit(stats) {
 }
 
 /**
+ * Builds each team's rolling VENUE_ROLLING_GAMES-match (default 38 — one full
+ * PL season) home/away split from real Understat match history, spanning the
+ * current season and, once that runs out, last season's tail — so the window
+ * reads as roughly "a full season" all year round instead of resetting to
+ * nothing every August. Pure helper consumed once by buildScoreContext, same
+ * precompute-once idiom as buildXgProfilesByTeamId (engine/style.js).
+ *
+ * MODEL: matched by NAME (canonicalClubKey), never FPL's numeric team.id —
+ * same reasoning as buildXgProfilesByTeamId and buildPlTenure
+ * (engine/normalise.js): ids are REASSIGNED every season as clubs are
+ * promoted/relegated, so an id join silently drifts wrong the next close
+ * season with no error to catch it. Small duplication of the "index Understat
+ * teams by canonical key" step against buildXgProfilesByTeamId's own version —
+ * kept separate because this one merges TWO seasons' entries per team before
+ * indexing, which that one never needs to.
+ *
+ * MODEL: a team's current- and prior-season Understat records arrive as two
+ * separate objects (Understat keys a "team" by team+season, not by club
+ * alone) — merged into one match list per club before the window is cut.
+ * `scored`/`missed` are already this team's own goals for/against per Understat
+ * match (not home/away goals — h_a only marks venue), so points-per-match
+ * follows directly: scored>missed→3, equal→1, else→0.
+ *
+ * @param {object|null} leagueXg      current season's Understat payload
+ * @param {object|null} leagueXgPrev  last season's Understat payload
+ * @param {object} teamsById          FPL team id → Team
+ * @returns {Object<number,{homePPG:number,awayPPG:number,homeGames:number,awayGames:number}>}
+ *   Keyed by FPL team id. A team absent here (no Understat match to its name —
+ *   a genuine newcomer, or an Understat outage) simply has no entry; the
+ *   caller falls back to the current-season FPL-fixtures path for it.
+ */
+export function buildRollingVenueStatsByTeamId(leagueXg, leagueXgPrev, teamsById) {
+  const understatTeams = [
+    ...(leagueXg?.teamsData     ? Object.values(leagueXg.teamsData)     : []),
+    ...(leagueXgPrev?.teamsData ? Object.values(leagueXgPrev.teamsData) : []),
+  ];
+  if (understatTeams.length === 0) return {};
+
+  const historyByKey = {};
+  for (const t of understatTeams) {
+    if (!t || !t.title || !Array.isArray(t.history)) continue;
+    (historyByKey[canonicalClubKey(t.title)] ||= []).push(...t.history);
+  }
+
+  const out = {};
+  for (const team of Object.values(teamsById)) {
+    let merged = null;
+    for (const raw of [team.name, team.shortName]) {
+      if (!raw) continue;
+      const hit = historyByKey[canonicalClubKey(raw)];
+      if (hit) { merged = hit; break; }
+    }
+    if (!merged || merged.length === 0) continue;
+
+    // Understat dates are 'YYYY-MM-DD HH:mm:ss' — directly Date-parseable.
+    // Chronological ascending, then keep only the most recent window.
+    const sorted = merged.slice().sort((a, b) => new Date(a.date) - new Date(b.date));
+    const window = sorted.slice(-VENUE_ROLLING_GAMES);
+
+    let homeGames = 0, awayGames = 0, homePts = 0, awayPts = 0;
+    for (const m of window) {
+      const scored = Number(m.scored);
+      const missed = Number(m.missed);
+      if (!Number.isFinite(scored) || !Number.isFinite(missed)) continue;
+      const pts = scored > missed ? 3 : scored === missed ? 1 : 0;
+      if (m.h_a === 'h')      { homeGames += 1; homePts += pts; }
+      else if (m.h_a === 'a') { awayGames += 1; awayPts += pts; }
+    }
+
+    out[team.id] = {
+      homeGames, awayGames,
+      homePPG: homeGames ? homePts / homeGames : 0,
+      awayPPG: awayGames ? awayPts / awayGames : 0,
+    };
+  }
+  return out;
+}
+
+/**
+ * Resolves one team's venue stats: the Understat rolling window when it
+ * clears MIN_VENUE_GAMES at both venues, else the current-season FPL-fixtures
+ * fallback (same shape either way — {homePPG, awayPPG, homeGames, awayGames}
+ * — so calcHomeAwaySplit never needs to know which source it got).
+ * @param {number} teamId
+ * @param {object} rollingByTeamId  buildRollingVenueStatsByTeamId output
+ * @param {object} fplByTeamId      buildVenueStats output
+ * @returns {object|undefined}
+ */
+function resolveVenueStats(teamId, rollingByTeamId, fplByTeamId) {
+  const rolling = rollingByTeamId[teamId];
+  return hasUsableVenueSplit(rolling) ? rolling : fplByTeamId[teamId];
+}
+
+/**
  * Venue-sensitivity profile for `team`: how much its home form diverges from
- * its away form, this season (VENUE_HISTORY_YEARS is not yet wired — see its
- * config.js comment). This is a standalone read of ONE team, not a fixture
- * read of two — see calcVenueEffect below for the fixture-level combination.
+ * its away form. Prefers a rolling VENUE_ROLLING_GAMES-match window sourced
+ * from real Understat match history (spans last season's tail once this
+ * season runs low — see buildRollingVenueStatsByTeamId), falling back to the
+ * current-season-only FPL-fixtures path (buildVenueStats) for any team it
+ * doesn't cover — a genuine newcomer to the top flight, or an Understat
+ * outage. This is a standalone read of ONE team, not a fixture read of two —
+ * see calcVenueEffect below for the fixture-level combination.
  *
  * MODEL: rawSplit = homePPG − awayPPG, SIGNED — a team can be stronger away
  * (negative) as easily as at home. `value` (baseSensitivity) is the
@@ -176,20 +280,31 @@ function hasUsableVenueSplit(stats) {
  * ignores it (see that function's doc) — the fixture-level effect is
  * magnitude-only by design, so `sign` is diagnostic, not consumed downstream.
  *
- * MODEL: below MIN_VENUE_GAMES at EITHER venue → neutral 50, flagged
- * estimated. Hard cutoff, not a blend — matches every other thin-sample guard
- * in this engine (calcTeamForm, calcFixtureHistory).
+ * MODEL: below MIN_VENUE_GAMES at EITHER venue (true of both sources tried) →
+ * neutral 50, flagged estimated. Hard cutoff, not a blend — matches every
+ * other thin-sample guard in this engine (calcTeamForm, calcFixtureHistory).
+ *
+ * MODEL: the league-relative normalisation pool below mixes teams resolved
+ * from either source — a genuine simplification. Both sources report the same
+ * unit (points-per-game delta), just over different sample depths (up to 38
+ * cross-season Understat games vs whatever's been played of the current FPL
+ * season), so a team on the thinner fallback reads slightly noisier against
+ * the pool, not wrongly-scaled.
  *
  * @param {Team} team
- * @param {object} ctx  must contain { playedFixtures: Fixture[], teamsById: object }
+ * @param {object} ctx  must contain { playedFixtures: Fixture[], teamsById: object,
+ *   rollingVenueStatsByTeamId?: object } — the last is precomputed by
+ *   buildScoreContext; absent/empty ctx.rollingVenueStatsByTeamId degrades
+ *   this to exactly its pre-Phase-3B behaviour (FPL fixtures only).
  * @returns {{value: number, estimated: boolean, homePPG: number, awayPPG: number,
  *            rawSplit: number, sign: -1|0|1, homeGames: number, awayGames: number}}
  *   value: 0–100 (baseSensitivity), higher = bigger home/away gap in EITHER
  *   direction. See FEATURE_ENGINE.md §3.
  */
 export function calcHomeAwaySplit(team, ctx) {
-  const venueByTeam = buildVenueStats(ctx.playedFixtures || []);
-  const stats = venueByTeam[team.id];
+  const rollingByTeamId = ctx.rollingVenueStatsByTeamId || {};
+  const fplByTeamId = buildVenueStats(ctx.playedFixtures || []);
+  const stats = resolveVenueStats(team.id, rollingByTeamId, fplByTeamId);
   const homeGames = stats?.homeGames ?? 0;
   const awayGames = stats?.awayGames ?? 0;
 
@@ -207,11 +322,12 @@ export function calcHomeAwaySplit(team, ctx) {
 
   // League-relative: normalise this team's |rawSplit| against the spread of
   // |rawSplit| across every OTHER team that also clears the threshold at both
-  // venues. team's own magnitude is always included (it passed the guard
-  // above), so this list is never empty.
+  // venues (whichever source each resolves from — see MODEL note above).
+  // team's own magnitude is always included (it passed the guard above), so
+  // this list is never empty.
   const magnitudes = [];
   for (const t of Object.values(ctx.teamsById)) {
-    const s = venueByTeam[t.id];
+    const s = resolveVenueStats(t.id, rollingByTeamId, fplByTeamId);
     if (hasUsableVenueSplit(s)) magnitudes.push(Math.abs(s.homePPG - s.awayPPG));
   }
   let min = magnitudes[0];

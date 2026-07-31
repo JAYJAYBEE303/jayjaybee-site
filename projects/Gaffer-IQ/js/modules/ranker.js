@@ -107,6 +107,7 @@ function buildCtx() {
   return buildScoreContext(season, {
     playerSummariesById: store.getAllPlayerSummaries(),
     leagueXg: store.getLeagueXg(),
+    leagueXgPrev: store.getLeagueXgPrev(),
     currentGw: store.getCurrentGw() ?? store.getNextGw() ?? 1,
   });
 }

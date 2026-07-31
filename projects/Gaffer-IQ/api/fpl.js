@@ -4,16 +4,18 @@
  * Validates the requested path against a strict per-source allowlist (anchored
  * regex), defensively normalises input, then fetches and forwards the JSON
  * response with CORS and per-endpoint Cache-Control headers. Contains no
- * analytical logic.
+ * analytical logic (the {teams→teamsData, players→playersData, dates→datesData}
+ * rename below is a naming adapter for the client's existing contract, not
+ * analysis — see the Understat section for why it exists).
  *
  * Two upstream sources:
  *   1. The official FPL API (default — no `source` param, or `source=fpl`).
- *   2. Understat (`source=understat`) — adds external xG / xGA data; the JSON
- *      lives inside <script> tags in HTML pages so the handler extracts it
- *      server-side with vanilla string/regex. Vanilla Node only, no npm deps.
+ *   2. Understat (`source=understat`) — adds external xG / xGA / pressing data.
  *
  * See ARCHITECTURE.md §5 (proxy spec) and §7 (external sources). Phase 3A
- * (ROADMAP.md) added the Understat upstream.
+ * (ROADMAP.md) added the Understat upstream; Phase 3B (see Understat section
+ * below) moved it from HTML-scraping to Understat's real JSON endpoints after
+ * the scraped page structure went stale in production.
  */
 
 // ─── FPL allowlist ──────────────────────────────────────────────────────────
@@ -34,16 +36,19 @@ const ALLOWED_PATTERNS = [
   { name: 'me',            pattern: /^me\/$/,                                         cache: 'no-store, max-age=0'                                },
 ];
 
-// ─── Understat allowlist (Phase 3A) ─────────────────────────────────────────
-// Understat exposes no REST API — the data is embedded as JS string literals
-// inside <script> tags on its HTML pages. We allowlist only the two page
-// shapes we actually need; everything else is rejected. xG data refreshes
-// roughly daily, so a 1h cache is plenty.
+// ─── Understat allowlist (Phase 3A, endpoints fixed Phase 3B) ──────────────
+// Understat exposes no PUBLIC REST API, but its own site fetches match data
+// from internal JSON endpoints (getLeagueData / getTeamData) rather than
+// embedding it in page HTML — confirmed live: the page HTML understat.com
+// serves today has zero embedded JSON, and both endpoints 404 without an
+// explicit season, so a season is REQUIRED on every path, no bare/implicit
+// "current season" form. xG data refreshes roughly daily, so a 1h cache is
+// plenty. Client-facing path stays `league/EPL/{season}` / `team/{slug}/
+// {season}` — only the upstream URL this maps to (below) changed.
 const ALLOWED_UNDERSTAT_PATTERNS = [
-  // Full league page — embeds teamsData, datesData, playersData for all 20 PL clubs.
-  { name: 'leagueEpl',  pattern: /^league\/EPL$/,             cache: 'public, max-age=3600' },
-  // Single-team season page — e.g. team/Arsenal/2024. Slug uses underscores;
-  // year is exactly four digits.
+  // Full league — every PL club's match-by-match history for one season.
+  { name: 'leagueEpl',  pattern: /^league\/EPL\/\d{4}$/,      cache: 'public, max-age=3600' },
+  // Single-team season — e.g. team/Arsenal/2025. Slug uses underscores.
   { name: 'teamSeason', pattern: /^team\/[A-Za-z_]+\/\d{4}$/, cache: 'public, max-age=3600' },
 ];
 
@@ -136,21 +141,51 @@ async function handleFpl(res, path) {
   res.status(200).json(data);
 }
 
-// ─── Understat upstream (Phase 3A) ──────────────────────────────────────────
-
+// ─── Understat upstream (Phase 3A, rewritten Phase 3B) ─────────────────────
+// The ORIGINAL Phase 3A design fetched Understat's page HTML and regex-scraped
+// `var teamsData = JSON.parse('...')`-style inline blocks. That stopped
+// working sometime after Phase 3A shipped — Understat's page HTML no longer
+// embeds this data at all; it's fetched by the PAGE ITSELF via an internal
+// XHR to a separate JSON endpoint. Confirmed live (2026-07-31) by loading
+// both page shapes in a real browser and inspecting document.scripts (zero
+// embedded JSON) versus the network log (a 200 OK `getLeagueData`/
+// `getTeamData` XHR carrying the actual data) — this had been silently
+// returning `parse_failed` on every call in production; Style Clash's
+// Understat axes have never had real data as a result, independent of season.
+//
+// Two things the real endpoint requires that a plain fetch doesn't send by
+// default, confirmed by testing without them first (plain GET → 404 even
+// with a valid season):
+//   1. `X-Requested-With: XMLHttpRequest` — Understat's server appears to
+//      gate these endpoints to same-page XHR traffic only.
+//   2. An explicit season in the path — there is no "current season" default;
+//      the bare form 404s.
 async function handleUnderstat(res, path) {
   const match = ALLOWED_UNDERSTAT_PATTERNS.find(({ pattern }) => pattern.test(path));
   if (!match) {
     return sendError(res, 400, 'Path not in Understat allowlist');
   }
 
+  // path is already allowlist-validated above (league/EPL/{season} or
+  // team/{slug}/{season}) — reshape to the real internal endpoint. Understat's
+  // own convention: 'league/EPL/2025' -> 'getLeagueData/EPL/2025',
+  // 'team/Arsenal/2025' -> 'getTeamData/Arsenal/2025'.
+  const upstreamPath = path.startsWith('league/')
+    ? path.replace(/^league\//, 'getLeagueData/')
+    : path.replace(/^team\//, 'getTeamData/');
+
   let upstream;
   try {
-    upstream = await fetch(`${UNDERSTAT_BASE}${path}`, {
-      // Understat returns HTML — a realistic browser UA avoids the occasional
-      // bot-detection 403. Accept text/html explicitly so we get the rendered
-      // page rather than any JSON variant they might add later.
-      headers: { 'User-Agent': USER_AGENT, Accept: 'text/html,application/xhtml+xml' },
+    upstream = await fetch(`${UNDERSTAT_BASE}${upstreamPath}`, {
+      headers: {
+        'User-Agent': USER_AGENT,
+        Accept: 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        // Understat's bot-detection has previously been sensitive to a
+        // missing Referer on direct/proxied requests — send the page a real
+        // browser session for this data would have come from.
+        Referer: `${UNDERSTAT_BASE}${path}`,
+      },
     });
   } catch (err) {
     return sendError(res, 502, `Understat fetch failed: ${err.message}`, null);
@@ -160,57 +195,42 @@ async function handleUnderstat(res, path) {
     return sendError(res, upstream.status, 'Understat upstream returned non-OK', upstream.status);
   }
 
-  let html;
+  let raw;
   try {
-    html = await upstream.text();
-  } catch (err) {
-    return sendError(res, 502, `Understat returned no body: ${err.message}`, upstream.status);
-  }
-
-  let data;
-  try {
-    data = extractUnderstatData(html);
-    if (!data || Object.keys(data).length === 0) {
-      throw new Error('No JSON.parse blocks found in Understat HTML');
-    }
+    raw = await upstream.json();
   } catch (err) {
     // Structured error envelope per Phase 3A deliverable — distinct status so
     // the client can degrade gracefully without confusing it with a network 5xx.
     res.status(422).json({
       error: 'parse_failed',
       source: 'understat',
-      detail: err.message,
+      detail: `Understat returned non-JSON: ${err.message}`,
     });
     return;
   }
 
   res.setHeader('Cache-Control', match.cache);
   res.setHeader('Content-Type', 'application/json');
-  res.status(200).json(data);
+  res.status(200).json(renameUnderstatKeys(raw));
 }
 
 /**
- * Extracts every `var <name> = JSON.parse('<uri-encoded-json>');` assignment
- * from an Understat HTML page and returns them keyed by variable name. Pure
- * vanilla string/regex; no npm packages (proxy rule, ARCHITECTURE.md §5).
+ * Understat's real endpoints return { teams, players, dates } (league) or
+ * { statistics, players, dates } (team) — renamed here to the {teamsData,
+ * playersData, datesData} shape the client (js/engine/style.js, form.js) has
+ * always consumed, so the Phase 3A→3B upstream-schema migration is fully
+ * contained to this proxy and no client code needed to change. `statistics`
+ * (team endpoint only, no league equivalent) passes through unrenamed — the
+ * client doesn't currently read it, kept only for forward compatibility.
  *
- * The captured payload is URI-encoded JSON — `decodeURIComponent` + `JSON.parse`
- * is the round-trip. Individual variable decode failures are swallowed so a
- * single malformed block doesn't kill the whole response; the outer handler
- * still 422s if zero blocks parsed.
+ * @param {object} raw
+ * @returns {object}
  */
-function extractUnderstatData(html) {
-  const re = /var\s+(\w+)\s*=\s*JSON\.parse\('([\s\S]+?)'\)/g;
-  const out = {};
-  let m;
-  while ((m = re.exec(html)) !== null) {
-    const varName = m[1];
-    const encoded = m[2];
-    try {
-      out[varName] = JSON.parse(decodeURIComponent(encoded));
-    } catch {
-      // Skip individual decode failures — other variables may still parse.
-    }
-  }
+function renameUnderstatKeys(raw) {
+  if (!raw || typeof raw !== 'object') return raw;
+  const out = { ...raw };
+  if ('teams'   in out) { out.teamsData   = out.teams;   delete out.teams; }
+  if ('players' in out) { out.playersData = out.players; delete out.players; }
+  if ('dates'   in out) { out.datesData   = out.dates;   delete out.dates; }
   return out;
 }

@@ -18,6 +18,7 @@ import {
 import { clamp, invert } from '../util.js';
 import {
   calcBaseDifficulty, calcVenueEffect, calcFixtureHistory,
+  buildRollingVenueStatsByTeamId,
 } from './fixtures.js';
 import {
   calcTeamForm, calcPlayerForm, calcPlayingLikelihood, buildUnderstatPlayerLookup,
@@ -35,19 +36,23 @@ import {
  * @param {Season} season   output of normaliseSeason
  * @param {object} [opts]
  * @param {object} [opts.playerSummariesById]  playerId → PlayerSummary (may be partial)
- * @param {object} [opts.leagueXg]             Understat league/EPL payload (Phase 3A); null when unavailable
+ * @param {object} [opts.leagueXg]             Understat league/EPL payload, current season (Phase 3A); null when unavailable
+ * @param {object} [opts.leagueXgPrev]         Understat league/EPL payload, LAST season (Phase 3B) — feeds only
+ *   calcHomeAwaySplit's rolling window (engine/fixtures.js); null when unavailable
  * @param {number} [opts.currentGw]            override; defaults to season.currentGw, then nextGw, then 1
  * @returns {object} ctx consumed by calcBase/HomeAway/Form/Style/Counter/FixtureHistory.
  *
  *   ctx shape:
- *     teamsById:           Object<teamId, Team>           (passthrough)
- *     playersByTeamId:     Object<teamId, Player[]>       (derived)
- *     fixtures:            Fixture[]                       (passthrough, sorted)
- *     playedFixtures:      Fixture[]                       (derived: f.played && f.result)
- *     playerSummariesById: Object<playerId, PlayerSummary> (passthrough, possibly {})
- *     leagueXg:            object | null                   (passthrough — Phase 3A)
- *     currentGw:           number
- *     leagueAvgStrength:   number  (mean of team.strength.overall across the league)
+ *     teamsById:                 Object<teamId, Team>           (passthrough)
+ *     playersByTeamId:           Object<teamId, Player[]>       (derived)
+ *     fixtures:                  Fixture[]                       (passthrough, sorted)
+ *     playedFixtures:            Fixture[]                       (derived: f.played && f.result)
+ *     playerSummariesById:       Object<playerId, PlayerSummary> (passthrough, possibly {})
+ *     leagueXg:                  object | null                   (passthrough — Phase 3A)
+ *     leagueXgPrev:              object | null                   (passthrough — Phase 3B)
+ *     rollingVenueStatsByTeamId: object                           (derived — Phase 3B, calcHomeAwaySplit input)
+ *     currentGw:                 number
+ *     leagueAvgStrength:         number  (mean of team.strength.overall across the league)
  */
 export function buildScoreContext(season, opts = {}) {
   if (!season || !season.teamsById) {
@@ -82,6 +87,17 @@ export function buildScoreContext(season, opts = {}) {
     ? buildUnderstatPlayerLookup(leagueXg)
     : null;
 
+  // Phase 3B: precompute calcHomeAwaySplit's rolling cross-season window once
+  // per ctx, same idiom as xgProfilesByTeamId above — never recomputed per
+  // fixture. leagueXgPrev (last season) exists ONLY to feed this; nothing
+  // else in the engine reads it. Always call — buildRollingVenueStatsByTeamId
+  // itself degrades to {} when both payloads are null/absent, and
+  // calcHomeAwaySplit already falls back to FPL fixtures for anything missing
+  // here, so there is no "skip when unavailable" branch needed.
+  const leagueXgPrev = opts.leagueXgPrev ?? null;
+  const rollingVenueStatsByTeamId =
+    buildRollingVenueStatsByTeamId(leagueXg, leagueXgPrev, season.teamsById);
+
   return {
     teamsById:           season.teamsById,
     playersByTeamId,
@@ -94,6 +110,11 @@ export function buildScoreContext(season, opts = {}) {
     leagueXg,
     xgProfilesByTeamId,
     understatPlayersByName,
+    // Phase 3B — last season's Understat payload, and the rolling venue stats
+    // derived from it plus leagueXg. See buildRollingVenueStatsByTeamId
+    // (engine/fixtures.js) and FEATURE_ENGINE.md §3.1.
+    leagueXgPrev,
+    rollingVenueStatsByTeamId,
     currentGw:           opts.currentGw ?? season.currentGw ?? season.nextGw ?? 1,
     leagueAvgStrength,
   };
