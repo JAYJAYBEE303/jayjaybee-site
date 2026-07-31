@@ -448,12 +448,12 @@ value = clamp(0, 100, 50 + edge * RELATIVE_EDGE_SENSITIVITY)
 `value` maps to a band string (drives colour everywhere — see `CONVENTIONS.md` §5.2):
 ```
 75–100 → 'great'
-61–74  → 'good'
-40–60  → 'neutral'
-26–39  → 'tough'
+60–74  → 'good'
+41–59  → 'neutral'
+26–40  → 'tough'
  0–25  → 'brutal'
 ```
-Band thresholds are config, not literals, so the palette can be re-calibrated after observing a season's distribution. Symmetric around the neutral midpoint (50): 'good'/'tough' are each 14 points wide either side of 'neutral', 'great'/'brutal' cover the remaining tails equally. Retuned from an earlier narrower 67/58/43/34 split.
+Band thresholds are config, not literals, so the palette can be re-calibrated after observing a season's distribution. Symmetric around the neutral midpoint (50): 'good'/'tough' are each 15 points wide either side of 'neutral', 'great'/'brutal' cover the remaining tails equally. An initial 40–60 neutral band read as too wide once seen live (40 and 60 both showing 'neutral' looked wrong), so it was narrowed to 41–59. Retuned from an earlier narrower-still 67/58/43/34 split before that.
 
 ### 8.5 Output shape (matches `ARCHITECTURE.md` §8)
 ```js

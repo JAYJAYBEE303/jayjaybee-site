@@ -542,8 +542,8 @@ export const CONFIDENCE_FLOOR = 0.5;
 // See FEATURE_ENGINE.md §8.4. CSS modifier classes must match these strings.
 export const BANDS = {
   great:   75,
-  good:    61,
-  neutral: 40,
+  good:    60,
+  neutral: 41,
   tough:   26,
   brutal:   0,
 };
