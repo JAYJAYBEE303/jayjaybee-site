@@ -241,16 +241,52 @@ export const LEAGUE_AVG_STRENGTH = 1150;
 // ─── §6  Team style profiling ─────────────────────────────────────────────────
 
 // Declarative interaction rules for calcStyleClash (engine/style.js).
-// Each rule contributes (sign * magnitude) to clashDelta for team A.
-//   sign +1 → A-high on axisA AND B-high on axisB favours A
-//   sign -1 → same combination disfavours A
-// See FEATURE_ENGINE.md §6.2. Extend this array in Phase 3 once real xG data
-// replaces the Phase 1 proxy axes.
+//
+// Each rule contributes  sign * magnitude * aDev * bDev  to team A's style
+// delta, where aDev = (A[axisA] - 50) / 50 and bDev = (B[axisB] - 50) / 50,
+// each in -1..+1. The product is SIGNED — all four quadrants are meaningful,
+// which is the whole point: a style is not merely "active or not", it is an
+// exposure that cuts both ways. A high press is an asset against a side that
+// cannot play out and a liability against one that can, and only a signed
+// product can say both. (The pre-Phase-3B rules used a co-activation product
+// clamped at zero, which could only ever express "both teams high on their
+// axis" and silently discarded every mismatch — the exact situations a style
+// clash is supposed to detect.)
+//
+// AXES ARE STYLE, NOT QUALITY. Every axis below is deliberately chosen to be
+// roughly orthogonal to how *good* a team is: a mid-table side can press as
+// hard as a title contender. Quality already enters the composite through
+// baseDifficulty (0.30) and teamForm (0.16) — a style rule built on xG-quality
+// axes would just re-weight team strength under a different name.
+//
+// See FEATURE_ENGINE.md §6.2 for the per-quadrant reading of each rule.
 export const STYLE_RULES = [
-  // High attackDirectness vs high defensiveHeight → A plays in behind B — favours A.
-  { axisA: 'attackDirectness', axisB: 'defensiveHeight', sign:  1, magnitude: 15 },
-  // B's high tempo drags a low-tempo A into an end-to-end game it dislikes.
-  { axisA: 'tempo',            axisB: 'tempo',            sign: -1, magnitude: 10 },
+  // A presses high; B's ability to play out from the back decides whether that
+  // press is a weapon or a liability.
+  //   A presses / B poor under pressure  → turnovers in dangerous areas   (+)
+  //   A presses / B press-resistant      → the press is played through    (−)
+  //   A sits off / B press-resistant     → the standard way to smother a
+  //                                        possession side                (+)
+  //   A sits off / B poor under pressure → A declines the obvious route
+  //                                        to hurt them                   (−)
+  { axisA: 'pressIntensity', axisB: 'buildUpControl', sign: -1, magnitude: 12 },
+
+  // A plays direct / in transition; B's press height sets how much grass sits
+  // behind B's defensive line. A high press is mechanically a high line — you
+  // cannot press the ball 60 yards from your own goal with a deep block.
+  //   A direct / B high press → the ball in behind, the classic counter   (+)
+  //   A direct / B deep block → direct balls into a packed penalty area   (−)
+  //   A patient / B high press → A gets pinned trying to play out          (−)
+  //   A patient / B deep block → no press to beat, A builds freely         (+)
+  { axisA: 'transitionDirectness', axisB: 'pressIntensity', sign: 1, magnitude: 10 },
+
+  // A relies on sustained territory; B's compactness near its own box decides
+  // whether that territory converts into real chances.
+  //   A territorial / B compact → possession without penetration          (−)
+  //   A territorial / B open    → repeatedly played through               (+)
+  //   A not territorial / B compact → B's main defensive strength is idle  (+)
+  //   A not territorial / B open    → A cannot exploit the openness        (−)
+  { axisA: 'territorialThreat', axisB: 'defensiveCompactness', sign: -1, magnitude: 8 },
 ];
 
 // Anchors used to normalise the three Phase-1 style-profile axes from raw

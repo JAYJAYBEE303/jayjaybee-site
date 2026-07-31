@@ -316,6 +316,13 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
         profileA:   style.profileA,
         profileB:   style.profileB,
         clashDelta: style.clashDelta,
+        // §6.2 mirroring inputs, so the UI can explain a style verdict rather
+        // than just print it (ARCHITECTURE.md §12 rule 6). opponentClashDelta
+        // is the same rule set run the other way; `edge` is their signed gap,
+        // which is what the displayed value is actually derived from.
+        opponentClashDelta: style.opponentClashDelta,
+        edge:               style.edge,
+        terms:              style.terms,
       },
       history: {
         value:      history.value,

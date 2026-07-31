@@ -405,6 +405,8 @@ function buildBreakdownRows(breakdown, venue) {
       ? ' title="Shows the OPPONENT\'s strength — a high number means a tougher opponent for this team. The bar colour reflects how good this fixture is for this team, same as every other row."'
       : key === 'counterMatchup'
       ? ` title="${esc(`Blend of Attacking Counters (${Math.round(m.attackingValue)} — this team's attack vs the opponent's defence) and Defending Counters (${Math.round(m.defendingValue)} — this team's defence vs the opponent's attack). See the sections below for the pairing-level detail.`)}"`
+      : key === 'styleClash'
+      ? ` title="${esc(styleClashTooltip(m))}"`
       : '';
     const label = key === 'homeAway'
       ? (venue === 'Home' ? 'Home Advantage' : 'Away Disadvantage')
@@ -422,6 +424,49 @@ function buildBreakdownRows(breakdown, venue) {
       </div>
     `.trim();
   }).join('');
+}
+
+// Plain-English name for each style rule, keyed by the rule's two axes. Kept
+// beside the renderer rather than in config.js for the same reason
+// PAIRING_LABELS lives here: config holds the model, the module holds the
+// wording. A rule with no entry falls back to its raw axis names, so adding a
+// STYLE_RULE without touching this map degrades to something readable rather
+// than rendering "undefined".
+const STYLE_RULE_LABELS = {
+  'pressIntensity|buildUpControl':          'press vs their build-up',
+  'transitionDirectness|pressIntensity':    'directness vs their press height',
+  'territorialThreat|defensiveCompactness': 'territory vs their compactness',
+};
+
+/**
+ * Tooltip for the Style Clash breakdown row. Names the rules that actually
+ * moved the number and in which direction, so a user can tell a genuine
+ * stylistic edge from a rounding artefact.
+ *
+ * @param {object} m  breakdown.styleClash
+ * @returns {string}  plain text; the caller escapes it.
+ */
+function styleClashTooltip(m) {
+  if (m.estimated) {
+    return 'Not enough style data for both teams — Understat pressing and '
+      + 'territory numbers are needed for this metric, so it sits at a neutral '
+      + '50 and does not affect the score.';
+  }
+
+  // Biggest movers first; anything under half a point is noise, not a story.
+  const movers = (m.terms || [])
+    .filter(t => Math.abs(t.contribution) >= 0.5)
+    .sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution))
+    .map(t => {
+      const label = STYLE_RULE_LABELS[`${t.axisA}|${t.axisB}`] || `${t.axisA} vs ${t.axisB}`;
+      return `${t.contribution > 0 ? '+' : '−'} ${label}`;
+    });
+
+  const head = 'How these two teams play against each other, scored so the '
+    + 'home and away numbers always total 100.';
+  return movers.length
+    ? `${head} Main factors for this team: ${movers.join(', ')}.`
+    : `${head} No strong stylistic pull either way in this fixture.`;
 }
 
 // ─── Build: counter-matchup pairings ─────────────────────────────────────────

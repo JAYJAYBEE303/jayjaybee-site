@@ -165,29 +165,78 @@ teamForm = normaliseLinear(rawForm, across all teams)
 **Purpose:** Some fixtures are "easy on paper" but stylistically dangerous (e.g. a possession-light counter-attacking side hosting a high line). This metric models *how two teams' styles interact*, not just how strong they are.
 
 ### 6.1 Style profile (`calcStyleProfile(team)`)
-With FPL-only data in Phase 1, profile each team on three proxy axes, each 0–100:
+
+The profile carries two distinct groups of axes, and the distinction is the whole point of the metric.
+
+**Quality axes** (xG-derived, Phase 3A). Retained for display and for pre-3B callers. **`STYLE_RULES` no longer consume these.**
 ```
-attackDirectness  = proxy from goals-per-shot / quick-scoring patterns
-                    (Phase 1 proxy: goals scored vs xG overperformance + early-game goals)
-defensiveHeight   = proxy from goals conceded profile + clean-sheet rate
-                    (high line ↔ concede fewer-but-bigger chances)
-tempo             = proxy from total goals in their matches (for + against) per game
-                    (high-tempo, end-to-end teams vs low-event teams)
+attackDirectness  = normalise(xG per game,  league min–max)
+defensiveHeight   = invert(normalise(xGA per game, league min–max))
+tempo             = normalise((xG + xGA) per game, league min–max)
 ```
-- These are **acknowledged proxies** (`// MODEL:` tagged). True possession/PPDA data is not in the FPL API; Phase 3 may replace these proxies with real xG/xGA and pressing data via an external source through the proxy (see `ARCHITECTURE.md` §7).
+
+**Style axes** (Phase 3B — PPDA and deep completions from the same Understat `league/EPL` payload already fetched for xG). These are what the clash is computed from. Each 0–100, `null` when unavailable:
+```
+pressIntensity       = invert(normalise(PPDA))              # low PPDA = presses hard and high
+buildUpControl       = normalise(PPDA-allowed)              # high = opponents can't disrupt our build-up
+territorialThreat    = normalise(deep completions / game)   # sustained entries within ~20m of goal
+defensiveCompactness = invert(normalise(deep conceded/game))# low conceded = compact block
+transitionDirectness = normalise(npxG per deep completion)  # threat per entry: high = direct/transition
+```
+
+**Why the split exists.** The quality axes measure how *good* a team is, and team quality already enters the composite twice — `baseDifficulty` (0.30) and `teamForm` (0.16). A "style" verdict derived from them was largely restating who the better side is, at 0.10 weight, under a different name. Every 3B axis is deliberately **quality-neutral**: a mid-table side can press as hard as a title contender, and `transitionDirectness` is a *ratio*, so being good at football lifts numerator and denominator together.
+
+Aggregation notes:
+- PPDA is a ratio of two counts, so numerators and denominators are summed across the season and divided **once**. A mean of per-match ratios would let one low-possession match dominate.
+- `npxG` (penalties stripped) feeds the style axes — a penalty is a restart, not evidence about open-field method.
+- Understat publishes `ppda` as `{att, def}`; `readPpdaPair` also accepts a pre-divided number so a payload shape change degrades instead of silently zeroing a team.
+
+**Availability is all-or-nothing per team** (`hasStyleAxes`). Every axis needs `ppda`, `ppda_allowed`, `deep` and `deep_allowed`, plus at least two teams in the league with usable inputs (no spread, no normalisation). When unavailable the axes are `null`, never `50` — a neutral-looking number is indistinguishable from a genuine mid-table reading, and the rules would happily multiply it into a confident-looking zero. **The FPL-proxy profile has no style axes at all**: goals and clean sheets describe outcomes, not method.
 
 ### 6.2 Style clash score (`calcStyleClash(teamA, teamB)`)
-**Purpose:** Translate the interaction of two profiles into an advantage for A. Style clash is about *mismatches*, so it is computed as directional matchups, not similarity.
+**Purpose:** translate the interaction of two profiles into an advantage for A. Style clash is about *mismatches*, so it is computed as directional matchups, not similarity.
+
+**Signed products, not co-activation.** Each rule contributes:
 ```
-# Examples of modelled interactions (each contributes a signed delta for A):
-#  - A high attackDirectness vs B high defensiveHeight  → favours A (pace in behind)
-#  - A low tempo vs B high tempo                         → B drags A into a game it dislikes → disfavours A
-#  - A strong attack axis vs B weak corresponding defence axis → favours A
-clashDelta = Σ over modelled interaction rules of (ruleSign * ruleMagnitude)
-styleClash = clamp(0,100, 50 + clashDelta)     # centred at 50 = neutral clash
+aDev = (A[axisA] − 50) / 50        # −1..+1
+bDev = (B[axisB] − 50) / 50        # −1..+1
+term = ruleSign * ruleMagnitude * aDev * bDev
 ```
-- The interaction rules and their magnitudes live in `config.js` as a small declarative table (`STYLE_RULES`) so the model is editable without touching logic.
-- **MODEL:** if either team lacks enough games to profile (`< MIN_VENUE_GAMES`), return 50, `estimated: true`. Style is the most speculative metric in Phase 1; weight it modestly (see §8) and lean on it more as data accrues / Phase 3 adds real inputs.
+All four quadrants are meaningful, because a style is an *exposure*, not a switch. The pre-3B version used `max(0, aDev) * max(0, bDev)`, which could only ever express "both teams high on their axis" and discarded every mismatch — the only situations a style clash exists to find. It also documented an interaction (a high-tempo B dragging a low-tempo A into a game it dislikes) that the co-activation formula made **mathematically unreachable**.
+
+The three rules in `config.js → STYLE_RULES`, with the reading in every quadrant:
+
+| Rule | Quadrant | Reading |
+|---|---|---|
+| `pressIntensity` × `buildUpControl`, sign −1, mag 12 | A presses / B poor under pressure | turnovers in dangerous areas → **+** |
+| | A presses / B press-resistant | the press is played through → **−** |
+| | A sits off / B press-resistant | the standard way to smother a possession side → **+** |
+| | A sits off / B poor under pressure | A declines the obvious route to hurt them → **−** |
+| `transitionDirectness` × `pressIntensity`, sign +1, mag 10 | A direct / B high press | ball in behind the high line → **+** |
+| | A direct / B deep block | direct balls into a packed box → **−** |
+| | A patient / B high press | A gets pinned trying to play out → **−** |
+| | A patient / B deep block | no press to beat, A builds freely → **+** |
+| `territorialThreat` × `defensiveCompactness`, sign −1, mag 8 | A territorial / B compact | possession without penetration → **−** |
+| | A territorial / B open | repeatedly played through → **+** |
+| | A not territorial / B compact | B's main defensive strength is idle → **+** |
+| | A not territorial / B open | A can't exploit the openness → **−** |
+
+A high press is mechanically a high line — you cannot press the ball 60 yards from your own goal with a deep block — which is what licenses `pressIntensity` standing in for "space in behind" in rule 2.
+
+**Mirroring (the two sides total exactly 100).** Running the rules once from A's side gives an absolute read that cannot be compared across a fixture: A's rules ask "does A's press trouble B's build-up?", B's rules ask a different question about different axes, so two awkward-to-play-against sides both score well and the fixture looks good for everyone. Same fix as §7.2's mirrored pairings and §8.7's relative composite — *derive, don't independently compute*:
+```
+deltaOwn = rules applied A-against-B
+deltaOpp = rules applied B-against-A
+edge     = deltaOwn − deltaOpp
+styleClash = clamp(0, 100, 50 + edge / 2)
+```
+Halving the gap is what puts the pair on a shared 100. `calcStyleClash(B, A)` computes the identical pair in swapped order, so it always returns `50 − edge/2`, and `clamp(0,100,v) + clamp(0,100,100−v) ≡ 100` for every real `v` — **exact, including at the rails**. Worked example: raw reads of 50 and 80 become 35 and 65 — the 30-point gap survives intact, it is only re-centred on 50.
+
+**Range in practice.** Theoretical cap is 50 ± 30 (Σ magnitudes). Against 20 teams with independent axes the observed spread is roughly p10 45 → p90 55, tails to ~35/65. At 0.10 weight that is typically ±0.5 composite points and at most ~±1.5 — a genuine tiebreaker on a 50/50 fixture, never a driver.
+
+- Rules and magnitudes live in `config.js` as a declarative table (`STYLE_RULES`), editable without touching logic.
+- **MODEL:** the score is a flagged neutral 50 unless **both** sides have real style axes *and* enough matches (`>= MIN_VENUE_GAMES`). On an Understat outage every fixture returns 50 rather than a style verdict inferred from goals — absence of information is not evidence (§1 rule 3). A flagged 50 costs nothing downstream: §8.6 skips estimated metrics entirely and §8.3 drops confidence to match.
+- `calcStyleClash` returns `terms` and `opponentTerms` (per-rule `aDev`, `bDev`, `contribution`) so the matchup UI can name *which* stylistic factors moved the number rather than just printing it (`ARCHITECTURE.md` §12 rule 6).
 
 ---
 
