@@ -36,9 +36,9 @@ const METRIC_ORDER = [
   'baseDifficulty',
   'counterMatchup',
   'teamForm',
+  'history',
   'homeAway',
   'styleClash',
-  'history',
 ];
 
 // Attacking pairing labels. Covers both the role-mode keys (stVsCb/wmVsFb/

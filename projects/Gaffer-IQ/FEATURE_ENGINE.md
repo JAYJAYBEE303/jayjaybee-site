@@ -383,33 +383,31 @@ This is where everything combines into the single 0–100 number (per team, per 
 ```
 WEIGHTS = {
   baseDifficulty:  0.30,   // strength priors — the dependable floor
-  counterMatchup:  0.28,   // attacking AND defending pairings blended (§7.2)
-  teamForm:        0.16,   // recent trajectory, opponent-adjusted
-  homeAway:        0.13,   // venue performance this season
-  styleClash:      0.10,   // stylistic interaction — Understat xG-backed (Phase 3A)
-  history:         0.03    // H2H nudge (thin data, low trust)
+  counterMatchup:  0.20,   // attacking AND defending pairings blended (§7.2)
+  teamForm:        0.15,   // recent trajectory, opponent-adjusted
+  history:         0.15,   // H2H nudge — real cross-season data (§4)
+  homeAway:        0.10,   // venue performance this season
+  styleClash:      0.10    // stylistic interaction — Understat xG-backed (Phase 3A)
 }   // sums to 1.00
 ```
 Rationale for the ordering:
-- **Base difficulty (0.30):** the largest single weight. Opponent quality is the only sub-metric that is *never* estimated — it is available from day one of a season and does not degrade when player summaries or Understat data are missing. History: 0.30 in Phase 1, cut to 0.25 in Phase 3A to fund the style weight, raised to 0.33 once it became clear the composite was under-weighting the single most decisive input, then trimmed slightly to **0.30** to help fund the counter-matchup rise below.
-- **Counter-matchup (0.28):** raised from 0.22. Previously `WEIGHTS.counterMatchup` consumed only a team's own attack vs the opponent's defence (`calcCounterMatchup`) — its own defensive quality against this opponent's attack earned no direct credit on its own composite, only an indirect, heavily-diluted one via the opponent's raw score in the §8.7 relative step. A team with an elite defence but a "mid" attack had that defensive strength essentially invisible to its own card. Now that the metric blends both pairings (`calcCombinedCounterMatchup`, §7.2), it carries roughly twice the underlying signal it used to, so its weight was raised to match — otherwise the blend would be a no-op for the final score (see the §7.2 "subtlety" note on why blending alone, without a weight change, cancels out algebraically in the relative step). It's now nearly as large as base difficulty, reflecting that Gaffer IQ's signature metric should matter close to as much as raw opponent strength.
+- **Base difficulty (0.30):** the largest single weight. Opponent quality is the only sub-metric that is *never* estimated — it is available from day one of a season and does not degrade when player summaries or Understat data are missing.
+- **Counter-matchup (0.20):** Gaffer IQ's signature metric — blends both pairings (`calcCombinedCounterMatchup`, §7.2), so a team's own attack AND defence both earn direct credit on its own composite.
+- **Form (0.15)** and **H2H (0.15):** raised to parity once §4's `calcFixtureHistory` moved off this-season-only FPL fixtures onto real cross-season Understat match data (up to `N_H2H=8` real meetings across 4 seasons) — no longer thin enough to justify a token weight. Live-checked case: Fulham vs Chelsea's actual 4-2 record over 6 meetings now resolves to 67/33, not a flat 50/50.
+- **Home/away (0.10)** and **style (0.10):** real signals, still the two most granular/noisy inputs — venue splits and stylistic axis interactions both carry a wider natural spread of uncertainty than the four above.
 
-  **The other four weights were trimmed to compensate**, preserving relative ordering, so the total still lands on exactly 1.00:
+  Full history of this table (weights before the current pass, `config.js` §8.1):
 
-  | Weight | Before | After |
-  |---|---|---|
-  | `baseDifficulty` | 0.33 | 0.30 |
-  | `counterMatchup` | 0.22 | **0.28** |
-  | `teamForm` | 0.18 | 0.16 |
-  | `homeAway` | 0.13 | 0.13 |
-  | `styleClash` | 0.11 | 0.10 |
-  | `history` | 0.03 | 0.03 |
+  | Weight | Phase 1 | Pre-rebalance | Current |
+  |---|---|---|---|
+  | `baseDifficulty` | 0.33 | 0.30 | 0.30 |
+  | `counterMatchup` | 0.22 | 0.28 | **0.20** |
+  | `teamForm` | 0.18 | 0.16 | **0.15** |
+  | `history` | 0.03 | 0.03 | **0.15** |
+  | `homeAway` | 0.13 | 0.13 | **0.10** |
+  | `styleClash` | 0.11 | 0.10 | **0.10** |
 
-- **Form (0.16)** and **home/away (0.13):** strong, well-evidenced signals.
-- **Style (0.10):** raised from 0.07 to 0.12 in Phase 3A once real Understat xG / xGA replaced the Phase 1 goals/clean-sheet proxies, then trimmed to 0.10 here. Still modest because style interactions are genuinely noisy, but no longer speculative.
-- **History (0.03):** deliberately small — H2H data is thin and football H2H is weakly predictive.
-
-> **The base-difficulty weight and the §8.6 stacking penalty are a matched pair.** Raising base difficulty to 0.33 on its own would make a strong favourite's score nearly immovable — no realistic combination of secondary metrics could shift it. §8.6 is what restores the ability of *several* bad secondary signals to tip a fixture, without letting any *single* one do so. Do not tune one without re-checking the other.
+> **The base-difficulty weight and the §8.6 stacking penalty are a matched pair.** Raising base difficulty on its own would make a strong favourite's score nearly immovable — no realistic combination of secondary metrics could shift it. §8.6 is what restores the ability of *several* bad secondary signals to tip a fixture, without letting any *single* one do so. Do not tune one without re-checking the other.
 
 ### 8.2 Combination
 ```
@@ -417,9 +415,9 @@ linearValue =
     WEIGHTS.baseDifficulty * invert(baseDifficulty)   # §2 direction exception
   + WEIGHTS.counterMatchup * counterMatchup
   + WEIGHTS.teamForm       * teamForm
+  + WEIGHTS.history        * history
   + WEIGHTS.homeAway       * homeAway
-  + WEIGHTS.styleClash     * styleClash
-  + WEIGHTS.history        * history          # all sub-metrics already 0–100
+  + WEIGHTS.styleClash     * styleClash          # all sub-metrics already 0–100
 
 ownRawValue = clamp(0, 100, linearValue - stackingPenalty)   # §8.6 — independent, per-team
 
@@ -487,7 +485,7 @@ CompositeScore = {
 
 **Formula:**
 ```
-STACK_METRICS = [counterMatchup, teamForm, homeAway, styleClash, history]
+STACK_METRICS = [counterMatchup, teamForm, history, homeAway, styleClash]
                 # baseDifficulty EXCLUDED — see below
 
 for each m in STACK_METRICS:

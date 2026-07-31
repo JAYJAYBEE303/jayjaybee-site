@@ -156,7 +156,7 @@ function bandFromValue(value) {
 // not one of the things that can pile up against it. Kept here rather than in
 // config.js because it is structural (which metrics are secondary), not a
 // tunable — same call as ROLE_ATTACK_GROUPS in counter.js.
-const STACK_METRICS = ['counterMatchup', 'teamForm', 'homeAway', 'styleClash', 'history'];
+const STACK_METRICS = ['counterMatchup', 'teamForm', 'history', 'homeAway', 'styleClash'];
 
 /**
  * How much to deduct from a fixture's weighted composite because MULTIPLE
@@ -282,9 +282,9 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
       (WEIGHTS.baseDifficulty * invert(base.value))
     + (WEIGHTS.counterMatchup * counter.value)
     + (WEIGHTS.teamForm       * form.value)
+    + (WEIGHTS.history        * history.value)
     + (WEIGHTS.homeAway       * venue.value)
-    + (WEIGHTS.styleClash     * style.value)
-    + (WEIGHTS.history        * history.value);
+    + (WEIGHTS.styleClash     * style.value);
 
   // §8.6 conditional term. Built from the same sub-metric shapes the breakdown
   // below reports, so it needs their { value, weight, estimated } triples — hence
@@ -292,9 +292,9 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
   const stack = calcStackingPenalty({
     counterMatchup: { value: counter.value, weight: WEIGHTS.counterMatchup, estimated: counter.estimated },
     teamForm:       { value: form.value,    weight: WEIGHTS.teamForm,       estimated: form.estimated },
+    history:        { value: history.value, weight: WEIGHTS.history,        estimated: history.estimated },
     homeAway:       { value: venue.value,   weight: WEIGHTS.homeAway,       estimated: venue.estimated },
     styleClash:     { value: style.value,   weight: WEIGHTS.styleClash,     estimated: style.estimated },
-    history:        { value: history.value, weight: WEIGHTS.history,        estimated: history.estimated },
   });
 
   const value = clamp(0, 100, linearValue - stack.penalty);
@@ -306,9 +306,9 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
       (base.estimated    ? 0 : WEIGHTS.baseDifficulty)
     + (counter.estimated ? 0 : WEIGHTS.counterMatchup)
     + (form.estimated    ? 0 : WEIGHTS.teamForm)
+    + (history.estimated ? 0 : WEIGHTS.history)
     + (venue.estimated   ? 0 : WEIGHTS.homeAway)
-    + (style.estimated   ? 0 : WEIGHTS.styleClash)
-    + (history.estimated ? 0 : WEIGHTS.history);
+    + (style.estimated   ? 0 : WEIGHTS.styleClash);
 
   return {
     value,
@@ -357,6 +357,13 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
         trend:     form.trend,
         games:     form.games,
       },
+      history: {
+        value:      history.value,
+        weight:     WEIGHTS.history,
+        estimated:  history.estimated,
+        meetings:   history.meetings,
+        pointsForA: history.pointsForA,
+      },
       homeAway: {
         value:        venue.value,
         weight:       WEIGHTS.homeAway,
@@ -385,13 +392,6 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
         opponentClashDelta: style.opponentClashDelta,
         edge:               style.edge,
         terms:              style.terms,
-      },
-      history: {
-        value:      history.value,
-        weight:     WEIGHTS.history,
-        estimated:  history.estimated,
-        meetings:   history.meetings,
-        pointsForA: history.pointsForA,
       },
     },
   };

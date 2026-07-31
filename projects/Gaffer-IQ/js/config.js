@@ -451,13 +451,18 @@ export const COUNTER_DEFENCE_WEIGHT = 0.5;
 // four non-baseDifficulty weights were trimmed to compensate (baseDifficulty
 // itself also trimmed slightly), preserving relative ordering, so the total
 // still lands on exactly 1.00. See FEATURE_ENGINE.md §7.2 and §8.1.
+// MODEL: rebalanced again — counterMatchup 0.28→0.20, history 0.03→0.15
+// (raised to parity with teamForm now that §4's calcFixtureHistory draws on
+// real cross-season Understat data instead of this-season-only FPL fixtures
+// — no longer thin enough to justify a token weight), homeAway 0.13→0.10.
+// baseDifficulty/styleClash unchanged. Still sums to 1.00. See FEATURE_ENGINE.md §8.1.
 export const WEIGHTS = {
   baseDifficulty: 0.30,   // strength priors — always available, the dependable floor
-  counterMatchup: 0.28,   // attacking AND defending pairings blended (§7.2)
-  teamForm:       0.16,   // recent trajectory, opponent-quality adjusted
-  homeAway:       0.13,   // venue performance this season
+  counterMatchup: 0.20,   // attacking AND defending pairings blended (§7.2)
+  teamForm:       0.15,   // recent trajectory, opponent-quality adjusted
+  history:        0.15,   // H2H nudge — raised now that it draws on real cross-season data (§4)
+  homeAway:       0.10,   // venue performance this season
   styleClash:     0.10,   // stylistic interaction — Understat xG-backed (Phase 3A)
-  history:        0.03,   // H2H nudge — deliberately tiny; data is thin and weakly predictive
 };
 
 // ─── §8.6  Stacking penalty (conditional interaction across sub-metrics) ─────
