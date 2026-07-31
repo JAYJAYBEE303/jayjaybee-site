@@ -31,10 +31,11 @@ const state = {
   // Nothing else in the engine reads this; Style Clash/calcStyleProfile stay
   // on the current season only.
   leagueXgPrev: null,
-  // Phase 4 — two seasons ago's leagueXg payload, fetched purely to deepen
-  // calcFixtureHistory's cross-season H2H window (N_H2H=6, config.js). Nothing
-  // else in the engine reads this.
+  // Phase 4 — two/three seasons ago's leagueXg payloads, fetched purely to
+  // deepen calcFixtureHistory's cross-season H2H window (N_H2H=8,
+  // config.js). Nothing else in the engine reads these.
   leagueXgPrev2: null,
+  leagueXgPrev3: null,
   teamXg: {},
   activeHorizon: 'GW1',
   // The user's squad: an ordered array of player IDs (max 15), shared by every
@@ -88,6 +89,7 @@ function getAllPlayerSummaries()       { return state.playerSummaries; }
 function getLeagueXg()                { return state.leagueXg; }
 function getLeagueXgPrev()            { return state.leagueXgPrev; }
 function getLeagueXgPrev2()           { return state.leagueXgPrev2; }
+function getLeagueXgPrev3()           { return state.leagueXgPrev3; }
 function getTeamXg(teamSlug)          { return state.teamXg[teamSlug] ?? null; }
 function getActiveHorizon()           { return state.activeHorizon; }
 function getSquad()                   { return state.squad; }
@@ -123,6 +125,10 @@ function setLeagueXgPrev(data) {
 
 function setLeagueXgPrev2(data) {
   state.leagueXgPrev2 = data;
+}
+
+function setLeagueXgPrev3(data) {
+  state.leagueXgPrev3 = data;
 }
 
 function setTeamXg(teamSlug, data) {
@@ -161,6 +167,7 @@ function setError(err) {
   state.leagueXg = null;
   state.leagueXgPrev = null;
   state.leagueXgPrev2 = null;
+  state.leagueXgPrev3 = null;
   state.lastRefreshAt = null;
   try { sessionStorage.removeItem(SS_KEY_SEASON); } catch { /* non-fatal */ }
   state.lastError = err;
@@ -177,6 +184,7 @@ function clearCache() {
   state.leagueXg = null;
   state.leagueXgPrev = null;
   state.leagueXgPrev2 = null;
+  state.leagueXgPrev3 = null;
   state.teamXg = {};
   state.lastRefreshAt = null;
   state.lastError = null;
@@ -216,9 +224,9 @@ export const store = {
   getSeason, getTeams, getTeam, getPlayers, getPlayer,
   getFixtures, getFixture, getPositions, getEvents,
   getCurrentGw, getNextGw, getPlayerSummary, getAllPlayerSummaries,
-  getLeagueXg, getLeagueXgPrev, getLeagueXgPrev2, getTeamXg,
+  getLeagueXg, getLeagueXgPrev, getLeagueXgPrev2, getLeagueXgPrev3, getTeamXg,
   getActiveHorizon, getSquad, getError, getLastRefreshAt, isFresh,
-  setSeason, setPlayerSummary, setLeagueXg, setLeagueXgPrev, setLeagueXgPrev2, setTeamXg,
+  setSeason, setPlayerSummary, setLeagueXg, setLeagueXgPrev, setLeagueXgPrev2, setLeagueXgPrev3, setTeamXg,
   setActiveHorizon, setSquad, setError, markDataReady,
   clearCache,
 };

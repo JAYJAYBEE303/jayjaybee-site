@@ -152,17 +152,17 @@ so the two sides of one fixture are always symmetric around 50 — a large venue
 
 **Purpose:** A small, deliberately low-weight nudge for persistent matchup patterns ("Team A always struggles at Team B").
 
-**Inputs:** cross-season Understat fixture lists — `ctx.leagueXg.datesData` (this season), `ctx.leagueXgPrev.datesData` (last season), `ctx.leagueXgPrev2.datesData` (two seasons ago) — each the FULL league schedule for that season (`{h:{title}, a:{title}, goals:{h,a}, isResult, datetime}` per match), not a per-team payload. Meetings between the two teams are pulled out by matching `h.title`/`a.title` against each team's name/shortName via `canonicalClubKey` (same resolver as §3.1's venue matching — never by Understat's own numeric ids). Falls back to `ctx.playedFixtures` (this-season-only FPL fixtures) when Understat has no name match for either team (promoted side, outage).
+**Inputs:** cross-season Understat fixture lists — `ctx.leagueXg.datesData` (this season), `ctx.leagueXgPrev.datesData` (last season), `ctx.leagueXgPrev2.datesData` (two seasons ago), `ctx.leagueXgPrev3.datesData` (three seasons ago) — each the FULL league schedule for that season (`{h:{title}, a:{title}, goals:{h,a}, isResult, datetime}` per match), not a per-team payload. Meetings between the two teams are pulled out by matching `h.title`/`a.title` against each team's name/shortName via `canonicalClubKey` (same resolver as §3.1's venue matching — never by Understat's own numeric ids). Falls back to `ctx.playedFixtures` (this-season-only FPL fixtures) when Understat has no name match for either team (promoted side, outage).
 
 **Formula:**
 ```
-meetings = last N_H2H meetings across the 3 fetched seasons (default 6), oldest→newest
+meetings = last N_H2H meetings across the 4 fetched seasons (default 8), oldest→newest
            falls back to this-season FPL fixtures if Understat found none
 A_points = points A took across those meetings (3/1/0)
 historyScore = (A_points / (3 * meetings.length)) * 100
 ```
 - **NOT mirrored/zero-sum** (unlike §3.2's venue effect or §6.2's style clash) — each side's value is independently "% of available league points taken," so A and B's values do not need to sum to 100. Example: across 10 meetings where A won once and the other 9 were draws, A took 12/30 points → **40**, B took 9/30 → **30**. Both true simultaneously; nothing to balance.
-- Two teams meet twice a season, so 3 seasons of Understat data realistically caps meeting count around 6 — `N_H2H=6` reflects that ceiling, it doesn't promise a depth the data can't reach. Early in a season (current-season Understat data still thin/empty preseason) the realistic count is closer to 4, climbing to 6 as the season plays out.
+- Two teams meet twice a season, so 4 seasons of Understat data realistically caps meeting count around 8 — `N_H2H=8` reflects that ceiling, it doesn't promise a depth the data can't reach. Early in a season (current-season Understat data still thin/empty preseason) the realistic count is closer to 6, climbing to 8 as the season plays out.
 - **MODEL:** if fewer than 2 prior meetings exist (promoted teams, thin cross-season overlap, etc.), return **50** and flag `estimated: true`. This is also the sole confidence gate: composite confidence (§8.3) zeroes this metric's weight share whenever `estimated`, so a sub-2-meeting H2H never inflates prediction confidence. This factor has the lowest weight in §8 precisely because football H2H is weakly predictive even with real data.
 
 ---

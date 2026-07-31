@@ -109,6 +109,7 @@ function buildCtx() {
     leagueXg: store.getLeagueXg(),
     leagueXgPrev: store.getLeagueXgPrev(),
     leagueXgPrev2: store.getLeagueXgPrev2(),
+    leagueXgPrev3: store.getLeagueXgPrev3(),
     currentGw: store.getCurrentGw() ?? store.getNextGw() ?? 1,
   });
 }
