@@ -271,20 +271,38 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
   const style   = calcStyleClash(team, opponent, ctx);
   const history = calcFixtureHistory(team.id, opponentId, ctx);
 
+  // MODEL: confidence = weighted share of non-estimated sub-metrics. Computed
+  // BEFORE linearValue below because linearValue now divides by it — see §8.3.
+  const confidence =
+      (base.estimated    ? 0 : WEIGHTS.baseDifficulty)
+    + (counter.estimated ? 0 : WEIGHTS.counterMatchup)
+    + (form.estimated    ? 0 : WEIGHTS.teamForm)
+    + (history.estimated ? 0 : WEIGHTS.history)
+    + (venue.estimated   ? 0 : WEIGHTS.homeAway)
+    + (style.estimated   ? 0 : WEIGHTS.styleClash);
+
   // Weighted blend — every sub-metric is already 0–100, higher = better for `team`.
-  // WEIGHTS sums to 1.00 (config.js / FEATURE_ENGINE.md §8.1), so no re-normalisation.
+  // WEIGHTS sums to 1.00 (config.js / FEATURE_ENGINE.md §8.1).
   //
   // baseDifficulty is the ONE exception to the higher-is-better rule: it is
   // stored as the opponent's strength (higher = harder) because the UI shows it
   // that way, so it is inverted here before weighting. Removing this invert()
   // would make facing Man City *raise* a team's score. See FEATURE_ENGINE.md §2.
-  const linearValue =
-      (WEIGHTS.baseDifficulty * invert(base.value))
-    + (WEIGHTS.counterMatchup * counter.value)
-    + (WEIGHTS.teamForm       * form.value)
-    + (WEIGHTS.history        * history.value)
-    + (WEIGHTS.homeAway       * venue.value)
-    + (WEIGHTS.styleClash     * style.value);
+  //
+  // MODEL: estimated sub-metrics are EXCLUDED from the sum, and the remaining
+  // (non-estimated) weights are re-normalised so they cover the full 0–1 range
+  // — an unreliable reading no longer dilutes the score at full weight, it
+  // simply doesn't count. `confidence` above IS that re-normalisation
+  // denominator: baseDifficulty is never estimated (§8.1), so confidence is
+  // always > 0 and this never divides by zero. See §8.3.
+  const rawWeightedSum =
+      (base.estimated    ? 0 : WEIGHTS.baseDifficulty * invert(base.value))
+    + (counter.estimated ? 0 : WEIGHTS.counterMatchup * counter.value)
+    + (form.estimated    ? 0 : WEIGHTS.teamForm       * form.value)
+    + (history.estimated ? 0 : WEIGHTS.history        * history.value)
+    + (venue.estimated   ? 0 : WEIGHTS.homeAway       * venue.value)
+    + (style.estimated   ? 0 : WEIGHTS.styleClash     * style.value);
+  const linearValue = confidence > 0 ? rawWeightedSum / confidence : 50;
 
   // §8.6 conditional term. Built from the same sub-metric shapes the breakdown
   // below reports, so it needs their { value, weight, estimated } triples — hence
@@ -298,17 +316,6 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
   });
 
   const value = clamp(0, 100, linearValue - stack.penalty);
-
-  // MODEL: confidence = weighted share of non-estimated sub-metrics. Estimated
-  // metrics still contribute their (fallback) value to `value` so the weights
-  // continue to sum to 1; they only lower confidence here. See §8.3.
-  const confidence =
-      (base.estimated    ? 0 : WEIGHTS.baseDifficulty)
-    + (counter.estimated ? 0 : WEIGHTS.counterMatchup)
-    + (form.estimated    ? 0 : WEIGHTS.teamForm)
-    + (history.estimated ? 0 : WEIGHTS.history)
-    + (venue.estimated   ? 0 : WEIGHTS.homeAway)
-    + (style.estimated   ? 0 : WEIGHTS.styleClash);
 
   return {
     value,

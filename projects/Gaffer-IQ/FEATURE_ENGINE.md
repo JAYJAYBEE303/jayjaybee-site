@@ -120,7 +120,7 @@ sign = sign(rawSplit)                                  # -1, 0, +1 — stored fo
 ```
 `baseSensitivity` (returned as `value`) answers "how much does venue matter for this team, either direction" — a team that is a fortress at home and one that is a fortress away score identically here; only `sign`, which nothing downstream consumes, tells them apart.
 
-**MODEL:** below `MIN_VENUE_GAMES` (default 4) at **either** venue, in EITHER source tried (rolling, then fallback) → neutral 50, flagged `estimated: true`. This is a **hard cutoff, not a blend** — matches every other thin-sample guard in this engine (`calcTeamForm`, `calcFixtureHistory`: "< 2 meetings → neutral 50, flagged").
+**MODEL:** below `MIN_VENUE_GAMES` (default 4) at **either** venue, in EITHER source tried (rolling, then fallback) → neutral 50, `estimated: false`. Deliberately the **one exception** to this engine's usual thin-sample guard (`calcTeamForm`, `calcFixtureHistory` both flag `estimated: true` below their thresholds): home advantage is treated as a standing structural fact about football, not a per-team read that can go missing — a team with no usable split simply reads as no additional edge over the baseline, rather than "unreliable, discard". This matters concretely under §8.3's confidence-based renormalisation: flagging it estimated would silently drop Home Advantage out of every promoted side's score, which is the behaviour this exception exists to avoid.
 
 **MODEL — mixed-source normalisation pool:** the league-relative normalisation above may compare a team resolved from the 38-game rolling window against one on the thinner current-season fallback. Both report the same unit (points-per-game delta), just over different sample depths, so a fallback team reads slightly noisier against the pool, not wrongly-scaled — a deliberate simplification rather than maintaining two separate normalisation pools.
 
@@ -138,7 +138,7 @@ awayPenalty = -homeBoost
 - `combinedMagnitude` is a **plain average of the two `baseSensitivity` values, regardless of whether their signs agree**. A team with a huge split paired with a perfectly neutral opponent still produces a real, non-zero effect — averaging with 0 halves it, it doesn't cancel it.
 - **CONFIRMED SIMPLIFICATION — magnitude-only, sign is ignored:** a team that is actually *stronger away than home* (`sign = -1`) still contributes its full `baseSensitivity` to the **home** side's boost when it happens to be playing at home, exactly as a traditionally home-strong team would. The model reads as "large home/away splits amplify the standard structural home advantage", not "which way does each team's split point". `homeBase.sign` / `awayBase.sign` remain on the return value for transparency and future refinement, but `calcVenueEffect` does not read them.
 - `W_VENUE_EFFECT` (default **0.5** in `config.js`, doubled from an original 0.25) caps the swing at ±50 composite-scale points when both teams are maximally venue-sensitive (`combinedMagnitude = 100`) — i.e. the full 0-100 range is reachable. Raised because in practice `combinedMagnitude` rarely nears its own ceiling, so observed values clustered in ~50-75 (home) / ~25-50 (away) at the old 0.25 — a linear rescale around the neutral 50 (an old reading of 68 becomes 86) stretches that into the full range without changing what drives it. `homeAway` is still only `WEIGHTS.homeAway` (0.10) of the composite, so this only changes how clearly the metric reads, not how much it can move the final score.
-- **MODEL:** either team's thin sample (`estimated: true` from `calcHomeAwaySplit`) makes the whole fixture-level effect speculative — `calcVenueEffect.estimated = homeBase.estimated || awayBase.estimated`.
+- **MODEL:** `calcVenueEffect.estimated = homeBase.estimated || awayBase.estimated` — always `false` in practice, since `calcHomeAwaySplit` never flags `estimated` (see above). Kept as an OR rather than hardcoded so this stays correct automatically if that policy ever changes.
 
 **Composite wiring** (`engine/composite.js → computeRawFixtureScore`): for the team being scored,
 ```
@@ -411,13 +411,23 @@ Rationale for the ordering:
 
 ### 8.2 Combination
 ```
-linearValue =
-    WEIGHTS.baseDifficulty * invert(baseDifficulty)   # §2 direction exception
-  + WEIGHTS.counterMatchup * counterMatchup
-  + WEIGHTS.teamForm       * teamForm
-  + WEIGHTS.history        * history
-  + WEIGHTS.homeAway       * homeAway
-  + WEIGHTS.styleClash     * styleClash          # all sub-metrics already 0–100
+confidence =                                      # computed FIRST — linearValue divides by it
+    (baseDifficulty.estimated ? 0 : WEIGHTS.baseDifficulty)
+  + (counterMatchup.estimated ? 0 : WEIGHTS.counterMatchup)
+  + (teamForm.estimated       ? 0 : WEIGHTS.teamForm)
+  + (history.estimated        ? 0 : WEIGHTS.history)
+  + (homeAway.estimated       ? 0 : WEIGHTS.homeAway)
+  + (styleClash.estimated     ? 0 : WEIGHTS.styleClash)
+
+rawWeightedSum =                                  # estimated sub-metrics contribute ZERO here
+    (baseDifficulty.estimated ? 0 : WEIGHTS.baseDifficulty * invert(baseDifficulty))  # §2 direction exception
+  + (counterMatchup.estimated ? 0 : WEIGHTS.counterMatchup * counterMatchup)
+  + (teamForm.estimated       ? 0 : WEIGHTS.teamForm       * teamForm)
+  + (history.estimated        ? 0 : WEIGHTS.history        * history)
+  + (homeAway.estimated       ? 0 : WEIGHTS.homeAway       * homeAway)
+  + (styleClash.estimated     ? 0 : WEIGHTS.styleClash     * styleClash)  # all sub-metrics already 0–100
+
+linearValue = confidence > 0 ? rawWeightedSum / confidence : 50   # re-normalised to the considered share
 
 ownRawValue = clamp(0, 100, linearValue - stackingPenalty)   # §8.6 — independent, per-team
 
@@ -428,8 +438,10 @@ value = clamp(0, 100, 50 + edge * RELATIVE_EDGE_SENSITIVITY)
 ```
 
 ### 8.3 Confidence handling
-- Each sub-metric reports `estimated: true|false`. The composite computes a **confidence** = weighted share of non-estimated metrics. If confidence < `CONFIDENCE_FLOOR` (default 0.6), the UI shows the score as provisional (e.g. hatched/greyed) — the number is still produced, never hidden.
-- **MODEL:** estimated sub-metrics are *not* dropped (that would silently re-weight the rest); they pass through at their fallback value (usually 50) and merely lower confidence. This keeps weights summing to 1 and behaviour predictable.
+- Each sub-metric reports `estimated: true|false`. The composite computes **confidence** = weighted share of non-estimated metrics FIRST. If confidence < `CONFIDENCE_FLOOR` (default 0.6), the UI shows the score as provisional (e.g. hatched/greyed) — the number is still produced, never hidden.
+- **MODEL:** estimated sub-metrics are **excluded entirely** from `linearValue`'s weighted sum, and the remaining non-estimated weights are **re-normalised** (divided by `confidence`) so they cover the full 0–1 range — e.g. a fixture where only 55% of the weight is non-estimated has that 55% scaled up to count as 100% of the score, exactly as `confidence` reports it. This replaced an earlier design where estimated metrics passed through at their fallback value (usually 50) and only lowered `confidence` without changing `value` — a genuinely unreliable reading no longer dilutes the score at full weight by masquerading as a neutral 50; it simply doesn't count.
+- `baseDifficulty` is never estimated (§8.1) — it's available from day one of a season and never degrades — so `confidence` is always > 0 and the division above never hits its zero-guard in practice.
+- `homeAway` is a deliberate exception: `calcHomeAwaySplit`/`calcVenueEffect` never flag `estimated` at all (§3.1), so Home Advantage / Away Disadvantage always counts toward both `confidence` and `linearValue`, even for a side with no usable venue history.
 
 ### 8.4 Bands (`config.js → BANDS`)
 `value` maps to a band string (drives colour everywhere — see `CONVENTIONS.md` §5.2):

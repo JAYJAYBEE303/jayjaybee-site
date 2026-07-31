@@ -281,8 +281,15 @@ function resolveVenueStats(teamId, rollingByTeamId, fplByTeamId) {
  * magnitude-only by design, so `sign` is diagnostic, not consumed downstream.
  *
  * MODEL: below MIN_VENUE_GAMES at EITHER venue (true of both sources tried) →
- * neutral 50, flagged estimated. Hard cutoff, not a blend — matches every
- * other thin-sample guard in this engine (calcTeamForm, calcFixtureHistory).
+ * neutral 50, value only — NOT flagged estimated. Deliberately the one
+ * exception to this engine's usual thin-sample guard (calcTeamForm,
+ * calcFixtureHistory both DO flag estimated below their thresholds): home
+ * advantage is treated as a standing structural fact about football, not a
+ * per-team read that can be "missing" — a team with no usable split just
+ * reads as no additional edge over the baseline (neutral 50) rather than
+ * "unreliable, discard". composite.js's confidence renormalisation (§8.3)
+ * would otherwise silently drop this metric out of the score entirely for
+ * every promoted side, which is the behaviour being deliberately avoided.
  *
  * MODEL: the league-relative normalisation pool below mixes teams resolved
  * from either source — a genuine simplification. Both sources report the same
@@ -309,8 +316,9 @@ export function calcHomeAwaySplit(team, ctx) {
   const awayGames = stats?.awayGames ?? 0;
 
   if (!hasUsableVenueSplit(stats)) {
+    // estimated:false is deliberate here — see the MODEL note above.
     return {
-      value: 50, estimated: true,
+      value: 50, estimated: false,
       homePPG: stats?.homePPG ?? 0, awayPPG: stats?.awayPPG ?? 0,
       rawSplit: 0, sign: 0,
       homeGames, awayGames,
@@ -387,9 +395,11 @@ export function calcVenueEffect(homeTeam, awayTeam, ctx) {
     homeBoost,
     awayPenalty: -homeBoost,
     combinedMagnitude,
-    // Either team's thin sample makes the WHOLE fixture-level effect
-    // speculative — absence of information on one side is not evidence the
-    // other side's reading should be trusted at full weight.
+    // Always false — calcHomeAwaySplit never flags estimated (see its MODEL
+    // note); a thin sample on either side just reads as neutral 50 for that
+    // side, not "discard the whole fixture-level effect". Kept as an OR over
+    // both sides (rather than a hardcoded false) so this stays correct
+    // automatically if calcHomeAwaySplit's policy ever changes.
     estimated: homeBase.estimated || awayBase.estimated,
     homeBase,
     awayBase,
