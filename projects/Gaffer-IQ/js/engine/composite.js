@@ -140,12 +140,20 @@ export function buildScoreContext(season, opts = {}) {
  * Map a 0–100 value onto its band string. Thresholds come from config (BANDS);
  * never inline a literal here — CSS modifier classes (.score-pill--great etc.)
  * key off this string, so the colour mapping stays single-sourced.
+ *
+ * Rounds BEFORE comparing against BANDS — every UI surface displays
+ * Math.round(value), so banding the raw unrounded value could label a
+ * displayed "40" as 'tough' whenever the true value was e.g. 39.6 (< the
+ * neutral threshold pre-rounding, but rounds up to display as 40). Rounding
+ * here keeps the label always consistent with the number the user actually
+ * sees, at every boundary.
  */
 function bandFromValue(value) {
-  if (value >= BANDS.great)   return 'great';
-  if (value >= BANDS.good)    return 'good';
-  if (value >= BANDS.neutral) return 'neutral';
-  if (value >= BANDS.tough)   return 'tough';
+  const rounded = Math.round(value);
+  if (rounded >= BANDS.great)   return 'great';
+  if (rounded >= BANDS.good)    return 'good';
+  if (rounded >= BANDS.neutral) return 'neutral';
+  if (rounded >= BANDS.tough)   return 'tough';
   return 'brutal';
 }
 
