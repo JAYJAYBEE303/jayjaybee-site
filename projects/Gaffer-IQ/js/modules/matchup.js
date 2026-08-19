@@ -380,7 +380,11 @@ function buildCard(team, venue, score, fdr, horizonScore, horizon, duels, defend
 
   card.innerHTML = `
     <header class="matchup-card__header">
-      <h2 class="matchup-card__team">${esc(team.name)}</h2>
+      <h2 class="matchup-card__team">
+        <img class="matchup-card__badge" src="${esc(team.badgeUrl)}" alt=""
+             onerror="this.style.display='none'">
+        ${esc(team.name)}
+      </h2>
       <span class="matchup-card__venue">${esc(venue)}</span>
     </header>
 

@@ -145,6 +145,13 @@ export function normaliseTeam(raw) {
     id: raw.id,
     name: raw.name,
     shortName: raw.short_name,
+    // raw.code is a separate, stable per-club id (distinct from raw.id, which
+    // is this season's fixture-list index) — it's what the official crest CDN
+    // keys badges on. badgeUrl is precomputed here rather than built ad hoc
+    // at render time so every module (matchup, ranker, dashboard, …) gets the
+    // same URL for free. See PREMIER_LEAGUE badge pattern in ARCHITECTURE.md.
+    code: raw.code,
+    badgeUrl: `https://resources.premierleague.com/premierleague/badges/rb/t${raw.code}.svg`,
     strength: {
       overall:      raw.strength,
       overallHome:  raw.strength_overall_home,
