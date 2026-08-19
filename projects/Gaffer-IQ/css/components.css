@@ -713,12 +713,24 @@
    cells to its right to shift and make room (ordinary flex reflow — no JS),
    which only a real width/height change produces. Every other :hover rule
    in this file uses transform/opacity/box-shadow instead; this is the one
-   place a genuine box-size transition is the actual requirement. */
+   place a genuine box-size transition is the actual requirement.
+
+   The score's own vertical position must NOT move during that growth — only
+   the box grows (downward, to make room for the reveal below) and the score
+   recentres horizontally as the box widens. That's why padding-top is a
+   fixed 6px in BOTH the base rule and the :hover rule below (never toggled,
+   so it's never part of what's animating) rather than relying on
+   justify-content: center, whose centred offset would itself grow as the
+   box got taller and drag the score down with it. .pgw-cell__score is given
+   an explicit pixel height/line-height for the same reason — a deterministic
+   box to measure the padding against, not a font-metric guess. */
 .pgw-strip .pgw-cell {
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
+  align-items: center;
   width: 36px;
   height: 28px;
+  padding-top: 6px;
   cursor: pointer;
   overflow: hidden;
   transition: width 200ms ease-out, height 200ms ease-out, box-shadow 200ms ease-out;
@@ -729,7 +741,8 @@
 }
 
 .pgw-strip .pgw-cell__score {
-  line-height: 1;
+  height: 16px;
+  line-height: 16px;
   flex: none;
 }
 
@@ -740,11 +753,14 @@
   transition: grid-template-rows 200ms ease-out;
 }
 
-/* padding-top/bottom live ONLY on the :hover/:focus-visible variant below —
-   declaring it here would reserve that space even while .pgw-cell__extra's
-   grid row is collapsed to 0fr (a stretched grid item's own padding still
-   occupies box-model space against a nominally-zero track in some engines),
-   which is what was pushing the score off-centre in the resting state. */
+/* This element's own padding-top/bottom is declared ONLY on the
+   :hover/:focus-visible variant below: it sits inside .pgw-cell__extra's
+   grid row, which is collapsed to 0fr at rest, and a stretched grid item's
+   own padding still occupies box-model space against a nominally-zero
+   track in some engines — declaring it here left residual space in the
+   resting state before. Its job is the gap between the score and the
+   opponent/venue block, plus clearance above the bottom border, once
+   expanded — it has no effect on the score's own position above it. */
 .pgw-strip .pgw-cell__extra-inner {
   overflow: hidden;
   display: flex;
@@ -755,30 +771,34 @@
   opacity: 0;
   /* Same 200ms ease-out as the box's width/height and the extra row's
      grid-template-rows below — everything settling at a different moment
-     (padding used to snap instantly, opacity used to lag 40ms behind on
-     its own 180ms curve) is what read as the animation "stopping twice". */
+     is what read as the animation "stopping twice". */
   transition: opacity 200ms ease-out, padding 200ms ease-out;
 }
 
 .pgw-strip .pgw-cell__opponent {
   font-size: 10px;
+  line-height: 12px;
   font-weight: 700;
   letter-spacing: 0.02em;
 }
 
 .pgw-strip .pgw-cell__venue {
   font-size: 10px;
+  line-height: 12px;
   font-weight: 600;
   color: var(--color-muted);
 }
 
-/* 56×56 — roomy enough that the score, opponent code, and venue letter all
-   clear the top/bottom border with breathing space either side (the 44/52
-   non-square first pass left text touching the border on top and bottom). */
+/* 60×60, square. padding-top stays the fixed 6px from the base rule above
+   (unlisted here — nothing to override) so the score never shifts; all of
+   the growth appears as new space below it: 6 (top, unchanged) + 16 (score)
+   + 4 (extra-inner top gap) + 12 (opponent) + 2 (gap) + 12 (venue) + 8
+   (extra-inner bottom clearance) = 60, so the venue line clears the bottom
+   border by the same 8px the score's top clears the top border by 6px. */
 .pgw-strip .pgw-cell:hover,
 .pgw-strip .pgw-cell:focus-visible {
-  width: 56px;
-  height: 56px;
+  width: 60px;
+  height: 60px;
   box-shadow: 0 0 0 1px currentColor inset;
 }
 
@@ -795,8 +815,8 @@
 .pgw-strip .pgw-cell:hover .pgw-cell__extra-inner,
 .pgw-strip .pgw-cell:focus-visible .pgw-cell__extra-inner {
   opacity: 1;
-  padding-top: 6px;
-  padding-bottom: 2px;
+  padding-top: 4px;
+  padding-bottom: 8px;
 }
 
 @media (prefers-reduced-motion: reduce) {
