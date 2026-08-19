@@ -740,16 +740,24 @@
   transition: grid-template-rows 200ms ease-out;
 }
 
+/* padding-top/bottom live ONLY on the :hover/:focus-visible variant below —
+   declaring it here would reserve that space even while .pgw-cell__extra's
+   grid row is collapsed to 0fr (a stretched grid item's own padding still
+   occupies box-model space against a nominally-zero track in some engines),
+   which is what was pushing the score off-centre in the resting state. */
 .pgw-strip .pgw-cell__extra-inner {
   overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  padding-top: 6px;
-  padding-bottom: 2px;
+  padding: 0;
   opacity: 0;
-  transition: opacity 150ms ease-out;
+  /* Same 200ms ease-out as the box's width/height and the extra row's
+     grid-template-rows below — everything settling at a different moment
+     (padding used to snap instantly, opacity used to lag 40ms behind on
+     its own 180ms curve) is what read as the animation "stopping twice". */
+  transition: opacity 200ms ease-out, padding 200ms ease-out;
 }
 
 .pgw-strip .pgw-cell__opponent {
@@ -787,7 +795,8 @@
 .pgw-strip .pgw-cell:hover .pgw-cell__extra-inner,
 .pgw-strip .pgw-cell:focus-visible .pgw-cell__extra-inner {
   opacity: 1;
-  transition: opacity 180ms ease-out 40ms;
+  padding-top: 6px;
+  padding-bottom: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {
