@@ -151,7 +151,7 @@ export function normaliseTeam(raw) {
     // at render time so every module (matchup, ranker, dashboard, …) gets the
     // same URL for free. See PREMIER_LEAGUE badge pattern in ARCHITECTURE.md.
     code: raw.code,
-    badgeUrl: `https://resources.premierleague.com/premierleague/badges/rb/t${raw.code}.svg`,
+    badgeUrl: `https://resources.premierleague.com/premierleague/badges/50/t${raw.code}.png`,
     strength: {
       overall:      raw.strength,
       overallHome:  raw.strength_overall_home,
