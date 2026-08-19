@@ -68,9 +68,11 @@ const DEFENDING_PAIRING_LABELS = {
 
 // ─── Module-level state ───────────────────────────────────────────────────────
 
-let _controls = null;   // .matchup-controls container (from HTML)
+let _nav      = null;   // .gw-nav container (from HTML)
 let _grid     = null;   // .matchup-grid container (from HTML)
 let _selectedFixtureId = null;
+let _navGroups = [];    // [{ gw, fixtures }] currently loaded into the navigator
+let _navIndex  = 0;     // index into _navGroups the navigator is showing
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -147,49 +149,114 @@ function groupByGw(fixtures, { descending = false } = {}) {
     .map(([gw, fixturesInGw]) => ({ gw, fixtures: fixturesInGw }));
 }
 
-// ─── Render: fixture picker ───────────────────────────────────────────────────
+// ─── Render: GW navigator ─────────────────────────────────────────────────────
 
 /**
- * Populate the .matchup-controls bar with a labelled <select> containing
- * fixtures grouped by GW. Re-builds the picker on data refresh.
+ * Load fixtures (grouped by GW) into the navigator and point it at whichever
+ * group contains the currently selected fixture. Re-runs on every data refresh,
+ * same trigger renderPicker used to have.
  * @param {Fixture[]} fixtures
- * @param {{ descending?: boolean }} [opts]
+ * @param {{ descending?: boolean }} [opts]  descending=true for off-season played list
  */
-function renderPicker(fixtures, { descending = false } = {}) {
-  _controls.innerHTML = '';
+function renderNav(fixtures, { descending = false } = {}) {
+  _navGroups = groupByGw(fixtures, { descending });
+  const idx = _navGroups.findIndex(g => g.fixtures.some(f => f.id === _selectedFixtureId));
+  _navIndex = idx >= 0 ? idx : 0;
+  buildNavPanel();
+}
 
-  const label = document.createElement('label');
-  label.className = 'fixture-picker__label';
-  label.htmlFor = 'fixture-picker';
-  label.textContent = 'Select fixture';
-
-  const select = document.createElement('select');
-  select.id = 'fixture-picker';
-  select.className = 'fixture-picker';
-
-  for (const { gw, fixtures: gwFixtures } of groupByGw(fixtures, { descending })) {
-    const optgroup = document.createElement('optgroup');
-    optgroup.label = `Gameweek ${gw}`;
-    for (const f of gwFixtures) {
-      const home = store.getTeam(f.homeTeamId);
-      const away = store.getTeam(f.awayTeamId);
-      if (!home || !away) continue;
-      const opt = document.createElement('option');
-      opt.value = String(f.id);
-      opt.textContent = `${home.shortName} vs ${away.shortName}`;
-      if (f.id === _selectedFixtureId) opt.selected = true;
-      optgroup.appendChild(opt);
-    }
-    if (optgroup.children.length > 0) select.appendChild(optgroup);
+/**
+ * Render the .gw-nav panel for the GW group at _navIndex: a prev/next header
+ * (arrows hidden — not merely disabled — at the ends of the navigable list,
+ * per the `hidden` attribute honoured globally in base.css) and one row per
+ * fixture, badge–shortname either side of a centred dash. Rebuilt wholesale
+ * on every nav interaction — cheap, mirrors buildCard's approach, and keeps
+ * the selected-row highlight trivial to recompute.
+ */
+function buildNavPanel() {
+  const group = _navGroups[_navIndex];
+  if (!group) {
+    _nav.innerHTML = '';
+    return;
   }
 
-  select.addEventListener('change', () => {
-    _selectedFixtureId = Number(select.value);
-    renderMatchup();
-  });
+  const isFirst = _navIndex === 0;
+  const isLast  = _navIndex === _navGroups.length - 1;
 
-  _controls.appendChild(label);
-  _controls.appendChild(select);
+  const rows = group.fixtures.map(f => {
+    const home = store.getTeam(f.homeTeamId);
+    const away = store.getTeam(f.awayTeamId);
+    if (!home || !away) return '';
+    const selected = f.id === _selectedFixtureId ? ' is-selected' : '';
+    return `
+      <li class="gw-nav__fixture${selected}" data-fixture-id="${f.id}" tabindex="0"
+          role="button" aria-pressed="${f.id === _selectedFixtureId}"
+          aria-label="${esc(`${home.name} vs ${away.name}`)}">
+        <span class="gw-nav__team gw-nav__team--home">
+          <img class="gw-nav__badge" src="${esc(home.badgeUrl)}" alt="" onerror="this.style.visibility='hidden'">
+          <span class="gw-nav__short">${esc(home.shortName)}</span>
+        </span>
+        <span class="gw-nav__dash" aria-hidden="true">–</span>
+        <span class="gw-nav__team gw-nav__team--away">
+          <span class="gw-nav__short">${esc(away.shortName)}</span>
+          <img class="gw-nav__badge" src="${esc(away.badgeUrl)}" alt="" onerror="this.style.visibility='hidden'">
+        </span>
+      </li>
+    `.trim();
+  }).join('');
+
+  _nav.innerHTML = `
+    <div class="gw-nav__header">
+      <button class="gw-nav__arrow gw-nav__arrow--prev" type="button"
+              aria-label="Previous gameweek"${isFirst ? ' hidden' : ''}>‹</button>
+      <span class="gw-nav__title">Gameweek ${esc(String(group.gw))}</span>
+      <button class="gw-nav__arrow gw-nav__arrow--next" type="button"
+              aria-label="Next gameweek"${isLast ? ' hidden' : ''}>›</button>
+    </div>
+    <ul class="gw-nav__list">${rows}</ul>
+  `;
+}
+
+/** Step the navigator to the previous GW group, if any. */
+function navPrev() {
+  if (_navIndex <= 0) return;
+  _navIndex -= 1;
+  buildNavPanel();
+}
+
+/** Step the navigator to the next GW group, if any. */
+function navNext() {
+  if (_navIndex >= _navGroups.length - 1) return;
+  _navIndex += 1;
+  buildNavPanel();
+}
+
+/** Select a fixture from a navigator row click and re-render the matchup. */
+function selectFixtureFromNav(fixtureId) {
+  if (fixtureId === _selectedFixtureId) return;
+  _selectedFixtureId = fixtureId;
+  renderMatchup();
+  buildNavPanel();
+}
+
+/**
+ * Delegated click handler for the .gw-nav panel (bound once in initMatchup —
+ * the panel persists across renders, only its innerHTML is replaced).
+ */
+function onNavClick(e) {
+  if (e.target.closest('.gw-nav__arrow--prev')) { navPrev(); return; }
+  if (e.target.closest('.gw-nav__arrow--next')) { navNext(); return; }
+  const row = e.target.closest('.gw-nav__fixture[data-fixture-id]');
+  if (row) selectFixtureFromNav(Number(row.dataset.fixtureId));
+}
+
+/** Keyboard equivalent of onNavClick for the focusable fixture rows. */
+function onNavKeydown(e) {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const row = e.target.closest('.gw-nav__fixture[data-fixture-id]');
+  if (!row) return;
+  e.preventDefault();
+  selectFixtureFromNav(Number(row.dataset.fixtureId));
 }
 
 // ─── Render: matchup cards ────────────────────────────────────────────────────
@@ -727,7 +794,7 @@ function onDataReady() {
   if (!_selectedFixtureId || !store.getFixture(_selectedFixtureId)) {
     _selectedFixtureId = fixtures[0].id;
   }
-  renderPicker(fixtures, { descending });
+  renderNav(fixtures, { descending });
   renderMatchup();
 }
 
@@ -742,16 +809,16 @@ function onHorizonChanged() {
 /**
  * Handle a player:selected event emitted by the Ranker (and any future module)
  * when the user clicks a player row to drill into its matchup breakdown.
- * Sets the selected fixture and re-renders — the picker is synced only when
- * the relevant option is present (it may not be in off-season mode).
+ * Sets the selected fixture and re-renders — the navigator is synced onto the
+ * fixture's GW group only when that group is present (it may not be in
+ * off-season mode).
  */
 function onPlayerSelected({ fixtureId }) {
   if (!store.isFresh() || !fixtureId) return;
   _selectedFixtureId = fixtureId;
-  const picker = _controls?.querySelector('.fixture-picker');
-  if (picker && picker.querySelector(`option[value="${fixtureId}"]`)) {
-    picker.value = String(fixtureId);
-  }
+  const idx = _navGroups.findIndex(g => g.fixtures.some(f => f.id === fixtureId));
+  if (idx >= 0) _navIndex = idx;
+  buildNavPanel();
   renderMatchup();
 }
 
@@ -759,23 +826,22 @@ function onPlayerSelected({ fixtureId }) {
  * Delegated click/keyboard handler for perGw strip cells, bound once on _grid
  * (which persists across renderMatchup() calls — only its innerHTML is
  * replaced) rather than per-cell, since cards are rebuilt on every render.
- * Reads data-fixture-id off the clicked cell, sets that fixture as the
- * picker's value, and dispatches 'change' — the same event renderPicker()
- * already listens for — so the full matchup re-renders for that fixture.
- * Cells with no data-fixture-id (blank GWs) are inert.
+ * Reads data-fixture-id off the clicked cell, points the navigator at that
+ * fixture's GW group, and re-renders — same jump-through renderPicker's
+ * dispatched 'change' used to drive. Cells with no data-fixture-id (blank
+ * GWs) are inert.
  */
 function onStripActivate(e) {
   const cell = e.target.closest('.pgw-cell[data-fixture-id]');
   if (!cell || !_grid.contains(cell)) return;
-  const fixtureId = cell.dataset.fixtureId;
+  const fixtureId = Number(cell.dataset.fixtureId);
   if (!fixtureId) return;
 
-  const picker = _controls?.querySelector('.fixture-picker');
-  const option = picker?.querySelector(`option[value="${fixtureId}"]`);
-  if (!picker || !option) return;
+  const idx = _navGroups.findIndex(g => g.fixtures.some(f => f.id === fixtureId));
+  if (idx < 0) return;
 
-  picker.value = fixtureId;
-  picker.dispatchEvent(new Event('change'));
+  _navIndex = idx;
+  selectFixtureFromNav(fixtureId);
 }
 
 function onStripKeydown(e) {
@@ -794,12 +860,18 @@ function onStripKeydown(e) {
  */
 export function initMatchup() {
   const root = document.querySelector('[data-module="matchup"]');
-  _controls  = root.querySelector('.matchup-controls');
+  _nav       = root.querySelector('.gw-nav');
   _grid      = root.querySelector('.matchup-grid');
 
   store.subscribe('data:ready',      onDataReady);
   store.subscribe('horizon:changed', onHorizonChanged);
   store.subscribe('player:selected', onPlayerSelected);
+
+  // Delegated on _nav (stable across renders) rather than per-row/button —
+  // the header arrows and fixture rows are torn down and rebuilt on every
+  // buildNavPanel() call.
+  _nav.addEventListener('click',   onNavClick);
+  _nav.addEventListener('keydown', onNavKeydown);
 
   // Delegated on _grid (stable across renders) rather than per-cell — the
   // perGw strip cells are torn down and rebuilt on every renderMatchup().

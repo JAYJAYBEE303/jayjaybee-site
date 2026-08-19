@@ -1,50 +1,162 @@
 /* Gaffer IQ — components.css
    Reusable component styles: matchup card, score pill, breakdown bars,
-   confidence indicator, counter-matchup pairings, fixture picker.
+   confidence indicator, counter-matchup pairings, GW navigator.
    BEM-lite per CONVENTIONS.md §5.1. All values via var(--…) from base.css.
    Band modifier classes (--great, --good, --neutral, --tough, --brutal) map
    directly from CompositeScore.band — see CONVENTIONS.md §5.2. */
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   FIXTURE PICKER
+   MATCHUP SHELL — GW navigator (left) + team cards (right)
+   Mirrors .ranker-shell / .dash-shell / .planner-shell's 300px-sidebar +
+   1fr-main pattern, just narrower — the navigator only ever holds a handful
+   of short fixture rows, not a filter stack.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-.matchup-controls {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  margin-bottom: var(--space-6);
-  padding-bottom: var(--space-4);
-  border-bottom: 1px solid var(--color-border-subtle);
+.matchup-shell {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: var(--space-6);
+  align-items: start;
 }
 
-.fixture-picker__label {
-  font-size: var(--font-size-sm);
-  color: var(--color-muted);
-  white-space: nowrap;
+@media (max-width: 900px) {
+  .matchup-shell {
+    grid-template-columns: 1fr;
+  }
 }
 
-.fixture-picker {
+/* ═══════════════════════════════════════════════════════════════════════════
+   GW NAVIGATOR — replaces the old fixture-picker <select>. One GW's fixtures
+   at a time, paged with the header arrows; click a row to load that matchup.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.gw-nav {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  color: var(--color-text);
-  font-size: var(--font-size-sm);
-  font-family: var(--font-sans);
-  padding: var(--space-2) var(--space-3);
-  cursor: pointer;
-  min-width: 220px;
-  transition: border-color 0.15s;
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  /* Stays in view while the (much taller) breakdown cards scroll past it. */
+  position: sticky;
+  top: calc(52px + var(--space-6));
 }
 
-.fixture-picker:hover {
+.gw-nav__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.gw-nav__title {
+  flex: 1;
+  text-align: center;
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--color-text);
+}
+
+/* Hidden outright (not merely disabled) at the ends of the navigable list —
+   see buildNavPanel() in matchup.js, which sets the `hidden` attribute
+   ([hidden]{display:none!important} in base.css) rather than `disabled`. */
+.gw-nav__arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-muted);
+  font-size: var(--font-size-md);
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.gw-nav__arrow:hover {
+  background: var(--color-surface-raised);
+  color: var(--color-text);
   border-color: var(--color-muted);
 }
 
-.fixture-picker:focus {
+.gw-nav__arrow:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
+}
+
+.gw-nav__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  list-style: none;
+}
+
+/* Home/dash/away as a 1fr auto 1fr grid, home right-aligned and away
+   left-aligned — the dash sits on one shared centre axis across every row
+   regardless of how the two shortnames' widths differ. */
+.gw-nav__fixture {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.gw-nav__fixture:hover {
+  background: var(--color-surface-raised);
+}
+
+.gw-nav__fixture.is-selected {
+  background: var(--color-accent-muted);
   border-color: var(--color-accent);
+}
+
+.gw-nav__fixture:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.gw-nav__team {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.gw-nav__team--home { justify-content: flex-end; }
+.gw-nav__team--away { justify-content: flex-start; }
+
+.gw-nav__badge {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  border-radius: 4px;
+  flex: none;
+}
+
+.gw-nav__short {
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text);
+}
+
+.gw-nav__fixture.is-selected .gw-nav__short {
+  color: var(--color-accent);
+}
+
+.gw-nav__dash {
+  color: var(--color-muted);
+  font-size: var(--font-size-xs);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -2872,14 +2984,11 @@
     font-size: var(--font-size-xl);
   }
 
-  /* Fixture picker: go full width inside the controls bar */
-  .matchup-controls {
-    flex-wrap: wrap;
-  }
-
-  .fixture-picker {
-    min-width: 0;
-    width: 100%;
+  /* GW navigator: stacked above the cards at this width (.matchup-shell
+     collapses to 1fr at 900px) — drop the sticky positioning so it scrolls
+     away with the page instead of pinning above content on a small screen. */
+  .gw-nav {
+    position: static;
   }
 
   /* ─── Player Ranker — table → card list ──────────────────────────────────
