@@ -703,23 +703,25 @@
    .pgw-cell__extra child, so it's untouched by any of this.
 
    Collapsed state must stay pixel-identical to the plain .pgw-cell above
-   (36×28, single centred score) — the flex column + 0fr extra row collapses
-   to the same box. Hover/focus reveals opponent + venue purely via the CSS
-   grid-template-rows "0fr → 1fr" trick on .pgw-cell__extra below; the cell
-   itself never animates width or height directly (layout-thrash prone —
-   grid-template-rows is the endorsed way to animate to auto content height),
-   it just grows as a side effect of that inner track expanding. Width stays
-   fixed throughout — a 3-char code at 10px comfortably fits 36px, so no
-   horizontal growth is needed either. */
+   (36×28, single centred score).
+
+   Hover/focus grows ONLY the hovered cell — width and height together, by
+   the same amount, so it stays square rather than turning into a tall
+   rectangle. This is a deliberate exception to "don't animate layout
+   properties": a transform-based scale would visually overlap neighbouring
+   cells instead of pushing them, and this strip specifically needs the
+   cells to its right to shift and make room (ordinary flex reflow — no JS),
+   which only a real width/height change produces. Every other :hover rule
+   in this file uses transform/opacity/box-shadow instead; this is the one
+   place a genuine box-size transition is the actual requirement. */
 .pgw-strip .pgw-cell {
   flex-direction: column;
   justify-content: center;
   width: 36px;
-  min-height: 28px;
-  height: auto;
+  height: 28px;
   cursor: pointer;
   overflow: hidden;
-  transition: box-shadow 200ms ease-out;
+  transition: width 200ms ease-out, height 200ms ease-out, box-shadow 200ms ease-out;
 }
 
 .pgw-strip .pgw-cell--static {
@@ -743,8 +745,9 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1px;
-  padding-top: 4px;
+  gap: 2px;
+  padding-top: 6px;
+  padding-bottom: 2px;
   opacity: 0;
   transition: opacity 150ms ease-out;
 }
@@ -761,8 +764,13 @@
   color: var(--color-muted);
 }
 
+/* 56×56 — roomy enough that the score, opponent code, and venue letter all
+   clear the top/bottom border with breathing space either side (the 44/52
+   non-square first pass left text touching the border on top and bottom). */
 .pgw-strip .pgw-cell:hover,
 .pgw-strip .pgw-cell:focus-visible {
+  width: 56px;
+  height: 56px;
   box-shadow: 0 0 0 1px currentColor inset;
 }
 
