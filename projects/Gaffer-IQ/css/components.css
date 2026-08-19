@@ -95,12 +95,13 @@
   list-style: none;
 }
 
-/* Home/dash/away as a 1fr auto 1fr grid, home right-aligned and away
-   left-aligned — the dash sits on one shared centre axis across every row
-   regardless of how the two shortnames' widths differ. */
+/* Score chip / home / dash / away / score chip as an auto 1fr auto 1fr auto
+   grid, home right-aligned and away left-aligned — the dash sits on one
+   shared centre axis across every row regardless of how the two shortnames'
+   widths differ, and the two outer score chips sit flush at the row edges. */
 .gw-nav__fixture {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: auto 1fr auto 1fr auto;
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-2);
@@ -108,6 +109,22 @@
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: background 0.12s, border-color 0.12s;
+}
+
+/* Each side's own CompositeScore for this fixture — reuses .score-chip
+   (band-coloured pill, same markup as the counter-matchup pairing chips) so
+   it reads identically wherever a Gaffer IQ score is shown. */
+.gw-nav__score {
+  justify-self: center;
+}
+
+/* The nav row is already tight on width and the chip's dashed border
+   (.score-chip--estimated above) already signals low confidence, so the ~
+   prefix is redundant here — drop it to save space. Scoped to this class
+   only; every other .score-chip--estimated usage (dashboard, ranker,
+   planner) keeps the ~. */
+.gw-nav__score.score-chip--estimated::before {
+  content: none;
 }
 
 .gw-nav__fixture:hover {

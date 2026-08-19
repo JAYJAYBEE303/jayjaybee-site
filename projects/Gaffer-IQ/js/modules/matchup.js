@@ -183,15 +183,27 @@ function buildNavPanel() {
   const isFirst = _navIndex === 0;
   const isLast  = _navIndex === _navGroups.length - 1;
 
+  // One shared context for every row's composite score below — buildCtx()
+  // rebuilds from the full store/season each call, so it must not run per row.
+  const ctx = buildCtx();
+
   const rows = group.fixtures.map(f => {
     const home = store.getTeam(f.homeTeamId);
     const away = store.getTeam(f.awayTeamId);
     if (!home || !away) return '';
     const selected = f.id === _selectedFixtureId ? ' is-selected' : '';
+
+    // Each side's own CompositeScore.value/band (same values buildCard's
+    // .score-pill shows) — reused here as .score-chip so the navigator gives
+    // an at-a-glance read of both teams' fixtures without opening the card.
+    const homeChip = navScoreChip(home, f, ctx);
+    const awayChip = navScoreChip(away, f, ctx);
+
     return `
       <li class="gw-nav__fixture${selected}" data-fixture-id="${f.id}" tabindex="0"
           role="button" aria-pressed="${f.id === _selectedFixtureId}"
           aria-label="${esc(`${home.name} vs ${away.name}`)}">
+        ${homeChip}
         <span class="gw-nav__team gw-nav__team--home">
           <img class="gw-nav__badge" src="${esc(home.badgeUrl)}" alt="" onerror="this.style.visibility='hidden'">
           <span class="gw-nav__short">${esc(home.shortName)}</span>
@@ -201,6 +213,7 @@ function buildNavPanel() {
           <span class="gw-nav__short">${esc(away.shortName)}</span>
           <img class="gw-nav__badge" src="${esc(away.badgeUrl)}" alt="" onerror="this.style.visibility='hidden'">
         </span>
+        ${awayChip}
       </li>
     `.trim();
   }).join('');
@@ -215,6 +228,24 @@ function buildNavPanel() {
     </div>
     <ul class="gw-nav__list">${rows}</ul>
   `;
+}
+
+/**
+ * Build one .score-chip for a nav row: `team`'s own CompositeScore.value for
+ * `fixture`, coloured by its band — same source (scoreFixture) and same
+ * markup/classes buildCounterPairings' pairing chips use, just plugged into
+ * the navigator instead of a breakdown row. Returns '' (renders nothing) if
+ * ctx isn't ready yet, so a mid-load navigator still draws its rows.
+ * @param {Team} team
+ * @param {Fixture} fixture
+ * @param {object|null} ctx  from buildCtx()
+ */
+function navScoreChip(team, fixture, ctx) {
+  if (!ctx) return '';
+  const score = scoreFixture(team, fixture, ctx);
+  const estClass = score.provisional ? ' score-chip--estimated' : '';
+  return `<span class="score-chip score-chip--${esc(score.band)}${estClass} gw-nav__score"
+                title="${esc(`${team.name}'s Gaffer IQ score for this fixture`)}">${Math.round(score.value)}</span>`;
 }
 
 /** Step the navigator to the previous GW group, if any. */
