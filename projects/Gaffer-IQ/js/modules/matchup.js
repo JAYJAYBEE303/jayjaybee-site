@@ -263,23 +263,68 @@ function showStatus(msg) {
 // ─── Build: perGw horizon strip ───────────────────────────────────────────────
 
 /**
+ * Resolve the real fixture id behind one scoreOverHorizon perGw entry, so the
+ * strip cell can be clicked through to the full Matchup Analyser breakdown.
+ * scoreOverHorizon (engine/composite.js) doesn't carry a fixture id on perGw
+ * entries — only gw/opponent shortName/venue — so it's re-derived here from
+ * the store rather than touching the engine. Matches on gw + venue + opponent
+ * shortName, which is sufficient to disambiguate DGW's two same-gw fixtures
+ * (a team can't face the same opponent twice in one gw).
+ * @param {Team} team
+ * @param {object} entry  one non-blank perGw entry
+ * @returns {number|null}
+ */
+function findFixtureId(team, entry) {
+  if (entry.isBlank || !entry.opponent) return null;
+  const isHome = entry.venue === 'H';
+  const match = store.getFixtures().find(f => {
+    if (f.gw !== entry.gw) return false;
+    const teamId = isHome ? f.homeTeamId : f.awayTeamId;
+    const oppId  = isHome ? f.awayTeamId : f.homeTeamId;
+    if (teamId !== team.id) return false;
+    return store.getTeam(oppId)?.shortName === entry.opponent;
+  });
+  return match ? match.id : null;
+}
+
+/**
  * Build a row of coloured cells, one per scoreOverHorizon perGw entry.
  * Blank GWs render as '–' with a neutral colour; DGWs produce two adjacent cells.
  * Low-confidence GWs (entry.provisional, same CONFIDENCE_FLOOR-gated flag the
  * top score pill uses — score-pill--estimated) get the same dashed-border
  * treatment here, via pgw-cell--estimated (already used by ranker.js's strip,
  * just not previously wired up on this page).
+ *
+ * Each non-blank cell also carries the opponent short name + venue as hidden
+ * child elements (revealed on hover purely via CSS — see .pgw-cell__extra in
+ * components.css) and a data-fixture-id used by the delegated click handler
+ * in initMatchup() to jump the fixture picker straight to that matchup.
+ * @param {Team} team  the team this strip belongs to — needed to resolve
+ *   each entry's fixture id via findFixtureId().
+ * @param {Array} perGw
  */
-function buildPerGwStrip(perGw) {
+function buildPerGwStrip(team, perGw) {
   if (!perGw || perGw.length === 0) return '';
   const cells = perGw.map(entry => {
-    const bandClass = entry.isBlank ? 'neutral' : entry.band;
-    const estClass  = (!entry.isBlank && entry.provisional) ? ' pgw-cell--estimated' : '';
+    const bandClass  = entry.isBlank ? 'neutral' : entry.band;
+    const estClass   = (!entry.isBlank && entry.provisional) ? ' pgw-cell--estimated' : '';
+    const fixtureId  = findFixtureId(team, entry);
+    const clickClass = fixtureId !== null ? '' : ' pgw-cell--static';
+    const idAttr      = fixtureId !== null ? ` data-fixture-id="${fixtureId}"` : '';
+    const tabAttr     = fixtureId !== null ? ' tabindex="0"' : '';
     const label = entry.isBlank
       ? `GW${entry.gw} (blank)`
       : `GW${entry.gw} ${entry.opponent ?? ''} (${entry.venue ?? ''}) — ${Math.round(entry.value)}${entry.provisional ? ' (low confidence)' : ''}`;
-    const display = entry.isBlank ? '–' : Math.round(entry.value);
-    return `<div class="pgw-cell pgw-cell--${esc(bandClass)}${estClass}" title="${esc(label)}">${esc(String(display))}</div>`;
+    const display  = entry.isBlank ? '–' : Math.round(entry.value);
+    const oppText  = entry.isBlank ? '–' : esc(String(entry.opponent ?? '').toUpperCase());
+    const venText  = entry.isBlank ? '' : esc(entry.venue ?? '');
+    return `<div class="pgw-cell pgw-cell--${esc(bandClass)}${estClass}${clickClass}"${idAttr}${tabAttr} title="${esc(label)}">`
+      + `<span class="pgw-cell__score">${esc(String(display))}</span>`
+      + `<div class="pgw-cell__extra"><div class="pgw-cell__extra-inner">`
+      + `<span class="pgw-cell__opponent">${oppText}</span>`
+      + `<span class="pgw-cell__venue">${venText}</span>`
+      + `</div></div>`
+      + `</div>`;
   }).join('');
   return `<div class="pgw-strip">${cells}</div>`;
 }
@@ -328,7 +373,7 @@ function buildCard(team, venue, score, fdr, horizonScore, horizon, duels, defend
         <span class="score-chip score-chip--${esc(horizonBand)} horizon-summary__score">${horizonValue}</span>
         <span class="horizon-summary__label">${esc(horizonBand)}</span>
       </div>
-      ${buildPerGwStrip(horizonScore.perGw)}
+      ${buildPerGwStrip(team, horizonScore.perGw)}
     </div>
     `
     : '';
@@ -706,6 +751,36 @@ function onPlayerSelected({ fixtureId }) {
   renderMatchup();
 }
 
+/**
+ * Delegated click/keyboard handler for perGw strip cells, bound once on _grid
+ * (which persists across renderMatchup() calls — only its innerHTML is
+ * replaced) rather than per-cell, since cards are rebuilt on every render.
+ * Reads data-fixture-id off the clicked cell, sets that fixture as the
+ * picker's value, and dispatches 'change' — the same event renderPicker()
+ * already listens for — so the full matchup re-renders for that fixture.
+ * Cells with no data-fixture-id (blank GWs) are inert.
+ */
+function onStripActivate(e) {
+  const cell = e.target.closest('.pgw-cell[data-fixture-id]');
+  if (!cell || !_grid.contains(cell)) return;
+  const fixtureId = cell.dataset.fixtureId;
+  if (!fixtureId) return;
+
+  const picker = _controls?.querySelector('.fixture-picker');
+  const option = picker?.querySelector(`option[value="${fixtureId}"]`);
+  if (!picker || !option) return;
+
+  picker.value = fixtureId;
+  picker.dispatchEvent(new Event('change'));
+}
+
+function onStripKeydown(e) {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  if (!e.target.closest('.pgw-cell[data-fixture-id]')) return;
+  e.preventDefault();
+  onStripActivate(e);
+}
+
 // ─── Public init ─────────────────────────────────────────────────────────────
 
 /**
@@ -721,6 +796,11 @@ export function initMatchup() {
   store.subscribe('data:ready',      onDataReady);
   store.subscribe('horizon:changed', onHorizonChanged);
   store.subscribe('player:selected', onPlayerSelected);
+
+  // Delegated on _grid (stable across renders) rather than per-cell — the
+  // perGw strip cells are torn down and rebuilt on every renderMatchup().
+  _grid.addEventListener('click',   onStripActivate);
+  _grid.addEventListener('keydown', onStripKeydown);
 
   // Defensive: if data is already fresh (sessionStorage hydration) trigger now,
   // since data:ready was emitted before this subscription was registered.

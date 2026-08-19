@@ -696,6 +696,100 @@
   opacity: 0.7;
 }
 
+/* ─── Matchup Analyser strip: hover-expand cells ────────────────────────────
+   Scoped to .pgw-strip .pgw-cell only — the Ranker's own fixture strip
+   (.ranker-fixtures .pgw-cell, further below) reuses the base .pgw-cell /
+   .pgw-cell--<band> rules above but renders plain <span> cells with no
+   .pgw-cell__extra child, so it's untouched by any of this.
+
+   Collapsed state must stay pixel-identical to the plain .pgw-cell above
+   (36×28, single centred score) — the flex column + 0fr extra row collapses
+   to the same box. Hover/focus reveals opponent + venue purely via the CSS
+   grid-template-rows "0fr → 1fr" trick on .pgw-cell__extra below; the cell
+   itself never animates width or height directly (layout-thrash prone —
+   grid-template-rows is the endorsed way to animate to auto content height),
+   it just grows as a side effect of that inner track expanding. Width stays
+   fixed throughout — a 3-char code at 10px comfortably fits 36px, so no
+   horizontal growth is needed either. */
+.pgw-strip .pgw-cell {
+  flex-direction: column;
+  justify-content: center;
+  width: 36px;
+  min-height: 28px;
+  height: auto;
+  cursor: pointer;
+  overflow: hidden;
+  transition: box-shadow 200ms ease-out;
+}
+
+.pgw-strip .pgw-cell--static {
+  cursor: default;
+}
+
+.pgw-strip .pgw-cell__score {
+  line-height: 1;
+  flex: none;
+}
+
+.pgw-strip .pgw-cell__extra {
+  display: grid;
+  grid-template-rows: 0fr;
+  width: 100%;
+  transition: grid-template-rows 200ms ease-out;
+}
+
+.pgw-strip .pgw-cell__extra-inner {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding-top: 4px;
+  opacity: 0;
+  transition: opacity 150ms ease-out;
+}
+
+.pgw-strip .pgw-cell__opponent {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.pgw-strip .pgw-cell__venue {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-muted);
+}
+
+.pgw-strip .pgw-cell:hover,
+.pgw-strip .pgw-cell:focus-visible {
+  box-shadow: 0 0 0 1px currentColor inset;
+}
+
+.pgw-strip .pgw-cell--static:hover,
+.pgw-strip .pgw-cell--static:focus-visible {
+  box-shadow: none;
+}
+
+.pgw-strip .pgw-cell:hover .pgw-cell__extra,
+.pgw-strip .pgw-cell:focus-visible .pgw-cell__extra {
+  grid-template-rows: 1fr;
+}
+
+.pgw-strip .pgw-cell:hover .pgw-cell__extra-inner,
+.pgw-strip .pgw-cell:focus-visible .pgw-cell__extra-inner {
+  opacity: 1;
+  transition: opacity 180ms ease-out 40ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pgw-strip .pgw-cell,
+  .pgw-strip .pgw-cell__extra,
+  .pgw-strip .pgw-cell__extra-inner {
+    transition: none;
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    PLAYER RANKER — controls, table, badges, fixture strip
    BEM-lite per CONVENTIONS.md §5.1. All colours via var(--…).
