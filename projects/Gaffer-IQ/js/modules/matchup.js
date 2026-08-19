@@ -171,18 +171,27 @@ function renderNav(fixtures, { descending = false } = {}) {
 
 /**
  * Build one <li class="gw-nav__fixture"> row — badge–shortname either side of
- * a centred dash/label, with each side's own composite .score-chip flush at
- * the row's outer edges. Shared by buildNavPanel (GW-grouped) and
- * buildTeamNavPanel (single-team, all fixtures) so both navigators render
- * pixel-identical rows off one source of truth.
+ * a centred dash/label, with composite .score-chip(s) flush at the row's
+ * outer edges. Shared by buildNavPanel (GW-grouped) and buildTeamNavPanel
+ * (single-team, all fixtures) so both navigators render pixel-identical rows
+ * off one source of truth.
  * @param {Fixture} f
  * @param {object|null} ctx     from buildCtx() — passed through to navScoreChip
- * @param {{ dashLabel?: string }} [opts]  dashLabel overrides the '–' separator
- *   (buildTeamNavPanel uses this to show each row's GW, since — unlike the GW
- *   nav — a team's fixture list spans many gameweeks with no shared header).
+ * @param {{ dashLabel?: string, chipTeamId?: number|null }} [opts]
+ *   dashLabel overrides the '–' separator (buildTeamNavPanel uses this to
+ *   show each row's GW, since — unlike the GW nav — a team's fixture list
+ *   spans many gameweeks with no shared header). chipTeamId, when set,
+ *   switches to single-chip mode: only that team's own composite score is
+ *   shown, always in the leading (left) slot regardless of whether it's the
+ *   home or away side of this particular fixture, and the trailing slot is
+ *   left empty. Used by buildTeamNavPanel — every row there already fixes
+ *   which team the list belongs to, so the opponent's own score (relative
+ *   to yet another opponent) isn't a useful read there the way it is in the
+ *   GW nav's proper side-by-side comparison. Omitted (null) there, both
+ *   sides' chips show as before.
  * @returns {string}  '' if either side's team record is missing
  */
-function buildFixtureRow(f, ctx, { dashLabel = '–' } = {}) {
+function buildFixtureRow(f, ctx, { dashLabel = '–', chipTeamId = null } = {}) {
   const home = store.getTeam(f.homeTeamId);
   const away = store.getTeam(f.awayTeamId);
   if (!home || !away) return '';
@@ -191,8 +200,15 @@ function buildFixtureRow(f, ctx, { dashLabel = '–' } = {}) {
   // Each side's own CompositeScore.value/band (same values buildCard's
   // .score-pill shows) — reused here as .score-chip so the navigator gives
   // an at-a-glance read of both teams' fixtures without opening the card.
-  const homeChip = navScoreChip(home, f, ctx);
-  const awayChip = navScoreChip(away, f, ctx);
+  let homeChip, awayChip;
+  if (chipTeamId !== null) {
+    const chipTeam = home.id === chipTeamId ? home : away.id === chipTeamId ? away : null;
+    homeChip = chipTeam ? navScoreChip(chipTeam, f, ctx) : '';
+    awayChip = '';
+  } else {
+    homeChip = navScoreChip(home, f, ctx);
+    awayChip = navScoreChip(away, f, ctx);
+  }
 
   return `
     <li class="gw-nav__fixture${selected}" data-fixture-id="${f.id}" tabindex="0"
@@ -341,10 +357,13 @@ function renderTeamNav(descending = false) {
  * fixtures, earliest GW first (or, in the off-season fallback, its most
  * recent TEAM_NAV_GW_LIMIT played ones, latest first — mirrors renderNav's
  * own in-season/off-season split, just scoped to one team instead of the
- * whole league). Reuses buildFixtureRow — same row markup and .score-chip
- * treatment as the GW navigator — with each row's GW number standing in for
- * the dash separator, since rows here span many gameweeks with no shared
- * per-GW header to carry that context.
+ * whole league). Reuses buildFixtureRow — same row markup as the GW
+ * navigator — with two differences: each row's GW number stands in for the
+ * dash separator (rows here span many gameweeks with no shared per-GW header
+ * to carry that context), and only this team's own .score-chip is shown, in
+ * a single left-hand column, via buildFixtureRow's chipTeamId — the
+ * opponent changes every row already, so its own score isn't a useful
+ * side-by-side read here the way it is in the GW nav.
  */
 function buildTeamNavPanel() {
   if (!_teamNav) return;
@@ -367,7 +386,7 @@ function buildTeamNavPanel() {
         .slice(0, TEAM_NAV_GW_LIMIT);
 
   const rows = fixtures
-    .map(f => buildFixtureRow(f, ctx, { dashLabel: `GW ${f.gw}` }))
+    .map(f => buildFixtureRow(f, ctx, { dashLabel: `GW ${f.gw}`, chipTeamId: team.id }))
     .join('');
 
   _teamNav.innerHTML = `
