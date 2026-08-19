@@ -70,9 +70,13 @@ const DEFENDING_PAIRING_LABELS = {
 
 let _nav      = null;   // .gw-nav container (from HTML)
 let _grid     = null;   // .matchup-grid container (from HTML)
+let _teamNav  = null;   // .team-nav container (from HTML) — mirrors _nav, one team at a time
 let _selectedFixtureId = null;
 let _navGroups = [];    // [{ gw, fixtures }] currently loaded into the navigator
 let _navIndex  = 0;     // index into _navGroups the navigator is showing
+let _teams     = [];    // all teams, alphabetical by name — _teamIndex steps through this
+let _teamIndex = 0;     // index into _teams the team navigator is showing; wraps both ends
+let _teamNavDescending = false; // true = off-season fallback (recent played, not upcoming)
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -166,6 +170,50 @@ function renderNav(fixtures, { descending = false } = {}) {
 }
 
 /**
+ * Build one <li class="gw-nav__fixture"> row — badge–shortname either side of
+ * a centred dash/label, with each side's own composite .score-chip flush at
+ * the row's outer edges. Shared by buildNavPanel (GW-grouped) and
+ * buildTeamNavPanel (single-team, all fixtures) so both navigators render
+ * pixel-identical rows off one source of truth.
+ * @param {Fixture} f
+ * @param {object|null} ctx     from buildCtx() — passed through to navScoreChip
+ * @param {{ dashLabel?: string }} [opts]  dashLabel overrides the '–' separator
+ *   (buildTeamNavPanel uses this to show each row's GW, since — unlike the GW
+ *   nav — a team's fixture list spans many gameweeks with no shared header).
+ * @returns {string}  '' if either side's team record is missing
+ */
+function buildFixtureRow(f, ctx, { dashLabel = '–' } = {}) {
+  const home = store.getTeam(f.homeTeamId);
+  const away = store.getTeam(f.awayTeamId);
+  if (!home || !away) return '';
+  const selected = f.id === _selectedFixtureId ? ' is-selected' : '';
+
+  // Each side's own CompositeScore.value/band (same values buildCard's
+  // .score-pill shows) — reused here as .score-chip so the navigator gives
+  // an at-a-glance read of both teams' fixtures without opening the card.
+  const homeChip = navScoreChip(home, f, ctx);
+  const awayChip = navScoreChip(away, f, ctx);
+
+  return `
+    <li class="gw-nav__fixture${selected}" data-fixture-id="${f.id}" tabindex="0"
+        role="button" aria-pressed="${f.id === _selectedFixtureId}"
+        aria-label="${esc(`${home.name} vs ${away.name}`)}">
+      ${homeChip}
+      <span class="gw-nav__team gw-nav__team--home">
+        <img class="gw-nav__badge" src="${esc(home.badgeUrl)}" alt="" onerror="this.style.visibility='hidden'">
+        <span class="gw-nav__short">${esc(home.shortName)}</span>
+      </span>
+      <span class="gw-nav__dash" aria-hidden="true">${esc(dashLabel)}</span>
+      <span class="gw-nav__team gw-nav__team--away">
+        <span class="gw-nav__short">${esc(away.shortName)}</span>
+        <img class="gw-nav__badge" src="${esc(away.badgeUrl)}" alt="" onerror="this.style.visibility='hidden'">
+      </span>
+      ${awayChip}
+    </li>
+  `.trim();
+}
+
+/**
  * Render the .gw-nav panel for the GW group at _navIndex: a prev/next header
  * (arrows hidden — not merely disabled — at the ends of the navigable list,
  * per the `hidden` attribute honoured globally in base.css) and one row per
@@ -187,36 +235,7 @@ function buildNavPanel() {
   // rebuilds from the full store/season each call, so it must not run per row.
   const ctx = buildCtx();
 
-  const rows = group.fixtures.map(f => {
-    const home = store.getTeam(f.homeTeamId);
-    const away = store.getTeam(f.awayTeamId);
-    if (!home || !away) return '';
-    const selected = f.id === _selectedFixtureId ? ' is-selected' : '';
-
-    // Each side's own CompositeScore.value/band (same values buildCard's
-    // .score-pill shows) — reused here as .score-chip so the navigator gives
-    // an at-a-glance read of both teams' fixtures without opening the card.
-    const homeChip = navScoreChip(home, f, ctx);
-    const awayChip = navScoreChip(away, f, ctx);
-
-    return `
-      <li class="gw-nav__fixture${selected}" data-fixture-id="${f.id}" tabindex="0"
-          role="button" aria-pressed="${f.id === _selectedFixtureId}"
-          aria-label="${esc(`${home.name} vs ${away.name}`)}">
-        ${homeChip}
-        <span class="gw-nav__team gw-nav__team--home">
-          <img class="gw-nav__badge" src="${esc(home.badgeUrl)}" alt="" onerror="this.style.visibility='hidden'">
-          <span class="gw-nav__short">${esc(home.shortName)}</span>
-        </span>
-        <span class="gw-nav__dash" aria-hidden="true">–</span>
-        <span class="gw-nav__team gw-nav__team--away">
-          <span class="gw-nav__short">${esc(away.shortName)}</span>
-          <img class="gw-nav__badge" src="${esc(away.badgeUrl)}" alt="" onerror="this.style.visibility='hidden'">
-        </span>
-        ${awayChip}
-      </li>
-    `.trim();
-  }).join('');
+  const rows = group.fixtures.map(f => buildFixtureRow(f, ctx)).join('');
 
   _nav.innerHTML = `
     <div class="gw-nav__header">
@@ -268,6 +287,7 @@ function selectFixtureFromNav(fixtureId) {
   _selectedFixtureId = fixtureId;
   renderMatchup();
   buildNavPanel();
+  buildTeamNavPanel();
 }
 
 /**
@@ -288,6 +308,132 @@ function onNavKeydown(e) {
   if (!row) return;
   e.preventDefault();
   selectFixtureFromNav(Number(row.dataset.fixtureId));
+}
+
+// ─── Render: team navigator ───────────────────────────────────────────────────
+
+// How many gameweeks of a team's fixture list to show at once — the full
+// 38-game season read as one list; trimmed to a manageable upcoming window.
+const TEAM_NAV_GW_LIMIT = 12;
+
+/**
+ * Load all teams (alphabetical by name) into the team navigator. Unlike
+ * renderNav, this does NOT jump to whichever team owns the selected fixture —
+ * per spec it always starts at the first team alphabetically, and only moves
+ * when the user steps it. Re-runs on every data refresh (team list rarely
+ * changes mid-season, but this stays correct if it ever does); _teamIndex is
+ * deliberately left untouched so an in-progress browse survives a refresh.
+ * @param {boolean} descending  true in the off-season fallback (onDataReady
+ *   found no unplayed fixtures league-wide) — same flag renderNav receives,
+ *   so buildTeamNavPanel can switch each team's own window the same way.
+ */
+function renderTeamNav(descending = false) {
+  _teams = store.getTeams().slice().sort((a, b) => a.name.localeCompare(b.name));
+  _teamNavDescending = descending;
+  if (_teamIndex >= _teams.length) _teamIndex = 0;
+  buildTeamNavPanel();
+}
+
+/**
+ * Render the .team-nav panel for the team at _teamIndex: a prev/next header
+ * (badge + full name, arrows always active — this list loops both ends, see
+ * teamNavPrev/teamNavNext) and that team's next TEAM_NAV_GW_LIMIT upcoming
+ * fixtures, earliest GW first (or, in the off-season fallback, its most
+ * recent TEAM_NAV_GW_LIMIT played ones, latest first — mirrors renderNav's
+ * own in-season/off-season split, just scoped to one team instead of the
+ * whole league). Reuses buildFixtureRow — same row markup and .score-chip
+ * treatment as the GW navigator — with each row's GW number standing in for
+ * the dash separator, since rows here span many gameweeks with no shared
+ * per-GW header to carry that context.
+ */
+function buildTeamNavPanel() {
+  if (!_teamNav) return;
+  const team = _teams[_teamIndex];
+  if (!team) {
+    _teamNav.innerHTML = '';
+    return;
+  }
+
+  const ctx = buildCtx();
+  const teamFixtures = store.getFixtures()
+    .filter(f => (f.homeTeamId === team.id || f.awayTeamId === team.id) && f.gw !== null);
+
+  const fixtures = _teamNavDescending
+    ? teamFixtures.filter(f => f.played)
+        .sort((a, b) => b.gw - a.gw || (b.kickoff || '').localeCompare(a.kickoff || ''))
+        .slice(0, TEAM_NAV_GW_LIMIT)
+    : teamFixtures.filter(f => !f.played)
+        .sort((a, b) => a.gw - b.gw || (a.kickoff || '').localeCompare(b.kickoff || ''))
+        .slice(0, TEAM_NAV_GW_LIMIT);
+
+  const rows = fixtures
+    .map(f => buildFixtureRow(f, ctx, { dashLabel: `GW ${f.gw}` }))
+    .join('');
+
+  _teamNav.innerHTML = `
+    <div class="gw-nav__header">
+      <button class="gw-nav__arrow gw-nav__arrow--prev" type="button"
+              aria-label="Previous team">‹</button>
+      <span class="gw-nav__title gw-nav__title--team">
+        <img class="gw-nav__badge" src="${esc(team.badgeUrl)}" alt="" onerror="this.style.visibility='hidden'">
+        ${esc(team.name)}
+      </span>
+      <button class="gw-nav__arrow gw-nav__arrow--next" type="button"
+              aria-label="Next team">›</button>
+    </div>
+    <ul class="gw-nav__list">${rows}</ul>
+  `;
+}
+
+/** Step the team navigator to the previous team, wrapping past the first. */
+function teamNavPrev() {
+  if (_teams.length === 0) return;
+  _teamIndex = (_teamIndex - 1 + _teams.length) % _teams.length;
+  buildTeamNavPanel();
+}
+
+/** Step the team navigator to the next team, wrapping past the last. */
+function teamNavNext() {
+  if (_teams.length === 0) return;
+  _teamIndex = (_teamIndex + 1) % _teams.length;
+  buildTeamNavPanel();
+}
+
+/**
+ * Select a fixture from a team-nav row click. Behaves like selectFixtureFromNav
+ * but additionally re-points the GW navigator at the clicked fixture's GW group
+ * (mirrors onStripActivate) since, unlike a GW-nav click, the clicked fixture
+ * here is very likely outside whatever GW group the left panel is currently
+ * showing.
+ */
+function selectFixtureFromTeamNav(fixtureId) {
+  if (fixtureId === _selectedFixtureId) return;
+  _selectedFixtureId = fixtureId;
+  const idx = _navGroups.findIndex(g => g.fixtures.some(f => f.id === fixtureId));
+  if (idx >= 0) _navIndex = idx;
+  renderMatchup();
+  buildNavPanel();
+  buildTeamNavPanel();
+}
+
+/**
+ * Delegated click handler for the .team-nav panel (bound once in initMatchup —
+ * the panel persists across renders, only its innerHTML is replaced).
+ */
+function onTeamNavClick(e) {
+  if (e.target.closest('.gw-nav__arrow--prev')) { teamNavPrev(); return; }
+  if (e.target.closest('.gw-nav__arrow--next')) { teamNavNext(); return; }
+  const row = e.target.closest('.gw-nav__fixture[data-fixture-id]');
+  if (row) selectFixtureFromTeamNav(Number(row.dataset.fixtureId));
+}
+
+/** Keyboard equivalent of onTeamNavClick for the focusable fixture rows. */
+function onTeamNavKeydown(e) {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const row = e.target.closest('.gw-nav__fixture[data-fixture-id]');
+  if (!row) return;
+  e.preventDefault();
+  selectFixtureFromTeamNav(Number(row.dataset.fixtureId));
 }
 
 // ─── Render: matchup cards ────────────────────────────────────────────────────
@@ -826,6 +972,7 @@ function onDataReady() {
     _selectedFixtureId = fixtures[0].id;
   }
   renderNav(fixtures, { descending });
+  renderTeamNav(descending);
   renderMatchup();
 }
 
@@ -850,6 +997,7 @@ function onPlayerSelected({ fixtureId }) {
   const idx = _navGroups.findIndex(g => g.fixtures.some(f => f.id === fixtureId));
   if (idx >= 0) _navIndex = idx;
   buildNavPanel();
+  buildTeamNavPanel();
   renderMatchup();
 }
 
@@ -893,6 +1041,7 @@ export function initMatchup() {
   const root = document.querySelector('[data-module="matchup"]');
   _nav       = root.querySelector('.gw-nav');
   _grid      = root.querySelector('.matchup-grid');
+  _teamNav   = root.querySelector('.team-nav');
 
   store.subscribe('data:ready',      onDataReady);
   store.subscribe('horizon:changed', onHorizonChanged);
@@ -903,6 +1052,10 @@ export function initMatchup() {
   // buildNavPanel() call.
   _nav.addEventListener('click',   onNavClick);
   _nav.addEventListener('keydown', onNavKeydown);
+
+  // Same delegation pattern as _nav, for the team navigator.
+  _teamNav.addEventListener('click',   onTeamNavClick);
+  _teamNav.addEventListener('keydown', onTeamNavKeydown);
 
   // Delegated on _grid (stable across renders) rather than per-cell — the
   // perGw strip cells are torn down and rebuilt on every renderMatchup().
