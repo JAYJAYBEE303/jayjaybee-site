@@ -44,10 +44,25 @@ import { initCalibration }  from './calibration.js';
  * ARCHITECTURE.md §6 treats bootstrap/fixtures as fresh for the session.
  */
 async function loadInitialData({ force = false } = {}) {
-  if (!force && store.isFresh()) {
+  // Two INDEPENDENT freshness gates. store.isFresh() reflects sessionStorage-
+  // backed `season` (ARCHITECTURE.md §6 — bootstrap/fixtures are the only
+  // payloads mirrored to sessionStorage), but leagueXg/leagueXgPrev/Prev2/Prev3
+  // are memory-only and reset to null on every module load (i.e. every page
+  // reload), independently of whether `season` just rehydrated from cache.
+  // Gating the Understat fetches on seasonFresh too (as this used to) meant a
+  // reload within the same tab session — season rehydrates, so isFresh() is
+  // true — skipped the Understat fetches forever, silently and permanently
+  // stranding H2H History / Style Clash / venue split on their neutral
+  // fallback for the rest of that session even though the proxy was healthy.
+  // See git history for the bug report this fixes.
+  const seasonFresh = !force && store.isFresh();
+  const xgFresh      = !force && store.getLeagueXg() !== null;
+
+  if (seasonFresh && xgFresh) {
     store.markDataReady();
     return;
   }
+
   try {
     // Phase 3A: league-wide xG is one HTTP call and enriches the whole model,
     // so it loads alongside bootstrap/fixtures rather than lazily. Wrapped in
@@ -59,23 +74,28 @@ async function loadInitialData({ force = false } = {}) {
     // Phase 4: fetches TWO seasons further back again, purely to deepen
     // calcFixtureHistory's cross-season H2H window (N_H2H=8, config.js).
     // Each season gets its own allSettled slot: an outage on any one must not
-    // block the others.
+    // block the others. Each slot is skipped (resolved with null, unused
+    // below) when its own freshness flag says it's already loaded.
     const [bootstrapRes, fixturesRes, leagueXgRes, leagueXgPrevRes, leagueXgPrev2Res, leagueXgPrev3Res] = await Promise.allSettled([
-      fetchBootstrap(),
-      fetchFixtures(),
-      fetchLeagueXg(UNDERSTAT_SEASON),
-      fetchLeagueXg(UNDERSTAT_PREV_SEASON),
-      fetchLeagueXg(UNDERSTAT_PREV2_SEASON),
-      fetchLeagueXg(UNDERSTAT_PREV3_SEASON),
+      seasonFresh ? Promise.resolve(null) : fetchBootstrap(),
+      seasonFresh ? Promise.resolve(null) : fetchFixtures(),
+      xgFresh ? Promise.resolve(null) : fetchLeagueXg(UNDERSTAT_SEASON),
+      xgFresh ? Promise.resolve(null) : fetchLeagueXg(UNDERSTAT_PREV_SEASON),
+      xgFresh ? Promise.resolve(null) : fetchLeagueXg(UNDERSTAT_PREV2_SEASON),
+      xgFresh ? Promise.resolve(null) : fetchLeagueXg(UNDERSTAT_PREV3_SEASON),
     ]);
 
-    if (bootstrapRes.status !== 'fulfilled') throw bootstrapRes.reason;
-    if (fixturesRes.status  !== 'fulfilled') throw fixturesRes.reason;
+    if (!seasonFresh) {
+      if (bootstrapRes.status !== 'fulfilled') throw bootstrapRes.reason;
+      if (fixturesRes.status  !== 'fulfilled') throw fixturesRes.reason;
 
-    const season = normaliseSeason(bootstrapRes.value, fixturesRes.value);
-    store.setSeason(season);
+      const season = normaliseSeason(bootstrapRes.value, fixturesRes.value);
+      store.setSeason(season);
+    }
 
-    if (leagueXgRes.status === 'fulfilled') {
+    if (xgFresh) {
+      // Already loaded this JS lifetime — leave store.leagueXg* untouched.
+    } else if (leagueXgRes.status === 'fulfilled') {
       store.setLeagueXg(leagueXgRes.value);
     } else {
       // MODEL: Understat is supplementary — log and continue with FPL-only data.
@@ -86,7 +106,9 @@ async function loadInitialData({ force = false } = {}) {
         leagueXgRes.reason?.message ?? leagueXgRes.reason);
     }
 
-    if (leagueXgPrevRes.status === 'fulfilled') {
+    if (xgFresh) {
+      // Already loaded this JS lifetime — leave store.leagueXgPrev untouched.
+    } else if (leagueXgPrevRes.status === 'fulfilled') {
       store.setLeagueXgPrev(leagueXgPrevRes.value);
     } else {
       // Same non-fatal treatment — calcHomeAwaySplit falls back to
@@ -95,7 +117,9 @@ async function loadInitialData({ force = false } = {}) {
         leagueXgPrevRes.reason?.message ?? leagueXgPrevRes.reason);
     }
 
-    if (leagueXgPrev2Res.status === 'fulfilled') {
+    if (xgFresh) {
+      // Already loaded this JS lifetime — leave store.leagueXgPrev2 untouched.
+    } else if (leagueXgPrev2Res.status === 'fulfilled') {
       store.setLeagueXgPrev2(leagueXgPrev2Res.value);
     } else {
       // Same non-fatal treatment — calcFixtureHistory falls back to fewer
@@ -104,7 +128,9 @@ async function loadInitialData({ force = false } = {}) {
         leagueXgPrev2Res.reason?.message ?? leagueXgPrev2Res.reason);
     }
 
-    if (leagueXgPrev3Res.status === 'fulfilled') {
+    if (xgFresh) {
+      // Already loaded this JS lifetime — leave store.leagueXgPrev3 untouched.
+    } else if (leagueXgPrev3Res.status === 'fulfilled') {
       store.setLeagueXgPrev3(leagueXgPrev3Res.value);
     } else {
       console.warn('[Gaffer IQ] Understat three-seasons-ago xG unavailable — H2H uses a shorter window.',
