@@ -14,10 +14,11 @@
 
 .matchup-shell {
   display: grid;
-  /* Team nav's rows carry a wider "GW n" centre label than the GW nav's plain
-     dash (see buildFixtureRow's dashLabel), so its column runs wider to keep
-     the outer score chips clear of the team badges either side of it. */
-  grid-template-columns: 260px 1fr 300px;
+  /* Team nav's rows are now a single content-hugging cluster (score, opponent,
+     H/A, GW — see .gw-nav__fixture--team), not the GW nav's side-by-side
+     comparison, so it no longer needs extra width of its own: same 260px as
+     the GW nav column. */
+  grid-template-columns: 260px 1fr 260px;
   gap: var(--space-6);
   align-items: start;
   /* Break out of .app-main's max-width:1400px + centering (layout.css) —
@@ -210,10 +211,16 @@
 }
 
 /* Team navigator's row layout: score chip, opponent, H/A letter, GW label —
-   4 columns instead of the GW nav's 5 (no second team, no second chip). See
-   buildTeamFixtureRow in matchup.js. */
+   4 columns instead of the GW nav's 5 (no second team, no second chip). All
+   four are auto (content-hugging), not a stretched 1fr — a 1fr opponent
+   column left the short opponent code flush left in a wide column, stranding
+   H/A + GW at the far right edge and reading as two separate clusters with a
+   dead gap between. Auto columns keep the whole row as one tight group, with
+   any leftover row width landing as trailing space past GW instead of in the
+   middle. See buildTeamFixtureRow in matchup.js. */
 .gw-nav__fixture--team {
-  grid-template-columns: auto 1fr auto auto;
+  grid-template-columns: auto auto auto auto;
+  justify-content: start;
 }
 
 /* Single-letter H/A indicator. Reuses the app's existing green/red status
