@@ -1001,6 +1001,7 @@
 .ranker-controls__pos-group {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: var(--space-1);
 }
 
