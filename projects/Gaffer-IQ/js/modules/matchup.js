@@ -718,7 +718,10 @@ function buildCard(team, venue, score, fdr, horizonScore, horizon, duels, defend
 
 /**
  * Build the six sub-metric breakdown rows as an HTML string.
- * Each row: label | bar (width = value%) | value | weight% | est?
+ * Each row: label | bar (width = value%) | value | weight%. An estimated
+ * metric (m.estimated) is flagged by the striped/muted bar and dimmed label
+ * alone (breakdown-row--estimated / breakdown-row__bar--estimated) — no
+ * separate "~" marker, per the no-symbol convention on this page.
  * Bar colour keys off the metric value's own band for at-a-glance diagnosis.
  *
  * baseDifficulty is a documented exception (FEATURE_ENGINE.md §1 rule 2, §2):
@@ -740,9 +743,6 @@ function buildBreakdownRows(breakdown, venue) {
     const val     = Math.round(m.value);
     const pct     = Math.round(m.weight * 100);
     const barBand = key === 'baseDifficulty' ? bandFromValue(invert(m.value)) : bandFromValue(val);
-    const estMark = m.estimated
-      ? '<span class="breakdown-row__est" title="Estimated — limited data">~</span>'
-      : '';
     const rowClass   = m.estimated ? ' breakdown-row--estimated' : '';
     const barEstClass = m.estimated ? ' breakdown-row__bar--estimated' : '';
     const labelTitle = key === 'baseDifficulty'
@@ -766,7 +766,6 @@ function buildBreakdownRows(breakdown, venue) {
         </div>
         <span class="breakdown-row__value">${val}</span>
         <span class="breakdown-row__weight">${pct}%</span>
-        ${estMark}
       </div>
     `.trim();
   }).join('');
@@ -876,9 +875,6 @@ function buildCounterPairings(pairings, labels, perspective, duels) {
     const atkDisplay = p.attackForm  !== null ? Math.round(p.attackForm)  : '—';
     const defDisplay = p.defenceForm !== null ? Math.round(p.defenceForm) : '—';
     const label      = esc(labels[key] ?? key);
-    const estMark    = p.estimated
-      ? '<span class="counter-pairing__est" title="Estimated — no player form loaded">~</span>'
-      : '';
     const rowClass   = p.estimated ? ' counter-pairing--estimated' : '';
     const detail     = perspective === 'defending'
       ? `Def ${esc(String(defDisplay))} / Atk ${esc(String(atkDisplay))}`
@@ -891,7 +887,6 @@ function buildCounterPairings(pairings, labels, perspective, duels) {
             <span class="counter-pairing__label">${label}</span>
             <span class="score-chip score-chip--${chipBand} counter-pairing__score">${esc(valDisplay)}</span>
             <span class="counter-pairing__detail">${detail}</span>
-            ${estMark}
           </span>
           <span class="counter-pairing-info__btn" aria-hidden="true"
                 title="Show the players behind this pairing">i</span>
