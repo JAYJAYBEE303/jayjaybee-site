@@ -1316,7 +1316,7 @@ In `js/config.js`, after `COUNTER_DEFENCE_WEIGHT`:
 // setPiece 0.0555/0.0410, box 0.0170/0.0091, fast 0.0229/0.0263.
 export const CHANNEL_AXIS_POOLED_SD = {
   setPieceThreat: 0.0690,
-  wideTransition: 0.0349,
+  wideTransition: 0.0348,
   boxThreat:      0.0193,
 };
 

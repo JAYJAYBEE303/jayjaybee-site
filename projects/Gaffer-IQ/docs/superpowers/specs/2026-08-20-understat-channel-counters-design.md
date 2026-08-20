@@ -164,7 +164,7 @@ construction, so it carries no independent information.
 |---|---|---|---|---|---|
 | setPiece | 0.2562 | 0.0555 | 0.2524 | 0.0410 | 0.0690 |
 | box | 0.9097 | 0.0170 | 0.9110 | 0.0091 | 0.0193 |
-| fast | 0.0822 | 0.0229 | 0.0856 | 0.0263 | 0.0349 |
+| fast | 0.0822 | 0.0229 | 0.0856 | 0.0263 | 0.0348 |
 
 **The baselines cancel.** Every team's xG-for in an axis is another team's xG-against, so
 league-mean-for equals league-mean-against to within 0.004 on all three axes. Subtracting
