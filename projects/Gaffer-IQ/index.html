@@ -59,18 +59,22 @@
         <div class="ranker-shell">
 
           <aside class="ranker-filters" aria-label="Ranker filters">
+            <!-- Start deselected: no pill active means no filter on this axis
+                 (see ranker.js's _activePosSet/_activeMinSecSet) — click a
+                 position to narrow to just it, instead of deselecting the
+                 other three. -->
             <div class="ranker-controls__pos-group" role="group" aria-label="Filter by position">
-              <button class="ranker-pos-btn is-active" data-pos="GKP" type="button">GKP</button>
-              <button class="ranker-pos-btn is-active" data-pos="DEF" type="button">DEF</button>
-              <button class="ranker-pos-btn is-active" data-pos="MID" type="button">MID</button>
-              <button class="ranker-pos-btn is-active" data-pos="FWD" type="button">FWD</button>
+              <button class="ranker-pos-btn" data-pos="GKP" type="button">GKP</button>
+              <button class="ranker-pos-btn" data-pos="DEF" type="button">DEF</button>
+              <button class="ranker-pos-btn" data-pos="MID" type="button">MID</button>
+              <button class="ranker-pos-btn" data-pos="FWD" type="button">FWD</button>
             </div>
 
             <div class="ranker-controls__pos-group" role="group" aria-label="Filter by playtime security">
-              <button class="ranker-minsec-btn is-active" data-minsec="Guaranteed" type="button">Guaranteed</button>
-              <button class="ranker-minsec-btn is-active" data-minsec="Likely"     type="button">Likely</button>
-              <button class="ranker-minsec-btn is-active" data-minsec="Rotation"   type="button">Rotation</button>
-              <button class="ranker-minsec-btn is-active" data-minsec="Risk"       type="button">Risk</button>
+              <button class="ranker-minsec-btn" data-minsec="Guaranteed" type="button">Guaranteed</button>
+              <button class="ranker-minsec-btn" data-minsec="Likely"     type="button">Likely</button>
+              <button class="ranker-minsec-btn" data-minsec="Rotation"   type="button">Rotation</button>
+              <button class="ranker-minsec-btn" data-minsec="Risk"       type="button">Risk</button>
             </div>
 
             <div class="ranker-controls__select-wrap">

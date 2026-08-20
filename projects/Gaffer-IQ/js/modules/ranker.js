@@ -69,10 +69,14 @@ let _rows = [];
 let _computeId = 0;
 
 // Active filter / sort / display state.
-let _activePosSet    = new Set(['GKP', 'DEF', 'MID', 'FWD']);
+// Empty set = no filter on that axis (every position / every playtime level
+// shows) — selecting a pill narrows to just the selected ones, rather than
+// the old "all selected by default" scheme where narrowing to one position
+// meant deselecting the other three.
+let _activePosSet    = new Set();
 let _activePriceBand = 'all';      // 'all' | numeric-string maximum price threshold
 let _activeTeamId    = 'all';
-let _activeMinSecSet = new Set(MIN_SEC_LEVELS.map(l => l.label)); // all levels active by default
+let _activeMinSecSet = new Set();
 let _sortBy          = 'value';    // 'value' | 'costPerPoint' | 'price' | 'minutesSecurity' | 'name' | 'team' | 'avgPointsPerGw' | 'nextFixtureScore'
 let _sortDesc        = true;
 
@@ -286,12 +290,16 @@ async function rebuildRowsChunked() {
 
 function applyFilters(rows) {
   return rows.filter(({ player, score }) => {
-    if (!_activePosSet.has(player.position))          return false;
+    // Empty set = axis not filtered (see _activePosSet's declaration) — only
+    // a non-empty set narrows the table down to its members.
+    if (_activePosSet.size > 0 &&
+        !_activePosSet.has(player.position))          return false;
     if (!priceInBand(player.price, _activePriceBand)) return false;
     if (_activeTeamId !== 'all' &&
         String(player.teamId) !== _activeTeamId)      return false;
     const ms = score.breakdown?.form?.minutesSecurity ?? 0;
-    if (!_activeMinSecSet.has(minSecLevel(ms).label)) return false;
+    if (_activeMinSecSet.size > 0 &&
+        !_activeMinSecSet.has(minSecLevel(ms).label)) return false;
     return true;
   });
 }
@@ -811,15 +819,15 @@ export function initRanker() {
   populatePriceFilter();
 
   // ── Position filter toggle buttons ──────────────────────────────────────
+  // Start deselected (see _activePosSet's declaration) — a click just
+  // toggles membership, freely down to zero, since zero means "unfiltered"
+  // rather than "nothing matches".
   root.querySelectorAll('.ranker-pos-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const pos = btn.dataset.pos;
       if (_activePosSet.has(pos)) {
-        // Keep at least one position active so the table is never empty.
-        if (_activePosSet.size > 1) {
-          _activePosSet.delete(pos);
-          btn.classList.remove('is-active');
-        }
+        _activePosSet.delete(pos);
+        btn.classList.remove('is-active');
       } else {
         _activePosSet.add(pos);
         btn.classList.add('is-active');
@@ -833,11 +841,8 @@ export function initRanker() {
     btn.addEventListener('click', () => {
       const lvl = btn.dataset.minsec;
       if (_activeMinSecSet.has(lvl)) {
-        // Keep at least one level active so the table is never empty.
-        if (_activeMinSecSet.size > 1) {
-          _activeMinSecSet.delete(lvl);
-          btn.classList.remove('is-active');
-        }
+        _activeMinSecSet.delete(lvl);
+        btn.classList.remove('is-active');
       } else {
         _activeMinSecSet.add(lvl);
         btn.classList.add('is-active');
