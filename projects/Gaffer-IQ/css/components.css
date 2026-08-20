@@ -14,9 +14,27 @@
 
 .matchup-shell {
   display: grid;
-  grid-template-columns: 260px 1fr;
+  /* Team nav's rows carry a wider "GW n" centre label than the GW nav's plain
+     dash (see buildFixtureRow's dashLabel), so its column runs wider to keep
+     the outer score chips clear of the team badges either side of it. */
+  grid-template-columns: 260px 1fr 300px;
   gap: var(--space-6);
   align-items: start;
+  /* Break out of .app-main's max-width:1400px + centering (layout.css) —
+     same escape .ranker-shell uses below, for the same reason: the fixed-
+     width side navigators were squeezing the middle column's two team cards
+     into well under half the viewport. width:100vw + these negative margins
+     is the standard technique for escaping a centred ancestor's max-width;
+     the side navigators land further out toward the viewport edges as a
+     direct result, and the middle column (both nav columns are fixed-width)
+     absorbs the rest — roughly doubling the cards' width on a typical
+     desktop viewport. Padding restores the horizontal inset app-main's own
+     padding provided before this element escaped its box. */
+  width: 100vw;
+  max-width: 100vw;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+  padding: 0 var(--space-6);
 }
 
 @media (max-width: 900px) {
@@ -28,9 +46,15 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    GW NAVIGATOR — replaces the old fixture-picker <select>. One GW's fixtures
    at a time, paged with the header arrows; click a row to load that matchup.
+   TEAM NAVIGATOR (.team-nav) mirrors it on the opposite side of the shell —
+   same panel chrome, header, and .gw-nav__* row markup, just one team's full
+   season instead of one GW's fixtures (see buildTeamNavPanel in matchup.js).
+   Deliberately NOT capped/scrolled to match height — a team's full fixture
+   list runs longer than one GW's, so this panel is taller by design.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-.gw-nav {
+.gw-nav,
+.team-nav {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -55,6 +79,15 @@
   font-weight: 700;
   letter-spacing: 0.02em;
   color: var(--color-text);
+}
+
+/* Team navigator's header title: same slot as .gw-nav__title above, just
+   with the team's badge spaced before its name instead of plain text. */
+.gw-nav__title--team {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
 }
 
 /* Hidden outright (not merely disabled) at the ends of the navigable list —
@@ -95,12 +128,13 @@
   list-style: none;
 }
 
-/* Home/dash/away as a 1fr auto 1fr grid, home right-aligned and away
-   left-aligned — the dash sits on one shared centre axis across every row
-   regardless of how the two shortnames' widths differ. */
+/* Score chip / home / dash / away / score chip as an auto 1fr auto 1fr auto
+   grid, home right-aligned and away left-aligned — the dash sits on one
+   shared centre axis across every row regardless of how the two shortnames'
+   widths differ, and the two outer score chips sit flush at the row edges. */
 .gw-nav__fixture {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: auto 1fr auto 1fr auto;
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-2);
@@ -108,6 +142,22 @@
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: background 0.12s, border-color 0.12s;
+}
+
+/* Each side's own CompositeScore for this fixture — reuses .score-chip
+   (band-coloured pill, same markup as the counter-matchup pairing chips) so
+   it reads identically wherever a Gaffer IQ score is shown. */
+.gw-nav__score {
+  justify-self: center;
+}
+
+/* The nav row is already tight on width and the chip's dashed border
+   (.score-chip--estimated above) already signals low confidence, so the ~
+   prefix is redundant here — drop it to save space. Scoped to this class
+   only; every other .score-chip--estimated usage (dashboard, ranker,
+   planner) keeps the ~. */
+.gw-nav__score.score-chip--estimated::before {
+  content: none;
 }
 
 .gw-nav__fixture:hover {
@@ -2985,10 +3035,11 @@
     font-size: var(--font-size-xl);
   }
 
-  /* GW navigator: stacked above the cards at this width (.matchup-shell
-     collapses to 1fr at 900px) — drop the sticky positioning so it scrolls
-     away with the page instead of pinning above content on a small screen. */
-  .gw-nav {
+  /* GW/team navigators: stacked above/below the cards at this width
+     (.matchup-shell collapses to 1fr at 900px) — drop the sticky positioning
+     so they scroll away with the page instead of pinning on a small screen. */
+  .gw-nav,
+  .team-nav {
     position: static;
   }
 

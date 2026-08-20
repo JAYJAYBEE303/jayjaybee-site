@@ -1,0 +1,66 @@
+/* ============================================================
+   jayjaybee.com — "back to jayjaybee.com" link
+   Injected only on /projects/ sub-project pages by
+   /assets/js/back-to-jayjaybee.js — see that file for the
+   path safeguard and detection logic.
+
+   Deliberately unopinionated: no font-family and no brand
+   hex colors are set anywhere in this file. When the link is
+   dropped into an existing nav bar it borrows that nav's own
+   item classes at runtime, so it is styled entirely by the
+   host project's own CSS. The rules below only cover the
+   fallback cases — a bare, unstyled nav item, or no nav bar
+   at all — and even those derive their color from `currentColor`
+   so they track whatever palette the host page has already
+   resolved (including its own light/dark theme).
+   ============================================================ */
+
+.jjb-back-link {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* Fallback styling for a nav item we couldn't borrow a class list
+   for (nav bar found, but empty or in an unrecognized shape). */
+.jjb-back-link--nav-fallback {
+  padding: 0 1em;
+  opacity: 0.85;
+}
+
+.jjb-back-link--nav-fallback:hover {
+  opacity: 1;
+}
+
+/* No nav bar on the page at all — float in the same "leftmost,
+   top-level" spot a nav item would occupy, styled only with
+   currentColor so it adapts to the host page's own theme. */
+.jjb-back-link--floating {
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  z-index: 2147483000;
+  padding: 0.5em 0.9em;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  font-size: 0.85rem;
+  line-height: 1;
+  opacity: 0.92;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.jjb-back-link--floating:hover {
+  opacity: 1;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jjb-back-link--floating {
+    transition: none;
+  }
+}
