@@ -12,11 +12,15 @@
  *    contains a "/projects/" segment. This is checked first, before
  *    any other code runs, so nothing is built or rendered off-path.
  *  - Nav gate: looks for the page's own <nav> (or [role="navigation"])
- *    element. If one exists, the link is prepended as a new first item
- *    inside it, borrowing the CSS classes of whatever nav item/link
- *    already sits in that slot (state classes like "is-active" are
- *    stripped). That makes the link render with that project's own
- *    font, color, spacing and hover behavior automatically — nothing
+ *    element. If that nav sits directly inside a <header> (or
+ *    [role="banner"]) alongside other bar content — a logo/brand, in
+ *    practice — the link is prepended to that outer bar instead, so it
+ *    lands leftmost of the *entire* bar (left of the logo), not just
+ *    leftmost of the nav's own links. Otherwise it's prepended as a new
+ *    first item inside the nav itself. Either way it borrows the CSS
+ *    classes of whatever nav item/link already sits in that slot (state
+ *    classes like "is-active" are stripped), so it renders with that
+ *    project's own font, color, spacing and hover behavior — nothing
  *    here hardcodes a look.
  *  - No <nav> found: the link floats fixed top-left instead, in the
  *    same "leftmost, top-level" spot a nav item would occupy, styled
@@ -77,9 +81,39 @@
     return { container: container, template: container.firstElementChild };
   }
 
+  // If `nav` lives directly inside a <header>/[role="banner"] alongside
+  // other bar content (a brand/logo, controls, ...), that ancestor is the
+  // real "nav bar" — return it so the link can be inserted leftmost of the
+  // whole bar rather than just leftmost within the <nav> itself.
+  function findOuterBar(nav) {
+    var parent = nav.parentElement;
+    if (!parent) return null;
+    var isBanner = parent.tagName === 'HEADER' || parent.getAttribute('role') === 'banner';
+    return isBanner ? parent : null;
+  }
+
+  // Reduce a nav-item template down to the link/button that actually
+  // carries the nav's own class-based styling (unwrapping a <li> if needed).
+  function resolveLinkTemplate(template) {
+    if (!template) return null;
+    return template.tagName === 'LI' ? template.querySelector('a, button') : template;
+  }
+
   function injectIntoNav(nav) {
     var slot = locateNavItemSlot(nav);
     var link = makeLink();
+    var outerBar = findOuterBar(nav);
+
+    if (outerBar) {
+      var linkTemplate = resolveLinkTemplate(slot.template);
+      if (linkTemplate) {
+        borrowClasses(link, linkTemplate);
+      } else {
+        link.classList.add('jjb-back-link--nav-fallback');
+      }
+      outerBar.insertBefore(link, outerBar.firstChild);
+      return;
+    }
 
     if (!slot.template) {
       // Nav bar exists but has no items to model — use built-in fallback look.
