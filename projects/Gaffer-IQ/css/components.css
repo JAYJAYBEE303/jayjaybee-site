@@ -209,6 +209,26 @@
   font-size: var(--font-size-xs);
 }
 
+/* Team navigator's row layout: score chip, opponent, H/A letter, GW label —
+   4 columns instead of the GW nav's 5 (no second team, no second chip). See
+   buildTeamFixtureRow in matchup.js. */
+.gw-nav__fixture--team {
+  grid-template-columns: auto 1fr auto auto;
+}
+
+/* Single-letter H/A indicator. Reuses the app's existing green/red status
+   tokens — same pair .squad-import-status--success/error use below — rather
+   than introducing new colours. Deliberately not bold: same weight as the
+   row's other small text (.gw-nav__dash). */
+.gw-nav__venue {
+  font-size: var(--font-size-xs);
+  font-weight: 400;
+  text-align: center;
+}
+
+.gw-nav__venue--home { color: var(--band-great); }
+.gw-nav__venue--away { color: var(--band-brutal); }
+
 /* ═══════════════════════════════════════════════════════════════════════════
    MATCHUP GRID — two-column layout for home/away cards
    ═══════════════════════════════════════════════════════════════════════════ */

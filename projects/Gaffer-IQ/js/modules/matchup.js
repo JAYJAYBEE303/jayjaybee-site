@@ -171,27 +171,16 @@ function renderNav(fixtures, { descending = false } = {}) {
 
 /**
  * Build one <li class="gw-nav__fixture"> row — badge–shortname either side of
- * a centred dash/label, with composite .score-chip(s) flush at the row's
- * outer edges. Shared by buildNavPanel (GW-grouped) and buildTeamNavPanel
- * (single-team, all fixtures) so both navigators render pixel-identical rows
- * off one source of truth.
+ * a centred dash, with composite .score-chip(s) flush at the row's outer
+ * edges. Used by buildNavPanel (GW-grouped, side-by-side comparison of both
+ * teams). buildTeamNavPanel has its own row builder (buildTeamFixtureRow,
+ * below) — a team-nav row already fixes which team the list belongs to, so
+ * repeating that team's own badge/name in every row would be redundant.
  * @param {Fixture} f
  * @param {object|null} ctx     from buildCtx() — passed through to navScoreChip
- * @param {{ dashLabel?: string, chipTeamId?: number|null }} [opts]
- *   dashLabel overrides the '–' separator (buildTeamNavPanel uses this to
- *   show each row's GW, since — unlike the GW nav — a team's fixture list
- *   spans many gameweeks with no shared header). chipTeamId, when set,
- *   switches to single-chip mode: only that team's own composite score is
- *   shown, always in the leading (left) slot regardless of whether it's the
- *   home or away side of this particular fixture, and the trailing slot is
- *   left empty. Used by buildTeamNavPanel — every row there already fixes
- *   which team the list belongs to, so the opponent's own score (relative
- *   to yet another opponent) isn't a useful read there the way it is in the
- *   GW nav's proper side-by-side comparison. Omitted (null) there, both
- *   sides' chips show as before.
  * @returns {string}  '' if either side's team record is missing
  */
-function buildFixtureRow(f, ctx, { dashLabel = '–', chipTeamId = null } = {}) {
+function buildFixtureRow(f, ctx) {
   const home = store.getTeam(f.homeTeamId);
   const away = store.getTeam(f.awayTeamId);
   if (!home || !away) return '';
@@ -200,15 +189,8 @@ function buildFixtureRow(f, ctx, { dashLabel = '–', chipTeamId = null } = {}) 
   // Each side's own CompositeScore.value/band (same values buildCard's
   // .score-pill shows) — reused here as .score-chip so the navigator gives
   // an at-a-glance read of both teams' fixtures without opening the card.
-  let homeChip, awayChip;
-  if (chipTeamId !== null) {
-    const chipTeam = home.id === chipTeamId ? home : away.id === chipTeamId ? away : null;
-    homeChip = chipTeam ? navScoreChip(chipTeam, f, ctx) : '';
-    awayChip = '';
-  } else {
-    homeChip = navScoreChip(home, f, ctx);
-    awayChip = navScoreChip(away, f, ctx);
-  }
+  const homeChip = navScoreChip(home, f, ctx);
+  const awayChip = navScoreChip(away, f, ctx);
 
   return `
     <li class="gw-nav__fixture${selected}" data-fixture-id="${f.id}" tabindex="0"
@@ -219,7 +201,7 @@ function buildFixtureRow(f, ctx, { dashLabel = '–', chipTeamId = null } = {}) 
         <img class="gw-nav__badge" src="${esc(home.badgeUrl)}" alt="" onerror="this.style.visibility='hidden'">
         <span class="gw-nav__short">${esc(home.shortName)}</span>
       </span>
-      <span class="gw-nav__dash" aria-hidden="true">${esc(dashLabel)}</span>
+      <span class="gw-nav__dash" aria-hidden="true">–</span>
       <span class="gw-nav__team gw-nav__team--away">
         <span class="gw-nav__short">${esc(away.shortName)}</span>
         <img class="gw-nav__badge" src="${esc(away.badgeUrl)}" alt="" onerror="this.style.visibility='hidden'">
@@ -351,19 +333,61 @@ function renderTeamNav(descending = false) {
 }
 
 /**
+ * Build one <li class="gw-nav__fixture gw-nav__fixture--team"> row for the
+ * team navigator: CompositeScore chip, opponent (badge+name), a single-letter
+ * H/A venue indicator, then the GW label — left to right. The navigator's own
+ * team is already fixed by the panel header above, so repeating its badge/
+ * name on every row (as the GW nav's side-by-side buildFixtureRow does) would
+ * just be the same redundant read twelve times over; only the opponent side
+ * is shown here.
+ * @param {Fixture} f
+ * @param {object|null} ctx  from buildCtx() — passed through to navScoreChip
+ * @param {Team} team        the navigator's own team — whichever side of `f`
+ *   this is, home/away is read straight off f.homeTeamId (no derived flag).
+ * @returns {string}  '' if either side's team record is missing
+ */
+function buildTeamFixtureRow(f, ctx, team) {
+  const home = store.getTeam(f.homeTeamId);
+  const away = store.getTeam(f.awayTeamId);
+  if (!home || !away) return '';
+  const isHome = f.homeTeamId === team.id;
+  const opponent = isHome ? away : home;
+  const selected = f.id === _selectedFixtureId ? ' is-selected' : '';
+
+  // This team's own CompositeScore.value/band for the fixture — same chip,
+  // same band colour scale as every other nav row (see navScoreChip).
+  const chip = navScoreChip(team, f, ctx);
+
+  // H/A letter reuses the app's existing green/red status tokens (band-great
+  // / band-brutal — same pair .squad-import-status--success/error use in
+  // components.css) rather than introducing new colours.
+  const venueLetter = isHome ? 'H' : 'A';
+  const venueClass = isHome ? 'gw-nav__venue--home' : 'gw-nav__venue--away';
+
+  return `
+    <li class="gw-nav__fixture gw-nav__fixture--team${selected}" data-fixture-id="${f.id}" tabindex="0"
+        role="button" aria-pressed="${f.id === _selectedFixtureId}"
+        aria-label="${esc(`${team.name} vs ${opponent.name}, ${isHome ? 'Home' : 'Away'}, Gameweek ${f.gw}`)}">
+      ${chip}
+      <span class="gw-nav__team gw-nav__team--away">
+        <img class="gw-nav__badge" src="${esc(opponent.badgeUrl)}" alt="" onerror="this.style.visibility='hidden'">
+        <span class="gw-nav__short">${esc(opponent.shortName)}</span>
+      </span>
+      <span class="gw-nav__venue ${venueClass}" aria-hidden="true">${venueLetter}</span>
+      <span class="gw-nav__dash" aria-hidden="true">GW ${esc(String(f.gw))}</span>
+    </li>
+  `.trim();
+}
+
+/**
  * Render the .team-nav panel for the team at _teamIndex: a prev/next header
  * (badge + full name, arrows always active — this list loops both ends, see
  * teamNavPrev/teamNavNext) and that team's next TEAM_NAV_GW_LIMIT upcoming
  * fixtures, earliest GW first (or, in the off-season fallback, its most
  * recent TEAM_NAV_GW_LIMIT played ones, latest first — mirrors renderNav's
  * own in-season/off-season split, just scoped to one team instead of the
- * whole league). Reuses buildFixtureRow — same row markup as the GW
- * navigator — with two differences: each row's GW number stands in for the
- * dash separator (rows here span many gameweeks with no shared per-GW header
- * to carry that context), and only this team's own .score-chip is shown, in
- * a single left-hand column, via buildFixtureRow's chipTeamId — the
- * opponent changes every row already, so its own score isn't a useful
- * side-by-side read here the way it is in the GW nav.
+ * whole league). Uses buildTeamFixtureRow — its own row markup, distinct from
+ * the GW navigator's buildFixtureRow (see that function's doc for why).
  */
 function buildTeamNavPanel() {
   if (!_teamNav) return;
@@ -386,7 +410,7 @@ function buildTeamNavPanel() {
         .slice(0, TEAM_NAV_GW_LIMIT);
 
   const rows = fixtures
-    .map(f => buildFixtureRow(f, ctx, { dashLabel: `GW ${f.gw}`, chipTeamId: team.id }))
+    .map(f => buildTeamFixtureRow(f, ctx, team))
     .join('');
 
   _teamNav.innerHTML = `
