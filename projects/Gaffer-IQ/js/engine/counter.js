@@ -19,6 +19,8 @@ import {
   ROLE_PAIRING_WEIGHTS,
   ROLE_CLASSIFY_THRESHOLDS,
   ROLE_SIGNATURE_THRESHOLDS,
+  ROLE_SIGNATURE_MIN_MINUTES,
+  ROLE_SIGNATURE_MIN_CHAIN,
   COUNTER_FALLBACK_EDGE,
   COUNTER_ATTACK_WEIGHT,
   COUNTER_DEFENCE_WEIGHT,
@@ -30,23 +32,50 @@ import { calcPlayerForm } from './form.js';
 // ─── Role classification ─────────────────────────────────────────────────────
 
 /**
- * Classify a player into one of GKP, CB, FB, DM, CM, WM, SS, ST using their
- * FPL element_type as the base and the relative shares of their ICT index
- * components (threat, influence, creativity) as the refining heuristic.
+ * Classify a player into one of GKP, CB, FB, DM, CM, WM, SS, ST.
  *
- * Pure: depends only on the player object. Returns null when the player has
- * no recorded ICT activity at all (too little signal to refine confidently)
- * so callers can decide to fall back to element_type grouping.
+ * Tiered by evidence quality:
+ *   1. Understat chain signature (buildupShare × createBias) — preferred.
+ *   2. FPL ICT component shares — fallback when the player has no Understat
+ *      match, too few minutes, or too little chain involvement.
+ *
+ * MODEL: chain data is preferred because ICT `threat` is a QUALITY measure —
+ * a poor winger has little of it and reads as a central midfielder. The chain
+ * signature is a ratio of the player's own involvement and is therefore
+ * quality-neutral (see buildRoleSignature).
+ *
+ * Pure: depends only on its arguments. Returns null when neither tier has
+ * enough signal, so callers can fall back to element_type grouping.
  *
  * @param {Player} player  internal Player — see ARCHITECTURE.md §8
+ * @param {object} [ctx]   buildScoreContext result; only
+ *                         ctx.understatPlayersByName is read. Omit to force
+ *                         the ICT path.
  * @returns {'GKP'|'CB'|'FB'|'DM'|'CM'|'WM'|'SS'|'ST'|null}
  */
-export function classifyRole(player) {
+export function classifyRole(player, ctx) {
   if (!player) return null;
 
-  // GKP: trivial — element_type is unambiguous and ICT is rarely meaningful.
+  // GKP: trivial — element_type is unambiguous and neither ICT nor chain is
+  // meaningful for a keeper.
   if (player.position === 'GKP') return 'GKP';
 
+  // Tier 1 — Understat chain signature.
+  const lookup = ctx?.understatPlayersByName;
+  const key    = (player.fullName || '').toLowerCase().trim();
+  const up     = (lookup && key) ? lookup[key] : null;
+  if (up) {
+    const minutes = parseFloat(up.time);
+    const chain   = parseFloat(up.xGChain);
+    // MODEL: below either floor the ratios are still dominated by sampling
+    // noise, and ICT — which accumulates from minute one — is the better read.
+    if (minutes >= ROLE_SIGNATURE_MIN_MINUTES && chain >= ROLE_SIGNATURE_MIN_CHAIN) {
+      const role = classifyRoleFromSignature(player.position, buildRoleSignature(up));
+      if (role) return role;
+    }
+  }
+
+  // Tier 2 — ICT shares (Phase 3C). Everything below is the existing body.
   const ict = player.ict;
   if (!ict) return null;
   const threat     = ict.threat     ?? 0;
@@ -273,14 +302,14 @@ function fallbackPairingFromStrength(teamA, teamB) {
  * unrefined players in the same pairing — that would silently understate the
  * unit for whichever side has worse ICT coverage.
  */
-function classifyTeamRoles(players) {
+function classifyTeamRoles(players, ctx) {
   const rolesByPlayerId = {};
   let outfieldClassified = 0;
   let outfieldTotalWithMinutes = 0;
 
   for (const p of players || []) {
     const minutes = p.totals?.minutes ?? 0;
-    const role = classifyRole(p);
+    const role = classifyRole(p, ctx);
     if (role) rolesByPlayerId[p.id] = role;
 
     // Only count outfield, played-this-season players when judging coverage.
@@ -326,8 +355,8 @@ export function calcCounterMatchup(teamA, teamB, ctx) {
   const playersA = ctx.playersByTeamId?.[teamA.id] || [];
   const playersB = ctx.playersByTeamId?.[teamB.id] || [];
 
-  const rolesA = classifyTeamRoles(playersA);
-  const rolesB = classifyTeamRoles(playersB);
+  const rolesA = classifyTeamRoles(playersA, ctx);
+  const rolesB = classifyTeamRoles(playersB, ctx);
   const useRoles = rolesA !== null && rolesB !== null;
 
   const pairingWeights = useRoles ? ROLE_PAIRING_WEIGHTS    : PAIRING_WEIGHTS;
@@ -639,12 +668,12 @@ export function calcIndividualDuels(teamA, teamB, ctx) {
   // a duel just isn't surfaced if its participants can't be classified.
   const rolesA = {};
   for (const e of xiA) {
-    const r = classifyRole(e.player);
+    const r = classifyRole(e.player, ctx);
     if (r) rolesA[e.player.id] = r;
   }
   const rolesB = {};
   for (const e of xiB) {
-    const r = classifyRole(e.player);
+    const r = classifyRole(e.player, ctx);
     if (r) rolesB[e.player.id] = r;
   }
 

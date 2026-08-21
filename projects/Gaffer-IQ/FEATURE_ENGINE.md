@@ -305,7 +305,15 @@ ATTACKER GROUP (of team A)        vs   DEFENSIVE GROUP (of team B)
   wide MIDs / wingers                   FBs (full-backs)
   central attacking MIDs                CBs + defensive MIDs (shielding)
 ```
-Position grouping is derived from `element_type` plus a light heuristic on each player's typical role (Phase 1: use `element_type`; refine with positional data in Phase 3).
+Position grouping is tiered by evidence quality: an Understat chain signature
+(`buildupShare = xGBuildup/xGChain`, `createBias = xA90/(xA90+npxG90)`) where
+the player is name-matched and clears `ROLE_SIGNATURE_MIN_MINUTES`; FPL ICT
+component shares otherwise; raw `element_type` when neither has signal.
+`buildupShare` measures positional depth and is quality-neutral
+(`corr(buildupShare, xGChain/90) = +0.008` across 102 regular 2025 defenders,
+vs `corr(buildupShare, xA/90) = −0.654`), which ICT `threat` share is not.
+`createBias` prevents set-piece centre-backs being misfiled as fullbacks.
+See the design spec `docs/superpowers/specs/2026-08-20-understat-channel-counters-design.md` §4.
 
 **Formula (counter-matchup for A's attack vs B's defence):**
 ```
