@@ -12,7 +12,7 @@ Root files
 	|default.html — the shared page chrome (head, body, header, footer, theme script, asset links) that wraps every page declaring layout: default.
 |
 |-----templates/
-	|page-template.html — starter scaffold to copy when creating a new page; excluded from the built site, lives in the repo as reference only.
+	|starting-template.html — blank page scaffold to copy when creating a new page: front matter + an empty body, since header, footer, background, and type all come from _layouts/default.html and assets/css/global.css. Excluded from the built site; repo reference only.
 |
 |assets/css/
 	|variables.css — design-system tokens (colors, spacing, type scale, breakpoints) used by every other stylesheet.

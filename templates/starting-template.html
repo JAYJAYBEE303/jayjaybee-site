@@ -5,58 +5,76 @@ description: One-line description of what this page is and why it exists.
 ---
 
 <!-- =============================================================
-     New page starter (Jekyll-style).
+     Blank page starter.
 
-     How to use:
-       1. Copy this file to the repo root (or any sub-folder) and
-          rename it — e.g. about.html, projects.html, notes.html.
-       2. Edit the front matter above (the block between the ---
-          fences). title is shown in the browser tab; description
-          is the meta tag search engines + social previews read.
-       3. Replace the body below with the page's real content.
+     Everything you can see before typing a single word — the paper
+     background and grain, the header, wordmark, nav, search, theme
+     toggle, the footer, the type scale, the reveal animations —
+     comes from two shared files:
 
-     What you DON'T need to do:
-       * Write a <head>, <body>, <header>, or <footer>.
-       * Re-link the stylesheet or animations.js.
-       * Re-include the pre-paint theme script.
-       * Add the skip link or theme toggle.
-       All of that is inherited from _layouts/default.html, which
-       wraps this file at build time on every push.
+       _layouts/default.html   the chrome: <head>, header, footer,
+                               the pre-paint theme/scroll-gate
+                               script, animations.js and search.js.
+       assets/css/global.css   the one stylesheet every page links.
+                               It imports, in cascade order:
+                                 variables.css  design tokens
+                                 layout.css     page shell + rhythm
+                                 components.css reusable UI pieces
 
-     Conventions:
-       * Each section under .page is separated by vertical rhythm
-         (see .page > section + section in layout.css).
-       * Use the section shapes from the design system:
-           .narrative .prose       — single body paragraph
-           .roles + .role-item     — two-column list rows
-           .work-list + .work-item — project cards
-           .about__sub             — numbered long-form subsections
-         Each starts with a .section-head holding a .mono-label
-         eyebrow and an h2.section-title.
+     So this file carries page BODY ONLY. Whatever sits between the
+     markers below is dropped into <main id="main" class="page"> by
+     the layout at build time.
 
-     NOTE: this folder (templates/) is listed in _config.yml under
-     `exclude`, so this file is NOT published as part of the site —
-     it lives in the repo as a reference only.
+     -------------------------------------------------------------
+     How to use
+       1. Copy this file to the repo root or a sub-folder and
+          rename it — e.g. projects/index.html, notes.html.
+       2. Edit the front matter above. `layout: default` is the line
+          that inherits all of the above; don't remove it. title
+          fills the browser tab, description the meta tag.
+       3. Write the page between the markers.
+
+     What NOT to add
+       * <!doctype>, <html>, <head>, <body>, <header>, <footer>
+       * a stylesheet <link>, or script tags for animations/search
+       * the skip link, the theme toggle, the pre-paint script
+       All inherited. Duplicating any of them will fight the layout.
+
+     -------------------------------------------------------------
+     Section shapes already in the design system. Each major block
+     is a top-level <section>; vertical spacing between them is
+     handled by `.page > section + section` in layout.css, so don't
+     add margins by hand.
+
+       .lede-block                 page-opening headline
+         .mono-label.lede-meta       small mono eyebrow
+         h1.lede-line                serif headline
+           .lede-line__row           one line of it
+
+       .narrative > .prose         single body paragraph
+
+       .roles > ol.role-list       reverse-chronological rows
+         li.role-item                .role-when / .role-body
+
+       .work > .work-list          project cards
+         .work-item
+
+       .about > .about__sub        numbered long-form subsections
+
+     Every section except the lede opens with a .section-head:
+
+       <header class="section-head">
+         <span class="mono-label">Eyebrow</span>
+         <h2 id="…-heading" class="section-title">Title.</h2>
+       </header>
+
+     and the <section> points at it with aria-labelledby.
+
+     -------------------------------------------------------------
+     NOTE: templates/ is listed under `exclude` in _config.yml, so
+     this file is never published. It lives here as reference only.
      ============================================================= -->
 
-<!-- Lede — optional but recommended. Sets POV in one sentence. -->
-<section class="lede-block" aria-label="Introduction">
-  <p class="mono-label lede-meta">TODO&nbsp;·&nbsp;Eyebrow</p>
-  <h1 class="lede-line">
-    TODO: the page's one-line headline.
-  </h1>
-</section>
+<!-- ===================== page body starts ===================== -->
 
-<!-- TODO: real content goes here. -->
-<section aria-labelledby="todo-heading">
-  <header class="section-head">
-    <span class="mono-label">Section&nbsp;eyebrow</span>
-    <h2 id="todo-heading" class="section-title">Section title.</h2>
-  </header>
-
-  <div class="prose">
-    <p>
-      TODO: replace this with the page's real content.
-    </p>
-  </div>
-</section>
+<!-- ====================== page body ends ====================== -->

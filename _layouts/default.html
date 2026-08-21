@@ -60,6 +60,12 @@
         if (!header) { openGate(); return; }
         // Deep-link / restored scroll: header already past the top.
         if (header.getBoundingClientRect().bottom <= 0) { openGate(); return; }
+        // Short page — a blank template, a stub, a page whose content
+        // fits the viewport. There is nothing to scroll, so the divider
+        // can never exit the top and the gate would never open, leaving
+        // the footer stuck at opacity 0 (the .is-gated rule in
+        // components.css also suppresses the 3s failsafe). Open now.
+        if (root.scrollHeight <= window.innerHeight + 8) { openGate(); return; }
         if (!('IntersectionObserver' in window)) { openGate(); return; }
 
         var io = new IntersectionObserver(function (entries) {
