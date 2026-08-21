@@ -253,6 +253,15 @@ modules/*  ──▶  read scores, render DOM for the active horizon
 - On app load, `api.js` fetches `bootstrap-static/` and `fixtures/` **once** and hands them to `store`. These two payloads power almost everything.
 - `element-summary/<id>/` is fetched **lazily and on demand** (e.g. when the user opens a player in the ranker or expands a matchup), then cached in `store`. Never bulk-fetch all ~700 players' summaries on load — that's ~700 requests; it's slow and abusive to the API. **Sanctioned exception:** the Ranker's "Last Season" Avg Pts/GW toggle (FEATURE_ENGINE.md §10.1) does load every summary, but only on an explicit button click, staggered into small chunks with a yield between each — never automatically on load.
 - `event/<gw>/live/` is fetched only by the dashboard, only when viewing the current/in-progress GW.
+- `team/{slug}/{season}` is fetched eagerly for every team at startup, once
+  `leagueXg` and fixtures have loaded, and cached in `store.teamXg` for the
+  session. Consumed as `ctx.teamXgBySlug`. Fetched up front — not lazily per
+  fixture — so every module scores every team on the same counter-matchup tier
+  from the first render; no score can differ between two sessions, or two tabs
+  in the same session, based on which fixture happened to be opened first.
+  Failures are swallowed to a console warning — the channel counter tier
+  degrades to the role tier per team, so a dead Understat upstream must never
+  surface as a page error.
 
 ### Caching (the `store`)
 - `store.js` keeps an in-memory object for the session and mirrors the big static payloads (`bootstrap`, `fixtures`) into `sessionStorage` keyed by a fetch timestamp.

@@ -22,6 +22,7 @@ import { buildScoreContext, scoreFixture, scoreOverHorizon, scorePlayer, rankPla
 import { calcBaseDifficulty, calcHomeAwaySplit, calcVenueEffect, calcFixtureHistory } from './engine/fixtures.js';
 import { calcTeamForm, calcPlayerForm, calcPlayingLikelihood } from './engine/form.js';
 import { calcStyleProfile, calcStyleClash } from './engine/style.js';
+import { buildUnderstatSlugsByTeamId } from './engine/channel.js';
 import {
   calcCounterMatchup, calcIndividualDuels, duelsForPairing,
 } from './engine/counter.js';
@@ -33,6 +34,10 @@ import { initPlanner }      from './modules/planner.js';
 import { initCalibration }  from './calibration.js';
 
 // ─── Data loading ─────────────────────────────────────────────────────────────
+
+// Slugs whose team-xG fetch has already been started this session, so a
+// re-render mid-flight can't fire a duplicate request.
+const _teamXgRequested = new Set();
 
 /**
  * Fetches bootstrap + fixtures in parallel, normalises into the internal
@@ -60,6 +65,9 @@ async function loadInitialData({ force = false } = {}) {
 
   if (seasonFresh && xgFresh) {
     store.markDataReady();
+    // Fire-and-forget; every module upgrades to the channel tier in place as
+    // each team's statistics land. Not gated on any tab being open.
+    prefetchAllTeamXg();
     return;
   }
 
@@ -138,11 +146,62 @@ async function loadInitialData({ force = false } = {}) {
     }
 
     store.markDataReady();
+    // Fire-and-forget; every module upgrades to the channel tier in place as
+    // each team's statistics land. Not gated on any tab being open.
+    prefetchAllTeamXg();
   } catch (err) {
     // store.setError() clears season state before emitting — the store is left
     // cleanly empty, not partially populated (CONVENTIONS.md §9, store.js §setError).
     const apiErr = err instanceof ApiError ? err : new ApiError(String(err?.message ?? err));
     store.setError(apiErr);
+  }
+}
+
+/**
+ * Fetch Understat team statistics for every team in the league once, at
+ * startup, so every module scores every team on the same counter-matchup
+ * tier from the first render.
+ *
+ * MODEL: replaces a per-fixture lazy fetch. That version cached a team's
+ * statistics only once its fixture was opened in Matchup, then let every
+ * other module pick up the same cached entry — which meant the SAME team
+ * could score differently for two users, or in two tabs of the same
+ * session, purely from click order rather than any real data change. 20
+ * proxy calls at boot is the same order of magnitude as the existing
+ * leagueXg fetch, so fetching every team eagerly costs little and removes
+ * the inconsistency outright rather than flagging it in the UI. See design
+ * spec §8 (revised 2026-08-21).
+ *
+ * Fire-and-forget: the app renders immediately on whatever tier the data
+ * supports and upgrades in place as each team's payload lands. Failures are
+ * swallowed to a console warning, never store.setError() — the channel tier
+ * is an ENRICHMENT, so a dead Understat upstream must not surface as a page
+ * error. Same policy as the league-xG fetch (see js/api.js, ROADMAP §3A).
+ *
+ * Re-render on arrival goes through store.markDataReady(): this codebase has
+ * no per-tab render dispatcher — every module re-renders off the 'data:ready'
+ * event it already subscribes to (matchup/dashboard/planner/ranker), and
+ * markDataReady() is a bare emit with no other side effects, so re-firing it
+ * is the existing and only post-boot re-render path.
+ */
+function prefetchAllTeamXg() {
+  const season = store.getSeason();
+  if (!season) return;
+
+  const slugs = buildUnderstatSlugsByTeamId(store.getLeagueXg(), season.teamsById);
+  for (const slug of new Set(Object.values(slugs))) {
+    if (_teamXgRequested.has(slug) || store.getTeamXg(slug)) continue;
+
+    _teamXgRequested.add(slug);
+    fetchTeamXg(slug)
+      .then((data) => {
+        store.setTeamXg(slug, data);
+        // Whatever tab is active upgrades in place as each payload lands.
+        store.markDataReady();
+      })
+      .catch((err) => {
+        console.warn(`[Gaffer IQ] team xG unavailable for ${slug}: ${err.message}`);
+      });
   }
 }
 
@@ -269,6 +328,7 @@ window.__engine = {
       leagueXgPrev: store.getLeagueXgPrev(),
       leagueXgPrev2: store.getLeagueXgPrev2(),
       leagueXgPrev3: store.getLeagueXgPrev3(),
+      teamXgBySlug: store.getAllTeamXg(),
       currentGw: gwOverride ?? store.getCurrentGw() ?? store.getNextGw() ?? 1,
     });
   },
