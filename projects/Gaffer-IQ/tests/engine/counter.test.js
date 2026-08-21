@@ -160,3 +160,60 @@ test('classifyRole returns GKP without consulting either source', () => {
 test('classifyRole returns null when neither chain nor ICT has signal', () => {
   assert.equal(classifyRole({ id: 3, position: 'MID', fullName: 'Ghost', ict: null }), null);
 });
+
+import { classifyTeamRoles } from '../../js/engine/counter.js';
+
+const teamPlayer = (id, position, fullName, minutes, ict) => ({
+  id, position, fullName, ict, totals: { minutes },
+});
+
+const chainRecord = (time, xGChain, xGBuildup, xA, npxG) =>
+  ({ time, xGChain, xGBuildup, xA, npxG });
+
+test('classifyTeamRoles flags estimated:false when chain covers most minutes', () => {
+  const players = [
+    teamPlayer(1, 'DEF', 'Deep One',  2000, { threat: 10, influence: 70, creativity: 20 }),
+    teamPlayer(2, 'MID', 'Wide One',  2000, { threat: 60, influence: 20, creativity: 20 }),
+  ];
+  const ctx = { understatPlayersByName: {
+    'deep one': chainRecord('2000', '10', '9.5', '0.2', '1.5'),
+    'wide one': chainRecord('2000', '15', '5',   '5',   '8'),
+  } };
+  const out = classifyTeamRoles(players, ctx);
+  assert.equal(out.estimated, false);
+  assert.equal(out.rolesByPlayerId[1], 'CB');
+  assert.equal(out.rolesByPlayerId[2], 'WM');
+});
+
+test('classifyTeamRoles still classifies, but flags estimated, on thin chain coverage', () => {
+  const players = [
+    teamPlayer(1, 'DEF', 'Matched',   500,  { threat: 10, influence: 70, creativity: 20 }),
+    teamPlayer(2, 'MID', 'Unmatched', 2500, { threat: 60, influence: 20, creativity: 20 }),
+  ];
+  const ctx = { understatPlayersByName: {
+    'matched': chainRecord('500', '4', '3.8', '0.1', '0.2'),
+  } };
+  const out = classifyTeamRoles(players, ctx);
+  // 500 of 3000 outfield minutes chain-covered = 0.167, below 0.75.
+  assert.equal(out.estimated, true);
+  // Both still get a role — the unmatched one via ICT.
+  assert.equal(out.rolesByPlayerId[1], 'CB');
+  assert.equal(out.rolesByPlayerId[2], 'WM');
+});
+
+test('classifyTeamRoles returns null when no outfielder has minutes', () => {
+  const players = [teamPlayer(1, 'GKP', 'Keeper', 3000, null)];
+  assert.equal(classifyTeamRoles(players, {}), null);
+});
+
+test('classifyTeamRoles no longer fails closed on one unclassifiable player', () => {
+  // Phase 3C dropped the WHOLE team to element_type here. It must not now.
+  const players = [
+    teamPlayer(1, 'DEF', 'Deep One', 2000, { threat: 10, influence: 70, creativity: 20 }),
+    teamPlayer(2, 'MID', 'No Signal', 2000, null),
+  ];
+  const out = classifyTeamRoles(players, {});
+  assert.notEqual(out, null);
+  assert.equal(out.rolesByPlayerId[1], 'CB');
+  assert.equal(out.rolesByPlayerId[2], undefined);
+});

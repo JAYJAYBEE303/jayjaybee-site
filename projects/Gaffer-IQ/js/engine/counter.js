@@ -21,6 +21,7 @@ import {
   ROLE_SIGNATURE_THRESHOLDS,
   ROLE_SIGNATURE_MIN_MINUTES,
   ROLE_SIGNATURE_MIN_CHAIN,
+  ROLE_CHAIN_COVERAGE_MIN,
   COUNTER_FALLBACK_EDGE,
   COUNTER_ATTACK_WEIGHT,
   COUNTER_DEFENCE_WEIGHT,
@@ -293,39 +294,55 @@ function fallbackPairingFromStrength(teamA, teamB) {
 }
 
 /**
- * Build a { playerId → role } map for one team's players. Returns null if
- * any outfield player in the squad fails classification (signals that ICT
- * data is too thin to refine — the caller should fall back to element_type
- * grouping and flag estimated:true).
+ * Build a { playerId → role } map for one team's players, plus a flag for how
+ * well chain data covered the squad.
  *
- * MODEL: "fail closed" on the squad as a whole rather than mixing refined and
- * unrefined players in the same pairing — that would silently understate the
- * unit for whichever side has worse ICT coverage.
+ * MODEL: per-player tiering, NOT fail-closed. Phase 3C dropped the whole team
+ * to element_type grouping when under 90% of outfielders classified, because
+ * mixing refined and unrefined players understates whichever side has worse
+ * coverage. That argument applies to mixing TAXONOMIES — chain and ICT emit
+ * the same eight labels from different evidence, so a per-player fallback is
+ * sound and strictly more informative than collapsing the squad.
+ *
+ * @param {Player[]} players
+ * @param {object}   ctx  buildScoreContext result (read for chain signatures)
+ * @returns {{rolesByPlayerId: Object<number,string>, estimated: boolean}|null}
+ *          null when no outfielder has any minutes — caller falls back to
+ *          element_type grouping. estimated:true when chain data covered less
+ *          than ROLE_CHAIN_COVERAGE_MIN of outfield minutes.
  */
-function classifyTeamRoles(players, ctx) {
+export function classifyTeamRoles(players, ctx) {
   const rolesByPlayerId = {};
-  let outfieldClassified = 0;
-  let outfieldTotalWithMinutes = 0;
+  let outfieldMinutes = 0;
+  let chainCoveredMinutes = 0;
+
+  const lookup = ctx?.understatPlayersByName;
 
   for (const p of players || []) {
     const minutes = p.totals?.minutes ?? 0;
     const role = classifyRole(p, ctx);
     if (role) rolesByPlayerId[p.id] = role;
 
-    // Only count outfield, played-this-season players when judging coverage.
-    if (p.position !== 'GKP' && minutes > 0) {
-      outfieldTotalWithMinutes++;
-      if (role) outfieldClassified++;
+    if (p.position === 'GKP' || minutes <= 0) continue;
+    outfieldMinutes += minutes;
+
+    // Coverage is measured on the SAME conditions classifyRole uses for its
+    // tier-1 branch, so the flag can never disagree with what was actually used.
+    const key = (p.fullName || '').toLowerCase().trim();
+    const up  = (lookup && key) ? lookup[key] : null;
+    if (up
+        && parseFloat(up.time)    >= ROLE_SIGNATURE_MIN_MINUTES
+        && parseFloat(up.xGChain) >= ROLE_SIGNATURE_MIN_CHAIN) {
+      chainCoveredMinutes += minutes;
     }
   }
 
-  if (outfieldTotalWithMinutes === 0) return null;
-  // Require almost-full coverage of regulars to trust the refined grouping.
-  // MODEL: a 90% bar tolerates a single fringe outfielder with no ICT signal
-  // without forcing a fallback for the whole team.
-  if ((outfieldClassified / outfieldTotalWithMinutes) < 0.9) return null;
+  if (outfieldMinutes === 0) return null;
 
-  return rolesByPlayerId;
+  return {
+    rolesByPlayerId,
+    estimated: (chainCoveredMinutes / outfieldMinutes) < ROLE_CHAIN_COVERAGE_MIN,
+  };
 }
 
 // ─── Public API ──────────────────────────────────────────────────────────────
@@ -355,9 +372,12 @@ export function calcCounterMatchup(teamA, teamB, ctx) {
   const playersA = ctx.playersByTeamId?.[teamA.id] || [];
   const playersB = ctx.playersByTeamId?.[teamB.id] || [];
 
-  const rolesA = classifyTeamRoles(playersA, ctx);
-  const rolesB = classifyTeamRoles(playersB, ctx);
-  const useRoles = rolesA !== null && rolesB !== null;
+  const roleResultA = classifyTeamRoles(playersA, ctx);
+  const roleResultB = classifyTeamRoles(playersB, ctx);
+  const useRoles = roleResultA !== null && roleResultB !== null;
+
+  const rolesA = roleResultA?.rolesByPlayerId ?? null;
+  const rolesB = roleResultB?.rolesByPlayerId ?? null;
 
   const pairingWeights = useRoles ? ROLE_PAIRING_WEIGHTS    : PAIRING_WEIGHTS;
   const attackGroups   = useRoles ? ROLE_ATTACK_GROUPS      : ELEMENT_ATTACK_GROUPS;
@@ -366,10 +386,12 @@ export function calcCounterMatchup(teamA, teamB, ctx) {
   const pairings = {};
   let weightedSum = 0;
   let totalWeight = 0;
-  // MODEL: an element_type fallback for either side flags the whole metric
-  // as estimated — the refinement is the headline of Phase 3C and its absence
-  // is material context for the UI.
-  let anyEstimated = !useRoles;
+  // MODEL: an element_type fallback for either side flags the whole metric as
+  // estimated, and so does thin chain coverage — a role grouping built mostly
+  // from ICT is materially less trustworthy than one built from chain data.
+  let anyEstimated = !useRoles
+    || (roleResultA?.estimated ?? false)
+    || (roleResultB?.estimated ?? false);
 
   for (const key of Object.keys(pairingWeights)) {
     const attackers = useRoles

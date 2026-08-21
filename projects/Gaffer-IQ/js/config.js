@@ -448,6 +448,16 @@ export const ROLE_SIGNATURE_THRESHOLDS = {
 export const ROLE_SIGNATURE_MIN_MINUTES = 450;
 export const ROLE_SIGNATURE_MIN_CHAIN   = 0.5;
 
+// Share of a team's outfield MINUTES that must be covered by a chain signature
+// before the role grouping is treated as fully data-backed.
+// MODEL: replaces Phase 3C's fail-closed 90% player-count bar. That bar existed
+// because mixing refined and unrefined players understates whichever side has
+// worse coverage — but that reasoning applies to mixing TAXONOMIES, and chain
+// and ICT emit the same eight labels from different evidence. Minutes-weighted
+// rather than headcount so a fringe squad player can't drag a team below the
+// bar. Below this share the roles are still used, just flagged estimated.
+export const ROLE_CHAIN_COVERAGE_MIN = 0.75;
+
 // Anchors for the counter-matchup fallback used when player-level form is missing
 // (no element-summary loaded yet). Maps (team-A attack − team-B defence) from the
 // FPL strength priors to a 0–100 pairing score, centred so the league-average gap

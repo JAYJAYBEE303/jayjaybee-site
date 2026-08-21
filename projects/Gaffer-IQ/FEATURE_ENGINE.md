@@ -315,6 +315,11 @@ vs `corr(buildupShare, xA/90) = −0.654`), which ICT `threat` share is not.
 `createBias` prevents set-piece centre-backs being misfiled as fullbacks.
 See the design spec `docs/superpowers/specs/2026-08-20-understat-channel-counters-design.md` §4.
 
+Role grouping degrades **per player**, not per team: Phase 3C's fail-closed
+90% coverage bar is replaced by `ROLE_CHAIN_COVERAGE_MIN` (0.75 of outfield
+MINUTES). Below that share the roles are still used but the metric is flagged
+`estimated`, rather than the whole squad collapsing to `element_type`.
+
 **Formula (counter-matchup for A's attack vs B's defence):**
 ```
 For each modelled pairing p (e.g. A.FWDs vs B.CBs):
