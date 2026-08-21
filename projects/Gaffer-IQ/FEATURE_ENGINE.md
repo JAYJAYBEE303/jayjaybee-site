@@ -376,7 +376,21 @@ The Matchup Analyser shows two labelled sections per team card: **Attacking Coun
 ```
 mirroredPairing(p).value = 100 - attackingPairing(p).value
 ```
-This is **not** a second independent `50 + edge * SENSITIVITY` calculation — it is arithmetically derived from the same computed edge, so `attackingValue + mirroredValue === 100` **exactly**, by construction, for every pairing and for the aggregate. The identity holds even through `clamp(0,100,...)`: for any real `y`, `100 - clamp(0,100,y) === clamp(0,100,100-y)` (trivial by cases: `y<0` → `100-0=100` and `clamp(100-y)=clamp(>100)=100`; `y>100` → `100-100=0` and `clamp(100-y)=clamp(<0)=0`; `0≤y≤100` → both sides equal `100-y`). Verified numerically against real (non-synthetic-formula) pairing data: `stVsCb (67.590909) + cbVsSt (32.409091) = 100.0000000000`, `wmVsFb (54.216756) + fbVsWm (45.783244) = 100.0000000000`, `cmVsCbDm (56.703717) + cbDmVsCm (43.296283) = 100.0000000000`, aggregate `61.177534 + 38.822466 = 100.0000000000`.
+This is **not** a second independent `50 + edge * SENSITIVITY` calculation — it is arithmetically derived from the same computed edge, so `attackingValue + mirroredValue === 100` **exactly**, by construction, **for every pairing**. The identity holds even through `clamp(0,100,...)`: for any real `y`, `100 - clamp(0,100,y) === clamp(0,100,100-y)` (trivial by cases: `y<0` → `100-0=100` and `clamp(100-y)=clamp(>100)=100`; `y>100` → `100-100=0` and `clamp(100-y)=clamp(<0)=0`; `0≤y≤100` → both sides equal `100-y`). Verified numerically against real (non-synthetic-formula) pairing data: `stVsCb (67.590909) + cbVsSt (32.409091) = 100.0000000000`, `wmVsFb (54.216756) + fbVsWm (45.783244) = 100.0000000000`, `cmVsCbDm (56.703717) + cbDmVsCm (43.296283) = 100.0000000000`, aggregate `61.177534 + 38.822466 = 100.0000000000`.
+
+**Precision caveat (aggregate only).** The per-pairing identity is exact in
+IEEE-754 as well as in real arithmetic — `v` and `100 - v` cancel bit-for-bit.
+The **aggregate** is a different object: `attackingValue` and `mirroredValue`
+are two independently accumulated weighted means, each carrying its own
+rounding, so `Σ(100−vᵢ)wᵢ/Σwᵢ + Σvᵢwᵢ/Σwᵢ` is exactly 100 in real arithmetic
+but can land 1 ulp away in floating point. Measured over 200,000 random pairing
+triples: ~21% miss by 1 ulp on `ROLE_PAIRING_WEIGHTS` (1.0/0.6/0.5), ~6% on
+`PAIRING_WEIGHTS` and on `CHANNEL_WEIGHTS`. This is a property of summing in
+floating point, not of the derivation, and it long predates the channel tier.
+Assert the aggregate with an epsilon — `window.__verify.zeroSum` and
+`tests/engine/counter.test.js` both use `1e-6`, eight orders of magnitude
+looser than the worst observed deviation (~1.4e-14). Assert per-pairing sums
+strictly.
 
 Pairing key mirrors (`cbVsSt`, `fbVsWm`, `cbDmVsCm` for role-mode; `cbVsFwd`, `fbVsWideMid`, `cbMidVsCam` for the element-type fallback) live in `engine/counter.js`'s `MIRRORED_PAIRING_KEYS`.
 

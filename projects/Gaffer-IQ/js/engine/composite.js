@@ -377,6 +377,7 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
         // defence; defendingValue: this team's defence vs the opponent's attack.
         attackingValue: counter.attackingValue,
         defendingValue: counter.defendingValue,
+        mode:           counter.mode,
       },
       teamForm: {
         value:     form.value,

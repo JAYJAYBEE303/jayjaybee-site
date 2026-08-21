@@ -319,9 +319,17 @@ window.__horizons = HORIZONS;
 window.__refresh  = () => { store.clearCache(); loadInitialData({ force: true }); };
 
 window.__engine = {
-  context(gwOverride) {
+  // `overrides` lets a console session build a context with any option
+  // replaced — e.g. context({ teamXgBySlug: {} }) forces the role tier, which
+  // is how the channel-vs-role before/after comparison is captured now that
+  // the boot-time prefetch (prefetchAllTeamXg) puts every team on the channel
+  // tier from first paint. Accepts a bare number for the long-standing
+  // context(gw) call shape.
+  context(gwOverride, overrides = {}) {
     const season = store.getSeason();
     if (!season) return null;
+    const gw = typeof gwOverride === 'object' && gwOverride !== null ? undefined : gwOverride;
+    const opts = typeof gwOverride === 'object' && gwOverride !== null ? gwOverride : overrides;
     return buildScoreContext(season, {
       playerSummariesById: store.getAllPlayerSummaries(),
       leagueXg: store.getLeagueXg(),
@@ -329,7 +337,8 @@ window.__engine = {
       leagueXgPrev2: store.getLeagueXgPrev2(),
       leagueXgPrev3: store.getLeagueXgPrev3(),
       teamXgBySlug: store.getAllTeamXg(),
-      currentGw: gwOverride ?? store.getCurrentGw() ?? store.getNextGw() ?? 1,
+      currentGw: gw ?? store.getCurrentGw() ?? store.getNextGw() ?? 1,
+      ...opts,
     });
   },
   scoreFixture,

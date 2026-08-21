@@ -612,6 +612,12 @@ export function calcCombinedCounterMatchup(attackingCounter, defendingCounter) {
     pairings:       attackingCounter.pairings,
     attackingValue: attackingCounter.value,
     defendingValue: defendingCounter.value,
+    // Which tier produced the pairings above ('channel' | 'role' | 'element').
+    // Taken from the ATTACKING read because `pairings` is the attacking read —
+    // the two must always describe the same object. Surfaced so the testing
+    // roadmap's tier check and the channel-vs-role comparison can see it
+    // without re-deriving which tier ran.
+    mode: attackingCounter.mode,
   };
 }
 

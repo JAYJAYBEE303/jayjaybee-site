@@ -26,6 +26,25 @@ Run through every item and tick it off before trusting any scores.
 - [ ] Error banner shows a meaningful message if the proxy fails — not just a generic error
 - [ ] Retry button successfully re-fetches data after an error
 - [ ] `#calibration` view loads and shows GW1 snapshot after deadline passes
+- [ ] Counter-matchup reaches channel mode — load the app, wait for the
+      boot-time team-statistics prefetch (Task 7) to resolve, and check
+      `window.__engine.calcCounterMatchup(home, away, ctx).mode` returns
+      `'channel'` for any fixture, not only one that has been opened.
+      Equivalently, `scoreFixture(...).breakdown.counterMatchup.mode`.
+      NOTE: this requires Understat to have published data for
+      `UNDERSTAT_SEASON`; early in a new campaign that payload is empty and
+      every team correctly degrades to the role tier
+- [ ] Channel pairing rows render as Set Pieces / Transition Speed / Box
+      Occupation, never raw camelCase keys
+- [ ] Attacking + Defending counter values still total exactly 100 per pairing
+- [ ] `npm test` passes `tests/engine/roleThresholds.test.js` with its
+      `SPOT_CHECK` fixture refreshed for the current season (Step 1 above) —
+      this is the automated form of "known players still land correctly"
+      (a first-choice fullback reads FB, a set-piece centre-back reads CB, a
+      holding midfielder reads DM). The thresholds were derived on
+      900+ minute players from a COMPLETE season and are applied in-season
+      at a 450-minute floor, so this is the check that the extrapolation
+      holds — re-run it whenever squads change materially, not only once.
 
 ### Sanity Checks (run these before GW1 deadline)
 
