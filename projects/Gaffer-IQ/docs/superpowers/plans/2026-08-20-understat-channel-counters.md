@@ -1132,24 +1132,31 @@ nothing fetches or consumes team statistics yet."
 
 ---
 
-### Task 7: Fetch team statistics for the selected fixture
+### Task 7: Prefetch team statistics for every team at startup
+
+**Revised 2026-08-21** — replaces a per-fixture lazy fetch (see design spec §8's revision
+note). The original version cached a team's `statistics` only once its fixture was opened
+in Matchup, then let every other module pick it up — which meant a team's score could
+visibly change mid-session purely from click order, not from any real data update. Eagerly
+fetching all 20 teams at boot costs the same order of magnitude in proxy calls as the
+existing `leagueXg` fetch and removes the inconsistency outright instead of flagging it.
 
 **Files:**
-- Modify: `js/modules/matchup.js` (imports; `buildCtx` at line 109-120; `renderMatchup` at line 490)
-- Modify: `js/modules/dashboard.js:259`, `js/modules/planner.js:172`, `js/modules/ranker.js:111`, `js/main.js:266` (one line each)
+- Modify: `js/main.js` (imports; boot sequence, after the existing `leagueXg` load)
+- Modify: `js/modules/dashboard.js:259`, `js/modules/planner.js:172`, `js/modules/ranker.js:111`, `js/modules/matchup.js:112`, `js/main.js:266` (one line each)
 - Modify: `ARCHITECTURE.md` (data-flow section)
 
 **Interfaces:**
-- Consumes: `buildUnderstatSlugsByTeamId` (Task 6), `store.getAllTeamXg` (Task 6), existing `fetchTeamXg` from `js/api.js`.
-- Produces: every `buildScoreContext` caller passes `teamXgBySlug`. `ensureTeamXg(fixture)` kicks off the two fetches and re-renders when they land.
+- Consumes: `buildUnderstatSlugsByTeamId` (Task 6), `store.getAllTeamXg`/`getTeamXg`/`setTeamXg` (Task 6), existing `fetchTeamXg` from `js/api.js`.
+- Produces: every `buildScoreContext` caller passes `teamXgBySlug`. `prefetchAllTeamXg()` kicks off all 20 fetches once, during boot, and re-renders the active view as each lands.
 
 - [ ] **Step 1: Add the imports**
 
-In `js/modules/matchup.js`, add to the existing import block:
+In `js/main.js`, add to the existing import block:
 
 ```js
-import { fetchTeamXg } from '../api.js';
-import { buildUnderstatSlugsByTeamId } from '../engine/channel.js';
+import { fetchTeamXg } from './api.js';
+import { buildUnderstatSlugsByTeamId } from './engine/channel.js';
 ```
 
 - [ ] **Step 2: Pass `teamXgBySlug` from every context builder**
@@ -1178,7 +1185,7 @@ Missing any of these does not break the build; it silently pins that module to t
 
 - [ ] **Step 3: Add the fetch orchestration**
 
-Add module-level state beside the other `_`-prefixed module variables at the top of `js/modules/matchup.js`:
+Add module-level state beside the other `_`-prefixed module variables at the top of `js/main.js`:
 
 ```js
 // Slugs whose team-xG fetch has already been started this session, so a
@@ -1186,36 +1193,44 @@ Add module-level state beside the other `_`-prefixed module variables at the top
 const _teamXgRequested = new Set();
 ```
 
-and add this function directly above `renderMatchup`:
+and add this function near the other boot-sequence helpers in `js/main.js`:
 
 ```js
 /**
- * Kick off the Understat team-statistics fetch for both teams in a fixture,
- * re-rendering when each lands. Fire-and-forget by design: the card renders
- * immediately on whatever tier the data supports, and upgrades in place if
- * and when the statistics arrive.
+ * Fetch Understat team statistics for every team in the league once, at
+ * startup, so every module scores every team on the same counter-matchup
+ * tier from the first render.
  *
- * MODEL: failures are swallowed to a console warning, never store.setError().
- * The channel tier is an ENRICHMENT — every consumer degrades to the role tier
- * on its own, so a dead Understat upstream must not surface as a page error.
- * Same policy as the league-xG fetch (see js/api.js, ROADMAP §3A).
+ * MODEL: replaces a per-fixture lazy fetch. That version cached a team's
+ * statistics only once its fixture was opened in Matchup, then let every
+ * other module pick up the same cached entry — which meant the SAME team
+ * could score differently for two users, or in two tabs of the same
+ * session, purely from click order rather than any real data change. 20
+ * proxy calls at boot is the same order of magnitude as the existing
+ * leagueXg fetch, so fetching every team eagerly costs little and removes
+ * the inconsistency outright rather than flagging it in the UI. See design
+ * spec §8 (revised 2026-08-21).
+ *
+ * Fire-and-forget: the app renders immediately on whatever tier the data
+ * supports and upgrades in place as each team's payload lands. Failures are
+ * swallowed to a console warning, never store.setError() — the channel tier
+ * is an ENRICHMENT, so a dead Understat upstream must not surface as a page
+ * error. Same policy as the league-xG fetch (see js/api.js, ROADMAP §3A).
  */
-function ensureTeamXg(fixture) {
+function prefetchAllTeamXg() {
   const season = store.getSeason();
   if (!season) return;
 
   const slugs = buildUnderstatSlugsByTeamId(store.getLeagueXg(), season.teamsById);
-  for (const teamId of [fixture.homeTeamId, fixture.awayTeamId]) {
-    const slug = slugs[teamId];
-    if (!slug || _teamXgRequested.has(slug) || store.getTeamXg(slug)) continue;
+  for (const slug of new Set(Object.values(slugs))) {
+    if (_teamXgRequested.has(slug) || store.getTeamXg(slug)) continue;
 
     _teamXgRequested.add(slug);
     fetchTeamXg(slug)
       .then((data) => {
         store.setTeamXg(slug, data);
-        // Only re-render if the user is still looking at a fixture that
-        // needs this team — otherwise the payload just sits in the cache.
-        renderMatchup();
+        // Whatever tab is active upgrades in place as each payload lands.
+        renderActiveTab();
       })
       .catch((err) => {
         console.warn(`[Gaffer IQ] team xG unavailable for ${slug}: ${err.message}`);
@@ -1224,24 +1239,31 @@ function ensureTeamXg(fixture) {
 }
 ```
 
-- [ ] **Step 4: Call it from `renderMatchup`**
+`renderActiveTab()` is the existing dispatcher `js/main.js` already calls on tab switch and
+on other post-boot data arrivals (e.g. once `leagueXg` itself resolves) — reuse it rather
+than adding a second re-render path.
 
-In `renderMatchup`, directly after the `if (!homeTeam || !awayTeam)` guard block returns, insert:
+- [ ] **Step 4: Call it once during boot**
+
+In `js/main.js`, directly after the season/`leagueXg` load that already resolves before the
+first render (slug resolution needs `leagueXg.teamsData`), insert:
 
 ```js
-  // Fire-and-forget; upgrades the counter tier in place when it lands.
-  ensureTeamXg(fixture);
+  // Fire-and-forget; every module upgrades to the channel tier in place as
+  // each team's statistics land. Not gated on any tab being open.
+  prefetchAllTeamXg();
 ```
 
 - [ ] **Step 5: Verify in the browser**
 
-Serve the app and open the Matchup tab. In the console:
+Serve the app and load it — no fixture needs to be opened. In the console:
 
 ```js
 Object.keys(window.__store.getAllTeamXg())
 ```
 
-Expected: two slugs after selecting a fixture, e.g. `['Arsenal', 'Liverpool']`. Then:
+Expected: all ~20 slugs appear as their fetches resolve, without visiting Matchup or
+selecting any fixture. Then:
 
 ```js
 Object.keys(window.__store.getAllTeamXg().Arsenal.statistics)
@@ -1249,7 +1271,8 @@ Object.keys(window.__store.getAllTeamXg().Arsenal.statistics)
 
 Expected: `['situation', 'formation', 'gameState', 'timing', 'shotZone', 'attackSpeed', 'result']`.
 
-Confirm no page-level error banner appears, and that selecting a second fixture adds two more slugs rather than replacing the first two.
+Confirm no page-level error banner appears, and that Dashboard/Planner/Ranker scores are
+already on the channel tier on first load rather than changing after a fixture is opened.
 
 - [ ] **Step 6: Run the tests**
 
@@ -1264,22 +1287,27 @@ Expected: PASS, 37 tests (no new tests — this task is DOM/network wiring, whic
 In the Understat data-flow section, add:
 
 ```markdown
-`team/{slug}/{season}` is fetched lazily by the Matchup Analyser for the two
-teams in the selected fixture only, cached in `store.teamXg` for the session,
-and consumed as `ctx.teamXgBySlug`. Failures are swallowed to a console warning
-— the channel counter tier degrades to the role tier, so a dead Understat
-upstream must never surface as a page error.
+`team/{slug}/{season}` is fetched eagerly for every team at startup, once
+`leagueXg` and fixtures have loaded, and cached in `store.teamXg` for the
+session. Consumed as `ctx.teamXgBySlug`. Fetched up front — not lazily per
+fixture — so every module scores every team on the same counter-matchup tier
+from the first render; no score can differ between two sessions, or two tabs
+in the same session, based on which fixture happened to be opened first.
+Failures are swallowed to a console warning — the channel counter tier
+degrades to the role tier per team, so a dead Understat upstream must never
+surface as a page error.
 ```
 
 - [ ] **Step 8: Commit**
 
 ```bash
-git add js/modules/matchup.js ARCHITECTURE.md
-git commit -m "feat(matchup): fetch Understat team statistics for the open fixture
+git add js/main.js ARCHITECTURE.md
+git commit -m "feat(main): prefetch Understat team statistics for every team at boot
 
-Two lazy proxy calls per fixture, cached per session, swallowed on failure.
-No scoring change yet — nothing reads ctx.teamXgBySlug until the channel
-engine lands."
+20 eager proxy calls at startup, cached per session, swallowed on failure.
+Replaces a per-fixture lazy fetch that let a team's tier depend on click
+order. No scoring change yet — nothing reads ctx.teamXgBySlug until the
+channel engine lands."
 ```
 
 ---
@@ -1657,11 +1685,11 @@ import { buildUnderstatSlugsByTeamId, buildChannelProfilesByTeamId } from './cha
 Directly after the `understatPlayersByName` precompute (currently ends around line 93), insert:
 
 ```js
-  // Channel tier: the per-team Understat `statistics` block, fetched lazily by
-  // the Matchup Analyser for the open fixture only. {} when nothing is cached
-  // yet, in which case calcCounterMatchup degrades to the role tier — see the
-  // design spec §8 for why the tier is chosen by data availability rather than
-  // by which module is asking.
+  // Channel tier: the per-team Understat `statistics` block, fetched eagerly
+  // for every team at startup (js/main.js prefetchAllTeamXg). {} only until
+  // that boot-time fetch resolves, in which case calcCounterMatchup degrades
+  // to the role tier — see the design spec §8 for why the tier is chosen by
+  // data availability rather than by which module is asking.
   const teamXgBySlug = opts.teamXgBySlug ?? null;
   const channelProfilesByTeamId = buildChannelProfilesByTeamId(
     teamXgBySlug,
@@ -1685,13 +1713,15 @@ Expected: PASS, 48 tests.
 
 - [ ] **Step 6: Verify in the browser**
 
-Open the Matchup tab, select a fixture, wait for the two fetches, then in the console:
+Load the app and wait for the boot-time prefetch (Task 7) to resolve — no fixture needs to
+be opened. Then in the console:
 
 ```js
 Object.keys(window.__engine.context().channelProfilesByTeamId)
 ```
 
-Expected: the two FPL team ids for the selected fixture.
+Expected: all ~20 FPL team ids, populating as each team's prefetch resolves — not gated on
+any fixture being selected.
 
 - [ ] **Step 7: Commit**
 
@@ -2300,24 +2330,113 @@ git commit -m "feat(matchup): label channel-tier counter pairings"
 
 **Interfaces:**
 - Consumes: everything above.
+- Produces: `tests/engine/roleThresholds.test.js`, a regression test for §4's role
+  thresholds against real named players.
 
-- [ ] **Step 1: Capture a before/after comparison**
+- [ ] **Step 1: Add an automated role-threshold regression test**
 
-With the branch checked out and the app loaded, record composite scores for the current gameweek's fixtures on each tier. In the console:
+**Added 2026-08-21.** §9's original safeguard against threshold drift was a manual
+browser spot-check inside this task's Step 4 checklist — easy to skip, and nothing
+fails loudly if it is. Give it an executable form so `npm test` catches drift on every
+run, not only when someone remembers to check by hand.
+
+Create `tests/engine/roleThresholds.test.js`:
 
 ```js
-const ctx = window.__engine.context();
-window.__store.getFixtures().filter(f => !f.played && f.gw === window.__store.getNextGw())
+/**
+ * tests/engine/roleThresholds.test.js
+ * Regression test for the classification thresholds in js/config.js
+ * (ROLE_SIGNATURE_THRESHOLDS) against a small set of named, well-known
+ * players whose position is unambiguous. This is what makes the §4/§9
+ * "known players still land correctly" check run in CI instead of only in
+ * a manual browser spot-check — a threshold edit that silently reclassifies
+ * Robertson as a CB, or Xhaka as a CM, fails here.
+ *
+ * MAINTENANCE: the records below are real Understat per-player season
+ * totals (time, xG, xA, npxG, xGChain, xGBuildup), captured from a live
+ * `fetchTeamXg`/league pull at the time this test was written — NOT
+ * fabricated. They go stale as a season progresses and a player's role
+ * changes clubs or systems. Refresh this fixture set from a live pull each
+ * pre-season, and whenever Task 13 Step 2's manual spot-check disagrees
+ * with what this test asserts.
+ */
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+import { buildRoleSignature, classifyRoleFromSignature } from '../../js/engine/counter.js';
+
+// TODO before this task is executed: replace each record below with a real
+// pull of that player's current-season Understat totals (time, xG, xA,
+// npxG, xGChain, xGBuildup) — do not commit placeholder numbers. Keep one
+// player per role this design spec names as a spot-check in §4: a
+// first-choice attacking fullback, a set-piece-taking centre-back, a
+// holding midfielder, a high-volume winger, and an out-and-out striker.
+const SPOT_CHECK = [
+  // { name: 'Robertson', position: 'DEF', role: 'FB', record: { time, xG, xA, npxG, xGChain, xGBuildup } },
+  // { name: 'Tarkowski', position: 'DEF', role: 'CB', record: { ... } },
+  // { name: 'Xhaka',     position: 'MID', role: 'DM', record: { ... } },
+  // { name: 'Saka',      position: 'MID', role: 'WM', record: { ... } },
+  // { name: 'Haaland',   position: 'FWD', role: 'ST', record: { ... } },
+];
+
+for (const { name, position, role, record } of SPOT_CHECK) {
+  test(`role threshold spot-check: ${name} classifies as ${role}`, () => {
+    const sig = buildRoleSignature(record);
+    assert.equal(classifyRoleFromSignature(position, sig), role);
+  });
+}
+
+test('role threshold spot-check fixture is populated', () => {
+  // Fails loudly if Step 1 above was skipped and the TODO records were
+  // never filled in — a silent empty array would make every test in this
+  // file vacuously pass.
+  assert.ok(SPOT_CHECK.length >= 5, 'populate SPOT_CHECK with real current-season records before merging');
+});
+```
+
+Populate `SPOT_CHECK` with real records for the current season before this task is
+considered done — the same names the design spec already names in §4 (FB: Robertson,
+Muñoz, Bradley, Dalot; CB: Tarkowski, Ballard, Milenković; DM: Xhaka, Ward-Prowse,
+Baleba; WM: Saka, Gordon, Mbeumo; ST: Haaland) are the natural choices, since their
+expected roles are already documented and spot-checked once.
+
+```bash
+npm test
+```
+
+Expected: PASS, one test per populated `SPOT_CHECK` entry plus the non-empty guard.
+
+- [ ] **Step 2: Capture a before/after comparison**
+
+**Revised 2026-08-21.** Task 7's boot-time prefetch means every team is on the channel tier
+from first load, so "before" can no longer be captured by simply checking the app before
+navigating anywhere — that no longer produces the role tier. Force the role tier for the
+"before" table by building a second context with `teamXgBySlug` overridden to `{}`, using
+the same `buildScoreContext` options the app already builds. With the branch checked out
+and the app loaded, in the console:
+
+```js
+const ctxChannel = window.__engine.context();
+const ctxRole = window.__engine.context({ teamXgBySlug: {} });
+
+const compare = (ctx) => window.__store.getFixtures()
+  .filter(f => !f.played && f.gw === window.__store.getNextGw())
   .map(f => {
     const h = window.__store.getTeam(f.homeTeamId), a = window.__store.getTeam(f.awayTeamId);
     const s = window.__engine.scoreFixture(h, f, ctx);
     return { fixture: `${h.shortName} v ${a.shortName}`, value: Math.round(s.value), mode: s.breakdown.counterMatchup.mode, confidence: s.confidence };
   });
+
+const before = compare(ctxRole);     // role tier throughout
+const after  = compare(ctxChannel);  // channel tier throughout
 ```
 
-Run once before opening any fixture (role tier throughout), then again after visiting each fixture so the statistics are cached (channel tier throughout). Record both tables.
+If `window.__engine.context()` does not accept an options override, add one before this
+step — a one-line change, since `buildScoreContext` already takes an `opts` object and
+Task 7 wires `teamXgBySlug` through it. Record both tables.
 
-- [ ] **Step 2: Sanity-check the deltas**
+- [ ] **Step 3: Sanity-check the deltas**
 
 Confirm all three hold. Any failure is a bug in Tasks 10–11, not a tuning problem:
 
@@ -2325,30 +2444,37 @@ Confirm all three hold. Any failure is a bug in Tasks 10–11, not a tuning prob
 - The home and away composites for the same fixture still total ~100 (the §8.7 relative property).
 - `confidence` does not *fall* when moving to the channel tier — channel pairings are never `estimated`, so it should rise or hold.
 
-- [ ] **Step 3: Add the checks to the testing roadmap**
+- [ ] **Step 4: Add the checks to the testing roadmap**
 
 In `GAFFER_IQ_TESTING_ROADMAP.md`, under the Technical Checklist, add:
 
 ```markdown
-- [ ] Counter-matchup reaches channel mode — open a fixture, wait for both team
-      fetches, and check `window.__engine.counterMatchup(home, away, ctx).mode`
-      returns `'channel'`
+- [ ] Counter-matchup reaches channel mode — load the app, wait for the
+      boot-time team-statistics prefetch (Task 7) to resolve, and check
+      `window.__engine.counterMatchup(home, away, ctx).mode` returns
+      `'channel'` for any fixture, not only one that has been opened
 - [ ] Channel pairing rows render as Set Pieces / Transition Speed / Box
       Occupation, never raw camelCase keys
 - [ ] Attacking + Defending counter values still total exactly 100 per pairing
-- [ ] Role signature spot-check — classify the current season's squads and
-      confirm known players land correctly (a first-choice fullback reads FB,
-      a set-piece centre-back reads CB, a holding midfielder reads DM). The
-      thresholds were derived on 900+ minute players from a COMPLETE season and
-      are applied in-season at a 450-minute floor, so this is the check that
-      the extrapolation holds.
+- [ ] `npm test` passes `tests/engine/roleThresholds.test.js` with its
+      `SPOT_CHECK` fixture refreshed for the current season (Step 1 above) —
+      this is the automated form of "known players still land correctly"
+      (a first-choice fullback reads FB, a set-piece centre-back reads CB, a
+      holding midfielder reads DM). The thresholds were derived on
+      900+ minute players from a COMPLETE season and are applied in-season
+      at a 450-minute floor, so this is the check that the extrapolation
+      holds — re-run it whenever squads change materially, not only once.
 ```
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add GAFFER_IQ_TESTING_ROADMAP.md
-git commit -m "docs(testing): add channel counter tier verification checks"
+git add tests/engine/roleThresholds.test.js GAFFER_IQ_TESTING_ROADMAP.md
+git commit -m "test(engine/counter): add automated role-threshold regression fixture
+
+Converts the manual role-signature spot-check into tests/engine/roleThresholds.test.js
+so npm test catches classification drift on named real players every run, not only
+when someone remembers the manual browser check."
 ```
 
 ---

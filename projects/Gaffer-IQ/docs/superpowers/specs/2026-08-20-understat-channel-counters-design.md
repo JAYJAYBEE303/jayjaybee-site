@@ -48,8 +48,10 @@ callers**. Six buckets, each shot-partitioned with a parallel `against` block:
 
 Two properties constrain everything downstream:
 
-- It is **per-team**, so a full-league read costs 20 proxy calls. It must be an
-  enrichment with graceful degradation, never a hard dependency.
+- It is **per-team**, so a full-league read costs 20 proxy calls — cheap enough to fetch
+  eagerly for every team at startup (§8) rather than lazily per fixture. It must still be
+  an enrichment with graceful degradation, never a hard dependency: a failed fetch degrades
+  that team to the role tier, never a page error.
 - It is a **season aggregate** — no per-match rows, no venue split, no decay. It is a
   stable *profile*, so it belongs beside `styleClash`, not beside `teamForm`.
 
@@ -169,7 +171,10 @@ construction, so it carries no independent information.
 **The baselines cancel.** Every team's xG-for in an axis is another team's xG-against, so
 league-mean-for equals league-mean-against to within 0.004 on all three axes. Subtracting
 the two shares removes the league baseline automatically — no baked league constants are
-needed for centring, which is what makes the tab-scoped, 2-teams-at-a-time fetch viable.
+needed for centring. This is also what made the original tab-scoped, 2-teams-at-a-time
+fetch viable at all — and remains true under §8's eager full-league fetch, which needs it
+for a different reason: scoring 20 teams' worth of pairings requires no additional
+league-constant maintenance as fixtures change.
 
 **Axis independence (n=20):** the largest pairwise correlation among attacking profiles
 is `corr(box, fast) = +0.334`; among defensive profiles the largest is
@@ -227,12 +232,34 @@ numbers. Every constant in §4 and §6 lands in `config.js`.
 
 ## 8. Score consistency across modules
 
-Tier selection is driven by **what is in the store**, not by which tab is active.
-Viewing a fixture in Matchup caches those two teams' `statistics` for the session, so
-Dashboard, Planner and Ranker then score those same teams in channel mode too. Scores
-improve as the user browses and never disagree at a single point in time. This matches
-how `leagueXg` already degrades through `buildScoreContext`. The cost is that a team's
-score can visibly change after its fixture is visited, which the UI marks explicitly.
+**Revised 2026-08-21** — superseded the per-fixture lazy fetch below after review; the
+original approach traded a real bug for a UI-badge workaround instead of removing it.
+
+Tier selection is driven by **what is in the store**, and every team's `statistics` is
+fetched once, eagerly, at startup — not lazily per fixture. All 20 team payloads are
+requested as part of the same boot sequence that already loads `leagueXg` and fixtures,
+before any tab renders. Dashboard, Planner, Ranker and Matchup therefore all score every
+team on the same tier from the first paint; there is no window in which two users, or two
+tabs in the same session, can see a different score for the same team because one of them
+happened to open a fixture the other didn't.
+
+**Why not lazy-per-fixture.** The original design cached a team's `statistics` only when
+its fixture was opened in Matchup, then let every other module pick up the same cached
+entry — "scores improve as the user browses." That is not a live-platform data update; the
+data was available the whole time, and the score changed only because of which tab the
+user happened to click, not because anything in the world changed. Two people viewing the
+same team on the same day could get different numbers purely from click order. The
+original mitigation was a UI flag marking the change "explicitly" — but that treats a
+self-inflicted inconsistency as something to disclose rather than remove.
+
+**Cost of prefetching everything.** 20 proxy calls at boot, the same order of magnitude as
+the existing `leagueXg` fetch. Failures keep the same swallow-to-console-warning policy as
+before — a dead Understat upstream degrades every consumer to the role tier, never a page
+error. No UI marker is needed because no consumer-visible drift remains to flag.
+
+Real, expected data changes — Understat re-aggregating a team's `statistics` after a
+gameweek's matches are played — are unaffected by this and are exactly the kind of change
+a live platform should surface; only the artificial click-order-driven variant is removed.
 
 ## 9. Verification
 
@@ -248,8 +275,15 @@ Beyond unit tests:
 - The mirroring identity is asserted numerically, as §7.2 already does by hand.
 - `js/calibration.js` snapshots are compared before and after each scoring change.
 - **Threshold re-validation.** §4's thresholds come from ≥900-minute players in a
-  complete season and are applied in-season at a 450-minute floor. Mid-season, re-run the
-  classification against current data and confirm known players still land correctly.
+  complete season and are applied in-season at a 450-minute floor. **Revised 2026-08-21:**
+  this is no longer a manual-only check. `tests/engine/roleThresholds.test.js` (Task 13)
+  asserts `classifyRoleFromSignature` against real records for a handful of named,
+  unambiguous players — the same ones spot-checked in §4 — so `npm test` catches
+  classification drift on every run rather than only when someone remembers to re-run the
+  browser check by hand. The fixture still needs refreshing each pre-season and whenever a
+  named player's role changes materially, since it is real per-player data, not a derived
+  formula; the manual mid-season spot-check remains as a trigger for *when* to refresh it,
+  not as the only thing guarding against drift.
 
 ## 10. Deferred
 
