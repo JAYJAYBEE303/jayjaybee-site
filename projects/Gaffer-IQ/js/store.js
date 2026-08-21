@@ -91,6 +91,7 @@ function getLeagueXgPrev()            { return state.leagueXgPrev; }
 function getLeagueXgPrev2()           { return state.leagueXgPrev2; }
 function getLeagueXgPrev3()           { return state.leagueXgPrev3; }
 function getTeamXg(teamSlug)          { return state.teamXg[teamSlug] ?? null; }
+function getAllTeamXg()               { return { ...state.teamXg }; }
 function getActiveHorizon()           { return state.activeHorizon; }
 function getSquad()                   { return state.squad; }
 function getError()                   { return state.lastError; }
@@ -224,7 +225,7 @@ export const store = {
   getSeason, getTeams, getTeam, getPlayers, getPlayer,
   getFixtures, getFixture, getPositions, getEvents,
   getCurrentGw, getNextGw, getPlayerSummary, getAllPlayerSummaries,
-  getLeagueXg, getLeagueXgPrev, getLeagueXgPrev2, getLeagueXgPrev3, getTeamXg,
+  getLeagueXg, getLeagueXgPrev, getLeagueXgPrev2, getLeagueXgPrev3, getTeamXg, getAllTeamXg,
   getActiveHorizon, getSquad, getError, getLastRefreshAt, isFresh,
   setSeason, setPlayerSummary, setLeagueXg, setLeagueXgPrev, setLeagueXgPrev2, setLeagueXgPrev3, setTeamXg,
   setActiveHorizon, setSquad, setError, markDataReady,
