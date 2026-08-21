@@ -322,3 +322,20 @@ test('calcCounterMatchupMirrored leaves a blank pairing blank', () => {
   assert.equal(m.pairings.setPieceDefence.value, null);
   assert.equal(m.value, null);
 });
+
+import { calcCombinedCounterMatchup } from '../../js/engine/counter.js';
+
+test('calcCombinedCounterMatchup carries maturity through the blend', () => {
+  // Regression: it dropped `maturity`, so metricMaturity saw undefined and
+  // defaulted to 1 — a one-match profile got full composite weight, which is
+  // exactly what the ramp exists to prevent.
+  const attacking = { value: 60, estimated: false, maturity: 0.125, mode: 'channel', pairings: {} };
+  const defending = { value: 40, estimated: false, maturity: 0.125, pairings: {} };
+  assert.equal(calcCombinedCounterMatchup(attacking, defending).maturity, 0.125);
+});
+
+test('calcCombinedCounterMatchup takes the lower maturity of the two sides', () => {
+  const attacking = { value: 60, estimated: false, maturity: 0.9, mode: 'channel', pairings: {} };
+  const defending = { value: 40, estimated: false, maturity: 0.2, pairings: {} };
+  assert.equal(calcCombinedCounterMatchup(attacking, defending).maturity, 0.2);
+});

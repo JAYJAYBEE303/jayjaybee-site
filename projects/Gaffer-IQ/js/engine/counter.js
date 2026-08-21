@@ -642,6 +642,12 @@ export function calcCombinedCounterMatchup(attackingCounter, defendingCounter) {
     // roadmap's tier check and the channel-vs-role comparison can see it
     // without re-deriving which tier ran.
     mode: attackingCounter.mode,
+    // MODEL: the LOWER of the two, for the same reason calcChannelCounter takes
+    // the lower of two teams' — a blend is only as well-evidenced as its weaker
+    // half. Dropping this field entirely (as this function originally did) made
+    // metricMaturity see `undefined` and fall back to 1, handing a one-match
+    // profile full composite weight — the exact failure the ramp prevents.
+    maturity: Math.min(attackingCounter.maturity ?? 1, defendingCounter.maturity ?? 1),
   };
 }
 

@@ -180,6 +180,33 @@ function bandFromValue(value) {
 const STACK_METRICS = ['counterMatchup', 'teamForm', 'history', 'homeAway', 'styleClash'];
 
 /**
+ * How much of a sub-metric's weight it has actually earned, 0–1.
+ *
+ * MODEL: `estimated` and `maturity` answer different questions and both are
+ * needed. `estimated` means "this reading is a fallback, don't use it" and
+ * always wins. `maturity` means "this reading is real, but built on N% of the
+ * evidence it eventually will be" — a distinction that did not exist before
+ * 2026-08-21, when every metric was all-or-nothing. Conflating them would
+ * force a choice between throwing away an early-season signal entirely and
+ * letting three matches of data swing a fixture as hard as thirty.
+ *
+ * A metric that reports no `maturity` is binary exactly as before: 1 when
+ * usable, 0 when estimated. Today only counterMatchup reports a partial value
+ * (engine/channel.js), but the mechanism is general — any metric can opt in by
+ * returning a `maturity` field, with no change needed here.
+ *
+ * @param {{estimated?: boolean, maturity?: number}|null} metric
+ * @returns {number}  0–1. Higher = more of its configured weight applies.
+ */
+export function metricMaturity(metric) {
+  if (!metric || metric.estimated) return 0;
+  if (typeof metric.maturity !== 'number' || Number.isNaN(metric.maturity)) {
+    return metric.maturity === undefined ? 1 : 0;
+  }
+  return clamp(0, 1, metric.maturity);
+}
+
+/**
  * How much to deduct from a fixture's weighted composite because MULTIPLE
  * secondary metrics are simultaneously unfavourable.
  *
@@ -292,15 +319,27 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
   const style   = calcStyleClash(team, opponent, ctx);
   const history = calcFixtureHistory(team.id, opponentId, ctx);
 
-  // MODEL: confidence = weighted share of non-estimated sub-metrics. Computed
-  // BEFORE linearValue below because linearValue now divides by it — see §8.3.
+  // MODEL: confidence = MATURITY-weighted share of usable sub-metrics.
+  // Computed BEFORE linearValue below because linearValue divides by it (§8.3).
+  //
+  // Revised 2026-08-21 from an all-or-nothing sum to a continuous one. A metric
+  // whose evidence is thin but real now contributes proportionally rather than
+  // being discarded — see metricMaturity below for why that is not the same
+  // thing as `estimated`.
+  const mBase    = metricMaturity(base);
+  const mCounter = metricMaturity(counter);
+  const mForm    = metricMaturity(form);
+  const mHistory = metricMaturity(history);
+  const mVenue   = metricMaturity(venue);
+  const mStyle   = metricMaturity(style);
+
   const confidence =
-      (base.estimated    ? 0 : WEIGHTS.baseDifficulty)
-    + (counter.estimated ? 0 : WEIGHTS.counterMatchup)
-    + (form.estimated    ? 0 : WEIGHTS.teamForm)
-    + (history.estimated ? 0 : WEIGHTS.history)
-    + (venue.estimated   ? 0 : WEIGHTS.homeAway)
-    + (style.estimated   ? 0 : WEIGHTS.styleClash);
+      WEIGHTS.baseDifficulty * mBase
+    + WEIGHTS.counterMatchup * mCounter
+    + WEIGHTS.teamForm       * mForm
+    + WEIGHTS.history        * mHistory
+    + WEIGHTS.homeAway       * mVenue
+    + WEIGHTS.styleClash     * mStyle;
 
   // Weighted blend — every sub-metric is already 0–100, higher = better for `team`.
   // WEIGHTS sums to 1.00 (config.js / FEATURE_ENGINE.md §8.1).
@@ -316,20 +355,26 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
   // simply doesn't count. `confidence` above IS that re-normalisation
   // denominator: baseDifficulty is never estimated (§8.1), so confidence is
   // always > 0 and this never divides by zero. See §8.3.
+  // term() guards the zero case explicitly: a metric at maturity 0 may carry a
+  // null value (a blank channel counter does), and null would otherwise ride
+  // through the arithmetic as a 0 rather than being genuinely absent.
+  const term = (weight, maturity, value) =>
+    (maturity === 0 || typeof value !== 'number' ? 0 : weight * maturity * value);
+
   const rawWeightedSum =
-      (base.estimated    ? 0 : WEIGHTS.baseDifficulty * invert(base.value))
-    + (counter.estimated ? 0 : WEIGHTS.counterMatchup * counter.value)
-    + (form.estimated    ? 0 : WEIGHTS.teamForm       * form.value)
-    + (history.estimated ? 0 : WEIGHTS.history        * history.value)
-    + (venue.estimated   ? 0 : WEIGHTS.homeAway       * venue.value)
-    + (style.estimated   ? 0 : WEIGHTS.styleClash     * style.value);
+      term(WEIGHTS.baseDifficulty, mBase,    invert(base.value))
+    + term(WEIGHTS.counterMatchup, mCounter, counter.value)
+    + term(WEIGHTS.teamForm,       mForm,    form.value)
+    + term(WEIGHTS.history,        mHistory, history.value)
+    + term(WEIGHTS.homeAway,       mVenue,   venue.value)
+    + term(WEIGHTS.styleClash,     mStyle,   style.value);
   const linearValue = confidence > 0 ? rawWeightedSum / confidence : 50;
 
   // §8.6 conditional term. Built from the same sub-metric shapes the breakdown
   // below reports, so it needs their { value, weight, estimated } triples — hence
   // the small intermediate object rather than reading the breakdown after the fact.
   const stack = calcStackingPenalty({
-    counterMatchup: { value: counter.value, weight: WEIGHTS.counterMatchup, estimated: counter.estimated },
+    counterMatchup: { value: counter.value, weight: WEIGHTS.counterMatchup, estimated: counter.estimated, maturity: mCounter },
     teamForm:       { value: form.value,    weight: WEIGHTS.teamForm,       estimated: form.estimated },
     history:        { value: history.value, weight: WEIGHTS.history,        estimated: history.estimated },
     homeAway:       { value: venue.value,   weight: WEIGHTS.homeAway,       estimated: venue.estimated },
@@ -378,6 +423,10 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
         attackingValue: counter.attackingValue,
         defendingValue: counter.defendingValue,
         mode:           counter.mode,
+        // 0–1 share of this metric's configured weight that actually applied.
+        // 0 = no Understat data yet; 1 = fully mature profile on both sides.
+        maturity:       mCounter,
+        effectiveWeight: WEIGHTS.counterMatchup * mCounter,
       },
       teamForm: {
         value:     form.value,
