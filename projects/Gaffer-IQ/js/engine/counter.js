@@ -96,6 +96,55 @@ export function classifyRole(player) {
   return null;
 }
 
+/**
+ * Build the two-dimensional role signature for one Understat player record.
+ *
+ * MODEL: xGChain − xGBuildup is BY DEFINITION the player's involvement in
+ * possessions where they took the shot or made the key pass, so buildupShare
+ * is a positional depth axis: ~0.95 for a centre-back, ~0.20 for a striker.
+ * Because it is a ratio of the player's own involvement it is quality-neutral
+ * — measured at corr(buildupShare, xGChain/90) = +0.008 across 102 regular
+ * 2025 defenders, versus corr(buildupShare, xA/90) = −0.654.
+ *
+ * MODEL: buildupShare alone misfiles two groups in OPPOSITE directions — a
+ * set-piece centre-back reads low (corner headers are final actions) and a
+ * defensive fullback reads low (little of anything). createBias separates
+ * them: a centre-back's final action is a shot, a fullback's is a cross.
+ *
+ * See FEATURE_ENGINE.md §7.2 and the design spec
+ * docs/superpowers/specs/2026-08-20-understat-channel-counters-design.md §4.
+ *
+ * @param {object} understatPlayer  raw record from leagueXg.playersData —
+ *                                  numeric fields arrive as STRINGS
+ * @returns {{buildupShare: number, createBias: number, npxg90: number,
+ *            chain90: number} | null}
+ *          buildupShare 0–1 (higher = deeper role); createBias 0–1 (higher =
+ *          creator not finisher); per-90 rates. null when there is too little
+ *          signal to classify on.
+ */
+export function buildRoleSignature(understatPlayer) {
+  if (!understatPlayer) return null;
+
+  const minutes = parseFloat(understatPlayer.time);
+  const chain   = parseFloat(understatPlayer.xGChain);
+  if (!(minutes > 0) || !(chain > 0)) return null;
+
+  const nineties = minutes / 90;
+  const buildup  = parseFloat(understatPlayer.xGBuildup) || 0;
+  const xa90     = (parseFloat(understatPlayer.xA)   || 0) / nineties;
+  const npxg90   = (parseFloat(understatPlayer.npxG) || 0) / nineties;
+  const final    = xa90 + npxg90;
+
+  return {
+    buildupShare: buildup / chain,
+    // MODEL: a player with no final action at all has no bias either way —
+    // 0.5 is the honest neutral, not 0 (which would read as pure finisher).
+    createBias: final > 0 ? xa90 / final : 0.5,
+    npxg90,
+    chain90: chain / nineties,
+  };
+}
+
 // ─── Role groupings used by calcCounterMatchup ───────────────────────────────
 
 // Role-based attacking / defending unit per pairing (Phase 3C refinement).
