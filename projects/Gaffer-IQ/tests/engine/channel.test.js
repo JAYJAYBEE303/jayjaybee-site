@@ -200,3 +200,43 @@ test('calcChannelCounter returns null when either team has no profile', () => {
 test('calcChannelCounter reports estimated false when both profiles are real', () => {
   assert.equal(calcChannelCounter(teamA, teamB, ctxAB).estimated, false);
 });
+
+import { channelPersonnelFactor } from '../../js/engine/channel.js';
+
+const squad = [
+  { id: 1, position: 'FWD', fullName: 'Big Striker',  totals: { minutes: 2700 }, chanceOfPlayingNext: 100 },
+  { id: 2, position: 'FWD', fullName: 'Backup',       totals: { minutes: 300  }, chanceOfPlayingNext: 100 },
+  { id: 3, position: 'MID', fullName: 'Winger',       totals: { minutes: 2700 }, chanceOfPlayingNext: 100 },
+];
+const roles = { 1: 'ST', 2: 'ST', 3: 'WM' };
+const chainCtx = { understatPlayersByName: {
+  'big striker': { time: '2700', xGChain: '24',    xGBuildup: '5',   xA: '2',    npxG: '12' },
+  'backup':      { time: '300',  xGChain: '0.666', xGBuildup: '0.2', xA: '0.05', npxG: '0.3' },
+  'winger':      { time: '2700', xGChain: '18',    xGBuildup: '6',   xA: '6',    npxG: '6'  },
+} };
+
+test('channelPersonnelFactor is 1.0 when the unit is fully available', () => {
+  const f = channelPersonnelFactor(squad, roles, 'boxThreat', chainCtx);
+  assert.ok(Math.abs(f - 1) < 1e-9);
+});
+
+test('channelPersonnelFactor drops when the unit leader is ruled out', () => {
+  const injured = squad.map(p => p.id === 1 ? { ...p, chanceOfPlayingNext: 0 } : p);
+  const f = channelPersonnelFactor(injured, roles, 'boxThreat', chainCtx);
+  assert.ok(f < 1, `expected a penalty, got ${f}`);
+  assert.ok(f >= 0.80, 'must not exceed the configured floor');
+});
+
+test('channelPersonnelFactor clamps to the configured bounds', () => {
+  const injured = squad.map(p => p.id === 1 ? { ...p, chanceOfPlayingNext: 0 } : p);
+  assert.ok(channelPersonnelFactor(injured, roles, 'boxThreat', chainCtx) >= 0.80);
+  assert.ok(channelPersonnelFactor(squad,   roles, 'boxThreat', chainCtx) <= 1.20);
+});
+
+test('channelPersonnelFactor is a neutral 1.0 when no unit player is matched', () => {
+  assert.equal(channelPersonnelFactor(squad, roles, 'boxThreat', { understatPlayersByName: {} }), 1);
+});
+
+test('channelPersonnelFactor is a neutral 1.0 when the unit is empty', () => {
+  assert.equal(channelPersonnelFactor(squad, {}, 'boxThreat', chainCtx), 1);
+});

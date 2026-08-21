@@ -526,6 +526,25 @@ export const CHANNEL_SENSITIVITY = 14;
 // of shots) stops being dominated by sampling noise.
 export const MIN_CHANNEL_SHOTS = 120;
 
+// Which roles supply each channel axis, for personnel weighting.
+// MODEL: the axes are shot-partition shares of a SEASON, so they cannot react
+// to an injury. Scaling the attacking share by how much of the relevant unit
+// is actually available makes a season aggregate respond to this week's squad.
+export const CHANNEL_ROLE_AXES = {
+  boxThreat:      ['ST', 'SS'],
+  wideTransition: ['WM', 'FB'],
+  // MODEL: set pieces are attacked by the aerial targets, not the whole XI —
+  // weighting by all eleven would make the factor a constant.
+  setPieceThreat: ['CB', 'ST', 'SS'],
+};
+
+// Bounds on the personnel factor. MODEL: deliberately narrow. The factor
+// corrects a season profile for this week's availability; it is not a second
+// quality term, and an unbounded ratio would let one missing player swamp the
+// axis edge it multiplies.
+export const CHANNEL_PERSONNEL_MIN = 0.80;
+export const CHANNEL_PERSONNEL_MAX = 1.20;
+
 // ─── §8  Composite matchup score ─────────────────────────────────────────────
 
 // Weights for all sub-metrics. Must sum to 1.00.

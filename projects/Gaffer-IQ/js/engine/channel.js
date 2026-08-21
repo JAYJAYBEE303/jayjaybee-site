@@ -11,9 +11,16 @@
 
 import {
   MIN_CHANNEL_SHOTS, CHANNEL_WEIGHTS, CHANNEL_AXIS_POOLED_SD, CHANNEL_SENSITIVITY,
+  CHANNEL_ROLE_AXES, CHANNEL_PERSONNEL_MIN, CHANNEL_PERSONNEL_MAX,
 } from '../config.js';
 import { clamp } from '../util.js';
 import { canonicalClubKey } from './normalise.js';
+// Circular by design: counter.js imports calcChannelCounter from here. ES
+// modules resolve this correctly because every binding involved is a hoisted
+// `function` declaration, bound at call time rather than module-evaluation
+// time. If any of them is ever converted to `const fn = () => …` the cycle
+// breaks — keep them as `function` declarations.
+import { buildRoleSignature, classifyRole } from './counter.js';
 
 /**
  * Map FPL team id → Understat URL slug, derived from the league payload that
@@ -207,6 +214,14 @@ export function calcChannelCounter(teamA, teamB, ctx) {
   const b = profiles?.[teamB?.id];
   if (!a?.hasChannelAxes || !b?.hasChannelAxes) return null;
 
+  // Roles for A only — the factor scales A's attacking share, and B's
+  // conceding share needs no personnel read.
+  const rolesA = {};
+  for (const p of ctx.playersByTeamId?.[teamA.id] || []) {
+    const role = classifyRole(p, ctx);
+    if (role) rolesA[p.id] = role;
+  }
+
   const pairings = {};
   let weightedSum = 0;
   let totalWeight = 0;
@@ -219,11 +234,17 @@ export function calcChannelCounter(teamA, teamB, ctx) {
     // otherwise silently score NaN.
     if (typeof attackShare !== 'number' || typeof concedeShare !== 'number') continue;
 
-    const edge  = attackShare - concedeShare;
+    const personnel = channelPersonnelFactor(
+      ctx.playersByTeamId?.[teamA.id] || [], rolesA, key, ctx,
+    );
+    // MODEL: the factor scales the ATTACKING share only. B's conceding profile
+    // describes how B leaks, which this week's availability in A's squad
+    // cannot change.
+    const edge = (attackShare * personnel) - concedeShare;
     const value = clamp(0, 100, 50 + (edge / CHANNEL_AXIS_POOLED_SD[key]) * CHANNEL_SENSITIVITY);
     const weight = CHANNEL_WEIGHTS[key];
 
-    pairings[key] = { value, weight, estimated: false, attackShare, concedeShare };
+    pairings[key] = { value, weight, estimated: false, attackShare, concedeShare, personnel };
     weightedSum += value * weight;
     totalWeight += weight;
   }
@@ -236,4 +257,49 @@ export function calcChannelCounter(teamA, teamB, ctx) {
     pairings,
     mode: 'channel',
   };
+}
+
+/**
+ * How much of an axis's usual chain contribution is actually available this
+ * week, as a multiplier on that axis's attacking share.
+ *
+ * MODEL: self-normalising — availability-weighted chain over total chain for
+ * the SAME unit. No league constant is needed, and a team whose whole unit is
+ * fit scores exactly 1.0 regardless of how good that unit is, so the factor
+ * corrects for availability without smuggling in a second quality term.
+ *
+ * @param {Player[]} players            the team's squad
+ * @param {Object<number,string>} roles playerId → role, from classifyTeamRoles
+ * @param {string} axisKey              a key of CHANNEL_ROLE_AXES
+ * @param {object} ctx                  buildScoreContext result
+ * @returns {number}  CHANNEL_PERSONNEL_MIN–MAX; exactly 1 when there is not
+ *                    enough data to judge. Direction: higher = more of the
+ *                    unit available.
+ */
+export function channelPersonnelFactor(players, roles, axisKey, ctx) {
+  const wanted = CHANNEL_ROLE_AXES[axisKey];
+  const lookup = ctx?.understatPlayersByName;
+  if (!wanted || !lookup || !players) return 1;
+
+  let availableChain = 0;
+  let totalChain = 0;
+  for (const p of players) {
+    if (!wanted.includes(roles?.[p.id])) continue;
+    const key = (p.fullName || '').toLowerCase().trim();
+    const sig = key ? buildRoleSignature(lookup[key]) : null;
+    if (!sig) continue;
+
+    const minutes = p.totals?.minutes ?? 0;
+    const seasonChain = sig.chain90 * (minutes / 90);
+    totalChain += seasonChain;
+
+    // chanceOfPlayingNext is null for most players — FPL populates it only
+    // when there is news, so null means "no doubt reported" (FEATURE_ENGINE
+    // §7.3), never "no data".
+    const availability = (p.chanceOfPlayingNext ?? 100) / 100;
+    availableChain += seasonChain * availability;
+  }
+
+  if (totalChain <= 0) return 1;
+  return clamp(CHANNEL_PERSONNEL_MIN, CHANNEL_PERSONNEL_MAX, availableChain / totalChain);
 }

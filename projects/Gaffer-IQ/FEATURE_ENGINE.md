@@ -358,6 +358,12 @@ league-wide sweep is needed to centre the scores. The mirrored Defending
 Counters stay arithmetic (`100 − attacking`), preserving the identity above.
 
 Tier selection is by data availability: `channel` → `role` → `element`.
+
+`attackShare` is scaled by `channelPersonnelFactor` — the availability-weighted
+share of the axis unit's season xGChain that is fit this week, clamped to
+0.80–1.20. Self-normalising against the same unit, so a fully fit team scores
+exactly 1.0 regardless of quality. This is what lets a season aggregate react
+to an injury.
 - `PAIRING_WEIGHT` lets the FWD-vs-CB pairing matter more than winger-vs-FB by default (`config.js`). `COUNTER_SENSITIVITY` (default scaled so a 20-point form gap moves the pairing ~±20) controls responsiveness.
 - "Defence unit form" uses the **defensive** read of `calcPlayerForm` for defenders (clean sheets, goals conceded while on pitch, defensive contribution) rather than attacking returns. Document this dual-mode in `counter.js`.
 - **MODEL:** uses minutes-weighting so likely starters drive the score, not fringe squad players. If a unit can't be assembled (missing data), fall back to team-level `strength_attack`/`strength_defence` and flag `estimated: true`.
