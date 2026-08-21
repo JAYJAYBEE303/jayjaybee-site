@@ -301,3 +301,24 @@ test('mirroring identity holds for channel-mode pairings', () => {
     `aggregate must total 100 within ${EPS}, got ${attacking.value + mirrored.value}`,
   );
 });
+
+import { calcCounterMatchup } from '../../js/engine/counter.js';
+
+test('calcCounterMatchup is channel-only — never role or element', () => {
+  const out = calcCounterMatchup(
+    { id: 1 }, { id: 2 },
+    { playersByTeamId: {}, channelProfilesByTeamId: {} },
+  );
+  assert.equal(out.mode, 'channel');
+});
+
+test('calcCounterMatchupMirrored leaves a blank pairing blank', () => {
+  const attacking = {
+    value: null, estimated: true, maturity: 0, mode: 'channel',
+    pairings: { setPieceThreat: { value: null, weight: 0.5, estimated: true } },
+  };
+  const m = calcCounterMatchupMirrored(attacking);
+  // 100 - null would be 100 — a confident-looking score invented from nothing.
+  assert.equal(m.pairings.setPieceDefence.value, null);
+  assert.equal(m.value, null);
+});

@@ -404,99 +404,114 @@ export function classifyTeamRoles(players, ctx) {
  * @param {Team} teamA
  * @param {Team} teamB
  * @param {object} ctx  must contain { playersByTeamId, playerSummariesById, teamsById }
- * @returns {{value: number, estimated: boolean, pairings: Object, mode: 'role'|'element'}}
+ * @returns {{value: number|null, estimated: boolean, maturity: number,
+ *            pairings: Object, mode: 'channel'}}
+ *          value is null and maturity 0 when Understat has published nothing
+ *          for either team — the UI renders blank rows and the composite gives
+ *          the metric no weight at all.
  */
 export function calcCounterMatchup(teamA, teamB, ctx) {
-  // Tier 1 — channel mode, when both teams' Understat statistics are cached.
-  // MODEL: the tier is chosen by DATA AVAILABILITY, not by which module is
-  // asking, so a fixture's score can only improve as payloads land and can
-  // never disagree with itself at a single point in time. See the design spec
-  // §8 and buildScoreContext's channelProfilesByTeamId precompute.
-  const channel = calcChannelCounter(teamA, teamB, ctx);
-  if (channel) return channel;
+  // Channel is now the ONLY tier. Everything below is the retired role /
+  // element pairing ladder, kept commented rather than deleted so it can be
+  // switched back on wholesale if the channel read disappoints in-season.
+  //
+  // RETIRED 2026-08-21. It scored a team's attacking unit against the
+  // opponent's defending unit by position pairing (ST vs CB, Wingers vs
+  // Fullbacks, CAM vs CDM). Replaced because it answered a quality question
+  // ("are my strikers better than their centre-backs") rather than a matchup
+  // question ("does the way I score match the way they concede"), and because
+  // its 120-shot gate meant the better read was unavailable until ~GW10.
+  //
+  // TO RE-ENABLE: uncomment the block below and restore the `if (channel)
+  // return channel;` guard in place of the unconditional return. classifyRole,
+  // buildRoleSignature, classifyRoleFromSignature, ROLE_ATTACK_GROUPS and
+  // ROLE_DEFENCE_GROUPS are all still live — the channel tier's personnel
+  // weighting and duelsForPairing depend on them — so only this block and
+  // classifyTeamRoles need waking up.
+  return calcChannelCounter(teamA, teamB, ctx);
 
-  const playersA = ctx.playersByTeamId?.[teamA.id] || [];
-  const playersB = ctx.playersByTeamId?.[teamB.id] || [];
-
-  const roleResultA = classifyTeamRoles(playersA, ctx);
-  const roleResultB = classifyTeamRoles(playersB, ctx);
-  const useRoles = roleResultA !== null && roleResultB !== null;
-
-  const rolesA = roleResultA?.rolesByPlayerId ?? null;
-  const rolesB = roleResultB?.rolesByPlayerId ?? null;
-
-  const pairingWeights = useRoles ? ROLE_PAIRING_WEIGHTS    : PAIRING_WEIGHTS;
-  const attackGroups   = useRoles ? ROLE_ATTACK_GROUPS      : ELEMENT_ATTACK_GROUPS;
-  const defenceGroups  = useRoles ? ROLE_DEFENCE_GROUPS     : ELEMENT_DEFENCE_GROUPS;
-
-  const pairings = {};
-  let weightedSum = 0;
-  let totalWeight = 0;
-  // MODEL: an element_type fallback for either side flags the whole metric as
-  // estimated, and so does thin chain coverage — a role grouping built mostly
-  // from ICT is materially less trustworthy than one built from chain data.
-  let anyEstimated = !useRoles
-    || (roleResultA?.estimated ?? false)
-    || (roleResultB?.estimated ?? false);
-
-  for (const key of Object.keys(pairingWeights)) {
-    const attackers = useRoles
-      ? selectByRole(playersA, attackGroups[key], rolesA)
-      : selectByPosition(playersA, attackGroups[key]);
-    const defenders = useRoles
-      ? selectByRole(playersB, defenceGroups[key], rolesB)
-      : selectByPosition(playersB, defenceGroups[key]);
-
-    // MODEL: prefer the chain read of the attacking unit; fall back to the
-    // form read when Understat can't supply one. Normalised onto the same
-    // 0–100 scale calcPlayerForm returns, so pairingEdge stays comparable
-    // across both paths.
-    const attackChain = minutesWeightedMeanChain(attackers, ctx);
-    const attackForm  = attackChain !== null
-      ? normaliseLinear(attackChain, CHAIN_UNIT_ANCHORS.min, CHAIN_UNIT_ANCHORS.max)
-      : minutesWeightedMeanForm(attackers, ctx);
-    const defenceForm = minutesWeightedMeanForm(defenders, ctx);
-
-    let pairingScore;
-    let pairingEstimated = false;
-    if (attackForm === null || defenceForm === null) {
-      // MODEL: missing unit data → fall back to strength priors and flag.
-      pairingScore = fallbackPairingFromStrength(teamA, teamB);
-      pairingEstimated = true;
-      anyEstimated = true;
-    } else {
-      // signed: positive = A's attack outperforms B's defence on form.
-      const pairingEdge = attackForm - defenceForm;
-      pairingScore = clamp(0, 100, 50 + (pairingEdge * COUNTER_SENSITIVITY));
-    }
-
-    pairings[key] = {
-      value:        pairingScore,
-      weight:       pairingWeights[key],
-      estimated:    pairingEstimated,
-      attackForm,
-      defenceForm,
-      attackSource: attackChain !== null ? 'chain' : 'form',
-      attackerCount: attackers.length,
-      defenderCount: defenders.length,
-    };
-
-    weightedSum += pairingScore * pairingWeights[key];
-    totalWeight += pairingWeights[key];
-  }
-
-  // MODEL: totalWeight is 0 only if the active pairing-weights table is empty —
-  // a config bug. Defensive 50/estimated rather than NaN if that ever happens.
-  const value = totalWeight === 0
-    ? 50
-    : clamp(0, 100, weightedSum / totalWeight);
-
-  return {
-    value,
-    estimated: anyEstimated || totalWeight === 0,
-    pairings,
-    mode: useRoles ? 'role' : 'element',
-  };
+//   const playersA = ctx.playersByTeamId?.[teamA.id] || [];
+//   const playersB = ctx.playersByTeamId?.[teamB.id] || [];
+// 
+//   const roleResultA = classifyTeamRoles(playersA, ctx);
+//   const roleResultB = classifyTeamRoles(playersB, ctx);
+//   const useRoles = roleResultA !== null && roleResultB !== null;
+// 
+//   const rolesA = roleResultA?.rolesByPlayerId ?? null;
+//   const rolesB = roleResultB?.rolesByPlayerId ?? null;
+// 
+//   const pairingWeights = useRoles ? ROLE_PAIRING_WEIGHTS    : PAIRING_WEIGHTS;
+//   const attackGroups   = useRoles ? ROLE_ATTACK_GROUPS      : ELEMENT_ATTACK_GROUPS;
+//   const defenceGroups  = useRoles ? ROLE_DEFENCE_GROUPS     : ELEMENT_DEFENCE_GROUPS;
+// 
+//   const pairings = {};
+//   let weightedSum = 0;
+//   let totalWeight = 0;
+//   // MODEL: an element_type fallback for either side flags the whole metric as
+//   // estimated, and so does thin chain coverage — a role grouping built mostly
+//   // from ICT is materially less trustworthy than one built from chain data.
+//   let anyEstimated = !useRoles
+//     || (roleResultA?.estimated ?? false)
+//     || (roleResultB?.estimated ?? false);
+// 
+//   for (const key of Object.keys(pairingWeights)) {
+//     const attackers = useRoles
+//       ? selectByRole(playersA, attackGroups[key], rolesA)
+//       : selectByPosition(playersA, attackGroups[key]);
+//     const defenders = useRoles
+//       ? selectByRole(playersB, defenceGroups[key], rolesB)
+//       : selectByPosition(playersB, defenceGroups[key]);
+// 
+//     // MODEL: prefer the chain read of the attacking unit; fall back to the
+//     // form read when Understat can't supply one. Normalised onto the same
+//     // 0–100 scale calcPlayerForm returns, so pairingEdge stays comparable
+//     // across both paths.
+//     const attackChain = minutesWeightedMeanChain(attackers, ctx);
+//     const attackForm  = attackChain !== null
+//       ? normaliseLinear(attackChain, CHAIN_UNIT_ANCHORS.min, CHAIN_UNIT_ANCHORS.max)
+//       : minutesWeightedMeanForm(attackers, ctx);
+//     const defenceForm = minutesWeightedMeanForm(defenders, ctx);
+// 
+//     let pairingScore;
+//     let pairingEstimated = false;
+//     if (attackForm === null || defenceForm === null) {
+//       // MODEL: missing unit data → fall back to strength priors and flag.
+//       pairingScore = fallbackPairingFromStrength(teamA, teamB);
+//       pairingEstimated = true;
+//       anyEstimated = true;
+//     } else {
+//       // signed: positive = A's attack outperforms B's defence on form.
+//       const pairingEdge = attackForm - defenceForm;
+//       pairingScore = clamp(0, 100, 50 + (pairingEdge * COUNTER_SENSITIVITY));
+//     }
+// 
+//     pairings[key] = {
+//       value:        pairingScore,
+//       weight:       pairingWeights[key],
+//       estimated:    pairingEstimated,
+//       attackForm,
+//       defenceForm,
+//       attackSource: attackChain !== null ? 'chain' : 'form',
+//       attackerCount: attackers.length,
+//       defenderCount: defenders.length,
+//     };
+// 
+//     weightedSum += pairingScore * pairingWeights[key];
+//     totalWeight += pairingWeights[key];
+//   }
+// 
+//   // MODEL: totalWeight is 0 only if the active pairing-weights table is empty —
+//   // a config bug. Defensive 50/estimated rather than NaN if that ever happens.
+//   const value = totalWeight === 0
+//     ? 50
+//     : clamp(0, 100, weightedSum / totalWeight);
+// 
+//   return {
+//     value,
+//     estimated: anyEstimated || totalWeight === 0,
+//     pairings,
+//     mode: useRoles ? 'role' : 'element',
+//   };
 }
 
 // ─── Defending Counters (mirrored pairings) ──────────────────────────────────
@@ -546,7 +561,13 @@ export function calcCounterMatchupMirrored(attackingResult) {
 
   for (const [key, p] of Object.entries(attackingResult.pairings)) {
     const mirroredKey = MIRRORED_PAIRING_KEYS[key] ?? `${key}Mirrored`;
-    const mirroredValue = 100 - p.value;
+    // MODEL: a blank pairing mirrors to blank, never to 100. `100 - null` is
+    // 100 in JS — a confident-looking score invented out of no data at all.
+    const mirroredValue = p.value === null || p.value === undefined ? null : 100 - p.value;
+    if (mirroredValue === null) {
+      pairings[mirroredKey] = { ...p, value: null };
+      continue;
+    }
 
     pairings[mirroredKey] = {
       value:         mirroredValue,
@@ -562,13 +583,16 @@ export function calcCounterMatchupMirrored(attackingResult) {
     totalWeight += p.weight;
   }
 
+  // totalWeight is 0 when every pairing was blank — mirror that as blank too,
+  // rather than a defensive 50 that reads like a real neutral score.
   const value = totalWeight === 0
-    ? 50
+    ? null
     : clamp(0, 100, weightedSum / totalWeight);
 
   return {
     value,
     estimated: attackingResult.estimated || totalWeight === 0,
+    maturity: attackingResult.maturity ?? (attackingResult.estimated ? 0 : 1),
     pairings,
   };
 }

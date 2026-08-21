@@ -193,10 +193,16 @@ test('calcChannelCounter clamps into 0-100 on an extreme mismatch', () => {
   assert.ok(out.value <= 100);
 });
 
-test('calcChannelCounter returns null when either team has no profile', () => {
-  assert.equal(calcChannelCounter(teamA, teamB, { channelProfilesByTeamId: { 1: profileA } }), null);
-  assert.equal(calcChannelCounter(teamA, teamB, { channelProfilesByTeamId: {} }), null);
-  assert.equal(calcChannelCounter(teamA, teamB, {}), null);
+test('calcChannelCounter no longer returns null when a profile is missing', () => {
+  // SUPERSEDED 2026-08-21: it returned null so calcCounterMatchup could fall
+  // through to the role tier. That tier is retired, so there is nothing to fall
+  // through to — it returns a blank shell instead (asserted in detail below).
+  for (const ctx of [{ channelProfilesByTeamId: { 1: profileA } }, { channelProfilesByTeamId: {} }, {}]) {
+    const out = calcChannelCounter(teamA, teamB, ctx);
+    assert.notEqual(out, null);
+    assert.equal(out.value, null);
+    assert.equal(out.maturity, 0);
+  }
 });
 
 test('calcChannelCounter reports estimated false when both profiles are real', () => {
@@ -295,4 +301,44 @@ test('buildChannelProfilesByTeamId keeps thin profiles now that they score', () 
   const out = buildChannelProfilesByTeamId({ Leeds: { statistics: thin } }, { 3: 'Leeds' });
   assert.equal(out[3].hasChannelAxes, true);
   assert.ok(Math.abs(out[3].maturity - 0.1) < 1e-9);
+});
+
+// ─── Blank shell instead of null (2026-08-21) ────────────────────────────────
+// The role/element fallback is retired, so calcChannelCounter can no longer
+// return null to hand off — it returns a channel-SHAPED result with null
+// values, which the UI renders as em-dashes until Understat publishes.
+
+test('calcChannelCounter returns a blank channel shell when a profile is missing', () => {
+  const out = calcChannelCounter(teamA, teamB, { channelProfilesByTeamId: { 1: profileA } });
+  assert.equal(out.mode, 'channel');
+  assert.equal(out.value, null);
+  assert.equal(out.maturity, 0);
+  assert.equal(out.estimated, true);
+  assert.deepEqual(Object.keys(out.pairings), ['setPieceThreat', 'wideTransition', 'boxThreat']);
+  assert.equal(out.pairings.setPieceThreat.value, null);
+});
+
+test('calcChannelCounter shell survives a totally empty context', () => {
+  const out = calcChannelCounter(teamA, teamB, {});
+  assert.equal(out.mode, 'channel');
+  assert.equal(out.maturity, 0);
+  assert.equal(out.value, null);
+});
+
+test('calcChannelCounter takes the LOWER maturity of the two teams', () => {
+  const thinA = { ...profileA, maturity: 0.25 };
+  const fatB  = { ...profileB, maturity: 1 };
+  const out = calcChannelCounter(teamA, teamB, { channelProfilesByTeamId: { 1: thinA, 2: fatB } });
+  assert.equal(out.maturity, 0.25);
+});
+
+test('calcChannelCounter is not estimated when axes exist, however thin', () => {
+  // MODEL: thin != estimated. `estimated` excludes a metric outright; maturity
+  // is what expresses "real but uncertain". Conflating them would defeat the ramp.
+  const thinA = { ...profileA, maturity: 0.05 };
+  const thinB = { ...profileB, maturity: 0.05 };
+  const out = calcChannelCounter(teamA, teamB, { channelProfilesByTeamId: { 1: thinA, 2: thinB } });
+  assert.equal(out.estimated, false);
+  assert.equal(out.maturity, 0.05);
+  assert.ok(out.value > 0);
 });

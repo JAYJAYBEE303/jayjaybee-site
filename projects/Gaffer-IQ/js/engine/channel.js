@@ -228,7 +228,18 @@ export function calcChannelCounter(teamA, teamB, ctx) {
   const profiles = ctx?.channelProfilesByTeamId;
   const a = profiles?.[teamA?.id];
   const b = profiles?.[teamB?.id];
-  if (!a?.hasChannelAxes || !b?.hasChannelAxes) return null;
+  // MODEL: a BLANK SHELL, not null. The role/element fallback was retired
+  // (2026-08-21), so there is nothing to hand off to — returning null would
+  // leave the UI with no rows at all. The shell keeps the three channel rows
+  // on the card with null values, which render as em-dashes and fill in once
+  // Understat publishes. maturity 0 means it contributes nothing to the
+  // composite, so a blank card cannot move a single score.
+  if (!a?.hasChannelAxes || !b?.hasChannelAxes) return blankChannelCounter();
+
+  // MODEL: the LOWER of the two maturities governs. A pairing is only as
+  // trustworthy as its weaker side — a mature attacking profile scored against
+  // one match of conceding data is still one match of evidence.
+  const maturity = Math.min(a.maturity ?? 1, b.maturity ?? 1);
 
   // Roles for A only — the factor scales A's attacking share, and B's
   // conceding share needs no personnel read.
@@ -265,14 +276,35 @@ export function calcChannelCounter(teamA, teamB, ctx) {
     totalWeight += weight;
   }
 
-  if (totalWeight === 0) return null;
+  if (totalWeight === 0) return blankChannelCounter();
 
   return {
     value: clamp(0, 100, weightedSum / totalWeight),
+    // MODEL: thin is NOT estimated. `estimated` drops a metric out of the
+    // composite entirely; maturity is what expresses "real but uncertain".
+    // Conflating them would collapse the ramp back into the gate it replaced.
     estimated: false,
+    maturity,
     pairings,
     mode: 'channel',
   };
+}
+
+/**
+ * The empty channel result: correct shape, no numbers, no influence.
+ *
+ * @returns {{value: null, estimated: true, maturity: 0, pairings: Object,
+ *            mode: 'channel'}}
+ */
+function blankChannelCounter() {
+  const pairings = {};
+  for (const key of Object.keys(CHANNEL_WEIGHTS)) {
+    pairings[key] = {
+      value: null, weight: CHANNEL_WEIGHTS[key], estimated: true,
+      attackShare: null, concedeShare: null, personnel: null,
+    };
+  }
+  return { value: null, estimated: true, maturity: 0, pairings, mode: 'channel' };
 }
 
 /**
