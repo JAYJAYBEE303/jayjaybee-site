@@ -54,3 +54,54 @@ test('buildRoleSignature gives createBias 0.5 when a player has neither xA nor n
   const sig = buildRoleSignature({ time: '900', xGChain: '4', xGBuildup: '4', xA: '0', npxG: '0' });
   assert.equal(sig.createBias, 0.5);
 });
+
+import { classifyRoleFromSignature } from '../../js/engine/counter.js';
+
+const sig = (buildupShare, createBias, npxg90 = 0.05) =>
+  ({ buildupShare, createBias, npxg90, chain90: 0.4 });
+
+test('classifyRoleFromSignature: deep, non-creating defender is a CB', () => {
+  assert.equal(classifyRoleFromSignature('DEF', sig(0.95, 0.30)), 'CB');
+});
+
+test('classifyRoleFromSignature: shallow, creating defender is a FB', () => {
+  assert.equal(classifyRoleFromSignature('DEF', sig(0.72, 0.69)), 'FB');
+});
+
+test('classifyRoleFromSignature: set-piece CB stays a CB despite low buildupShare', () => {
+  // Tarkowski-shaped: shallow because of corner headers, but a finisher.
+  assert.equal(classifyRoleFromSignature('DEF', sig(0.70, 0.30)), 'CB');
+});
+
+test('classifyRoleFromSignature: high-shot midfielder is a WM', () => {
+  assert.equal(classifyRoleFromSignature('MID', sig(0.37, 0.50, 0.31)), 'WM');
+});
+
+test('classifyRoleFromSignature: pure build-up midfielder is a DM', () => {
+  assert.equal(classifyRoleFromSignature('MID', sig(0.85, 0.55, 0.05)), 'DM');
+});
+
+test('classifyRoleFromSignature: balanced midfielder is a CM', () => {
+  assert.equal(classifyRoleFromSignature('MID', sig(0.55, 0.55, 0.13)), 'CM');
+});
+
+test('classifyRoleFromSignature: WM test wins over DM for a high-shot deep mid', () => {
+  // Ordering matters: shot threat is the more decisive signal.
+  assert.equal(classifyRoleFromSignature('MID', sig(0.85, 0.50, 0.30)), 'WM');
+});
+
+test('classifyRoleFromSignature: deep-dropping forward is an SS', () => {
+  assert.equal(classifyRoleFromSignature('FWD', sig(0.35, 0.40, 0.40)), 'SS');
+});
+
+test('classifyRoleFromSignature: penalty-box forward is an ST', () => {
+  assert.equal(classifyRoleFromSignature('FWD', sig(0.21, 0.15, 0.44)), 'ST');
+});
+
+test('classifyRoleFromSignature: GKP short-circuits without needing a signature', () => {
+  assert.equal(classifyRoleFromSignature('GKP', null), 'GKP');
+});
+
+test('classifyRoleFromSignature: null signature yields null for outfielders', () => {
+  assert.equal(classifyRoleFromSignature('MID', null), null);
+});

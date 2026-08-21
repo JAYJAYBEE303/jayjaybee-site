@@ -416,6 +416,38 @@ export const ROLE_CLASSIFY_THRESHOLDS = {
   fwdSsCreativityShare: 0.30,
 };
 
+// Classification thresholds for classifyRoleFromSignature(position, sig) in
+// engine/counter.js — the Understat-chain replacement for the ICT-share
+// thresholds above (which remain as the per-player fallback).
+//
+// MODEL: derived from the 2025 season, 139 DEF / 153 MID / 24 FWD with at
+// least 900 minutes. Spot-checked groups: FB = Robertson, Muñoz, Bradley,
+// Dalot, Wan-Bissaka, Spence; DM = Xhaka, Ward-Prowse, Baleba, Ampadu;
+// WM = Saka, Gordon, Mbeumo, Semenyo; SS = Welbeck, Solanke, Delap.
+// See the design spec §4 for the full derivation.
+export const ROLE_SIGNATURE_THRESHOLDS = {
+  // DEF: a fullback is BOTH shallower than a centre-back (more final-third
+  // involvement) AND a creator rather than a finisher. Both conditions are
+  // required — a set-piece CB satisfies the first alone.
+  defFbBuildupShareMax: 0.82,
+  defFbCreateBiasMin:   0.50,
+  // MID: a winger / inside-forward is a primary shot threat. Tested first
+  // because it is the most decisive signal.
+  midWmNpxg90Min:       0.22,
+  // MID: a #6 is almost pure build-up.
+  midDmBuildupShareMin: 0.78,
+  // FWD: a shadow striker drops into pockets, so more of their involvement
+  // sits before the final action than an out-and-out striker's.
+  fwdSsBuildupShareMin: 0.30,
+};
+
+// Minimum evidence before a chain signature is trusted over the ICT fallback.
+// MODEL: the thresholds above were derived on 900+ minute players; 450 (five
+// full matches) is the in-season floor at which the ratios have stabilised
+// enough to beat ICT. Below either bar, classifyRole falls back.
+export const ROLE_SIGNATURE_MIN_MINUTES = 450;
+export const ROLE_SIGNATURE_MIN_CHAIN   = 0.5;
+
 // Anchors for the counter-matchup fallback used when player-level form is missing
 // (no element-summary loaded yet). Maps (team-A attack − team-B defence) from the
 // FPL strength priors to a 0–100 pairing score, centred so the league-average gap

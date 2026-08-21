@@ -18,6 +18,7 @@ import {
   PAIRING_WEIGHTS,
   ROLE_PAIRING_WEIGHTS,
   ROLE_CLASSIFY_THRESHOLDS,
+  ROLE_SIGNATURE_THRESHOLDS,
   COUNTER_FALLBACK_EDGE,
   COUNTER_ATTACK_WEIGHT,
   COUNTER_DEFENCE_WEIGHT,
@@ -143,6 +144,47 @@ export function buildRoleSignature(understatPlayer) {
     npxg90,
     chain90: chain / nineties,
   };
+}
+
+/**
+ * Classify a player into one of GKP, CB, FB, DM, CM, WM, SS, ST from their
+ * chain signature. Pure: depends only on its two arguments.
+ *
+ * MODEL: ordering is deliberate. Within MID, shot threat is tested before
+ * build-up share because a deep-lying player who still shoots a lot is a
+ * wide/attacking threat first and a #6 second.
+ *
+ * @param {'GKP'|'DEF'|'MID'|'FWD'} position  FPL element_type, normalised
+ * @param {{buildupShare: number, createBias: number, npxg90: number} | null} sig
+ * @returns {'GKP'|'CB'|'FB'|'DM'|'CM'|'WM'|'SS'|'ST'|null}  null when the
+ *          signature is absent (caller should fall back to ICT).
+ */
+export function classifyRoleFromSignature(position, sig) {
+  // GKP is unambiguous from element_type and has no meaningful chain profile.
+  if (position === 'GKP') return 'GKP';
+  if (!sig) return null;
+
+  const T = ROLE_SIGNATURE_THRESHOLDS;
+
+  if (position === 'DEF') {
+    const shallow  = sig.buildupShare < T.defFbBuildupShareMax;
+    const creating = sig.createBias  >= T.defFbCreateBiasMin;
+    // MODEL: BOTH conditions required. A set-piece centre-back is shallow but
+    // finishes rather than creates, so the createBias test keeps them at CB.
+    return (shallow && creating) ? 'FB' : 'CB';
+  }
+
+  if (position === 'MID') {
+    if (sig.npxg90       >= T.midWmNpxg90Min)       return 'WM';
+    if (sig.buildupShare >= T.midDmBuildupShareMin) return 'DM';
+    return 'CM';
+  }
+
+  if (position === 'FWD') {
+    return sig.buildupShare >= T.fwdSsBuildupShareMin ? 'SS' : 'ST';
+  }
+
+  return null;
 }
 
 // ─── Role groupings used by calcCounterMatchup ───────────────────────────────
