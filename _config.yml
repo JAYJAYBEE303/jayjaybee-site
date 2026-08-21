@@ -36,3 +36,16 @@ exclude:
   - Gemfile.lock
   - vendor
   - node_modules
+
+  # -----------------------------------------------------------------------
+  # Sub-project internals. GitHub Pages ships jekyll-optional-front-matter,
+  # which promotes EVERY .md file to a rendered page whether or not it has
+  # front matter — so project docs were both being published at
+  # jayjaybee.com and run through Liquid. A JSDoc `@returns {{a: number}}`
+  # in a plan doc reads as an unterminated Liquid variable and fails the
+  # build for the whole site. These are engineering notes, not site
+  # content; keep them out of the build entirely.
+  # -----------------------------------------------------------------------
+  - "projects/**/*.md"
+  - projects/apps/gaffer-iq/docs
+  - projects/apps/gaffer-iq/tests
