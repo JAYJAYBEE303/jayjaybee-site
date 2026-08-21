@@ -520,11 +520,21 @@ export const CHANNEL_WEIGHTS = {
 // COUNTER_SENSITIVITY produces on the role tier.
 export const CHANNEL_SENSITIVITY = 14;
 
-// Minimum shots in a team's situation partition before its channel profile is
-// trusted. MODEL: a PL side takes ~13 shots a game, so 120 is roughly nine
-// matches — the point at which the set-piece share (the thinnest bucket, ~25%
-// of shots) stops being dominated by sampling noise.
-export const MIN_CHANNEL_SHOTS = 120;
+// Shots in a team's situation partition at which its channel profile is
+// considered fully mature — the TOP of the maturity ramp, not an on/off bar.
+// MODEL: a PL side takes ~13 shots a game, so 120 is roughly nine matches —
+// the point at which the set-piece share (the thinnest bucket, ~25% of shots)
+// stops being dominated by sampling noise.
+//
+// MODEL (revised 2026-08-21): this used to gate profile creation outright —
+// below 120 shots a team had no profile at all and the whole metric fell back
+// to position pairings until ~GW10. That cost a quarter of the season on the
+// signal this feature exists to provide. It is now a ramp instead: a thin
+// profile still scores, it just carries proportionally less weight in the
+// composite (see maturity in engine/channel.js and the maturity-weighted
+// blend in engine/composite.js). Early-season noise is therefore visible and
+// observable without being able to swing a fixture rating.
+export const CHANNEL_MATURITY_FULL_SHOTS = 120;
 
 // Which roles supply each channel axis, for personnel weighting.
 // MODEL: the axes are shot-partition shares of a SEASON, so they cannot react

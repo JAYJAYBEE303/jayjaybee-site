@@ -93,17 +93,20 @@ test('buildChannelProfile reports hasChannelAxes true above the shot floor', () 
   assert.equal(buildChannelProfile(statistics).hasChannelAxes, true);
 });
 
-test('buildChannelProfile nulls every axis below MIN_CHANNEL_SHOTS', () => {
+test('buildChannelProfile no longer nulls a thin profile — it scales it', () => {
+  // SUPERSEDED 2026-08-21: this used to assert that under 120 shots every axis
+  // came back null. That gate is gone; thin data now scores at low maturity so
+  // the signal is usable from GW1 instead of ~GW10.
   const thin = JSON.parse(JSON.stringify(statistics));
   thin.situation.OpenPlay.shots = 20;
   thin.situation.FromCorner.shots = 5;
   thin.situation.SetPiece.shots = 2;
   thin.situation.DirectFreekick.shots = 1;
   const p = buildChannelProfile(thin);
-  assert.equal(p.hasChannelAxes, false);
-  assert.equal(p.setPieceThreat.for, null);
-  assert.equal(p.boxThreat.for, null);
-  assert.equal(p.wideTransition.for, null);
+  assert.equal(p.hasChannelAxes, true);
+  assert.ok(Math.abs(p.setPieceThreat.for - 0.25) < 1e-9);
+  // 28 of 120 shots
+  assert.ok(Math.abs(p.maturity - (28 / 120)) < 1e-9);
 });
 
 test('buildChannelProfile handles a missing statistics block', () => {
@@ -130,13 +133,12 @@ test('buildChannelProfilesByTeamId omits teams with no cached payload', () => {
   assert.equal(out[2], undefined);
 });
 
-test('buildChannelProfilesByTeamId omits teams whose profile is below the shot floor', () => {
-  const thin = JSON.parse(JSON.stringify(statistics));
-  thin.situation.OpenPlay.shots = 10;
-  thin.situation.FromCorner.shots = 2;
-  thin.situation.SetPiece.shots = 1;
-  thin.situation.DirectFreekick.shots = 0;
-  const out = buildChannelProfilesByTeamId({ Leeds: { statistics: thin } }, { 3: 'Leeds' });
+test('buildChannelProfilesByTeamId omits teams with no usable axes at all', () => {
+  // SUPERSEDED 2026-08-21: thin profiles are no longer omitted (see the
+  // maturity ramp). Only a STRUCTURALLY unusable block drops out — here the
+  // shotZone and attackSpeed partitions are missing entirely.
+  const out = buildChannelProfilesByTeamId(
+    { Leeds: { statistics: { situation: statistics.situation } } }, { 3: 'Leeds' });
   assert.equal(out[3], undefined);
 });
 
@@ -239,4 +241,58 @@ test('channelPersonnelFactor is a neutral 1.0 when no unit player is matched', (
 
 test('channelPersonnelFactor is a neutral 1.0 when the unit is empty', () => {
   assert.equal(channelPersonnelFactor(squad, {}, 'boxThreat', chainCtx), 1);
+});
+
+// ─── Maturity ramp (2026-08-21) ──────────────────────────────────────────────
+// MIN_CHANNEL_SHOTS stopped being an on/off bar and became the TOP of a ramp:
+// a thin profile still scores, it just barely counts toward the composite.
+
+test('buildChannelProfile reports maturity 1 at or above the full-evidence bar', () => {
+  // 400 situation shots, well past CHANNEL_MATURITY_FULL_SHOTS (120)
+  assert.equal(buildChannelProfile(statistics).maturity, 1);
+});
+
+test('buildChannelProfile scores a thin profile instead of nulling it', () => {
+  const thin = JSON.parse(JSON.stringify(statistics));
+  thin.situation.OpenPlay.shots = 9;
+  thin.situation.FromCorner.shots = 2;
+  thin.situation.SetPiece.shots = 1;
+  thin.situation.DirectFreekick.shots = 0;
+  const p = buildChannelProfile(thin);
+  // 12 of 120 shots -> maturity 0.1, but the shares are still real numbers.
+  assert.equal(p.hasChannelAxes, true);
+  assert.ok(Math.abs(p.maturity - 0.1) < 1e-9);
+  assert.ok(Math.abs(p.setPieceThreat.for - 0.25) < 1e-9);
+});
+
+test('buildChannelProfile clamps maturity to 1, never above', () => {
+  const fat = JSON.parse(JSON.stringify(statistics));
+  fat.situation.OpenPlay.shots = 5000;
+  assert.equal(buildChannelProfile(fat).maturity, 1);
+});
+
+test('buildChannelProfile reports maturity 0 for a missing statistics block', () => {
+  assert.equal(buildChannelProfile(null).maturity, 0);
+  assert.equal(buildChannelProfile(null).hasChannelAxes, false);
+});
+
+test('buildChannelProfile has no axes when a share has no denominator', () => {
+  // Real block shape, but every xG is zero — no shares can be formed.
+  const empty = { situation: { OpenPlay: { shots: 0, xG: 0, against: { xG: 0 } } },
+                  shotZone: { shotOboxTotal: { xG: 0, against: { xG: 0 } } },
+                  attackSpeed: { Fast: { xG: 0, against: { xG: 0 } } } };
+  const p = buildChannelProfile(empty);
+  assert.equal(p.hasChannelAxes, false);
+  assert.equal(p.maturity, 0);
+});
+
+test('buildChannelProfilesByTeamId keeps thin profiles now that they score', () => {
+  const thin = JSON.parse(JSON.stringify(statistics));
+  thin.situation.OpenPlay.shots = 9;
+  thin.situation.FromCorner.shots = 2;
+  thin.situation.SetPiece.shots = 1;
+  thin.situation.DirectFreekick.shots = 0;
+  const out = buildChannelProfilesByTeamId({ Leeds: { statistics: thin } }, { 3: 'Leeds' });
+  assert.equal(out[3].hasChannelAxes, true);
+  assert.ok(Math.abs(out[3].maturity - 0.1) < 1e-9);
 });

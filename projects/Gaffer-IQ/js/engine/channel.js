@@ -10,7 +10,7 @@
  */
 
 import {
-  MIN_CHANNEL_SHOTS, CHANNEL_WEIGHTS, CHANNEL_AXIS_POOLED_SD, CHANNEL_SENSITIVITY,
+  CHANNEL_MATURITY_FULL_SHOTS, CHANNEL_WEIGHTS, CHANNEL_AXIS_POOLED_SD, CHANNEL_SENSITIVITY,
   CHANNEL_ROLE_AXES, CHANNEL_PERSONNEL_MIN, CHANNEL_PERSONNEL_MAX,
 } from '../config.js';
 import { clamp } from '../util.js';
@@ -70,6 +70,8 @@ const NO_CHANNEL_AXES = Object.freeze({
   wideTransition: Object.freeze({ for: null, against: null }),
   boxThreat:      Object.freeze({ for: null, against: null }),
   shots: 0,
+  // 0–1 share of CHANNEL_MATURITY_FULL_SHOTS. No evidence = no weight.
+  maturity: 0,
 });
 
 /** Internal: read one side's xG from a statistics bucket. */
@@ -127,13 +129,17 @@ export function buildChannelProfile(statistics) {
   const DEAD = ['FromCorner', 'SetPiece', 'DirectFreekick'];
   const BOX  = ['shotSixYardBox', 'shotPenaltyArea'];
 
-  // Sample-size guard reads SHOTS (a count), not xG (a sum of probabilities).
+  // Maturity reads SHOTS (a count), not xG (a sum of probabilities).
   let shots = 0;
   for (const k of ['OpenPlay', ...DEAD]) {
     const b = sit[k];
     if (b) shots += (typeof b.shots === 'number' ? b.shots : parseFloat(b.shots) || 0);
   }
-  if (shots < MIN_CHANNEL_SHOTS) return { ...NO_CHANNEL_AXES, shots };
+  // MODEL: a ramp, not a gate. A thin profile is still the best read of how
+  // this team plays; it is simply less certain, and engine/composite.js scales
+  // its contribution by exactly this number. Gating instead of scaling threw
+  // the signal away entirely until ~GW10 — see CHANNEL_MATURITY_FULL_SHOTS.
+  const maturity = clamp(0, 1, shots / CHANNEL_MATURITY_FULL_SHOTS);
 
   const axis = (side) => ({
     setPiece: share(sumXg(sit, DEAD, side), bucketXg(sit.OpenPlay, side)),
@@ -145,9 +151,17 @@ export function buildChannelProfile(statistics) {
   const f = axis('for');
   const a = axis('against');
 
+  // MODEL: axes exist only when every share has a denominator. A missing share
+  // is a structurally absent axis (no shots of that kind at all), which is a
+  // different condition from a THIN one — thin is handled by maturity above.
+  const complete = [f.setPiece, f.box, f.fast, a.setPiece, a.box, a.fast]
+    .every(v => typeof v === 'number');
+  if (!complete) return { ...NO_CHANNEL_AXES, shots };
+
   return {
     hasChannelAxes: true,
     shots,
+    maturity,
     setPieceThreat: { for: f.setPiece, against: a.setPiece },
     wideTransition: { for: f.fast,     against: a.fast },
     boxThreat:      { for: f.box,      against: a.box },
@@ -159,10 +173,12 @@ export function buildChannelProfile(statistics) {
  * once per ctx by buildScoreContext, same idiom as buildXgProfilesByTeamId in
  * engine/style.js, so the share arithmetic never repeats per fixture.
  *
- * MODEL: teams whose profile came back below MIN_CHANNEL_SHOTS are OMITTED
+ * MODEL: teams whose statistics block yields no usable axes at all are OMITTED
  * rather than included with null axes. Presence in this map is exactly the
  * condition calcChannelCounter tests for, so an unusable profile and an absent
  * one behave identically and there is only one degradation path to reason about.
+ * THIN profiles are NOT omitted — they are included and carry a low `maturity`,
+ * which engine/composite.js uses to scale their weight (revised 2026-08-21).
  *
  * @param {Object<string,object>|null} teamXgBySlug   store.getAllTeamXg()
  * @param {Object<number,string>|null} slugsByTeamId  buildUnderstatSlugsByTeamId()
