@@ -23,6 +23,7 @@ import {
   ROLE_SIGNATURE_MIN_CHAIN,
   ROLE_CHAIN_COVERAGE_MIN,
   COUNTER_FALLBACK_EDGE,
+  CHAIN_UNIT_ANCHORS,
   COUNTER_ATTACK_WEIGHT,
   COUNTER_DEFENCE_WEIGHT,
   BANDS,
@@ -278,6 +279,42 @@ function minutesWeightedMeanForm(players, ctx) {
 }
 
 /**
+ * Minutes-weighted mean of xGChain per 90 across a unit.
+ *
+ * MODEL: chain credits every player involved in a possession that ended in a
+ * shot, so the winger whose cross another player converts is rewarded. FPL
+ * points and ICT `threat` both under-reward exactly that contribution, which
+ * is why this replaces calcPlayerForm on the ATTACKING side of a pairing.
+ * The defending side keeps calcPlayerForm — Understat publishes no per-player
+ * defensive data at any endpoint, so there is nothing to replace it with.
+ *
+ * Minutes-weighted so likely starters drive the read; players with no minutes
+ * or no Understat match drop out rather than diluting it.
+ *
+ * @param {Player[]} players
+ * @param {object}   ctx  buildScoreContext result
+ * @returns {number|null}  mean xGChain per 90 (raw rate, ~0.15–0.80 in the PL),
+ *                         or null when no eligible player is matched.
+ */
+export function minutesWeightedMeanChain(players, ctx) {
+  const lookup = ctx?.understatPlayersByName;
+  if (!lookup || !players || players.length === 0) return null;
+
+  let sum = 0;
+  let totalW = 0;
+  for (const p of players) {
+    const minutes = p.totals?.minutes ?? 0;
+    if (minutes <= 0) continue;
+    const key = (p.fullName || '').toLowerCase().trim();
+    const sig = key ? buildRoleSignature(lookup[key]) : null;
+    if (!sig) continue;
+    sum    += sig.chain90 * minutes;
+    totalW += minutes;
+  }
+  return totalW === 0 ? null : sum / totalW;
+}
+
+/**
  * Internal: when a unit can't be assembled (no minutes, no players, no summary),
  * fall back to FPL strength priors mapped to a 0–100 pairing score.
  * MODEL: same scale family as base difficulty but tighter, since this captures
@@ -401,7 +438,14 @@ export function calcCounterMatchup(teamA, teamB, ctx) {
       ? selectByRole(playersB, defenceGroups[key], rolesB)
       : selectByPosition(playersB, defenceGroups[key]);
 
-    const attackForm  = minutesWeightedMeanForm(attackers, ctx);
+    // MODEL: prefer the chain read of the attacking unit; fall back to the
+    // form read when Understat can't supply one. Normalised onto the same
+    // 0–100 scale calcPlayerForm returns, so pairingEdge stays comparable
+    // across both paths.
+    const attackChain = minutesWeightedMeanChain(attackers, ctx);
+    const attackForm  = attackChain !== null
+      ? normaliseLinear(attackChain, CHAIN_UNIT_ANCHORS.min, CHAIN_UNIT_ANCHORS.max)
+      : minutesWeightedMeanForm(attackers, ctx);
     const defenceForm = minutesWeightedMeanForm(defenders, ctx);
 
     let pairingScore;
@@ -423,6 +467,7 @@ export function calcCounterMatchup(teamA, teamB, ctx) {
       estimated:    pairingEstimated,
       attackForm,
       defenceForm,
+      attackSource: attackChain !== null ? 'chain' : 'form',
       attackerCount: attackers.length,
       defenderCount: defenders.length,
     };

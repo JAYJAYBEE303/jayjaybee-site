@@ -331,6 +331,13 @@ For each modelled pairing p (e.g. A.FWDs vs B.CBs):
 
 counterMatchup = Σ (pairingScore(p) * PAIRING_WEIGHT(p)) / Σ PAIRING_WEIGHT(p)
 ```
+
+`attackUnitForm` prefers the **chain** read — the minutes-weighted mean of
+`xGChain/90` across the unit, normalised through `CHAIN_UNIT_ANCHORS` — and
+falls back to the minutes-weighted `calcPlayerForm` mean when Understat has no
+match. Each pairing reports which was used as `attackSource: 'chain'|'form'`.
+`defenceUnitForm` is unchanged: Understat publishes no per-player defensive
+data, so there is nothing to replace `calcPlayerForm` with on that side.
 - `PAIRING_WEIGHT` lets the FWD-vs-CB pairing matter more than winger-vs-FB by default (`config.js`). `COUNTER_SENSITIVITY` (default scaled so a 20-point form gap moves the pairing ~±20) controls responsiveness.
 - "Defence unit form" uses the **defensive** read of `calcPlayerForm` for defenders (clean sheets, goals conceded while on pitch, defensive contribution) rather than attacking returns. Document this dual-mode in `counter.js`.
 - **MODEL:** uses minutes-weighting so likely starters drive the score, not fringe squad players. If a unit can't be assembled (missing data), fall back to team-level `strength_attack`/`strength_defence` and flag `estimated: true`.

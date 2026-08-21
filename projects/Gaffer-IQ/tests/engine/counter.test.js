@@ -217,3 +217,41 @@ test('classifyTeamRoles no longer fails closed on one unclassifiable player', ()
   assert.equal(out.rolesByPlayerId[1], 'CB');
   assert.equal(out.rolesByPlayerId[2], undefined);
 });
+
+import { minutesWeightedMeanChain } from '../../js/engine/counter.js';
+
+test('minutesWeightedMeanChain weights by minutes, not headcount', () => {
+  const players = [
+    teamPlayer(1, 'FWD', 'Starter', 2700, null),
+    teamPlayer(2, 'FWD', 'Sub',      300, null),
+  ];
+  const ctx = { understatPlayersByName: {
+    // chain90 = 0.8 for the starter, 0.2 for the sub
+    'starter': chainRecord('2700', '24', '5', '2', '10'),
+    'sub':     chainRecord('300',  '0.666', '0.2', '0.05', '0.3'),
+  } };
+  const v = minutesWeightedMeanChain(players, ctx);
+  // (0.8*2700 + 0.2*300) / 3000 = 0.74
+  assert.ok(Math.abs(v - 0.74) < 0.005);
+});
+
+test('minutesWeightedMeanChain skips players with zero minutes', () => {
+  const players = [
+    teamPlayer(1, 'FWD', 'Starter', 2700, null),
+    teamPlayer(2, 'FWD', 'Unused',     0, null),
+  ];
+  const ctx = { understatPlayersByName: {
+    'starter': chainRecord('2700', '24', '5', '2', '10'),
+    'unused':  chainRecord('2700', '99', '5', '2', '10'),
+  } };
+  assert.ok(Math.abs(minutesWeightedMeanChain(players, ctx) - 0.8) < 0.005);
+});
+
+test('minutesWeightedMeanChain returns null when nobody is matched', () => {
+  const players = [teamPlayer(1, 'FWD', 'Nobody', 2700, null)];
+  assert.equal(minutesWeightedMeanChain(players, { understatPlayersByName: {} }), null);
+});
+
+test('minutesWeightedMeanChain returns null for an empty unit', () => {
+  assert.equal(minutesWeightedMeanChain([], { understatPlayersByName: {} }), null);
+});

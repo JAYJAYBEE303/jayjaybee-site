@@ -465,6 +465,15 @@ export const ROLE_CHAIN_COVERAGE_MIN = 0.75;
 // priors compress for the average-team attack-vs-defence spread).
 export const COUNTER_FALLBACK_EDGE = { min: -300, max: 300 };
 
+// Anchors mapping a unit's minutes-weighted mean xGChain per 90 onto 0–100,
+// so the chain read of an attacking unit is on the same scale as the
+// calcPlayerForm read it replaces.
+// MODEL: 2025 season per-90 chain distribution — defenders p10 0.165 / p90
+// 0.503, midfielders p10 0.272 / p90 0.751, forwards p10 0.358 / p90 0.783.
+// A single pair of anchors spanning 0.15–0.80 covers every attacking unit
+// without needing per-role scales; units below 0.15 are fringe-squad noise.
+export const CHAIN_UNIT_ANCHORS = { min: 0.15, max: 0.80 };
+
 // How the combined Counter-Matchup score (engine/counter.js →
 // calcCombinedCounterMatchup) blends a team's Attacking Counters (its attack
 // vs the opponent's defence) with its Defending Counters (its defence vs the
