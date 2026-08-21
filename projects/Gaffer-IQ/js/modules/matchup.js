@@ -746,18 +746,49 @@ function buildCard(team, venue, score, fdr, horizonScore, horizon, duels, defend
  * @param {object} breakdown  the CompositeScore.breakdown object
  * @param {'Home'|'Away'} venue  which side of the fixture this card is for
  */
+/**
+ * Tooltip for the Counter-Matchup breakdown row. Explains the attack/defence
+ * blend and, while the channel profiles are still filling in, why the row is
+ * carrying less than its configured 20%.
+ *
+ * @param {object} m  breakdown.counterMatchup
+ * @returns {string}  plain text, escaped by the caller
+ */
+function counterMatchupTooltip(m) {
+  if (typeof m.value !== 'number') {
+    return 'No Understat shot data published for these teams yet, so this metric '
+         + 'is not scoring and contributes nothing to the total. The rows below '
+         + 'will fill in once matches have been played.';
+  }
+  const blend = `Blend of Attacking Counters (${Math.round(m.attackingValue)} — this team's `
+    + `attack vs the opponent's defence) and Defending Counters (${Math.round(m.defendingValue)} `
+    + `— this team's defence vs the opponent's attack). See the sections below for the `
+    + `pairing-level detail.`;
+  const maturity = m.maturity ?? 1;
+  if (maturity >= 1) return blend;
+  return `${blend} Built on ${Math.round(maturity * 100)}% of a full season's shot data, `
+    + `so it currently carries ${Math.round((m.effectiveWeight ?? m.weight) * 100)}% of the `
+    + `score rather than its full ${Math.round(m.weight * 100)}%.`;
+}
+
 function buildBreakdownRows(breakdown, venue) {
   return METRIC_ORDER.map(key => {
-    const m       = breakdown[key];
-    const val     = Math.round(m.value);
-    const pct     = Math.round(m.weight * 100);
-    const barBand = key === 'baseDifficulty' ? bandFromValue(invert(m.value)) : bandFromValue(val);
+    const m        = breakdown[key];
+    const hasValue = typeof m.value === 'number';
+    const val      = hasValue ? Math.round(m.value) : null;
+    // The weight shown is the weight actually APPLIED. A metric on the maturity
+    // ramp (engine/composite.js metricMaturity) earns its configured weight
+    // gradually, so printing the nominal 20% while only 2% counted would
+    // misstate how much this row is really steering the score.
+    const pct      = Math.round((m.effectiveWeight ?? m.weight) * 100);
+    const barBand  = !hasValue ? 'neutral'
+      : key === 'baseDifficulty' ? bandFromValue(invert(m.value)) : bandFromValue(val);
     const rowClass   = m.estimated ? ' breakdown-row--estimated' : '';
     const barEstClass = m.estimated ? ' breakdown-row__bar--estimated' : '';
     const labelTitle = key === 'baseDifficulty'
       ? ' title="Shows the OPPONENT\'s strength — a high number means a tougher opponent for this team. The bar colour reflects how good this fixture is for this team, same as every other row."'
       : key === 'counterMatchup'
-      ? ` title="${esc(`Blend of Attacking Counters (${Math.round(m.attackingValue)} — this team's attack vs the opponent's defence) and Defending Counters (${Math.round(m.defendingValue)} — this team's defence vs the opponent's attack). See the sections below for the pairing-level detail.`)}"`
+      ? ` title="${esc(counterMatchupTooltip(m))}"`
       : key === 'styleClash'
       ? ` title="${esc(styleClashTooltip(m))}"`
       : key === 'homeAway'
@@ -771,9 +802,9 @@ function buildBreakdownRows(breakdown, venue) {
       <div class="breakdown-row${rowClass}">
         <span class="breakdown-row__label"${labelTitle}>${esc(label)}</span>
         <div class="breakdown-row__bar-wrap">
-          <div class="breakdown-row__bar breakdown-row__bar--${barBand}${barEstClass}" style="width:${val}%"></div>
+          <div class="breakdown-row__bar breakdown-row__bar--${barBand}${barEstClass}" style="width:${val ?? 0}%"></div>
         </div>
-        <span class="breakdown-row__value">${val}</span>
+        <span class="breakdown-row__value">${val ?? '—'}</span>
         <span class="breakdown-row__weight">${pct}%</span>
       </div>
     `.trim();
@@ -878,11 +909,21 @@ function styleClashTooltip(m) {
  */
 function buildCounterPairings(pairings, labels, perspective, duels) {
   return Object.entries(pairings).map(([key, p]) => {
-    const val        = Math.round(p.value);
-    const valDisplay = p.estimated ? 'N/A' : String(val);
-    const chipBand   = p.estimated ? 'neutral' : bandFromValue(val);
-    const atkDisplay = p.attackForm  !== null ? Math.round(p.attackForm)  : '—';
-    const defDisplay = p.defenceForm !== null ? Math.round(p.defenceForm) : '—';
+    // A channel-tier pairing has no value until Understat publishes, so the row
+    // renders blank rather than as a rounded null (which reads as a real 0).
+    const hasValue   = typeof p.value === 'number';
+    const val        = hasValue ? Math.round(p.value) : null;
+    const valDisplay = !hasValue ? '—' : (p.estimated ? 'N/A' : String(val));
+    const chipBand   = (!hasValue || p.estimated) ? 'neutral' : bandFromValue(val);
+
+    // Channel pairings describe SHARES of a team's own xG (0–1), not the 0–100
+    // unit-form reads the retired position pairings carried. Rendering a share
+    // through the form path printed "Atk NaN / Def NaN" on every channel row.
+    const isChannel  = p.attackShare !== undefined;
+    const asPct      = (v) => (typeof v === 'number' ? `${Math.round(v * 100)}%` : '—');
+    const asScore    = (v) => (typeof v === 'number' ? String(Math.round(v)) : '—');
+    const atkDisplay = isChannel ? asPct(p.attackShare)  : asScore(p.attackForm);
+    const defDisplay = isChannel ? asPct(p.concedeShare) : asScore(p.defenceForm);
     const label      = esc(labels[key] ?? key);
     const rowClass   = p.estimated ? ' counter-pairing--estimated' : '';
     const detail     = perspective === 'defending'

@@ -357,7 +357,36 @@ because each team's xG-for in an axis is another team's xG-against, so no
 league-wide sweep is needed to centre the scores. The mirrored Defending
 Counters stay arithmetic (`100 − attacking`), preserving the identity above.
 
-Tier selection is by data availability: `channel` → `role` → `element`.
+**Channel is the only tier (revised 2026-08-21).** The `role` and `element`
+position-pairing ladders are retired — commented out in place in
+`engine/counter.js`, not deleted, with a re-enable note. `calcCounterMatchup`
+always returns the channel read. When Understat has published nothing for a
+team, it returns a blank shell: the three rows still render (as `—`), `value`
+is `null`, and `maturity` is 0, so the metric contributes nothing at all rather
+than falling back to a different model. `classifyRole`, `buildRoleSignature`,
+`classifyRoleFromSignature` and the `ROLE_*` groups remain LIVE — channel
+personnel weighting and `duelsForPairing` depend on them.
+
+**Maturity ramp.** `CHANNEL_MATURITY_FULL_SHOTS` (120, ~9 matches) was a gate:
+below it a team had no profile and the metric fell back until roughly GW10,
+costing a quarter of the season on the one signal this tier exists to provide.
+It is now the top of a ramp:
+
+```
+maturity(team)    = clamp(0, 1, situationShots / CHANNEL_MATURITY_FULL_SHOTS)
+maturity(pairing) = min(maturity(A), maturity(B))
+effectiveWeight   = WEIGHTS.counterMatchup * maturity(pairing)
+```
+
+Measured on real 2025 data, effective weight ramps `0.02 → 0.043 → 0.085 →
+0.128 → 0.192 → 0.20` across 1/2/4/6/9/12 matches played. A thin profile still
+scores and is still displayed; it simply cannot swing a fixture.
+
+**`maturity` is not `estimated`.** `estimated` means "this reading is a
+fallback, don't use it" and always wins. `maturity` means "this reading is
+real, but built on N% of the evidence it eventually will be". A channel profile
+is never `estimated` while it has axes, however thin — conflating the two would
+collapse the ramp back into the gate it replaced.
 
 `attackShare` is scaled by `channelPersonnelFactor` — the availability-weighted
 share of the axis unit's season xGChain that is fit this week, clamped to
@@ -500,7 +529,8 @@ value = clamp(0, 100, 50 + edge * RELATIVE_EDGE_SENSITIVITY)
 
 ### 8.3 Confidence handling
 - Each sub-metric reports `estimated: true|false`. The composite computes **confidence** = weighted share of non-estimated metrics FIRST. If confidence < `CONFIDENCE_FLOOR` (default 0.5), the UI shows the score as provisional (e.g. hatched/greyed) — the number is still produced, never hidden.
-- **MODEL:** estimated sub-metrics are **excluded entirely** from `linearValue`'s weighted sum, and the remaining non-estimated weights are **re-normalised** (divided by `confidence`) so they cover the full 0–1 range — e.g. a fixture where only 55% of the weight is non-estimated has that 55% scaled up to count as 100% of the score, exactly as `confidence` reports it. This replaced an earlier design where estimated metrics passed through at their fallback value (usually 50) and only lowered `confidence` without changing `value` — a genuinely unreliable reading no longer dilutes the score at full weight by masquerading as a neutral 50; it simply doesn't count.
+- **MODEL (revised 2026-08-21):** each sub-metric contributes `weight × maturity`, where `maturity` comes from `metricMaturity()` (`engine/composite.js`) — 0 when the metric is `estimated`, 1 when it reports no maturity of its own, and anything in between when it does. `confidence` is the sum of those maturity-weighted shares and remains the re-normalisation denominator, so the identity still holds exactly: whatever weight actually applied is scaled back up to cover the full 0–1 range. Today only `counterMatchup` reports a partial maturity (see §7.2's ramp); the other five are binary and behave precisely as they did before. The mechanism is general — any metric can opt in by returning a `maturity` field, with no change to the blend.
+- **MODEL:** estimated sub-metrics are **excluded entirely** from `linearValue`'s weighted sum (maturity 0), and the remaining weights are **re-normalised** (divided by `confidence`) so they cover the full 0–1 range — e.g. a fixture where only 55% of the weight is non-estimated has that 55% scaled up to count as 100% of the score, exactly as `confidence` reports it. This replaced an earlier design where estimated metrics passed through at their fallback value (usually 50) and only lowered `confidence` without changing `value` — a genuinely unreliable reading no longer dilutes the score at full weight by masquerading as a neutral 50; it simply doesn't count.
 - `baseDifficulty` is never estimated (§8.1) — it's available from day one of a season and never degrades — so `confidence` is always > 0 and the division above never hits its zero-guard in practice.
 - `homeAway` is a deliberate exception: `calcHomeAwaySplit`/`calcVenueEffect` never flag `estimated` at all (§3.1), so Home Advantage / Away Disadvantage always counts toward both `confidence` and `linearValue`, even for a side with no usable venue history.
 
