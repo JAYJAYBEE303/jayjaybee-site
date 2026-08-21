@@ -30,6 +30,7 @@ import {
 } from '../config.js';
 import { clamp, normaliseLinear } from '../util.js';
 import { calcPlayerForm } from './form.js';
+import { calcChannelCounter } from './channel.js';
 
 // ─── Role classification ─────────────────────────────────────────────────────
 
@@ -406,6 +407,14 @@ export function classifyTeamRoles(players, ctx) {
  * @returns {{value: number, estimated: boolean, pairings: Object, mode: 'role'|'element'}}
  */
 export function calcCounterMatchup(teamA, teamB, ctx) {
+  // Tier 1 — channel mode, when both teams' Understat statistics are cached.
+  // MODEL: the tier is chosen by DATA AVAILABILITY, not by which module is
+  // asking, so a fixture's score can only improve as payloads land and can
+  // never disagree with itself at a single point in time. See the design spec
+  // §8 and buildScoreContext's channelProfilesByTeamId precompute.
+  const channel = calcChannelCounter(teamA, teamB, ctx);
+  if (channel) return channel;
+
   const playersA = ctx.playersByTeamId?.[teamA.id] || [];
   const playersB = ctx.playersByTeamId?.[teamB.id] || [];
 
@@ -503,6 +512,12 @@ const MIRRORED_PAIRING_KEYS = {
   fwdVsCb:     'cbVsFwd',
   wideMidVsFb: 'fbVsWideMid',
   camVsCbMid:  'cbMidVsCam',
+  // Channel tier. The mirror is still arithmetic (100 − attacking value), NOT
+  // a second read from the defending team's own statistics.against — deriving
+  // it independently would break the sum-to-100 identity §7.2 depends on.
+  setPieceThreat: 'setPieceDefence',
+  wideTransition: 'transitionDefence',
+  boxThreat:      'boxDefence',
 };
 
 /**

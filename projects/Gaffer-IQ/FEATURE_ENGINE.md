@@ -338,6 +338,26 @@ falls back to the minutes-weighted `calcPlayerForm` mean when Understat has no
 match. Each pairing reports which was used as `attackSource: 'chain'|'form'`.
 `defenceUnitForm` is unchanged: Understat publishes no per-player defensive
 data, so there is nothing to replace `calcPlayerForm` with on that side.
+
+**Channel tier (`engine/channel.js → calcChannelCounter`).** When both teams'
+Understat `statistics` payloads are cached, the counter is scored on three
+independent axes instead of position pairings:
+
+```
+axisEdge(a)  = attackShare_A(a) − concedeShare_B(a)
+axisScore(a) = clamp(0,100, 50 + (axisEdge(a) / CHANNEL_AXIS_POOLED_SD[a]) * CHANNEL_SENSITIVITY)
+value        = Σ axisScore(a) * CHANNEL_WEIGHTS[a] / Σ CHANNEL_WEIGHTS[a]
+```
+
+Axes: `setPieceThreat` (dead-ball share of non-penalty xG, weight 0.50),
+`wideTransition` (Fast share of attack-speed xG, 0.30), `boxThreat` (in-box
+share of shot-zone xG, 0.20). No open-play axis exists — `openPlayShare` is
+identically `1 − setPieceShare`. The league baseline cancels out of every edge
+because each team's xG-for in an axis is another team's xG-against, so no
+league-wide sweep is needed to centre the scores. The mirrored Defending
+Counters stay arithmetic (`100 − attacking`), preserving the identity above.
+
+Tier selection is by data availability: `channel` → `role` → `element`.
 - `PAIRING_WEIGHT` lets the FWD-vs-CB pairing matter more than winger-vs-FB by default (`config.js`). `COUNTER_SENSITIVITY` (default scaled so a 20-point form gap moves the pairing ~±20) controls responsiveness.
 - "Defence unit form" uses the **defensive** read of `calcPlayerForm` for defenders (clean sheets, goals conceded while on pitch, defensive contribution) rather than attacking returns. Document this dual-mode in `counter.js`.
 - **MODEL:** uses minutes-weighting so likely starters drive the score, not fringe squad players. If a unit can't be assembled (missing data), fall back to team-level `strength_attack`/`strength_defence` and flag `estimated: true`.

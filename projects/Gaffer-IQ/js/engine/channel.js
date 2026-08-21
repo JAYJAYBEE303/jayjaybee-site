@@ -9,7 +9,10 @@
  * All outputs: 0–100, higher = favourable for the team being scored.
  */
 
-import { MIN_CHANNEL_SHOTS } from '../config.js';
+import {
+  MIN_CHANNEL_SHOTS, CHANNEL_WEIGHTS, CHANNEL_AXIS_POOLED_SD, CHANNEL_SENSITIVITY,
+} from '../config.js';
+import { clamp } from '../util.js';
 import { canonicalClubKey } from './normalise.js';
 
 /**
@@ -169,4 +172,68 @@ export function buildChannelProfilesByTeamId(teamXgBySlug, slugsByTeamId) {
     if (profile.hasChannelAxes) out[teamId] = profile;
   }
   return out;
+}
+
+/**
+ * Channel counter-matchup: team A's threat profile against team B's
+ * conceding profile, axis by axis.
+ *
+ * Asymmetric by design, exactly like calcCounterMatchup — A's attack against
+ * B's defence is a different number from B's attack against A's defence.
+ *
+ * MODEL: the league baseline cancels out of the edge. Every team's xG-for in
+ * an axis is another team's xG-against, so league-mean-for equals
+ * league-mean-against to within 0.004 on all three axes (2025, n=20).
+ * Subtracting the two shares therefore removes the baseline automatically —
+ * which is what makes a two-teams-at-a-time fetch viable, since no league-wide
+ * sweep is needed to centre the score.
+ *
+ * MODEL: each edge is z-scored by its OWN pooled SD before scaling. The axes
+ * have very different natural spreads (set-piece share ranges 0.170–0.370
+ * across the league, box share only 0.884–0.937), so a single shared
+ * sensitivity would let the widest axis dominate purely by units.
+ *
+ * @param {Team} teamA
+ * @param {Team} teamB
+ * @param {object} ctx  must contain { channelProfilesByTeamId }
+ * @returns {{value: number, estimated: boolean, pairings: Object,
+ *            mode: 'channel'} | null}
+ *          0–100, higher = better for teamA. null when either team has no
+ *          usable profile — the caller falls through to the role tier.
+ */
+export function calcChannelCounter(teamA, teamB, ctx) {
+  const profiles = ctx?.channelProfilesByTeamId;
+  const a = profiles?.[teamA?.id];
+  const b = profiles?.[teamB?.id];
+  if (!a?.hasChannelAxes || !b?.hasChannelAxes) return null;
+
+  const pairings = {};
+  let weightedSum = 0;
+  let totalWeight = 0;
+
+  for (const key of Object.keys(CHANNEL_WEIGHTS)) {
+    const attackShare  = a[key]?.for;
+    const concedeShare = b[key]?.against;
+    // Guarded even though hasChannelAxes implies both are numbers — a future
+    // axis added to CHANNEL_WEIGHTS but not to buildChannelProfile would
+    // otherwise silently score NaN.
+    if (typeof attackShare !== 'number' || typeof concedeShare !== 'number') continue;
+
+    const edge  = attackShare - concedeShare;
+    const value = clamp(0, 100, 50 + (edge / CHANNEL_AXIS_POOLED_SD[key]) * CHANNEL_SENSITIVITY);
+    const weight = CHANNEL_WEIGHTS[key];
+
+    pairings[key] = { value, weight, estimated: false, attackShare, concedeShare };
+    weightedSum += value * weight;
+    totalWeight += weight;
+  }
+
+  if (totalWeight === 0) return null;
+
+  return {
+    value: clamp(0, 100, weightedSum / totalWeight),
+    estimated: false,
+    pairings,
+    mode: 'channel',
+  };
 }

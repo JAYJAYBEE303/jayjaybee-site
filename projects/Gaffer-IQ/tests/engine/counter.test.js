@@ -255,3 +255,49 @@ test('minutesWeightedMeanChain returns null when nobody is matched', () => {
 test('minutesWeightedMeanChain returns null for an empty unit', () => {
   assert.equal(minutesWeightedMeanChain([], { understatPlayersByName: {} }), null);
 });
+
+import { calcCounterMatchupMirrored } from '../../js/engine/counter.js';
+
+test('mirroring identity holds for channel-mode pairings', () => {
+  const pairings = {
+    setPieceThreat: { value: 84.502, weight: 0.50, estimated: false },
+    wideTransition: { value: 45.783, weight: 0.30, estimated: false },
+    boxThreat:      { value: 56.703, weight: 0.20, estimated: false },
+  };
+  // Derived exactly the way calcChannelCounter derives it, NOT hardcoded. A
+  // literal here is a second source of truth that can drift from the pairings
+  // it claims to summarise — which is precisely what broke this test's first
+  // version (61.177534 against a true weighted mean of 67.3265). The mirror
+  // arithmetic was correct; the fixture disagreed with itself.
+  const totalWeight = Object.values(pairings).reduce((t, p) => t + p.weight, 0);
+  const value = Object.values(pairings)
+    .reduce((t, p) => t + p.value * p.weight, 0) / totalWeight;
+  const attacking = { value, estimated: false, mode: 'channel', pairings };
+  const mirrored = calcCounterMatchupMirrored(attacking);
+  for (const [key, mirrorKey] of [
+    ['setPieceThreat', 'setPieceDefence'],
+    ['wideTransition', 'transitionDefence'],
+    ['boxThreat',      'boxDefence'],
+  ]) {
+    assert.equal(
+      attacking.pairings[key].value + mirrored.pairings[mirrorKey].value,
+      100,
+      `${key} + ${mirrorKey} must total exactly 100`,
+    );
+  }
+  // Per-pairing the identity is EXACT by construction (mirrored = 100 - v, so
+  // v + (100 - v) collapses algebraically) — asserted strictly above.
+  //
+  // The AGGREGATE is a different arithmetic object: two independently
+  // accumulated weighted means, each carrying its own IEEE-754 rounding. It is
+  // exact in real arithmetic but not in floating point — empirically ~21% of
+  // random pairing triples miss by 1 ulp on the pre-existing ROLE weights
+  // (1.0/0.6/0.5) and ~6% on channel weights, so this is not a channel-tier
+  // regression. Gated at the same EPS the project's own zero-sum verifier uses
+  // (window.__verify.zeroSum, js/main.js); observed deviation here is ~1.4e-14.
+  const EPS = 1e-6;
+  assert.ok(
+    Math.abs((attacking.value + mirrored.value) - 100) < EPS,
+    `aggregate must total 100 within ${EPS}, got ${attacking.value + mirrored.value}`,
+  );
+});

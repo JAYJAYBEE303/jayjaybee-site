@@ -144,3 +144,59 @@ test('buildChannelProfilesByTeamId returns {} for empty inputs', () => {
   assert.deepEqual(buildChannelProfilesByTeamId(null, null), {});
   assert.deepEqual(buildChannelProfilesByTeamId({}, {}), {});
 });
+
+import { calcChannelCounter } from '../../js/engine/channel.js';
+
+const teamA = { id: 1, name: 'A' };
+const teamB = { id: 2, name: 'B' };
+
+// A leans on set pieces (0.35 vs league 0.256); B is unusually good at
+// defending them (0.18 vs league 0.252). A should win that axis heavily.
+const profileA = {
+  hasChannelAxes: true, shots: 500,
+  setPieceThreat: { for: 0.35, against: 0.25 },
+  wideTransition: { for: 0.08, against: 0.09 },
+  boxThreat:      { for: 0.91, against: 0.91 },
+};
+const profileB = {
+  hasChannelAxes: true, shots: 500,
+  setPieceThreat: { for: 0.22, against: 0.18 },
+  wideTransition: { for: 0.09, against: 0.08 },
+  boxThreat:      { for: 0.90, against: 0.91 },
+};
+const ctxAB = { channelProfilesByTeamId: { 1: profileA, 2: profileB } };
+
+test('calcChannelCounter scores an axis off attackShare minus concedeShare', () => {
+  const out = calcChannelCounter(teamA, teamB, ctxAB);
+  // edge = 0.35 − 0.18 = 0.17; z = 0.17/0.0690 = 2.464; 50 + 2.464*14 = 84.5
+  assert.ok(Math.abs(out.pairings.setPieceThreat.value - 84.50) < 0.5);
+});
+
+test('calcChannelCounter aggregates axes by CHANNEL_WEIGHTS', () => {
+  const out = calcChannelCounter(teamA, teamB, ctxAB);
+  assert.ok(out.value > 50 && out.value <= 100);
+  assert.equal(out.mode, 'channel');
+});
+
+test('calcChannelCounter is asymmetric', () => {
+  const ab = calcChannelCounter(teamA, teamB, ctxAB).value;
+  const ba = calcChannelCounter(teamB, teamA, ctxAB).value;
+  assert.notEqual(Math.round(ab), Math.round(ba));
+});
+
+test('calcChannelCounter clamps into 0-100 on an extreme mismatch', () => {
+  const extremeA = { ...profileA, setPieceThreat: { for: 0.90, against: 0.25 } };
+  const out = calcChannelCounter(teamA, teamB, { channelProfilesByTeamId: { 1: extremeA, 2: profileB } });
+  assert.ok(out.pairings.setPieceThreat.value <= 100);
+  assert.ok(out.value <= 100);
+});
+
+test('calcChannelCounter returns null when either team has no profile', () => {
+  assert.equal(calcChannelCounter(teamA, teamB, { channelProfilesByTeamId: { 1: profileA } }), null);
+  assert.equal(calcChannelCounter(teamA, teamB, { channelProfilesByTeamId: {} }), null);
+  assert.equal(calcChannelCounter(teamA, teamB, {}), null);
+});
+
+test('calcChannelCounter reports estimated false when both profiles are real', () => {
+  assert.equal(calcChannelCounter(teamA, teamB, ctxAB).estimated, false);
+});
