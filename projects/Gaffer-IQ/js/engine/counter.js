@@ -648,6 +648,12 @@ const PAIRING_ROLE_ALIAS = {
  *   key is unknown or no duel matched (caller renders a no-data state).
  */
 export function duelsForPairing(duels, pairingKey) {
+  // MODEL: channel-tier axes are team shot-profile shares, not player-vs-player
+  // pairings, so there is no honest duel list to show. Return empty and let the
+  // UI render its explicit "no player data" state rather than surfacing duels
+  // that had no part in the score.
+  if (!(pairingKey in PAIRING_ROLE_ALIAS)) return [];
+
   const canonical = PAIRING_ROLE_ALIAS[pairingKey];
   if (!canonical || !duels || duels.length === 0) return [];
   const attackRoles  = ROLE_ATTACK_GROUPS[canonical];

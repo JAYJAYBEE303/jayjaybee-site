@@ -53,6 +53,11 @@ const PAIRING_LABELS = {
   fwdVsCb:     'FWD vs CB',
   wideMidVsFb: 'Wide MID vs FB',
   camVsCbMid:  'CAM vs CB+DM',
+  // Channel tier (engine/channel.js). These are threat-profile axes rather
+  // than position pairings, so they read as phases of play, not matchups.
+  setPieceThreat: 'Set Pieces',
+  wideTransition: 'Transition Speed',
+  boxThreat:      'Box Occupation',
 };
 
 // Defending mirror of PAIRING_LABELS — same units, defender-first phrasing.
@@ -64,6 +69,9 @@ const DEFENDING_PAIRING_LABELS = {
   cbVsFwd:     'CB vs FWD',
   fbVsWideMid: 'FB vs Wide MID',
   cbMidVsCam:  'CB+DM vs CAM',
+  setPieceDefence:   'Set-Piece Defence',
+  transitionDefence: 'Transition Defence',
+  boxDefence:        'Box Defence',
 };
 
 // ─── Module-level state ───────────────────────────────────────────────────────
