@@ -484,6 +484,48 @@ export const CHAIN_UNIT_ANCHORS = { min: 0.15, max: 0.80 };
 export const COUNTER_ATTACK_WEIGHT  = 0.5;
 export const COUNTER_DEFENCE_WEIGHT = 0.5;
 
+// ─── Channel counter-matchup (Understat team statistics) ────────────────────
+// Three INDEPENDENT partitions of the same shots — not one partition of
+// threat. An open-play axis is deliberately absent: openPlayShare is
+// identically 1 − setPieceShare, so it carries no extra information.
+//
+// MODEL: measured across all 20 clubs, 2025 season. Largest pairwise
+// correlation among attacking profiles is corr(box, fast) = +0.334; among
+// defensive profiles corr(setPiece, fast) = −0.161. The axes are
+// near-independent, so none needs collapsing into another.
+
+// Pooled standard deviation of (attacking share − conceding share) per axis,
+// used to z-score each edge so all three contribute on a common scale.
+// MODEL: sqrt(sd_for² + sd_against²) from the 2025 league distribution —
+// setPiece 0.0555/0.0410, box 0.0170/0.0091, fast 0.0229/0.0263.
+export const CHANNEL_AXIS_POOLED_SD = {
+  setPieceThreat: 0.0690,
+  wideTransition: 0.0348,
+  boxThreat:      0.0193,
+};
+
+// MODEL: weighted by discriminating power and novelty, not intuition.
+// setPiece has the widest league spread (0.170–0.370) and is the ONLY axis on
+// which the composite currently carries no signal at all. box has the
+// narrowest spread (0.884–0.937) and the strongest residual quality confound
+// (corr with npxG volume +0.408), so it is weighted least.
+export const CHANNEL_WEIGHTS = {
+  setPieceThreat: 0.50,
+  wideTransition: 0.30,
+  boxThreat:      0.20,
+};
+
+// Points per pooled standard deviation of axis edge.
+// MODEL: 14 puts a 2-SD mismatch at ±28 points, comparable to the spread
+// COUNTER_SENSITIVITY produces on the role tier.
+export const CHANNEL_SENSITIVITY = 14;
+
+// Minimum shots in a team's situation partition before its channel profile is
+// trusted. MODEL: a PL side takes ~13 shots a game, so 120 is roughly nine
+// matches — the point at which the set-piece share (the thinnest bucket, ~25%
+// of shots) stops being dominated by sampling noise.
+export const MIN_CHANNEL_SHOTS = 120;
+
 // ─── §8  Composite matchup score ─────────────────────────────────────────────
 
 // Weights for all sub-metrics. Must sum to 1.00.

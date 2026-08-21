@@ -39,3 +39,80 @@ test('buildUnderstatSlugsByTeamId omits teams it cannot match', () => {
   const out = buildUnderstatSlugsByTeamId(leagueXg, { 9: { id: 9, name: 'Some New Club', shortName: 'SNC' } });
   assert.equal(out[9], undefined);
 });
+
+import { buildChannelProfile } from '../../js/engine/channel.js';
+
+// Shaped like a real getTeamData statistics block, with round numbers.
+const statistics = {
+  situation: {
+    OpenPlay:       { shots: 300, goals: 30, xG: 30, against: { shots: 200, goals: 20, xG: 24 } },
+    FromCorner:     { shots: 60,  goals: 6,  xG: 6,  against: { shots: 40,  goals: 4,  xG: 4  } },
+    SetPiece:       { shots: 30,  goals: 3,  xG: 3,  against: { shots: 20,  goals: 2,  xG: 2  } },
+    DirectFreekick: { shots: 10,  goals: 1,  xG: 1,  against: { shots: 10,  goals: 1,  xG: 2  } },
+    Penalty:        { shots: 8,   goals: 6,  xG: 6,  against: { shots: 4,   goals: 3,  xG: 3  } },
+  },
+  shotZone: {
+    ownGoals:        { shots: 2,   goals: 2,  xG: 2,  against: { shots: 1,   goals: 1,  xG: 1  } },
+    shotOboxTotal:   { shots: 100, goals: 2,  xG: 4,  against: { shots: 80,  goals: 2,  xG: 3  } },
+    shotPenaltyArea: { shots: 250, goals: 25, xG: 30, against: { shots: 150, goals: 15, xG: 21 } },
+    shotSixYardBox:  { shots: 40,  goals: 12, xG: 6,  against: { shots: 30,  goals: 9,  xG: 6  } },
+  },
+  attackSpeed: {
+    Normal:   { shots: 200, goals: 20, xG: 24, against: { shots: 150, goals: 15, xG: 18 } },
+    Standard: { shots: 100, goals: 10, xG: 12, against: { shots: 80,  goals: 8,  xG: 9  } },
+    Slow:     { shots: 50,  goals: 5,  xG: 6,  against: { shots: 40,  goals: 4,  xG: 5  } },
+    Fast:     { shots: 30,  goals: 4,  xG: 6,  against: { shots: 20,  goals: 3,  xG: 8  } },
+  },
+};
+
+test('buildChannelProfile computes set-piece share excluding penalties', () => {
+  const p = buildChannelProfile(statistics);
+  // dead ball xG for = 6+3+1 = 10; open play = 30; total = 40 → 0.25
+  assert.ok(Math.abs(p.setPieceThreat.for - 0.25) < 1e-9);
+  // against: 4+2+2 = 8; open play 24; total 32 → 0.25
+  assert.ok(Math.abs(p.setPieceThreat.against - 0.25) < 1e-9);
+});
+
+test('buildChannelProfile computes box share excluding own goals', () => {
+  const p = buildChannelProfile(statistics);
+  // box xG for = 30+6 = 36; obox = 4; total 40 → 0.90
+  assert.ok(Math.abs(p.boxThreat.for - 0.90) < 1e-9);
+  // against: 21+6 = 27; obox 3; total 30 → 0.90
+  assert.ok(Math.abs(p.boxThreat.against - 0.90) < 1e-9);
+});
+
+test('buildChannelProfile computes fast share over all attack speeds', () => {
+  const p = buildChannelProfile(statistics);
+  // fast 6 of (24+12+6+6) = 48 → 0.125
+  assert.ok(Math.abs(p.wideTransition.for - 0.125) < 1e-9);
+  // against: 8 of (18+9+5+8) = 40 → 0.20
+  assert.ok(Math.abs(p.wideTransition.against - 0.20) < 1e-9);
+});
+
+test('buildChannelProfile reports hasChannelAxes true above the shot floor', () => {
+  assert.equal(buildChannelProfile(statistics).hasChannelAxes, true);
+});
+
+test('buildChannelProfile nulls every axis below MIN_CHANNEL_SHOTS', () => {
+  const thin = JSON.parse(JSON.stringify(statistics));
+  thin.situation.OpenPlay.shots = 20;
+  thin.situation.FromCorner.shots = 5;
+  thin.situation.SetPiece.shots = 2;
+  thin.situation.DirectFreekick.shots = 1;
+  const p = buildChannelProfile(thin);
+  assert.equal(p.hasChannelAxes, false);
+  assert.equal(p.setPieceThreat.for, null);
+  assert.equal(p.boxThreat.for, null);
+  assert.equal(p.wideTransition.for, null);
+});
+
+test('buildChannelProfile handles a missing statistics block', () => {
+  const p = buildChannelProfile(null);
+  assert.equal(p.hasChannelAxes, false);
+  assert.equal(p.setPieceThreat.against, null);
+});
+
+test('buildChannelProfile handles a partial statistics block without throwing', () => {
+  const p = buildChannelProfile({ situation: statistics.situation });
+  assert.equal(p.hasChannelAxes, false);
+});
