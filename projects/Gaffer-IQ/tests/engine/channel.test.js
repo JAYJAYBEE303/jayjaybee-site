@@ -116,3 +116,31 @@ test('buildChannelProfile handles a partial statistics block without throwing', 
   const p = buildChannelProfile({ situation: statistics.situation });
   assert.equal(p.hasChannelAxes, false);
 });
+
+import { buildChannelProfilesByTeamId } from '../../js/engine/channel.js';
+
+test('buildChannelProfilesByTeamId keys profiles by FPL team id', () => {
+  const out = buildChannelProfilesByTeamId({ Arsenal: { statistics } }, { 1: 'Arsenal' });
+  assert.equal(out[1].hasChannelAxes, true);
+  assert.ok(Math.abs(out[1].setPieceThreat.for - 0.25) < 1e-9);
+});
+
+test('buildChannelProfilesByTeamId omits teams with no cached payload', () => {
+  const out = buildChannelProfilesByTeamId({ Arsenal: { statistics } }, { 1: 'Arsenal', 2: 'Liverpool' });
+  assert.equal(out[2], undefined);
+});
+
+test('buildChannelProfilesByTeamId omits teams whose profile is below the shot floor', () => {
+  const thin = JSON.parse(JSON.stringify(statistics));
+  thin.situation.OpenPlay.shots = 10;
+  thin.situation.FromCorner.shots = 2;
+  thin.situation.SetPiece.shots = 1;
+  thin.situation.DirectFreekick.shots = 0;
+  const out = buildChannelProfilesByTeamId({ Leeds: { statistics: thin } }, { 3: 'Leeds' });
+  assert.equal(out[3], undefined);
+});
+
+test('buildChannelProfilesByTeamId returns {} for empty inputs', () => {
+  assert.deepEqual(buildChannelProfilesByTeamId(null, null), {});
+  assert.deepEqual(buildChannelProfilesByTeamId({}, {}), {});
+});

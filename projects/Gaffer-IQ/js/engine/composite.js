@@ -24,6 +24,7 @@ import {
   calcTeamForm, calcPlayerForm, calcPlayingLikelihood, buildUnderstatPlayerLookup,
 } from './form.js';
 import { calcStyleClash, buildXgProfilesByTeamId } from './style.js';
+import { buildUnderstatSlugsByTeamId, buildChannelProfilesByTeamId } from './channel.js';
 import {
   calcCounterMatchup, calcCounterMatchupMirrored, calcCombinedCounterMatchup,
 } from './counter.js';
@@ -93,6 +94,17 @@ export function buildScoreContext(season, opts = {}) {
     ? buildUnderstatPlayerLookup(leagueXg)
     : null;
 
+  // Channel tier: the per-team Understat `statistics` block, fetched eagerly
+  // for every team at startup (js/main.js prefetchAllTeamXg). {} only until
+  // that boot-time fetch resolves, in which case calcCounterMatchup degrades
+  // to the role tier — see the design spec §8 for why the tier is chosen by
+  // data availability rather than by which module is asking.
+  const teamXgBySlug = opts.teamXgBySlug ?? null;
+  const channelProfilesByTeamId = buildChannelProfilesByTeamId(
+    teamXgBySlug,
+    buildUnderstatSlugsByTeamId(leagueXg, season.teamsById),
+  );
+
   // Phase 3B: precompute calcHomeAwaySplit's rolling cross-season window once
   // per ctx, same idiom as xgProfilesByTeamId above — never recomputed per
   // fixture. leagueXgPrev (last season) exists ONLY to feed this; nothing
@@ -123,6 +135,7 @@ export function buildScoreContext(season, opts = {}) {
     leagueXg,
     xgProfilesByTeamId,
     understatPlayersByName,
+    channelProfilesByTeamId,
     // Phase 3B — last season's Understat payload, and the rolling venue stats
     // derived from it plus leagueXg. See buildRollingVenueStatsByTeamId
     // (engine/fixtures.js) and FEATURE_ENGINE.md §3.1.

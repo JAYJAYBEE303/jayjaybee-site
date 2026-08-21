@@ -143,3 +143,30 @@ export function buildChannelProfile(statistics) {
     boxThreat:      { for: f.box,      against: a.box },
   };
 }
+
+/**
+ * Build the FPL-team-id-keyed channel profile lookup. Pure helper consumed
+ * once per ctx by buildScoreContext, same idiom as buildXgProfilesByTeamId in
+ * engine/style.js, so the share arithmetic never repeats per fixture.
+ *
+ * MODEL: teams whose profile came back below MIN_CHANNEL_SHOTS are OMITTED
+ * rather than included with null axes. Presence in this map is exactly the
+ * condition calcChannelCounter tests for, so an unusable profile and an absent
+ * one behave identically and there is only one degradation path to reason about.
+ *
+ * @param {Object<string,object>|null} teamXgBySlug   store.getAllTeamXg()
+ * @param {Object<number,string>|null} slugsByTeamId  buildUnderstatSlugsByTeamId()
+ * @returns {Object<number,object>}  FPL team id → channel profile. {} when empty.
+ */
+export function buildChannelProfilesByTeamId(teamXgBySlug, slugsByTeamId) {
+  if (!teamXgBySlug || !slugsByTeamId) return {};
+
+  const out = {};
+  for (const [teamId, slug] of Object.entries(slugsByTeamId)) {
+    const payload = teamXgBySlug[slug];
+    if (!payload) continue;
+    const profile = buildChannelProfile(payload.statistics);
+    if (profile.hasChannelAxes) out[teamId] = profile;
+  }
+  return out;
+}
