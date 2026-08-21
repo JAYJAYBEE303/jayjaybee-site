@@ -19,7 +19,7 @@ url: https://jayjaybee.com
 # -----------------------------------------------------------------------------
 defaults:
   - scope:
-      path: "projects/fc26-calculator"
+      path: "projects/apps/fc26-calculator"
     values:
       layout: null
 
