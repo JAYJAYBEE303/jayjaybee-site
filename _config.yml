@@ -11,15 +11,31 @@ description: IT Desktop Analyst at Aston Martin F1. Endpoint work, PowerShell to
 url: https://jayjaybee.com
 
 # -----------------------------------------------------------------------------
-# Self-contained sub-projects: never wrap them in the site layout.
-# The FC26 calculator has its own <head>, <body>, fonts, and design system —
-# Jekyll would only get in its way. Setting layout: null at this path is
-# belt-and-braces; the file has no front matter, so Jekyll already treats it
-# as a static asset and copies it verbatim.
+# Layout defaults. Jekyll applies these in order, with later + more specific
+# scopes overriding earlier ones.
+#
+#   projects/       the projects wiki. Any page dropped in here inherits the
+#                   site chrome (header, nav, footer, global.css) without
+#                   needing `layout: default` in its own front matter, so new
+#                   write-ups pick up the jayjaybee.com look for free.
+#
+#   projects/apps/  self-contained sub-projects — FC26 calculator, Gaffer IQ.
+#                   Each owns its entire document: own <head>, fonts, tokens,
+#                   and stylesheets. They must NOT inherit anything from the
+#                   site layout. This is belt-and-braces: none of them have
+#                   front matter, so Jekyll already treats them as static
+#                   assets and copies them verbatim — a layout default cannot
+#                   reach a file Jekyll never renders. The override is here so
+#                   the rule survives someone later adding front matter.
 # -----------------------------------------------------------------------------
 defaults:
   - scope:
-      path: "projects/apps/fc26-calculator"
+      path: "projects"
+    values:
+      layout: default
+
+  - scope:
+      path: "projects/apps"
     values:
       layout: null
 
@@ -45,7 +61,11 @@ exclude:
   # in a plan doc reads as an unterminated Liquid variable and fails the
   # build for the whole site. These are engineering notes, not site
   # content; keep them out of the build entirely.
+  #
+  # Scoped to apps/ specifically, NOT all of projects/: the wiki pages in
+  # projects/ are meant to be publishable, and many will be written in
+  # Markdown. A blanket `projects/**/*.md` would silently swallow them.
   # -----------------------------------------------------------------------
-  - "projects/**/*.md"
+  - "projects/apps/**/*.md"
   - projects/apps/gaffer-iq/docs
   - projects/apps/gaffer-iq/tests
