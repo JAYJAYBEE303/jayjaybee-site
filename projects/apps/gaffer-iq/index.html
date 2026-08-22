@@ -146,8 +146,36 @@
 
           <!-- Squad import (Phase 4-1) -->
           <div class="squad-import-wrap" id="dash-import-wrap">
-            <button class="squad-import-btn" id="dash-import-btn" type="button"
-                    title="Import your FPL squad by Team ID">Import FPL squad</button>
+            <div class="squad-import-row">
+              <button class="squad-import-btn" id="dash-import-btn" type="button"
+                      title="Import your FPL squad by Team ID">Import FPL squad</button>
+              <!-- Team ID help — pure <details> disclosure, same affordance as the
+                   matchup page's pairing "i" buttons. No JS wiring needed. -->
+              <details class="squad-import-help" id="dash-import-help">
+                <summary class="squad-import-help__btn"
+                         title="Where do I find my FPL Team ID?"
+                         aria-label="Where do I find my FPL Team ID?">?</summary>
+                <div class="squad-import-help__panel">
+                  <p class="squad-import-help__title">Finding your FPL Team ID</p>
+                  <ol class="squad-import-help__steps">
+                    <li>Sign in at <strong>fantasy.premierleague.com</strong> and open
+                        <strong>My Team</strong>.</li>
+                    <li>Open DevTools — right-click the page and choose
+                        <strong>Inspect</strong>, or press <kbd>F12</kbd>
+                        (<kbd>⌥</kbd><kbd>⌘</kbd><kbd>I</kbd> on Mac).</li>
+                    <li>Switch to the <strong>Network</strong> tab.</li>
+                    <li>Reload the page (<kbd>F5</kbd>) with DevTools still open.</li>
+                    <li>Find the request named <code>my-team/1234567/</code> — that
+                        number is your Team ID.</li>
+                  </ol>
+                  <p class="squad-import-help__aside">
+                    Quicker route: from the <strong>Points</strong> or
+                    <strong>Transfers</strong> page the address bar reads
+                    <code>/entry/<strong>1234567</strong>/event/5</code> — same number.
+                  </p>
+                </div>
+              </details>
+            </div>
             <div class="squad-import-panel" id="dash-import-panel" hidden>
               <label class="squad-import-label" for="dash-import-id">FPL Team ID</label>
               <div class="squad-import-panel__row">
@@ -227,8 +255,36 @@
 
           <!-- Squad import (Phase 4-1) -->
           <div class="squad-import-wrap" id="planner-import-wrap">
-            <button class="squad-import-btn" id="planner-import-btn" type="button"
-                    title="Import your FPL squad by Team ID">Import FPL squad</button>
+            <div class="squad-import-row">
+              <button class="squad-import-btn" id="planner-import-btn" type="button"
+                      title="Import your FPL squad by Team ID">Import FPL squad</button>
+              <!-- Team ID help — pure <details> disclosure, same affordance as the
+                   matchup page's pairing "i" buttons. No JS wiring needed. -->
+              <details class="squad-import-help" id="planner-import-help">
+                <summary class="squad-import-help__btn"
+                         title="Where do I find my FPL Team ID?"
+                         aria-label="Where do I find my FPL Team ID?">?</summary>
+                <div class="squad-import-help__panel">
+                  <p class="squad-import-help__title">Finding your FPL Team ID</p>
+                  <ol class="squad-import-help__steps">
+                    <li>Sign in at <strong>fantasy.premierleague.com</strong> and open
+                        <strong>My Team</strong>.</li>
+                    <li>Open DevTools — right-click the page and choose
+                        <strong>Inspect</strong>, or press <kbd>F12</kbd>
+                        (<kbd>⌥</kbd><kbd>⌘</kbd><kbd>I</kbd> on Mac).</li>
+                    <li>Switch to the <strong>Network</strong> tab.</li>
+                    <li>Reload the page (<kbd>F5</kbd>) with DevTools still open.</li>
+                    <li>Find the request named <code>my-team/1234567/</code> — that
+                        number is your Team ID.</li>
+                  </ol>
+                  <p class="squad-import-help__aside">
+                    Quicker route: from the <strong>Points</strong> or
+                    <strong>Transfers</strong> page the address bar reads
+                    <code>/entry/<strong>1234567</strong>/event/5</code> — same number.
+                  </p>
+                </div>
+              </details>
+            </div>
             <div class="squad-import-panel" id="planner-import-panel" hidden>
               <label class="squad-import-label" for="planner-import-id">FPL Team ID</label>
               <div class="squad-import-panel__row">

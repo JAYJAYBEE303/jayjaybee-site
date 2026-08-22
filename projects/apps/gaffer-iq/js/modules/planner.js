@@ -132,6 +132,9 @@ let _importPanel   = null;
 let _importIdInput = null;
 let _importStatus  = null;
 let _importInfo    = null;
+/** The "Where do I find my Team ID?" <details>. Both dropdowns hang off
+ *  the same wrap and overlay the same space, so only one may be open. */
+let _importHelp    = null;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -1064,6 +1067,8 @@ function showImportStatus(msg, type) {
 
 function openImportPanel() {
   if (!_importPanel) return;
+  // The help panel occupies the same overlay slot — collapse it first.
+  if (_importHelp) _importHelp.open = false;
   _importPanel.hidden = false;
   _importBtn?.classList.add('is-open');
   if (_importIdInput) {
@@ -1203,7 +1208,13 @@ function wireDom() {
   _importStatus  = document.getElementById('planner-import-status');
   _importInfo    = document.getElementById('planner-import-info');
 
+  _importHelp    = document.getElementById('planner-import-help');
+
   _importBtn?.addEventListener('click', openImportPanel);
+  // Reciprocal of the guard in openImportPanel — opening help hides the form.
+  _importHelp?.addEventListener('toggle', () => {
+    if (_importHelp.open) closeImportPanel();
+  });
   document.getElementById('planner-import-cancel')?.addEventListener('click', closeImportPanel);
   document.getElementById('planner-import-go')?.addEventListener('click', handleImport);
   _importIdInput?.addEventListener('keydown', e => {
