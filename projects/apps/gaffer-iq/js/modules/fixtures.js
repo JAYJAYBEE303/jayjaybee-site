@@ -1,84 +1,70 @@
 /**
  * js/modules/fixtures.js
  * Layer: module. Owns the DOM for the Fixtures view.
- * Side effects: DOM writes only. Reads nothing from the store yet.
- *
- * STATUS: STRUCTURAL BLUEPRINT. Every value this module renders is a
- * placeholder — no fixture, team, event, lineup or H2H data is read from the
- * store, and no engine function is called. What IS real: the three-mode
- * navigation, the pickers, the pane switching, and the cross-links between
- * modes. The intent is to agree the shape of the view before wiring data.
- *
- * When data is wired, the ONLY functions that should change are the three
- * render*Pane() builders below (plus their row helpers) — every seam is
- * marked `DATA SEAM:`. The layer rules still apply: this file may read the
- * store and call engine/ functions, but must never compute a metric itself
- * (ARCHITECTURE.md §3 hard rule 3, §10).
+ * Side effects: DOM writes; one lazy call to api.js's fetchLivePoints().
+ * Reads from store; calls engine/standings.js. No analytical logic lives here
+ * — the league table is accumulated by engine/standings.js, not by this file
+ * (ARCHITECTURE.md §3 hard rule 2).
  *
  * Four modes, switched by .fx-modes__btn:
- *   gameweek  — this GW's fixtures: kickoff times, results, and a per-fixture
- *               disclosure holding match events, both lineups, and an H2H peek.
- *   table     — the league table, with European/relegation zones marked.
- *   team      — one team's recent results and upcoming fixtures.
- *   h2h       — full head-to-head history for one pairing.
+ *   gameweek  — LIVE DATA. One GW's fixtures grouped by kickoff day: status,
+ *               crests, score or kickoff time, and a per-fixture disclosure
+ *               holding match events and who featured (from event/{gw}/live/).
+ *   table     — LIVE DATA. The league table, accumulated from played fixtures,
+ *               with an Overall/Home/Away split and European/relegation zones.
+ *   team      — STILL A BLUEPRINT. Placeholder rows only.
+ *   h2h       — STILL A BLUEPRINT. Placeholder rows only.
  *
- * Subscriptions: none yet. See onDataReady() for where 'data:ready' goes.
+ * Two things the FPL API simply does not publish, so they are not rendered:
+ * team lineups (starting XI, bench, formation) and event minute timings. What
+ * event/{gw}/live/ gives is per-fixture stat totals per player, so the detail
+ * panel shows who scored/assisted/was booked and who featured with how many
+ * minutes — labelled as such rather than dressed up as a teamsheet.
+ *
+ * Subscriptions: data:ready, live:updated
  */
+
+import { store } from '../store.js';
+import { LEAGUE_FORM_WINDOW } from '../config.js';
+import { fetchLivePoints } from '../api.js';
+import { calcLeagueTable, attachNextFixtures, addMovement } from '../engine/standings.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const MODES = ['gameweek', 'table', 'team', 'h2h'];
 
-// Blueprint volumes — how many placeholder rows each block draws. Deliberately
-// realistic (10 fixtures in a GW, 11 + 4 in a squad, 8 past meetings) so the
-// layout is stress-tested at the size it will actually run at.
-const SKEL = {
-  dayGroups:   3,
-  perDay:      [3, 4, 3],
-  lineupXi:    11,
-  lineupBench: 4,
-  eventsHome:  3,
-  eventsAway:  2,
-  teamRows:    6,
-  h2hMeetings: 8,
-  trendPips:   6,
-};
+const FIRST_GW = 1;
+const LAST_GW  = 38;
 
-// Day headings for the gameweek pane's grouping. Real kickoffs group by
-// calendar date; these stand in for that grouping so the visual rhythm of a
-// split gameweek is visible.
-const SKEL_DAYS = ['Friday', 'Saturday', 'Sunday'];
-
-// Status chips a fixture row can carry. Drives both the legend and the
-// placeholder rows, so the two can never drift apart.
+// Status chips a fixture row can carry. Drives both the legend and the rows,
+// so the two can never drift apart.
 const STATUS_CHIPS = [
-  { key: 'ft',       label: 'FT',   hint: 'Played — final score shown' },
-  { key: 'live',     label: 'LIVE', hint: 'In progress — score updates' },
+  { key: 'ft',       label: 'FT',   hint: 'Full time — final score' },
+  { key: 'live',     label: 'LIVE', hint: 'Kicked off, not yet finished' },
   { key: 'upcoming', label: 'KO',   hint: 'Upcoming — kickoff time shown' },
 ];
 
-// Stand-in team names for the pickers. DATA SEAM: replaced by
-// store.getTeams() sorted by name, with team.id as the option value.
-const SKEL_TEAMS = ['Team A', 'Team B', 'Team C', 'Team D', 'Team E', 'Team F'];
-
-// Summary tiles above a team's results/fixtures split.
-const TEAM_STATS = ['P', 'W', 'D', 'L', 'GF', 'GA', 'GD', 'Pts'];
-
-// Event glyphs, in the order they would typically appear in a match feed.
-const EVENT_TYPES = [
-  { icon: '⚽',    label: 'Goal' },
-  { icon: 'Ⓐ',    label: 'Assist' },
-  { icon: '\u{1f7e8}', label: 'Yellow card' },
-  { icon: '\u{1f7e5}', label: 'Red card' },
-  { icon: '⇄',    label: 'Substitution' },
+// Per-fixture stat identifiers worth showing as a match event, in feed order.
+// Keys are FPL's own `explain[].stats[].identifier` values. Anything not
+// listed here (minutes, bonus, bps, saves, clean sheets…) is scoring detail
+// rather than a match event and belongs in the Ranker, not here.
+const EVENT_IDENTIFIERS = [
+  { id: 'goals_scored',     icon: '⚽', label: 'Goal' },
+  { id: 'own_goals',        icon: '⚽', label: 'Own goal' },
+  { id: 'assists',          icon: 'Ⓐ', label: 'Assist' },
+  { id: 'penalties_saved',  icon: '✋', label: 'Penalty saved' },
+  { id: 'penalties_missed', icon: '✖', label: 'Penalty missed' },
+  { id: 'yellow_cards',     icon: '\u{1f7e8}', label: 'Yellow card' },
+  { id: 'red_cards',        icon: '\u{1f7e5}', label: 'Red card' },
 ];
 
-const H2H_COLUMNS = ['Date', 'Season', 'Venue', 'Home', 'Score', 'Away', 'Notes'];
+// Reading order for a team's featured players.
+const POS_ORDER = { GKP: 0, DEF: 1, MID: 2, FWD: 3 };
 
 // League table columns, left to right. `num` cells are right-aligned mono.
 const LEAGUE_COLUMNS = [
   { key: 'pos',  label: '#',    num: true  },
-  { key: 'move', label: '',     num: false },  // movement arrow since last GW
+  { key: 'move', label: '',     num: false },
   { key: 'team', label: 'Team', num: false },
   { key: 'pl',   label: 'Pl',   num: true  },
   { key: 'w',    label: 'W',    num: true  },
@@ -102,14 +88,17 @@ const LEAGUE_ZONES = [
   { key: 'rel',  label: 'Relegation',        from: 18, to: 20 },
 ];
 
-const LEAGUE_SIZE = 20;
+// ─── Blueprint volumes (team + h2h panes only) ───────────────────────────────
+// The two panes still awaiting data draw this many placeholder rows.
 
-// Movement-since-last-gameweek glyphs, cycled across the placeholder rows.
-const MOVE_GLYPHS = [
-  { key: 'up',   glyph: '▲' },
-  { key: 'flat', glyph: '–' },
-  { key: 'down', glyph: '▼' },
-];
+const SKEL = { teamRows: 6, h2hMeetings: 8, trendPips: 6 };
+
+const TEAM_STATS  = ['P', 'W', 'D', 'L', 'GF', 'GA', 'GD', 'Pts'];
+const H2H_COLUMNS = ['Date', 'Season', 'Venue', 'Home', 'Score', 'Away', 'Notes'];
+
+// Stand-in team names for the two blueprint pickers. DATA SEAM: replaced by
+// store.getTeams() when those panes are wired.
+const SKEL_TEAMS = ['Team A', 'Team B', 'Team C', 'Team D', 'Team E', 'Team F'];
 
 // ─── Module-level state ───────────────────────────────────────────────────────
 
@@ -119,6 +108,21 @@ let _panes     = {};     // mode key -> .fx-pane element
 let _pickers   = {};     // mode key -> .fx-picker element
 let _modeBtns  = [];     // .fx-modes__btn nodes
 let _mode      = 'gameweek';
+
+let _gw    = null;         // gameweek the gameweek pane is showing
+let _scope = 'overall';    // league table venue split
+
+// Fixture ids whose <details> is open, so a re-render (live data landing,
+// GW step) doesn't collapse what the user just opened.
+let _openFixtures = new Set();
+
+// GWs whose live payload is already in flight, so re-renders mid-fetch can't
+// fire a duplicate request. Mirrors main.js's _teamXgRequested.
+const _liveRequested = new Set();
+
+// GWs whose live fetch failed. Rendered as a message instead of retrying in a
+// loop — a dead upstream must not turn into a request storm.
+const _liveFailed = new Set();
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -132,75 +136,98 @@ function esc(str) {
 }
 
 /**
- * A blank bar standing in for a value that is not wired yet. Width is passed
- * in `ch` so the bar occupies roughly the space the real string will — the
- * only inline style in this module, and one CONVENTIONS.md §5.3 explicitly
- * allows (a computed bar width).
- * @param {number} chars    approximate character width of the eventual value
- * @param {string} [extra]  optional extra class
+ * A blank bar standing in for a value the team/h2h panes don't have yet.
+ * Width is in `ch` so the bar occupies roughly the space its eventual string
+ * will — the only inline style in this module, and one CONVENTIONS.md §5.3
+ * explicitly allows (a computed bar width).
  */
 function ph(chars, extra = '') {
   return `<span class="fx-ph ${esc(extra)}" style="width:${Number(chars)}ch" aria-hidden="true"></span>`;
 }
 
-/** Repeat a builder n times and join — the blueprint's whole rendering idiom. */
+/** Repeat a builder n times and join. */
 function times(n, fn) {
   let out = '';
   for (let i = 0; i < n; i++) out += fn(i);
   return out;
 }
 
-// ─── Gameweek pane ────────────────────────────────────────────────────────────
+/**
+ * A team crest. Real badge when the team is known (team.badgeUrl is
+ * precomputed in normalise.js), otherwise the empty ring the blueprint used.
+ * onerror hides a missing badge rather than showing a broken-image icon —
+ * same treatment as matchup.js's .gw-nav__badge.
+ */
+function crest(team, extra = '') {
+  const cls = `fx-crest ${extra}`.trim();
+  if (!team?.badgeUrl) return `<span class="${esc(cls)}" aria-hidden="true"></span>`;
+  return `<img class="${esc(cls)}" src="${esc(team.badgeUrl)}" alt=""`
+       + ` onerror="this.style.visibility='hidden'">`;
+}
+
+// ─── Date formatting ─────────────────────────────────────────────────────────
+// Kickoffs arrive as ISO strings in UTC and are rendered in the viewer's local
+// zone — deliberate: a personal tool should show the time you'd actually watch
+// the match at. All formatting is display-only and stays in this module.
+
+function toDate(iso) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** "15:00" */
+function fmtTime(iso) {
+  const d = toDate(iso);
+  return d ? d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : 'TBC';
+}
+
+/** "Saturday" */
+function fmtWeekday(iso) {
+  const d = toDate(iso);
+  return d ? d.toLocaleDateString(undefined, { weekday: 'long' }) : 'Date TBC';
+}
+
+/** "16 August 2026" */
+function fmtDateLong(iso) {
+  const d = toDate(iso);
+  return d ? d.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+}
+
+/** "16 Aug" */
+function fmtDateShort(iso) {
+  const d = toDate(iso);
+  return d ? d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : 'TBC';
+}
+
+/** "Fri 15 Aug, 18:30" */
+function fmtDateTime(iso) {
+  const d = toDate(iso);
+  if (!d) return 'TBC';
+  return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
+       + ', ' + fmtTime(iso);
+}
+
+/** Local calendar day, used only as a grouping key. Null kickoffs group last. */
+function dayKey(iso) {
+  const d = toDate(iso);
+  return d ? d.toLocaleDateString(undefined, { year: 'numeric', month: '2-digit', day: '2-digit' }) : 'tbc';
+}
+
+// ─── Shared render pieces ─────────────────────────────────────────────────────
 
 /**
- * One team's side of a fixture row: crest slot + name.
- * DATA SEAM: crest becomes the team badge, name becomes team.shortName.
+ * Win/draw/loss pips.
+ * @param {string[]} form  ['W','D','L',…] oldest → newest
  */
-function skelSide(side) {
-  return `
-    <span class="fx-side fx-side--${side}">
-      <span class="fx-crest" aria-hidden="true"></span>
-      <span class="fx-side__name">${ph(9)}</span>
-    </span>`;
+function pips(form) {
+  if (!form?.length) return '<span class="fx-pips fx-pips--empty">—</span>';
+  return `<span class="fx-pips">${form.map(r =>
+    `<span class="fx-pip fx-pip--${r.toLowerCase()}" title="${esc(r)}"></span>`
+  ).join('')}</span>`;
 }
 
-/** One line in a match-event feed. DATA SEAM: the fixture's event stream. */
-function skelEvent(i) {
-  const type = EVENT_TYPES[i % EVENT_TYPES.length];
-  return `
-    <li class="fx-event">
-      <span class="fx-event__min">${ph(3)}</span>
-      <span class="fx-event__icon" aria-hidden="true">${type.icon}</span>
-      <span class="fx-event__type">${esc(type.label)}</span>
-      <span class="fx-event__player">${ph(11)}</span>
-    </li>`;
-}
-
-/** One player line in a lineup list. DATA SEAM: the fixture's lineup + bench. */
-function skelLineupRow() {
-  return `
-    <li class="fx-lineup__row">
-      <span class="fx-lineup__num">${ph(2)}</span>
-      <span class="fx-lineup__name">${ph(12)}</span>
-      <span class="fx-lineup__pos">${ph(3)}</span>
-    </li>`;
-}
-
-/** One team's lineup column inside a fixture's detail disclosure. */
-function skelLineup(side) {
-  return `
-    <div class="fx-lineup fx-lineup--${side}">
-      <p class="fx-lineup__head">
-        <span class="fx-lineup__team">${ph(9)}</span>
-        <span class="fx-lineup__formation">${ph(5)}</span>
-      </p>
-      <ol class="fx-lineup__list">${times(SKEL.lineupXi, skelLineupRow)}</ol>
-      <p class="fx-lineup__subhead">Bench</p>
-      <ul class="fx-lineup__list fx-lineup__list--bench">${times(SKEL.lineupBench, skelLineupRow)}</ul>
-    </div>`;
-}
-
-/** Win/draw/loss pips — the compact form strip, reused by both other panes. */
+/** Placeholder pips, for the two panes still on the blueprint. */
 function skelPips(n) {
   const cycle = ['w', 'd', 'l'];
   return `<span class="fx-pips">${
@@ -208,31 +235,173 @@ function skelPips(n) {
   }</span>`;
 }
 
+/** A short "nothing to show" block, styled like the rest of the pane. */
+function emptyState(message) {
+  return `<p class="fx-empty">${esc(message)}</p>`;
+}
+
+// ─── Gameweek pane ────────────────────────────────────────────────────────────
+
 /**
- * The expandable half of a fixture row: events, both lineups, and an H2H peek
- * that deep-links into the h2h mode. Native <details> — no JS toggle needed,
- * the same affordance as the Team ID help disclosure in index.html.
+ * @returns {'ft'|'live'|'upcoming'}  which status chip a fixture carries.
+ *   `started` is set at kickoff and `finished` (→ played) at full time, so
+ *   started && !played is exactly "in progress" — no clock arithmetic needed.
  */
-function skelFixtureDetail() {
+function statusOf(fixture) {
+  if (fixture.played)  return 'ft';
+  if (fixture.started) return 'live';
+  return 'upcoming';
+}
+
+/** One team's side of a fixture row. */
+function sideHtml(team, side) {
+  return `
+    <span class="fx-side fx-side--${side}">
+      ${crest(team)}
+      <span class="fx-side__name" title="${esc(team?.name ?? '')}">${esc(team?.shortName ?? '???')}</span>
+    </span>`;
+}
+
+/**
+ * Index one gameweek's live payload down to a single fixture.
+ *
+ * FPL reports a player's stats for the GW as a whole in `stats`, and splits
+ * them per fixture in `explain` — so in a double gameweek only `explain`
+ * attributes correctly, which is why that is what this reads.
+ *
+ * @param {object} live      raw event/{gw}/live/ payload
+ * @param {object} fixture   the fixture to extract
+ * @returns {{events: {home: object[], away: object[]},
+ *            featured: {home: object[], away: object[]}}}
+ */
+function indexFixtureLive(live, fixture) {
+  const events   = { home: [], away: [] };
+  const featured = { home: [], away: [] };
+
+  for (const el of live?.elements ?? []) {
+    const slice = el.explain?.find(x => x.fixture === fixture.id);
+    if (!slice) continue;
+
+    const player = store.getPlayer(el.id);
+    if (!player) continue;
+
+    const side = player.teamId === fixture.homeTeamId ? 'home'
+               : player.teamId === fixture.awayTeamId ? 'away'
+               : null;
+    if (!side) continue;
+
+    // explain[].stats only carries identifiers that scored (or cost) points,
+    // so a missing identifier means "none", not "unknown".
+    const values = {};
+    for (const s of slice.stats ?? []) values[s.identifier] = s.value;
+
+    const minutes = values.minutes ?? 0;
+    if (minutes > 0) featured[side].push({ player, minutes });
+
+    for (const kind of EVENT_IDENTIFIERS) {
+      const count = values[kind.id] ?? 0;
+      if (count > 0) events[side].push({ player, kind, count });
+    }
+  }
+
+  for (const side of ['home', 'away']) {
+    featured[side].sort((a, b) =>
+      (POS_ORDER[a.player.position] ?? 9) - (POS_ORDER[b.player.position] ?? 9)
+      || b.minutes - a.minutes
+      || a.player.name.localeCompare(b.player.name));
+
+    events[side].sort((a, b) =>
+      EVENT_IDENTIFIERS.indexOf(a.kind) - EVENT_IDENTIFIERS.indexOf(b.kind)
+      || a.player.name.localeCompare(b.player.name));
+  }
+
+  return { events, featured };
+}
+
+/** One line in a match-event feed. */
+function eventHtml({ player, kind, count }) {
+  return `
+    <li class="fx-event">
+      <span class="fx-event__icon" aria-hidden="true">${kind.icon}</span>
+      <span class="fx-event__player">${esc(player.name)}</span>
+      ${count > 1 ? `<span class="fx-event__count">×${count}</span>` : ''}
+      <span class="fx-event__type">${esc(kind.label)}</span>
+    </li>`;
+}
+
+/** One team's column of players who featured. */
+function featuredHtml(list, team) {
+  if (!list.length) return `<div class="fx-lineup">${emptyState('No appearances recorded.')}</div>`;
+  return `
+    <div class="fx-lineup">
+      <p class="fx-lineup__head">
+        <span class="fx-lineup__team">${esc(team?.shortName ?? '')}</span>
+        <span class="fx-lineup__formation">${list.length} played</span>
+      </p>
+      <ul class="fx-lineup__list">
+        ${list.map(({ player, minutes }) => `
+          <li class="fx-lineup__row">
+            <span class="fx-lineup__num">${minutes}'</span>
+            <span class="fx-lineup__name">${esc(player.name)}</span>
+            <span class="fx-lineup__pos">${esc(player.position)}</span>
+          </li>`).join('')}
+      </ul>
+    </div>`;
+}
+
+/**
+ * The expandable half of a fixture row. Content depends on what exists yet:
+ * an upcoming fixture has nothing to report, a played one needs the GW's live
+ * payload, which is fetched lazily when the disclosure is first opened.
+ */
+function fixtureDetailHtml(fixture, home, away) {
+  const status = statusOf(fixture);
+
+  if (status === 'upcoming') {
+    return `<div class="fx-detail">${emptyState(
+      `Not played yet — kicks off ${fmtDateTime(fixture.kickoff)}.`)}</div>`;
+  }
+
+  if (_liveFailed.has(fixture.gw)) {
+    return `<div class="fx-detail">${emptyState(
+      'Match data unavailable — the live endpoint could not be reached. Reload to retry.')}</div>`;
+  }
+
+  const live = store.getLive(fixture.gw);
+  if (!live) {
+    return `<div class="fx-detail">${emptyState('Loading match data…')}</div>`;
+  }
+
+  const { events, featured } = indexFixtureLive(live, fixture);
+  const anyEvents = events.home.length || events.away.length;
+
   return `
     <div class="fx-detail">
 
       <section class="fx-detail__block">
         <h4 class="fx-detail__title">Match events</h4>
-        <div class="fx-detail__cols">
-          <ul class="fx-events">${times(SKEL.eventsHome, skelEvent)}</ul>
-          <ul class="fx-events fx-events--away">${times(SKEL.eventsAway, skelEvent)}</ul>
-        </div>
-        <p class="fx-detail__note">Goals, assists, cards and substitutions. Home column left.</p>
+        ${anyEvents ? `
+          <div class="fx-detail__cols">
+            <ul class="fx-events">${events.home.map(eventHtml).join('')}</ul>
+            <ul class="fx-events fx-events--away">${events.away.map(eventHtml).join('')}</ul>
+          </div>` : emptyState('No goals, assists or cards recorded.')}
+        <p class="fx-detail__note">
+          Home column left. FPL publishes per-match totals, not minute timings,
+          so events are unordered within a match.
+        </p>
       </section>
 
       <section class="fx-detail__block">
-        <h4 class="fx-detail__title">Lineups</h4>
+        <h4 class="fx-detail__title">Who featured</h4>
         <div class="fx-detail__cols">
-          ${skelLineup('home')}
-          ${skelLineup('away')}
+          ${featuredHtml(featured.home, home)}
+          ${featuredHtml(featured.away, away)}
         </div>
-        <p class="fx-detail__note">Starting XI then bench, with shirt number and position.</p>
+        <p class="fx-detail__note">
+          Every player with minutes, longest first within each position. FPL
+          publishes no teamsheet, so starting XI, bench and formation are not
+          available to show.
+        </p>
       </section>
 
       <section class="fx-detail__block">
@@ -244,163 +413,282 @@ function skelFixtureDetail() {
           <span class="fx-h2h-mini__trend">Last ${SKEL.trendPips}${skelPips(SKEL.trendPips)}</span>
         </div>
         <button class="fx-link-btn" type="button" data-fx-open-h2h>Open full head-to-head →</button>
+        <p class="fx-detail__note">Still a blueprint — wired with the Head-to-head tab.</p>
       </section>
 
     </div>`;
 }
 
-/** One fixture row: status, both sides, score-or-kickoff, and the disclosure. */
-function skelFixture(i) {
-  const status     = STATUS_CHIPS[i % STATUS_CHIPS.length];
-  const isUpcoming = status.key === 'upcoming';
-  const centre     = isUpcoming
-    ? ph(5, 'fx-ph--time')
-    : `${ph(1)}<em>–</em>${ph(1)}`;
+/** One fixture row: status, both sides, score or kickoff, and the disclosure. */
+function fixtureHtml(fixture) {
+  const home   = store.getTeam(fixture.homeTeamId);
+  const away   = store.getTeam(fixture.awayTeamId);
+  const status = statusOf(fixture);
+  const chip   = STATUS_CHIPS.find(c => c.key === status);
+
+  // `result` is populated only at full time (normalise.js), so an in-progress
+  // fixture shows its kickoff time rather than a half-finished scoreline.
+  const centre = fixture.played && fixture.result
+    ? `<span class="fx-fixture__score">${fixture.result.homeGoals}<em>–</em>${fixture.result.awayGoals}</span>`
+    : `<span class="fx-fixture__score fx-fixture__score--time">${esc(fmtTime(fixture.kickoff))}</span>`;
 
   return `
     <li class="fx-item">
-      <details class="fx-fixture">
+      <details class="fx-fixture" data-fixture-id="${fixture.id}"${_openFixtures.has(fixture.id) ? ' open' : ''}>
         <summary class="fx-fixture__summary">
-          <span class="fx-status fx-status--${status.key}" title="${esc(status.hint)}">${esc(status.label)}</span>
-          ${skelSide('home')}
+          <span class="fx-status fx-status--${status}" title="${esc(chip.hint)}">${esc(chip.label)}</span>
+          ${sideHtml(home, 'home')}
           <span class="fx-fixture__centre">
-            <span class="fx-fixture__score">${centre}</span>
-            <span class="fx-fixture__ko">${ph(11)}</span>
+            ${centre}
+            <span class="fx-fixture__ko">${esc(fmtDateShort(fixture.kickoff))}</span>
           </span>
-          ${skelSide('away')}
-          <span class="fx-fixture__venue">${ph(10)}</span>
+          ${sideHtml(away, 'away')}
           <span class="fx-fixture__chev" aria-hidden="true">▾</span>
         </summary>
-        ${skelFixtureDetail()}
+        ${fixtureDetailHtml(fixture, home, away)}
       </details>
     </li>`;
 }
 
-/**
- * DATA SEAM: the gameweek pane. Reads store.getFixtures() for the selected GW,
- * groups by kickoff date, and renders one .fx-item per fixture.
- */
+/** Group a GW's fixtures by local kickoff day, preserving fixture order. */
+function groupByDay(fixtures) {
+  const groups = [];
+  const byKey  = new Map();
+  for (const f of fixtures) {
+    const key = dayKey(f.kickoff);
+    if (!byKey.has(key)) {
+      const group = { key, kickoff: f.kickoff, fixtures: [] };
+      byKey.set(key, group);
+      groups.push(group);
+    }
+    byKey.get(key).fixtures.push(f);
+  }
+  return groups;
+}
+
 function renderGameweekPane() {
+  if (!_panes.gameweek) return;
+
+  if (!store.getSeason()) {
+    _panes.gameweek.innerHTML = emptyState('Loading FPL data…');
+    return;
+  }
+
+  const gw       = _gw;
+  const event    = store.getEvents().find(e => e.id === gw) ?? null;
+  const fixtures = store.getFixtures().filter(f => f.gw === gw);
+  const groups   = groupByDay(fixtures);
+
   const legend = STATUS_CHIPS.map(c => `
     <span class="fx-legend__item">
       <span class="fx-status fx-status--${c.key}">${esc(c.label)}</span>${esc(c.hint)}
     </span>`).join('');
 
+  const first = fixtures[0]?.kickoff;
+  const last  = fixtures[fixtures.length - 1]?.kickoff;
+  const span  = first && last && dayKey(first) !== dayKey(last)
+    ? `${fmtDateShort(first)} – ${fmtDateShort(last)}`
+    : fmtDateLong(first);
+
+  const tag = event?.isCurrent ? '<span class="fx-tag fx-tag--now">Current</span>'
+            : event?.isNext    ? '<span class="fx-tag">Next</span>'
+            : '';
+
   _panes.gameweek.innerHTML = `
     <header class="fx-pane__head">
       <div class="fx-pane__headline">
-        <h2 class="fx-pane__title">Gameweek ${ph(2)}</h2>
+        <h2 class="fx-pane__title">Gameweek ${gw} ${tag}</h2>
         <p class="fx-pane__sub">
-          <span>Deadline ${ph(14)}</span>
-          <span>${ph(16)}</span>
-          <span>${ph(2)} fixtures</span>
+          ${event ? `<span>Deadline ${esc(fmtDateTime(event.deadline))}</span>` : ''}
+          ${span ? `<span>${esc(span)}</span>` : ''}
+          <span>${fixtures.length} ${fixtures.length === 1 ? 'fixture' : 'fixtures'}</span>
         </p>
       </div>
       <div class="fx-legend">${legend}</div>
     </header>
 
-    ${times(SKEL.dayGroups, d => `
+    ${fixtures.length ? groups.map(g => `
       <section class="fx-daygroup">
         <h3 class="fx-daygroup__title">
-          <span class="fx-daygroup__day">${esc(SKEL_DAYS[d] ?? 'Day')}</span>
-          <span class="fx-daygroup__date">${ph(12)}</span>
+          <span class="fx-daygroup__day">${esc(fmtWeekday(g.kickoff))}</span>
+          <span class="fx-daygroup__date">${esc(fmtDateLong(g.kickoff))}</span>
         </h3>
-        <ul class="fx-list">${times(SKEL.perDay[d] ?? 3, skelFixture)}</ul>
-      </section>`)}
+        <ul class="fx-list">${g.fixtures.map(fixtureHtml).join('')}</ul>
+      </section>`).join('')
+      : emptyState(`No fixtures scheduled for gameweek ${gw}.`)}
   `;
+
+  syncGwPicker(gw);
+}
+
+/** Keep the stepper label and its bounds in step with the selected GW. */
+function syncGwPicker(gw) {
+  const label = _root.querySelector('#fx-gw-label');
+  if (label) label.textContent = `Gameweek ${gw}`;
+
+  const prev = _root.querySelector('[data-fx-gw="prev"]');
+  const next = _root.querySelector('[data-fx-gw="next"]');
+  if (prev) prev.disabled = gw <= FIRST_GW;
+  if (next) next.disabled = gw >= LAST_GW;
+
+  const now = _root.querySelector('[data-fx-gw="now"]');
+  if (now) now.disabled = gw === (store.getCurrentGw() ?? store.getNextGw());
+}
+
+// ─── Live payload (match events + appearances) ────────────────────────────────
+
+/**
+ * Fetch and cache one GW's live payload, once. Fire-and-forget: the pane
+ * re-renders off the store's 'live:updated' event when it lands.
+ *
+ * Failures are swallowed to a console warning and a per-GW flag, never
+ * store.setError() — match detail is an ENRICHMENT of the fixture list, so a
+ * dead live endpoint must not blank the tab. Same policy as the Understat
+ * fetches in main.js (ROADMAP §3A, CONVENTIONS.md §9).
+ */
+function ensureLive(gw) {
+  if (!Number.isInteger(gw)) return;
+  if (store.getLive(gw) || _liveRequested.has(gw) || _liveFailed.has(gw)) return;
+
+  _liveRequested.add(gw);
+  fetchLivePoints(gw)
+    .then(raw => store.setLive(gw, raw))
+    .catch(err => {
+      _liveFailed.add(gw);
+      console.warn(`[fixtures] live data unavailable for GW${gw}: ${err.message ?? err}`);
+      if (_mode === 'gameweek') renderGameweekPane();
+    });
 }
 
 // ─── League table pane ────────────────────────────────────────────────────────
 
 /**
  * @param {number} pos  1-based league position
- * @returns {string}    zone key ('ucl' | 'uel' | 'uecl' | 'rel'), or '' for
- *                      the mid-table positions that belong to no zone.
+ * @returns {string}    zone key, or '' for the positions that belong to none.
  */
 function zoneFor(pos) {
   return LEAGUE_ZONES.find(z => pos >= z.from && pos <= z.to)?.key ?? '';
 }
 
-/** One league-table row. DATA SEAM: one team's standing + form + next fixture. */
-function skelLeagueRow(i) {
-  const pos  = i + 1;
-  const zone = zoneFor(pos);
-  const move = MOVE_GLYPHS[i % MOVE_GLYPHS.length];
+/** ▲ / – / ▼ for a team's movement since the previous gameweek. */
+function movementHtml(movement) {
+  if (movement > 0) return `<span class="fx-league__move fx-league__move--up" title="Up ${movement}">▲</span>`;
+  if (movement < 0) return `<span class="fx-league__move fx-league__move--down" title="Down ${-movement}">▼</span>`;
+  return '<span class="fx-league__move fx-league__move--flat" title="No change">–</span>';
+}
 
+/** The Next column: opponent crest, short name, venue and official FDR. */
+function nextFixtureHtml(next) {
+  if (!next) return '<span class="fx-league__none">—</span>';
+  return `${crest(next.opponent, 'fx-crest--sm')}`
+       + `<span title="${esc(next.opponent?.name ?? '')}">${esc(next.opponent?.shortName ?? '???')}</span>`
+       + `<span class="fx-venue">(${next.isHome ? 'H' : 'A'})</span>`
+       + (next.difficulty
+           ? `<span class="fx-row__tag fx-fdr--${next.difficulty}" title="Official FPL difficulty">${next.difficulty}</span>`
+           : '');
+}
+
+function leagueRowHtml(row) {
+  const zone = zoneFor(row.position);
   return `
     <tr class="fx-league__row${zone ? ` fx-league__row--${zone}` : ''}">
-      <td class="fx-league__pos">${pos}</td>
-      <td class="fx-league__move fx-league__move--${move.key}" aria-hidden="true">${move.glyph}</td>
+      <td class="fx-league__pos">${row.position}</td>
+      <td>${movementHtml(row.movement)}</td>
       <td class="fx-league__team">
-        <span class="fx-crest fx-crest--sm" aria-hidden="true"></span>
-        <button class="fx-link-btn" type="button" data-fx-open-team>${ph(11)}</button>
+        ${crest(row.team, 'fx-crest--sm')}
+        <button class="fx-link-btn" type="button" data-fx-open-team
+                data-team-id="${row.teamId}">${esc(row.team.name)}</button>
       </td>
-      <td class="fx-league__num">${ph(2)}</td>
-      <td class="fx-league__num">${ph(2)}</td>
-      <td class="fx-league__num">${ph(2)}</td>
-      <td class="fx-league__num">${ph(2)}</td>
-      <td class="fx-league__num">${ph(2)}</td>
-      <td class="fx-league__num">${ph(2)}</td>
-      <td class="fx-league__num">${ph(3)}</td>
-      <td class="fx-league__num fx-league__pts">${ph(2)}</td>
-      <td class="fx-league__form">${skelPips(5)}</td>
-      <td class="fx-league__next">
-        <span class="fx-crest fx-crest--sm" aria-hidden="true"></span>${ph(4)}
-        <span class="fx-row__tag">${ph(3)}</span>
-      </td>
+      <td class="fx-league__num">${row.played}</td>
+      <td class="fx-league__num">${row.won}</td>
+      <td class="fx-league__num">${row.drawn}</td>
+      <td class="fx-league__num">${row.lost}</td>
+      <td class="fx-league__num">${row.goalsFor}</td>
+      <td class="fx-league__num">${row.goalsAgainst}</td>
+      <td class="fx-league__num">${row.goalDifference > 0 ? '+' : ''}${row.goalDifference}</td>
+      <td class="fx-league__num fx-league__pts">${row.points}</td>
+      <td class="fx-league__form">${pips(row.form)}</td>
+      <td class="fx-league__next">${nextFixtureHtml(row.nextFixture)}</td>
     </tr>`;
 }
 
-/**
- * DATA SEAM: the league table. FPL's bootstrap does not ship a standings
- * payload, so this is built by walking store.getFixtures() for every played
- * fixture and accumulating W/D/L, goals and points per team — that derivation
- * is analytical, so it belongs in engine/, not here (ARCHITECTURE.md §3 hard
- * rule 2). The Home/Away split just filters that walk by venue.
- */
 function renderTablePane() {
+  if (!_panes.table) return;
+
+  const season = store.getSeason();
+  if (!season) {
+    _panes.table.innerHTML = emptyState('Loading FPL data…');
+    return;
+  }
+
+  const fixtures = store.getFixtures();
+  const teams    = store.getTeams();
+  const played   = fixtures.filter(f => f.played && f.result);
+
+  // "Completed gameweeks" is the highest GW that has any finished fixture —
+  // the movement baseline is the table as it stood one GW earlier.
+  const lastGw = played.reduce((max, f) => (f.gw !== null && f.gw > max ? f.gw : max), 0);
+
+  const rows = attachNextFixtures(
+    addMovement(
+      calcLeagueTable(fixtures, teams, { venue: _scope }),
+      calcLeagueTable(fixtures, teams, { venue: _scope, upToGw: Math.max(lastGw - 1, 0) }),
+    ),
+    fixtures,
+    season.teamsById,
+  );
+
   const legend = LEAGUE_ZONES.map(z => `
     <span class="fx-legend__item">
       <span class="fx-zone-key fx-zone-key--${z.key}" aria-hidden="true"></span>${esc(z.label)}
     </span>`).join('');
+
+  const lastKickoff = played.reduce(
+    (latest, f) => (f.kickoff && (!latest || f.kickoff > latest) ? f.kickoff : latest), null);
+
+  const scopeNote = _scope === 'overall'
+    ? 'All fixtures.'
+    : `${_scope === 'home' ? 'Home' : 'Away'} fixtures only — positions are for this split, not the real table.`;
 
   _panes.table.innerHTML = `
     <header class="fx-pane__head">
       <div class="fx-pane__headline">
         <h2 class="fx-pane__title">League table</h2>
         <p class="fx-pane__sub">
-          <span>After ${ph(2)} gameweeks</span>
-          <span>Updated ${ph(12)}</span>
+          <span>After ${lastGw} ${lastGw === 1 ? 'gameweek' : 'gameweeks'}</span>
+          ${lastKickoff ? `<span>Latest result ${esc(fmtDateShort(lastKickoff))}</span>` : ''}
+          <span>${esc(scopeNote)}</span>
         </p>
       </div>
       <div class="fx-legend">${legend}</div>
     </header>
 
-    <div class="fx-table-wrap">
-      <table class="fx-table fx-league">
-        <thead>
-          <tr>
-            ${LEAGUE_COLUMNS.map(c => `
-              <th scope="col"${c.num ? ' class="fx-league__num"' : ''}>${esc(c.label)}</th>`).join('')}
-          </tr>
-        </thead>
-        <tbody>${times(LEAGUE_SIZE, skelLeagueRow)}</tbody>
-      </table>
-    </div>
+    ${played.length ? `
+      <div class="fx-table-wrap">
+        <table class="fx-table fx-league">
+          <thead>
+            <tr>
+              ${LEAGUE_COLUMNS.map(c =>
+                `<th scope="col"${c.num ? ' class="fx-league__num"' : ''}>${esc(c.label)}</th>`).join('')}
+            </tr>
+          </thead>
+          <tbody>${rows.map(leagueRowHtml).join('')}</tbody>
+        </table>
+      </div>
 
-    <p class="fx-detail__note">
-      Form is the last five results, most recent last. Selecting a team name
-      will open that team's results and fixtures in the By team view.
-    </p>
+      <p class="fx-detail__note">
+        Accumulated from finished fixtures — FPL publishes no standings endpoint.
+        Ordering is points, then goal difference, then goals scored; clubs level
+        on all three are shown alphabetically rather than split by head-to-head.
+        Form is the last ${LEAGUE_FORM_WINDOW} results, most recent last. Next shows the official
+        FPL 1–5 difficulty, not the Gaffer IQ score.
+      </p>`
+      : emptyState('No fixtures have been played yet this season.')}
   `;
 }
 
-// ─── Team pane ────────────────────────────────────────────────────────────────
+// ─── Team pane (blueprint) ────────────────────────────────────────────────────
 
-/**
- * One compact row in a team's results/fixtures column.
- * @param {boolean} played  past rows show a score, future rows a kickoff time
- */
 function skelTeamRow(played) {
   return `
     <li class="fx-row">
@@ -412,12 +700,15 @@ function skelTeamRow(played) {
     </li>`;
 }
 
-/**
- * DATA SEAM: the team pane. Reads the selected team's fixture list, splits on
- * fixture.played, and renders the two columns plus the season summary tiles.
- */
+/** DATA SEAM: the selected team's fixture list, split on fixture.played. */
 function renderTeamPane() {
+  if (!_panes.team) return;
   _panes.team.innerHTML = `
+    <p class="fx-blueprint-note fx-blueprint-note--inline">
+      <strong>Blueprint.</strong> This view is still placeholders — Gameweek and
+      Table are the live ones.
+    </p>
+
     <header class="fx-pane__head fx-pane__head--team">
       <div class="fx-teamhead">
         <span class="fx-crest fx-crest--lg" aria-hidden="true"></span>
@@ -449,24 +740,20 @@ function renderTeamPane() {
         <ul class="fx-list fx-list--compact">${times(SKEL.teamRows, () => skelTeamRow(false))}</ul>
       </section>
     </div>
-
-    <p class="fx-detail__note">
-      Row reads: date · home/away · opponent · score or kickoff · difficulty tag.
-      Selecting a row will open that fixture back in the Gameweek view.
-    </p>
   `;
 }
 
-// ─── Head-to-head pane ────────────────────────────────────────────────────────
+// ─── Head-to-head pane (blueprint) ────────────────────────────────────────────
 
-/**
- * DATA SEAM: the h2h pane. Reads every recorded meeting between the two
- * selected teams — engine/fixtures.js already keeps a cross-season H2H window
- * for calcFixtureHistory, which is the natural source — and renders the
- * tallies, the trend strip, and the meetings table.
- */
+/** DATA SEAM: every recorded meeting between the two selected teams. */
 function renderH2hPane() {
+  if (!_panes.h2h) return;
   _panes.h2h.innerHTML = `
+    <p class="fx-blueprint-note fx-blueprint-note--inline">
+      <strong>Blueprint.</strong> This view is still placeholders — Gameweek and
+      Table are the live ones.
+    </p>
+
     <header class="fx-pane__head">
       <div class="fx-pane__headline">
         <h2 class="fx-pane__title" id="fx-h2h-title">Pick two teams</h2>
@@ -531,11 +818,7 @@ function renderH2hPane() {
 
 // ─── Pickers ──────────────────────────────────────────────────────────────────
 
-/**
- * Fill the three team <select>s.
- * DATA SEAM: swap SKEL_TEAMS for store.getTeams(), using team.id as the option
- * value and team.name as the label.
- */
+/** DATA SEAM: swap SKEL_TEAMS for store.getTeams() with the two panes below. */
 function populateTeamSelects() {
   const options = SKEL_TEAMS
     .map((name, i) => `<option value="${i}">${esc(name)}</option>`)
@@ -553,7 +836,6 @@ function populateTeamSelects() {
   }
 }
 
-/** Echo the team picker's selection into the team pane's header. */
 function syncTeamHeading() {
   const sel  = _root.querySelector('#fx-team-select');
   const name = _root.querySelector('#fx-team-name');
@@ -563,7 +845,6 @@ function syncTeamHeading() {
     : sel.options[sel.selectedIndex].textContent;
 }
 
-/** Echo both h2h selections into the h2h pane's title and its tile labels. */
 function syncH2hHeading() {
   const a     = _root.querySelector('#fx-h2h-a');
   const b     = _root.querySelector('#fx-h2h-b');
@@ -583,10 +864,6 @@ function syncH2hHeading() {
 
 // ─── Mode switching ───────────────────────────────────────────────────────────
 
-/**
- * Show one mode's pane and its matching picker, hide the other two.
- * @param {'gameweek'|'team'|'h2h'} mode
- */
 function setMode(mode) {
   if (!MODES.includes(mode)) return;
   _mode = mode;
@@ -612,10 +889,8 @@ function onModeClick(e) {
 }
 
 /**
- * Delegated on _panesWrap (stable across renders) rather than per-button — the
- * cross-link buttons are rebuilt on every render*Pane() call.
- * DATA SEAM: this is also where the clicked row's team id(s) get pushed into
- * the target mode's picker before the mode switch.
+ * Delegated on _panesWrap (stable across renders) rather than per-element —
+ * every row and disclosure is rebuilt on each render.
  */
 function onPanesClick(e) {
   if (e.target.closest('[data-fx-open-h2h]'))  { setMode('h2h');  return; }
@@ -623,27 +898,35 @@ function onPanesClick(e) {
 }
 
 /**
- * Overall / Home / Away split for the league table.
- * DATA SEAM: re-run the standings walk filtered by venue, then re-render.
+ * Opening a fixture is what triggers its GW's live fetch — the payload is
+ * needed by nothing else, so nothing pays for it until a user asks.
  */
-function onScopeClick(e) {
-  const btn = e.target.closest('.fx-scope__btn');
-  if (!btn) return;
-  _root.querySelectorAll('.fx-scope__btn').forEach(b => {
-    const active = b === btn;
-    b.classList.toggle('is-active', active);
-    b.setAttribute('aria-pressed', String(active));
-  });
+function onPanesToggle(e) {
+  const details = e.target;
+  if (!(details instanceof HTMLDetailsElement) || !details.classList.contains('fx-fixture')) return;
+
+  const id = Number(details.dataset.fixtureId);
+  if (details.open) _openFixtures.add(id); else _openFixtures.delete(id);
+
+  const fixture = store.getFixture(id);
+  if (details.open && fixture && statusOf(fixture) !== 'upcoming') ensureLive(fixture.gw);
 }
 
-/**
- * GW stepper. DATA SEAM: move the selected GW by ±1, or back to
- * store.getCurrentGw() for data-fx-gw="now", then re-render the gameweek pane.
- */
 function onGwStep(e) {
   const btn = e.target.closest('[data-fx-gw]');
-  if (!btn) return;
-  // No-op while the pane is a blueprint — there is no GW state to move yet.
+  if (!btn || btn.disabled) return;
+
+  const home = store.getCurrentGw() ?? store.getNextGw() ?? FIRST_GW;
+  const next = btn.dataset.fxGw === 'prev' ? _gw - 1
+             : btn.dataset.fxGw === 'next' ? _gw + 1
+             : home;
+
+  const clamped = Math.min(LAST_GW, Math.max(FIRST_GW, next));
+  if (clamped === _gw) return;
+
+  _gw = clamped;
+  _openFixtures.clear();   // ids don't carry across gameweeks
+  renderGameweekPane();
 }
 
 function onSwapClick() {
@@ -654,12 +937,35 @@ function onSwapClick() {
   syncH2hHeading();
 }
 
+function onScopeClick(e) {
+  const btn = e.target.closest('.fx-scope__btn');
+  if (!btn) return;
+
+  _root.querySelectorAll('.fx-scope__btn').forEach(b => {
+    const active = b === btn;
+    b.classList.toggle('is-active', active);
+    b.setAttribute('aria-pressed', String(active));
+  });
+
+  _scope = btn.dataset.fxScope;
+  renderTablePane();
+}
+
 /**
- * DATA SEAM: not subscribed yet. When the panes read real data this becomes
- * the 'data:ready' handler — populate the selects from store.getTeams(), set
- * the selected GW from store.getCurrentGw(), and re-render the active pane.
+ * Season data has landed (or been re-emitted as an enrichment arrives). Pick
+ * the opening gameweek the first time only, so a re-emit can't yank the user
+ * back from a GW they stepped to.
  */
-function onDataReady() { /* intentionally empty while this view is a blueprint */ }
+function onDataReady() {
+  if (_gw === null) _gw = store.getCurrentGw() ?? store.getNextGw() ?? FIRST_GW;
+  renderGameweekPane();
+  renderTablePane();
+}
+
+/** A GW's live payload landed — only the gameweek pane reads it. */
+function onLiveUpdated() {
+  renderGameweekPane();
+}
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
@@ -677,16 +983,20 @@ export function initFixtures() {
 
   populateTeamSelects();
 
-  // Built once — there is no data to re-render against yet.
-  renderGameweekPane();
-  renderTablePane();
+  // The two blueprint panes have no data to wait on — build them once.
   renderTeamPane();
   renderH2hPane();
+
+  store.subscribe('data:ready',   onDataReady);
+  store.subscribe('live:updated', onLiveUpdated);
 
   _root.querySelector('.fx-modes')?.addEventListener('click', onModeClick);
   _root.querySelector('.fx-controls')?.addEventListener('click', onGwStep);
   _root.querySelector('.fx-scope')?.addEventListener('click', onScopeClick);
+
   _panesWrap?.addEventListener('click', onPanesClick);
+  // `toggle` doesn't bubble, so delegation needs the capture phase.
+  _panesWrap?.addEventListener('toggle', onPanesToggle, true);
 
   _root.querySelector('#fx-team-select')?.addEventListener('change', syncTeamHeading);
   _root.querySelector('#fx-h2h-a')?.addEventListener('change', syncH2hHeading);
@@ -694,4 +1004,8 @@ export function initFixtures() {
   _root.querySelector('#fx-h2h-swap')?.addEventListener('click', onSwapClick);
 
   setMode('gameweek');
+
+  // Defensive: if data is already fresh (sessionStorage hydration) trigger now,
+  // since data:ready was emitted before this subscription was registered.
+  if (store.isFresh()) onDataReady();
 }

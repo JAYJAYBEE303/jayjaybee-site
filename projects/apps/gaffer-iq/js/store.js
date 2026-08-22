@@ -9,7 +9,7 @@
 
 // Bump the version suffix when the normalised model shape changes — old
 // cached payloads will then be ignored rather than feeding stale data through.
-const SS_KEY_SEASON = 'gaffer-iq:season:v1';
+const SS_KEY_SEASON = 'gaffer-iq:season:v2';
 
 // Shared squad key — the ONE place the user's 15-man squad is persisted.
 // Reuses the Dashboard's pre-existing key so an already-saved squad survives
@@ -37,6 +37,12 @@ const state = {
   leagueXgPrev2: null,
   leagueXgPrev3: null,
   teamXg: {},
+  // Fixtures tab — raw `event/{gw}/live/` payloads keyed by GW. This is the
+  // ONLY source of per-fixture match events (scorers, assists, cards) and of
+  // who actually featured; bootstrap/fixtures carry neither. Memory-only and
+  // never mirrored to sessionStorage: the endpoint is explicitly no-store
+  // (see the allowlist in api/fpl.js) because a live GW changes by the minute.
+  live: {},
   activeHorizon: 'GW1',
   // The user's squad: an ordered array of player IDs (max 15), shared by every
   // module that reads/edits it (Dashboard, Planner). Previously each module
@@ -91,6 +97,7 @@ function getLeagueXgPrev()            { return state.leagueXgPrev; }
 function getLeagueXgPrev2()           { return state.leagueXgPrev2; }
 function getLeagueXgPrev3()           { return state.leagueXgPrev3; }
 function getTeamXg(teamSlug)          { return state.teamXg[teamSlug] ?? null; }
+function getLive(gw)                  { return state.live[gw] ?? null; }
 function getAllTeamXg()               { return { ...state.teamXg }; }
 function getActiveHorizon()           { return state.activeHorizon; }
 function getSquad()                   { return state.squad; }
@@ -136,6 +143,17 @@ function setTeamXg(teamSlug, data) {
   state.teamXg[teamSlug] = data;
 }
 
+/**
+ * Cache one gameweek's raw live payload. Emits so any open view re-renders
+ * the moment it lands, the same contract as the other async enrichments.
+ * @param {number} gw
+ * @param {object} data  raw `event/{gw}/live/` JSON
+ */
+function setLive(gw, data) {
+  state.live[gw] = data;
+  emit('live:updated', gw);
+}
+
 function setActiveHorizon(key) {
   if (state.activeHorizon === key) return;
   state.activeHorizon = key;
@@ -169,6 +187,7 @@ function setError(err) {
   state.leagueXgPrev = null;
   state.leagueXgPrev2 = null;
   state.leagueXgPrev3 = null;
+  state.live = {};
   state.lastRefreshAt = null;
   try { sessionStorage.removeItem(SS_KEY_SEASON); } catch { /* non-fatal */ }
   state.lastError = err;
@@ -187,6 +206,7 @@ function clearCache() {
   state.leagueXgPrev2 = null;
   state.leagueXgPrev3 = null;
   state.teamXg = {};
+  state.live = {};
   state.lastRefreshAt = null;
   state.lastError = null;
   try { sessionStorage.removeItem(SS_KEY_SEASON); } catch { /* non-fatal */ }
@@ -226,8 +246,10 @@ export const store = {
   getFixtures, getFixture, getPositions, getEvents,
   getCurrentGw, getNextGw, getPlayerSummary, getAllPlayerSummaries,
   getLeagueXg, getLeagueXgPrev, getLeagueXgPrev2, getLeagueXgPrev3, getTeamXg, getAllTeamXg,
+  getLive,
   getActiveHorizon, getSquad, getError, getLastRefreshAt, isFresh,
   setSeason, setPlayerSummary, setLeagueXg, setLeagueXgPrev, setLeagueXgPrev2, setLeagueXgPrev3, setTeamXg,
+  setLive,
   setActiveHorizon, setSquad, setError, markDataReady,
   clearCache,
 };

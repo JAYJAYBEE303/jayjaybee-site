@@ -232,6 +232,11 @@ export function normaliseFixture(raw) {
     homeTeamId: raw.team_h,
     awayTeamId: raw.team_a,
     played,
+    // FPL flips `started` at kickoff and `finished` at full time, so
+    // started && !played is exactly "in progress". Additive: nothing that
+    // existed before this field reads it, and `result` keeps its old meaning
+    // (populated only once the fixture is FINISHED, never mid-match).
+    started: Boolean(raw.started),
     result: played
       ? { homeGoals: raw.team_h_score, awayGoals: raw.team_a_score }
       : null,

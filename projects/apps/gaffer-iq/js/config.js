@@ -891,3 +891,16 @@ export const RANK_TOP_PERCENTILE = 0.25;
 // flag with. Everyone between RANK_TOP_PERCENTILE and here (and outside both
 // green tiers) falls into the middle "yellow" tier — see FEATURE_ENGINE.md §13.
 export const RANK_BOTTOM_PERCENTILE = 0.40;
+
+// ─── League standings (Fixtures tab → Table) ─────────────────────────────────
+
+// Points awarded per result. Constants rather than literals so a competition
+// with different scoring (or a historical 2-points-for-a-win season) is a
+// config change, not an engine edit.
+export const POINTS_WIN  = 3;
+export const POINTS_DRAW = 1;
+export const POINTS_LOSS = 0;
+
+// How many of a team's most recent completed fixtures the table's form column
+// summarises. Five is the conventional league-table window.
+export const LEAGUE_FORM_WINDOW = 5;

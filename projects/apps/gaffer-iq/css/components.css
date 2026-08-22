@@ -3799,7 +3799,7 @@
 
 .fx-fixture__summary {
   display: grid;
-  grid-template-columns: 5.5ch 1fr 10ch 1fr 12ch 2ch;
+  grid-template-columns: 5.5ch 1fr 11ch 1fr 2ch;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
@@ -3862,13 +3862,10 @@
   color: var(--color-muted);
 }
 
-.fx-fixture__ko,
-.fx-fixture__venue {
+.fx-fixture__ko {
   font-size: var(--font-size-xs);
   color: var(--color-muted);
 }
-
-.fx-fixture__venue { text-align: right; }
 
 .fx-fixture__chev {
   color: var(--color-muted);
@@ -4380,6 +4377,86 @@
   vertical-align: middle;
 }
 
+/* ─── Real data: crests, empty states, badges ────────────────────────────────
+   Everything below arrived with the Gameweek and Table panes being wired to
+   live FPL data. The .fx-ph placeholder bar above still serves the two panes
+   that remain blueprints (By team, Head-to-head). */
+
+/* A real badge replaces the placeholder ring: no dashed outline, no fill. */
+img.fx-crest {
+  border: none;
+  background: none;
+  border-radius: 0;
+  object-fit: contain;
+}
+
+/* "Nothing to show here" — used for empty gameweeks, unplayed fixtures, and
+   an unreachable live endpoint. Quiet by design; these are normal states. */
+.fx-empty {
+  padding: var(--space-4);
+  color: var(--color-muted);
+  font-size: var(--font-size-sm);
+  text-align: center;
+}
+
+/* Current / Next gameweek badge beside the pane title. */
+.fx-tag {
+  display: inline-block;
+  vertical-align: middle;
+  padding: 1px var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-raised);
+  color: var(--color-muted);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.fx-tag--now {
+  border-color: var(--color-accent);
+  background: var(--color-accent-muted);
+  color: var(--color-accent);
+}
+
+/* An unplayed fixture shows its kickoff time where a score would go — same
+   slot, but lighter, so a scan down the column separates the two instantly. */
+.fx-fixture__score--time {
+  font-weight: 400;
+  color: var(--color-muted);
+}
+
+/* A repeated event (a brace, a hat-trick) collapses to one line with a count. */
+.fx-event__count {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-accent);
+}
+
+.fx-event__player { font-weight: 600; }
+
+/* A team with no completed fixtures yet has no form to show. */
+.fx-pips--empty { color: var(--color-muted); }
+
+.fx-league__none { color: var(--color-muted); }
+
+/* Official FPL 1–5 difficulty on the Next column. Direction is opposite to the
+   Gaffer IQ score — 1 is easiest — so the band mapping is reversed here
+   (CONVENTIONS.md §5.2, and see .fdr-chip which does the same job elsewhere). */
+.fx-fdr--1 { border-color: var(--band-great);   color: var(--band-great);   }
+.fx-fdr--2 { border-color: var(--band-good);    color: var(--band-good);    }
+.fx-fdr--3 { border-color: var(--band-neutral); color: var(--band-neutral); }
+.fx-fdr--4 { border-color: var(--band-tough);   color: var(--band-tough);   }
+.fx-fdr--5 { border-color: var(--band-brutal);  color: var(--band-brutal);  }
+
+/* Blueprint banner, when it sits inside a pane rather than above the whole
+   tab — narrower, so it reads as a note about this view only. */
+.fx-blueprint-note--inline {
+  max-width: 52ch;
+  margin-bottom: var(--space-6);
+}
+
 /* ─── Fixtures: mobile ───────────────────────────────────────────────────── */
 
 @media (max-width: 768px) {
@@ -4413,7 +4490,6 @@
   .fx-fixture__centre { grid-area: centre; }
   .fx-side--away      { grid-area: away; }
 
-  .fx-fixture__venue,
   .fx-fixture__chev { display: none; }
 
   /* Both two-column blocks collapse to one. */
