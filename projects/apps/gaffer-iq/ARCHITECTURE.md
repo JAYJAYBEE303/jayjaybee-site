@@ -351,8 +351,21 @@ Player {
 Fixture {
   id, gw, kickoff,
   homeTeamId, awayTeamId,
-  played: bool,
-  result: { homeGoals, awayGoals } | null,
+  started,                               // FPL flips this at kickoff
+  played,                                // finished || finished_provisional.
+                                         //   FPL's own `finished` flips only once
+                                         //   BONUS is confirmed, hours after full
+                                         //   time, so reading it alone hides every
+                                         //   result for the rest of the evening.
+  bonusConfirmed,                        // raw `finished`. Read this ONLY for bonus;
+                                         //   the scoreline is final at full time.
+  result: { homeGoals, awayGoals } | null,  // the score AS IT STANDS — set as soon as
+                                         //   FPL publishes one, so a live match shows
+                                         //   its running score. `played` says whether
+                                         //   it is final; engine code only ever reads
+                                         //   results via ctx.playedFixtures, which is
+                                         //   gated on played && result.
+
   fplDifficulty: { home, away },         // the official FDR we are replacing
   // derived (per side), filled by composite.js:
   gafferScore: { home: CompositeScore, away: CompositeScore }

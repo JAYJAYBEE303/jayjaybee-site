@@ -387,7 +387,8 @@ function fixtureDetailHtml(fixture, home, away) {
           </div>` : emptyState('No goals, assists or cards recorded.')}
         <p class="fx-detail__note">
           Home column left. FPL publishes per-match totals, not minute timings,
-          so events are unordered within a match.
+          so events are unordered within a match.${fixture.played && !fixture.bonusConfirmed
+            ? ' Bonus points for this match are still provisional.' : ''}
         </p>
       </section>
 
@@ -426,9 +427,10 @@ function fixtureHtml(fixture) {
   const status = statusOf(fixture);
   const chip   = STATUS_CHIPS.find(c => c.key === status);
 
-  // `result` is populated only at full time (normalise.js), so an in-progress
-  // fixture shows its kickoff time rather than a half-finished scoreline.
-  const centre = fixture.played && fixture.result
+  // A score is shown as soon as FPL publishes one, so a match in progress
+  // carries its running score; the LIVE chip beside it is what says the score
+  // is not final. Only a fixture yet to kick off falls back to its time.
+  const centre = fixture.result
     ? `<span class="fx-fixture__score">${fixture.result.homeGoals}<em>–</em>${fixture.result.awayGoals}</span>`
     : `<span class="fx-fixture__score fx-fixture__score--time">${esc(fmtTime(fixture.kickoff))}</span>`;
 

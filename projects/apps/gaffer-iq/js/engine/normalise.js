@@ -224,20 +224,40 @@ export function normalisePlayer(raw) {
  * @returns {Fixture}   internal Fixture — see ARCHITECTURE.md §8
  */
 export function normaliseFixture(raw) {
-  const played = Boolean(raw.finished);
+  // FPL uses THREE flags, not two, and the difference matters:
+  //   started              → flipped at kickoff
+  //   finished_provisional → flipped at full time. The match is over.
+  //   finished             → flipped LATER, once bonus points are confirmed.
+  //
+  // Reading `finished` alone (as this did) meant a match that ended hours ago
+  // still counted as unplayed and carried no result — so the league table sat
+  // empty, completed fixtures showed a LIVE chip, and every engine metric fed
+  // by ctx.playedFixtures (team form, style profile, venue split, H2H) quietly
+  // ignored the round for the rest of the evening. `played` therefore means
+  // "the match has been played", which is what every caller already assumes.
+  const started  = Boolean(raw.started);
+  const complete = Boolean(raw.finished) || Boolean(raw.finished_provisional);
+  const hasScore = typeof raw.team_h_score === 'number'
+                && typeof raw.team_a_score === 'number';
+
   return {
     id: raw.id,
     gw: raw.event,                  // null for unscheduled fixtures (rare)
     kickoff: raw.kickoff_time,       // ISO string; engine never reformats
     homeTeamId: raw.team_h,
     awayTeamId: raw.team_a,
-    played,
-    // FPL flips `started` at kickoff and `finished` at full time, so
-    // started && !played is exactly "in progress". Additive: nothing that
-    // existed before this field reads it, and `result` keeps its old meaning
-    // (populated only once the fixture is FINISHED, never mid-match).
-    started: Boolean(raw.started),
-    result: played
+    played: complete,
+    started,
+    // Bonus points are still provisional between finished_provisional and
+    // finished; the SCORELINE is not — it is final at full time. Only a
+    // consumer that cares about bonus (not the scoreline) should read this.
+    bonusConfirmed: Boolean(raw.finished),
+    // The score as it currently stands — set as soon as FPL publishes one, so
+    // an in-progress match can show its running score. `played` is what says
+    // whether that score is final, and every engine consumer reaches results
+    // through ctx.playedFixtures (composite.js: f.played && f.result), so a
+    // mid-match score can never leak into a metric.
+    result: hasScore
       ? { homeGoals: raw.team_h_score, awayGoals: raw.team_a_score }
       : null,
     fplDifficulty: {                 // the official 1–5 FDR Gaffer IQ replaces
