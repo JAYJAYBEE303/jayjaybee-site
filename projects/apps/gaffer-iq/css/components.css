@@ -3571,12 +3571,14 @@
 
 /* Mode switch. Same visual language as .horizon-switcher, but scoped here so
    a change to the global switcher cannot silently restyle this module. */
-.fx-modes {
+.fx-modes,
+.fx-scope {
   display: flex;
   gap: var(--space-1);
 }
 
-.fx-modes__btn {
+.fx-modes__btn,
+.fx-scope__btn {
   padding: var(--space-1) var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -3589,13 +3591,15 @@
   transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 
-.fx-modes__btn:hover {
+.fx-modes__btn:hover,
+.fx-scope__btn:hover {
   background: var(--color-surface-raised);
   color: var(--color-text);
   border-color: var(--color-muted);
 }
 
-.fx-modes__btn.is-active {
+.fx-modes__btn.is-active,
+.fx-scope__btn.is-active {
   background: var(--color-accent-muted);
   border-color: var(--color-accent);
   color: var(--color-accent);
@@ -3824,6 +3828,8 @@
 
 /* Crest slot — an empty ring until real badges land. */
 .fx-crest {
+  display: inline-block;
+  vertical-align: middle;
   width: 20px;
   height: 20px;
   flex-shrink: 0;
@@ -4292,14 +4298,98 @@
   color: var(--color-muted);
 }
 
+/* ─── League table ───────────────────────────────────────────────────────── */
+
+/* Zone key in the legend. Same four colours as the row stripes below, and both
+   are driven off LEAGUE_ZONES in fixtures.js so they cannot fall out of step. */
+.fx-zone-key {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--band-neutral);
+}
+
+.fx-zone-key--ucl  { background: var(--band-great); }
+.fx-zone-key--uel  { background: var(--band-good); }
+.fx-zone-key--uecl { background: var(--band-light-green); }
+.fx-zone-key--rel  { background: var(--band-brutal); }
+
+/* Below this width .fx-table-wrap scrolls rather than crushing 13 columns. */
+.fx-league { min-width: 820px; }
+
+.fx-league__num {
+  text-align: right;
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
+.fx-league th.fx-league__num { text-align: right; }
+
+.fx-league__pos {
+  width: 4ch;
+  color: var(--color-muted);
+}
+
+/* Zone stripe rides on the position cell as an inset shadow — a border-left on
+   a border-collapse table is unreliable across the first-cell boundary. */
+.fx-league__row--ucl  .fx-league__pos { box-shadow: inset 3px 0 0 var(--band-great); }
+.fx-league__row--uel  .fx-league__pos { box-shadow: inset 3px 0 0 var(--band-good); }
+.fx-league__row--uecl .fx-league__pos { box-shadow: inset 3px 0 0 var(--band-light-green); }
+.fx-league__row--rel  .fx-league__pos { box-shadow: inset 3px 0 0 var(--band-brutal); }
+
+.fx-league__move {
+  width: 3ch;
+  text-align: center;
+  font-size: var(--font-size-xs);
+}
+
+.fx-league__move--up   { color: var(--band-good); }
+.fx-league__move--flat { color: var(--color-muted); }
+.fx-league__move--down { color: var(--band-brutal); }
+
+.fx-league__team {
+  min-width: 18ch;
+  white-space: nowrap;
+}
+
+.fx-league__team .fx-crest,
+.fx-league__next .fx-crest { margin-right: var(--space-2); }
+
+/* The team name is the cross-link into the By team view, so it reads as body
+   text until hovered rather than as a row of blue links. */
+.fx-league__team .fx-link-btn {
+  margin-top: 0;
+  vertical-align: middle;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.fx-league__team .fx-link-btn:hover { color: var(--color-accent); }
+
+.fx-league__pts {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.fx-league__form,
+.fx-league__next { white-space: nowrap; }
+
+.fx-league__next .fx-row__tag {
+  margin-left: var(--space-2);
+  vertical-align: middle;
+}
+
 /* ─── Fixtures: mobile ───────────────────────────────────────────────────── */
 
 @media (max-width: 768px) {
 
   .fx-controls { gap: var(--space-3); }
 
-  .fx-modes { width: 100%; }
-  .fx-modes__btn { flex: 1; min-height: 44px; }
+  .fx-modes,
+  .fx-scope { width: 100%; }
+  .fx-modes__btn,
+  .fx-scope__btn { flex: 1; min-height: 44px; }
 
   .fx-picker { width: 100%; }
   .fx-select { flex: 1; min-width: 0; }

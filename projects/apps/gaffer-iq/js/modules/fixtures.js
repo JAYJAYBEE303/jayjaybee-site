@@ -15,9 +15,10 @@
  * store and call engine/ functions, but must never compute a metric itself
  * (ARCHITECTURE.md §3 hard rule 3, §10).
  *
- * Three modes, switched by .fx-modes__btn:
+ * Four modes, switched by .fx-modes__btn:
  *   gameweek  — this GW's fixtures: kickoff times, results, and a per-fixture
  *               disclosure holding match events, both lineups, and an H2H peek.
+ *   table     — the league table, with European/relegation zones marked.
  *   team      — one team's recent results and upcoming fixtures.
  *   h2h       — full head-to-head history for one pairing.
  *
@@ -26,7 +27,7 @@
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const MODES = ['gameweek', 'team', 'h2h'];
+const MODES = ['gameweek', 'table', 'team', 'h2h'];
 
 // Blueprint volumes — how many placeholder rows each block draws. Deliberately
 // realistic (10 fixtures in a GW, 11 + 4 in a squad, 8 past meetings) so the
@@ -73,6 +74,42 @@ const EVENT_TYPES = [
 ];
 
 const H2H_COLUMNS = ['Date', 'Season', 'Venue', 'Home', 'Score', 'Away', 'Notes'];
+
+// League table columns, left to right. `num` cells are right-aligned mono.
+const LEAGUE_COLUMNS = [
+  { key: 'pos',  label: '#',    num: true  },
+  { key: 'move', label: '',     num: false },  // movement arrow since last GW
+  { key: 'team', label: 'Team', num: false },
+  { key: 'pl',   label: 'Pl',   num: true  },
+  { key: 'w',    label: 'W',    num: true  },
+  { key: 'd',    label: 'D',    num: true  },
+  { key: 'l',    label: 'L',    num: true  },
+  { key: 'gf',   label: 'GF',   num: true  },
+  { key: 'ga',   label: 'GA',   num: true  },
+  { key: 'gd',   label: 'GD',   num: true  },
+  { key: 'pts',  label: 'Pts',  num: true  },
+  { key: 'form', label: 'Form', num: false },
+  { key: 'next', label: 'Next', num: false },
+];
+
+// Qualification / relegation zones, as inclusive position ranges. The legend
+// and the per-row stripes both derive from this one list, so they cannot drift
+// apart. Positions outside every range carry no zone.
+const LEAGUE_ZONES = [
+  { key: 'ucl',  label: 'Champions League',  from: 1,  to: 4  },
+  { key: 'uel',  label: 'Europa League',     from: 5,  to: 5  },
+  { key: 'uecl', label: 'Conference League', from: 6,  to: 6  },
+  { key: 'rel',  label: 'Relegation',        from: 18, to: 20 },
+];
+
+const LEAGUE_SIZE = 20;
+
+// Movement-since-last-gameweek glyphs, cycled across the placeholder rows.
+const MOVE_GLYPHS = [
+  { key: 'up',   glyph: '▲' },
+  { key: 'flat', glyph: '–' },
+  { key: 'down', glyph: '▼' },
+];
 
 // ─── Module-level state ───────────────────────────────────────────────────────
 
@@ -270,6 +307,91 @@ function renderGameweekPane() {
         </h3>
         <ul class="fx-list">${times(SKEL.perDay[d] ?? 3, skelFixture)}</ul>
       </section>`)}
+  `;
+}
+
+// ─── League table pane ────────────────────────────────────────────────────────
+
+/**
+ * @param {number} pos  1-based league position
+ * @returns {string}    zone key ('ucl' | 'uel' | 'uecl' | 'rel'), or '' for
+ *                      the mid-table positions that belong to no zone.
+ */
+function zoneFor(pos) {
+  return LEAGUE_ZONES.find(z => pos >= z.from && pos <= z.to)?.key ?? '';
+}
+
+/** One league-table row. DATA SEAM: one team's standing + form + next fixture. */
+function skelLeagueRow(i) {
+  const pos  = i + 1;
+  const zone = zoneFor(pos);
+  const move = MOVE_GLYPHS[i % MOVE_GLYPHS.length];
+
+  return `
+    <tr class="fx-league__row${zone ? ` fx-league__row--${zone}` : ''}">
+      <td class="fx-league__pos">${pos}</td>
+      <td class="fx-league__move fx-league__move--${move.key}" aria-hidden="true">${move.glyph}</td>
+      <td class="fx-league__team">
+        <span class="fx-crest fx-crest--sm" aria-hidden="true"></span>
+        <button class="fx-link-btn" type="button" data-fx-open-team>${ph(11)}</button>
+      </td>
+      <td class="fx-league__num">${ph(2)}</td>
+      <td class="fx-league__num">${ph(2)}</td>
+      <td class="fx-league__num">${ph(2)}</td>
+      <td class="fx-league__num">${ph(2)}</td>
+      <td class="fx-league__num">${ph(2)}</td>
+      <td class="fx-league__num">${ph(2)}</td>
+      <td class="fx-league__num">${ph(3)}</td>
+      <td class="fx-league__num fx-league__pts">${ph(2)}</td>
+      <td class="fx-league__form">${skelPips(5)}</td>
+      <td class="fx-league__next">
+        <span class="fx-crest fx-crest--sm" aria-hidden="true"></span>${ph(4)}
+        <span class="fx-row__tag">${ph(3)}</span>
+      </td>
+    </tr>`;
+}
+
+/**
+ * DATA SEAM: the league table. FPL's bootstrap does not ship a standings
+ * payload, so this is built by walking store.getFixtures() for every played
+ * fixture and accumulating W/D/L, goals and points per team — that derivation
+ * is analytical, so it belongs in engine/, not here (ARCHITECTURE.md §3 hard
+ * rule 2). The Home/Away split just filters that walk by venue.
+ */
+function renderTablePane() {
+  const legend = LEAGUE_ZONES.map(z => `
+    <span class="fx-legend__item">
+      <span class="fx-zone-key fx-zone-key--${z.key}" aria-hidden="true"></span>${esc(z.label)}
+    </span>`).join('');
+
+  _panes.table.innerHTML = `
+    <header class="fx-pane__head">
+      <div class="fx-pane__headline">
+        <h2 class="fx-pane__title">League table</h2>
+        <p class="fx-pane__sub">
+          <span>After ${ph(2)} gameweeks</span>
+          <span>Updated ${ph(12)}</span>
+        </p>
+      </div>
+      <div class="fx-legend">${legend}</div>
+    </header>
+
+    <div class="fx-table-wrap">
+      <table class="fx-table fx-league">
+        <thead>
+          <tr>
+            ${LEAGUE_COLUMNS.map(c => `
+              <th scope="col"${c.num ? ' class="fx-league__num"' : ''}>${esc(c.label)}</th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>${times(LEAGUE_SIZE, skelLeagueRow)}</tbody>
+      </table>
+    </div>
+
+    <p class="fx-detail__note">
+      Form is the last five results, most recent last. Selecting a team name
+      will open that team's results and fixtures in the By team view.
+    </p>
   `;
 }
 
@@ -491,12 +613,27 @@ function onModeClick(e) {
 
 /**
  * Delegated on _panesWrap (stable across renders) rather than per-button — the
- * "Open full head-to-head" buttons are rebuilt on every renderGameweekPane().
- * DATA SEAM: this is also where the clicked fixture's two team ids get pushed
- * into the h2h selects before the mode switch.
+ * cross-link buttons are rebuilt on every render*Pane() call.
+ * DATA SEAM: this is also where the clicked row's team id(s) get pushed into
+ * the target mode's picker before the mode switch.
  */
 function onPanesClick(e) {
-  if (e.target.closest('[data-fx-open-h2h]')) setMode('h2h');
+  if (e.target.closest('[data-fx-open-h2h]'))  { setMode('h2h');  return; }
+  if (e.target.closest('[data-fx-open-team]')) { setMode('team'); }
+}
+
+/**
+ * Overall / Home / Away split for the league table.
+ * DATA SEAM: re-run the standings walk filtered by venue, then re-render.
+ */
+function onScopeClick(e) {
+  const btn = e.target.closest('.fx-scope__btn');
+  if (!btn) return;
+  _root.querySelectorAll('.fx-scope__btn').forEach(b => {
+    const active = b === btn;
+    b.classList.toggle('is-active', active);
+    b.setAttribute('aria-pressed', String(active));
+  });
 }
 
 /**
@@ -542,11 +679,13 @@ export function initFixtures() {
 
   // Built once — there is no data to re-render against yet.
   renderGameweekPane();
+  renderTablePane();
   renderTeamPane();
   renderH2hPane();
 
   _root.querySelector('.fx-modes')?.addEventListener('click', onModeClick);
   _root.querySelector('.fx-controls')?.addEventListener('click', onGwStep);
+  _root.querySelector('.fx-scope')?.addEventListener('click', onScopeClick);
   _panesWrap?.addEventListener('click', onPanesClick);
 
   _root.querySelector('#fx-team-select')?.addEventListener('change', syncTeamHeading);

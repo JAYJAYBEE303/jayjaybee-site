@@ -69,6 +69,8 @@
           <div class="fx-modes" role="group" aria-label="Fixtures view">
             <button class="fx-modes__btn is-active" data-fx-mode="gameweek"
                     type="button" aria-pressed="true">Gameweek</button>
+            <button class="fx-modes__btn" data-fx-mode="table"
+                    type="button" aria-pressed="false">Table</button>
             <button class="fx-modes__btn" data-fx-mode="team"
                     type="button" aria-pressed="false">By team</button>
             <button class="fx-modes__btn" data-fx-mode="h2h"
@@ -84,6 +86,18 @@
             <button class="fx-step" data-fx-gw="next" type="button"
                     aria-label="Next gameweek">›</button>
             <button class="fx-step__now" data-fx-gw="now" type="button">This GW</button>
+          </div>
+
+          <div class="fx-picker" data-fx-picker="table" hidden>
+            <span class="fx-label" id="fx-scope-label">Split</span>
+            <div class="fx-scope" role="group" aria-labelledby="fx-scope-label">
+              <button class="fx-scope__btn is-active" data-fx-scope="overall"
+                      type="button" aria-pressed="true">Overall</button>
+              <button class="fx-scope__btn" data-fx-scope="home"
+                      type="button" aria-pressed="false">Home</button>
+              <button class="fx-scope__btn" data-fx-scope="away"
+                      type="button" aria-pressed="false">Away</button>
+            </div>
           </div>
 
           <div class="fx-picker" data-fx-picker="team" hidden>
@@ -103,6 +117,7 @@
 
         <div class="fx-panes">
           <div class="fx-pane is-active" data-fx-pane="gameweek"></div>
+          <div class="fx-pane" data-fx-pane="table"></div>
           <div class="fx-pane" data-fx-pane="team"></div>
           <div class="fx-pane" data-fx-pane="h2h"></div>
         </div>
