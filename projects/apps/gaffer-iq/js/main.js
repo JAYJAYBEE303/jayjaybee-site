@@ -28,6 +28,7 @@ import {
 } from './engine/counter.js';
 
 import { initMatchup }      from './modules/matchup.js';
+import { initFixtures }     from './modules/fixtures.js';
 import { initRanker }       from './modules/ranker.js';
 import { initDashboard }    from './modules/dashboard.js';
 import { initPlanner }      from './modules/planner.js';
@@ -287,6 +288,7 @@ routeToHash();
 // Modules register their store subscriptions here, before loadInitialData() is
 // called, so they are in place when data:ready fires.
 initMatchup();
+initFixtures();
 initRanker();
 initDashboard();
 initPlanner();

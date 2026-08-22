@@ -149,8 +149,9 @@ gaffer-iq/                          (= projects/gaffer-iq/ in the repo)
     │   ├── counter.js          # Position-based counter-matchup scoring.
     │   └── composite.js        # Combines all metrics → composite matchup score.
     │
-    └── modules/                # The four features. These OWN the DOM; engine never does.
+    └── modules/                # The feature views. These OWN the DOM; engine never does.
         ├── matchup.js          # Matchup Analyser.
+        ├── fixtures.js         # Fixtures: GW grid, per-team schedule, H2H history.
         ├── ranker.js           # Player Ranker.
         ├── dashboard.js        # GW Decision Dashboard.
         └── planner.js          # Transfer Planner.
@@ -441,6 +442,7 @@ All four modules consume the **same** engine output (composite scores + breakdow
 
 Relationships, concretely:
 - **Matchup Analyser** is the "view source" for a single fixture. Other modules link into it ("why is this score what it is?").
+- **Fixtures** is the schedule-level companion to the Matchup Analyser: the GW grid (kickoff times, results, per-fixture events and lineups), one team's results/upcoming split, and the full H2H history for a pairing. It carries no scoring of its own — it is the "what and when" view that the Matchup Analyser then explains. *Currently a structural blueprint: `js/modules/fixtures.js` renders placeholders only, with every data seam marked `DATA SEAM:`.*
 - **Player Ranker** = player form × that player's fixture composite over the horizon → a ranked projected-value list. It is the bridge between team-level fixture scores and player-level decisions.
 - **GW Dashboard** is horizon-locked to `GW1` by design (it's about *this* week's decisions: captaincy, starting XI, bench order, risk flags). It consumes the ranker's projections and the live endpoint.
 - **Transfer Planner** is the most horizon-aware module: it takes your current squad (entered manually in Phase 1; possibly imported in a later phase), the ranker's projections over the chosen horizon, and budget/free-transfer constraints, and proposes the moves that most raise projected total. It depends on the ranker and, through it, the whole engine.

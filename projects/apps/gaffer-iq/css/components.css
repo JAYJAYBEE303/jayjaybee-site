@@ -3511,3 +3511,827 @@
     padding: var(--space-2) var(--space-3);
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FIXTURES — gameweek grid, per-team results/fixtures, head-to-head history
+   STRUCTURAL BLUEPRINT. Every value inside these blocks is a placeholder bar
+   (.fx-ph) rendered by js/modules/fixtures.js; the layout, hierarchy and
+   control affordances are the thing being reviewed, not the numbers.
+   Prefixed fx- throughout. BEM-lite per CONVENTIONS.md §5.1, tokens only.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Blueprint banner ───────────────────────────────────────────────────── */
+
+.fx-blueprint-note {
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-4);
+  border: 1px var(--estimated-border-style) var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-muted);
+  font-size: var(--font-size-xs);
+  line-height: 1.6;
+}
+
+.fx-blueprint-note strong { color: var(--color-text); }
+
+/* ─── Placeholder bar ─────────────────────────────────────────────────────
+   Stands in for one unwired value. Width comes from JS in ch units so each
+   bar occupies roughly the space its eventual string will. Deliberately flat
+   and unanimated — this is a wireframe, not a loading state. */
+
+.fx-ph {
+  display: inline-block;
+  height: 0.72em;
+  vertical-align: -0.05em;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-subtle);
+  min-width: 1ch;
+}
+
+/* Time-shaped values read as outlines, not solid blocks, so a kickoff time
+   never gets mistaken for a score. */
+.fx-ph--time {
+  background: transparent;
+  border-style: var(--estimated-border-style);
+}
+
+/* ─── Controls bar ───────────────────────────────────────────────────────── */
+
+.fx-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+  padding-bottom: var(--space-4);
+  margin-bottom: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* Mode switch. Same visual language as .horizon-switcher, but scoped here so
+   a change to the global switcher cannot silently restyle this module. */
+.fx-modes {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.fx-modes__btn {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-muted);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.fx-modes__btn:hover {
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  border-color: var(--color-muted);
+}
+
+.fx-modes__btn.is-active {
+  background: var(--color-accent-muted);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.fx-picker {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.fx-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.fx-select {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-sans);
+  padding: var(--space-1) var(--space-3);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.fx-select:hover { border-color: var(--color-muted); }
+
+.fx-select:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-color: var(--color-accent);
+}
+
+/* GW stepper — arrows, label, and a "back to now" escape hatch. */
+.fx-step,
+.fx-step__now,
+.fx-swap {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  line-height: 1;
+  padding: var(--space-1) var(--space-2);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.fx-step:hover,
+.fx-step__now:hover,
+.fx-swap:hover {
+  background: var(--color-surface-raised);
+  border-color: var(--color-muted);
+}
+
+.fx-step__now { color: var(--color-muted); }
+
+.fx-step__label {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  min-width: 12ch;
+  text-align: center;
+}
+
+/* ─── Panes ──────────────────────────────────────────────────────────────── */
+
+/* Mirrors the .module-view show/hide contract one level down: exactly one
+   pane carries .is-active at a time (see setMode() in fixtures.js). */
+.fx-pane { display: none; }
+.fx-pane.is-active { display: block; }
+
+.fx-pane__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.fx-pane__title {
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.fx-pane__sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+  margin-top: var(--space-1);
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+}
+
+.fx-pane__sub > span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* ─── Status legend ──────────────────────────────────────────────────────── */
+
+.fx-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
+
+.fx-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* ─── Status chip ────────────────────────────────────────────────────────── */
+
+.fx-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 4.5ch;
+  padding: 1px var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--band-neutral-bg);
+  color: var(--color-muted);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+}
+
+.fx-status--live {
+  background: var(--band-good-bg);
+  border-color: var(--band-good);
+  color: var(--band-good);
+}
+
+.fx-status--upcoming {
+  background: var(--color-accent-muted);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+/* ─── Day grouping ───────────────────────────────────────────────────────── */
+
+.fx-daygroup { margin-bottom: var(--space-6); }
+
+.fx-daygroup__title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding-bottom: var(--space-2);
+  margin-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-border-subtle);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.fx-daygroup__day {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
+
+/* ─── Fixture list ───────────────────────────────────────────────────────── */
+
+.fx-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.fx-item { list-style: none; }
+
+.fx-fixture {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+
+.fx-fixture[open] { border-color: var(--color-muted); }
+
+.fx-fixture__summary {
+  display: grid;
+  grid-template-columns: 5.5ch 1fr 10ch 1fr 12ch 2ch;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+  list-style: none;
+  transition: background 0.15s;
+}
+
+.fx-fixture__summary::-webkit-details-marker { display: none; }
+.fx-fixture__summary:hover { background: var(--color-surface-raised); }
+
+.fx-side {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/* The away side mirrors so both team names sit against the centre score. */
+.fx-side--away { flex-direction: row-reverse; }
+
+.fx-side__name {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+/* Crest slot — an empty ring until real badges land. */
+.fx-crest {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1px var(--estimated-border-style) var(--color-border);
+  background: var(--color-surface-raised);
+}
+
+.fx-crest--sm { width: 14px; height: 14px; }
+.fx-crest--lg { width: 44px; height: 44px; border-radius: var(--radius-md); }
+
+.fx-fixture__centre {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.fx-fixture__score {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-md);
+  font-weight: 700;
+}
+
+.fx-fixture__score em {
+  font-style: normal;
+  color: var(--color-muted);
+}
+
+.fx-fixture__ko,
+.fx-fixture__venue {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
+
+.fx-fixture__venue { text-align: right; }
+
+.fx-fixture__chev {
+  color: var(--color-muted);
+  font-size: var(--font-size-sm);
+  transition: transform 0.15s;
+}
+
+.fx-fixture[open] .fx-fixture__chev { transform: rotate(180deg); }
+
+/* ─── Fixture detail disclosure ──────────────────────────────────────────── */
+
+.fx-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg);
+}
+
+.fx-detail__block {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+}
+
+.fx-detail__title {
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-muted);
+  margin-bottom: var(--space-3);
+}
+
+.fx-detail__cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+.fx-detail__note {
+  margin-top: var(--space-2);
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+/* ─── Match events ───────────────────────────────────────────────────────── */
+
+.fx-events {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.fx-event {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+}
+
+/* Away events read right-to-left so the two feeds mirror the pitch. */
+.fx-events--away .fx-event {
+  flex-direction: row-reverse;
+  text-align: right;
+}
+
+.fx-event__min {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  flex-shrink: 0;
+}
+
+.fx-event__icon {
+  font-size: var(--font-size-sm);
+  line-height: 1;
+}
+
+.fx-event__type {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
+
+/* ─── Lineups ────────────────────────────────────────────────────────────── */
+
+.fx-lineup__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
+  margin-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-border-subtle);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.fx-lineup__formation {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
+
+.fx-lineup__subhead {
+  margin: var(--space-3) 0 var(--space-2);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-muted);
+}
+
+.fx-lineup__list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.fx-lineup__list--bench { opacity: 0.7; }
+
+.fx-lineup__row {
+  display: grid;
+  grid-template-columns: 3ch 1fr 5ch;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+}
+
+.fx-lineup__num {
+  font-family: var(--font-mono);
+  color: var(--color-muted);
+}
+
+.fx-lineup__pos {
+  text-align: right;
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
+
+/* ─── H2H peek inside a fixture ──────────────────────────────────────────── */
+
+.fx-h2h-mini {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+  font-size: var(--font-size-sm);
+}
+
+.fx-h2h-mini__tally,
+.fx-h2h-mini__trend {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.fx-h2h-mini__tally em,
+.fx-h2h-mini__trend {
+  font-style: normal;
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
+
+.fx-link-btn {
+  margin-top: var(--space-3);
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--color-accent);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.fx-link-btn:hover { text-decoration: underline; }
+
+/* ─── Form / result pips ─────────────────────────────────────────────────── */
+
+.fx-pips {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.fx-pip {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--band-neutral);
+}
+
+.fx-pip--w { background: var(--band-good); }
+.fx-pip--d { background: var(--band-neutral); }
+.fx-pip--l { background: var(--band-brutal); }
+
+/* ─── Team pane ──────────────────────────────────────────────────────────── */
+
+.fx-pane__head--team { align-items: center; }
+
+.fx-teamhead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.fx-stat-row {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.fx-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 6ch;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+
+.fx-stat__label {
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-muted);
+}
+
+.fx-stat__value {
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
+/* Two-column results/upcoming split — same 1fr 1fr rhythm as .fx-detail__cols. */
+.fx-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-6);
+}
+
+.fx-col__title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
+  margin-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  font-size: var(--font-size-md);
+  font-weight: 600;
+}
+
+.fx-col__count {
+  font-size: var(--font-size-xs);
+  font-weight: 400;
+  color: var(--color-muted);
+}
+
+.fx-list--compact { gap: var(--space-1); }
+
+.fx-row {
+  display: grid;
+  grid-template-columns: 12ch 3ch 1fr 8ch 5ch;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  font-size: var(--font-size-sm);
+}
+
+.fx-row:hover {
+  border-color: var(--color-border);
+  background: var(--color-surface-raised);
+}
+
+.fx-row__date {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
+
+.fx-venue {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
+
+.fx-row__opp {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.fx-row__value {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
+.fx-row__value em {
+  font-style: normal;
+  color: var(--color-muted);
+}
+
+.fx-row__tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px var(--space-1);
+  border: 1px var(--estimated-border-style) var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+}
+
+/* ─── Head-to-head pane ──────────────────────────────────────────────────── */
+
+.fx-h2h-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.fx-h2h-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  text-align: center;
+}
+
+/* The three result tiles borrow band colour so the split reads at a glance:
+   team A wins, draws, team B wins (CONVENTIONS.md §5.2 colours). */
+.fx-h2h-tile--a { border-color: var(--band-good);    background: var(--band-good-bg); }
+.fx-h2h-tile--d { border-color: var(--band-neutral); background: var(--band-neutral-bg); }
+.fx-h2h-tile--b { border-color: var(--band-tough);   background: var(--band-tough-bg); }
+
+.fx-h2h-tile__value {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+}
+
+.fx-h2h-tile__label {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
+
+.fx-h2h-trend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  margin-bottom: var(--space-4);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+}
+
+.fx-h2h-trend__label { font-weight: 600; }
+
+.fx-h2h-trend__note {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
+
+.fx-table-wrap {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+}
+
+.fx-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+}
+
+.fx-table th {
+  position: sticky;
+  top: 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface-raised);
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+.fx-table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.fx-table tbody tr:last-child td { border-bottom: none; }
+.fx-table tbody tr:hover { background: var(--color-surface); }
+
+.fx-table__score {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.fx-table__score em {
+  font-style: normal;
+  color: var(--color-muted);
+}
+
+/* ─── Fixtures: mobile ───────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+
+  .fx-controls { gap: var(--space-3); }
+
+  .fx-modes { width: 100%; }
+  .fx-modes__btn { flex: 1; min-height: 44px; }
+
+  .fx-picker { width: 100%; }
+  .fx-select { flex: 1; min-width: 0; }
+
+  .fx-step,
+  .fx-step__now,
+  .fx-swap { min-height: 44px; min-width: 44px; }
+
+  /* Fixture row drops the venue column and stacks status above the pairing. */
+  .fx-fixture__summary {
+    grid-template-columns: 1fr 9ch 1fr;
+    grid-template-areas:
+      "status status status"
+      "home   centre away";
+    row-gap: var(--space-2);
+    padding: var(--space-3);
+  }
+
+  .fx-fixture__summary > .fx-status { grid-area: status; justify-self: start; }
+  .fx-side--home      { grid-area: home; }
+  .fx-fixture__centre { grid-area: centre; }
+  .fx-side--away      { grid-area: away; }
+
+  .fx-fixture__venue,
+  .fx-fixture__chev { display: none; }
+
+  /* Both two-column blocks collapse to one. */
+  .fx-detail__cols,
+  .fx-two-col { grid-template-columns: 1fr; }
+
+  .fx-row { grid-template-columns: 10ch 2ch 1fr 7ch; }
+  .fx-row__tag { display: none; }
+
+  .fx-pane__head { flex-direction: column; align-items: flex-start; }
+}

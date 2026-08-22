@@ -23,6 +23,7 @@
 
       <nav class="module-nav" aria-label="Module navigation">
         <a class="module-nav__item is-active" href="#matchup">Matchup</a>
+        <a class="module-nav__item" href="#fixtures">Fixtures</a>
         <a class="module-nav__item" href="#ranker">Ranker</a>
         <a class="module-nav__item" href="#dashboard">Dashboard</a>
         <a class="module-nav__item" href="#planner">Planner</a>
@@ -50,6 +51,62 @@
           </div>
           <aside class="team-nav" aria-label="Team fixture navigator"></aside>
         </div>
+      </section>
+
+      <!-- FIXTURES — structural blueprint (js/modules/fixtures.js).
+           Containers only: the three panes are filled with placeholder
+           skeletons by the module, exactly where real data will go. -->
+      <section class="module-view" data-module="fixtures" aria-label="Fixtures">
+
+        <p class="fx-blueprint-note">
+          <strong>Blueprint.</strong> Layout and navigation only — every value on this
+          tab is a placeholder. No fixture, event, lineup or head-to-head data is
+          wired up yet.
+        </p>
+
+        <div class="fx-controls">
+
+          <div class="fx-modes" role="group" aria-label="Fixtures view">
+            <button class="fx-modes__btn is-active" data-fx-mode="gameweek"
+                    type="button" aria-pressed="true">Gameweek</button>
+            <button class="fx-modes__btn" data-fx-mode="team"
+                    type="button" aria-pressed="false">By team</button>
+            <button class="fx-modes__btn" data-fx-mode="h2h"
+                    type="button" aria-pressed="false">Head-to-head</button>
+          </div>
+
+          <!-- One picker per mode; the module toggles `hidden` so only the
+               active mode's controls are present. -->
+          <div class="fx-picker" data-fx-picker="gameweek">
+            <button class="fx-step" data-fx-gw="prev" type="button"
+                    aria-label="Previous gameweek">‹</button>
+            <span class="fx-step__label" id="fx-gw-label">Gameweek —</span>
+            <button class="fx-step" data-fx-gw="next" type="button"
+                    aria-label="Next gameweek">›</button>
+            <button class="fx-step__now" data-fx-gw="now" type="button">This GW</button>
+          </div>
+
+          <div class="fx-picker" data-fx-picker="team" hidden>
+            <label class="fx-label" for="fx-team-select">Team</label>
+            <select class="fx-select" id="fx-team-select"></select>
+          </div>
+
+          <div class="fx-picker" data-fx-picker="h2h" hidden>
+            <label class="fx-label" for="fx-h2h-a">Head-to-head</label>
+            <select class="fx-select" id="fx-h2h-a"></select>
+            <button class="fx-swap" id="fx-h2h-swap" type="button"
+                    aria-label="Swap the two teams">⇄</button>
+            <select class="fx-select" id="fx-h2h-b"></select>
+          </div>
+
+        </div>
+
+        <div class="fx-panes">
+          <div class="fx-pane is-active" data-fx-pane="gameweek"></div>
+          <div class="fx-pane" data-fx-pane="team"></div>
+          <div class="fx-pane" data-fx-pane="h2h"></div>
+        </div>
+
       </section>
 
       <section class="module-view" data-module="ranker" aria-label="Player Ranker">
