@@ -224,6 +224,22 @@
   letter-spacing: var(--tr-headline);
 }
 
+/* Display variant — for a section title that IS the page's opening
+   heading, on pages with no separate .lede-block above it. Borrows the
+   lede's type tokens so it reads at hero scale. Keep in sync with
+   .lede-line below, including its narrow-viewport clamp. */
+.section-title--display {
+  font-size: var(--fs-display);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--tr-display);
+  text-wrap: balance;
+}
+@media (max-width: 30rem) {
+  .section-title--display {
+    font-size: clamp(2rem, 8.5vw, 3.25rem);
+  }
+}
+
 /* =========================================================================
    LEDE — the opening line. The single biggest element on the page.
    ========================================================================= */

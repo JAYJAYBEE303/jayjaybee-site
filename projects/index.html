@@ -2,6 +2,7 @@
 layout: default
 title: Projects — Josh Bailey
 description: Things I've made. Tools, calculators, and analysis engines built to scratch an itch — FC26 Feel Calculator, Gaffer IQ, and whatever comes next.
+scroll_gate: false
 ---
 
 <!-- =============================================================
@@ -15,27 +16,25 @@ description: Things I've made. Tools, calculators, and analysis engines built to
 
      Self-contained apps under /projects/apps/ are deliberately
      exempt: they own their whole document and share none of this.
+
+     `scroll_gate: false` opts out of the layout's scroll-gate. The
+     gate holds the whole body hidden until the reader scrolls past
+     the hero — right for the home page, wrong here, where there is
+     no hero to read first and the work should just be there. The
+     per-element reveal observer still runs, so items below the fold
+     continue to fade in as they scroll into view.
      ============================================================= -->
 
 <!-- ============================================================
-     Lede — gives the page its <h1>. The work section below keeps
-     its own .section-head eyebrow + <h2>, exactly as it appeared
-     on the home page.
-     ============================================================ -->
-<section class="lede-block" aria-label="Introduction">
-  <p class="mono-label lede-meta">Projects&nbsp;·&nbsp;Josh&nbsp;Bailey</p>
-  <h1 class="lede-line">
-    <span class="lede-line__row">Things I've made.</span>
-  </h1>
-</section>
-
-<!-- ============================================================
-     Selected work — moved here verbatim from the home page.
+     Selected work — the whole page. No separate lede block: this
+     section's own head carries the page heading, promoted to <h1>
+     and to hero scale via .section-title--display, so the reader
+     lands straight on the work.
      ============================================================ -->
 <section class="work" aria-labelledby="work-heading">
   <header class="section-head">
     <span class="mono-label">Selected&nbsp;work</span>
-    <h2 id="work-heading" class="section-title">Things I've made.</h2>
+    <h1 id="work-heading" class="section-title section-title--display">Things I've made.</h1>
   </header>
 
   <ol class="work-list" role="list">

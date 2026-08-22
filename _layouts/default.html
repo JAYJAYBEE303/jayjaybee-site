@@ -37,10 +37,18 @@
       var root = document.documentElement;
       root.classList.replace('no-js', 'js');
 
+      // Pages opt out of the gate with `scroll_gate: false` in front
+      // matter. The gate exists to hold the body back until the reader
+      // has passed the hero — pages without a hero to read first (the
+      // projects wiki) don't want it. This only removes the extra
+      // hold-everything condition: the per-element reveal observer in
+      // animations.js still fades each item in as it scrolls into view.
+      var gate = {% if page.scroll_gate == false %}false{% else %}true{% endif %};
+
       // Reduced-motion users: skip the gate entirely.
       var reduce = window.matchMedia &&
                    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      if (reduce) return;
+      if (reduce || !gate) return;
 
       root.classList.add('is-gated');
 
@@ -88,7 +96,7 @@
     })();
   </script>
 
-  <link rel="stylesheet" href="/assets/css/global.css?v=47" />
+  <link rel="stylesheet" href="/assets/css/global.css?v=48" />
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -278,7 +286,7 @@
       <div class="footer-block footer-block--colophon">
         <span class="mono-label">Colophon</span>
         <p class="footer-line">
-          Set in Newsreader, Hanken Grotesk, and IBM Plex Mono. Built in Silverstone. Last touched May&nbsp;2026.
+          Set in Newsreader, Hanken Grotesk, and IBM Plex Mono. Built in Silverstone. Last touched September&nbsp;2026.
         </p>
       </div>
 
