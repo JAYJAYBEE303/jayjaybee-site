@@ -738,13 +738,27 @@ same `maturity` the engine applied, so they cannot disagree with the score.
 | Metric | `N` | Unit |
 |---|---|---|
 | `teamForm` | `FORM_WINDOW_GWS` (5) | matches played — **exact** |
-| `counterMatchup` | `CHANNEL_MATURITY_FULL_MATCHES` (9) | matches' **worth of shot data** — approximate |
+| `counterMatchup` | `CHANNEL_MATURITY_FULL_MATCHES` (10) | matches' **worth of shot data**, for the thinner of the two sides — approximate |
 
-The counter-matchup unit is the one place this is not a literal match count: that
-ramp is driven by a shot total (`CHANNEL_MATURITY_FULL_SHOTS` = 120), so a
-high-volume side arrives in fewer than nine matches and a low-volume one takes
-more. The row's tooltip says exactly that rather than implying a precision the
-number does not have.
+`counterMatchup`'s unit is the one place this is not a literal match count, for
+**two** reasons the row's tooltip spells out rather than glossing:
+
+  1. It ramps on a shot total (`CHANNEL_MATURITY_FULL_SHOTS` = 120), so a
+     high-volume side arrives in fewer than ten matches and a low-volume one
+     takes more.
+  2. It is a **pairing** reading, not a team one. `calcCombinedCounterMatchup`
+     takes `min()` of the two sides' maturities — a blend is only as
+     well-evidenced as its weaker half — so a thoroughly-covered team still
+     shows a low counter while its opponent's profile is thin. Observed live:
+     Man Utd on 21 shots against Ipswich on 10 reads from Ipswich's 10.
+
+`done` is computed with **`Math.round`, clamped to `N - 1`**, not `Math.floor`.
+Flooring under-reported by up to a whole unit across the entire range: one match
+in, a team carries ~13 of the 120 shots needed, which is 1.08 tenths of the
+window — and floor rendered that as `0/10` when a match had plainly been played.
+The clamp covers the other end, so a metric at 96% cannot round up to `10/10`
+and claim a completeness it has not reached; that display is unreachable by
+construction, because `maturity >= 1` hides the counter entirely.
 
 ---
 

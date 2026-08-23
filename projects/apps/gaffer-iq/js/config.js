@@ -576,17 +576,22 @@ export const CHANNEL_SENSITIVITY = 14;
 export const CHANNEL_MATURITY_FULL_SHOTS = 120;
 
 // The same threshold expressed in MATCHES, for display only — the breakdown's
-// maturity counter reads "6/9" because matches are the unit a reader reasons
+// maturity counter reads "6/10" because matches are the unit a reader reasons
 // in, while the ramp itself is driven by the shot count above.
 //
-// The two are not perfectly interchangeable and the UI must not pretend they
-// are: a high-volume side reaches 120 shots in fewer than nine matches and a
+// 10 to CHANNEL_MATURITY_FULL_SHOTS' 120 implies 12 shots a match, which sits
+// squarely in the Premier League's actual range (~11–13 depending on season and
+// side). A tenth of the window per match is also the reading a user naturally
+// expects from a counter, and there is no accuracy to be bought by picking a
+// denominator that is harder to reason about.
+//
+// The two units are not perfectly interchangeable and the UI must not pretend
+// they are: a high-volume side reaches 120 shots in fewer than ten matches and a
 // low-volume one takes more, so this counter tracks "matches' worth of shot
-// data", not matches played. The row's tooltip says so. Derived from the ~13
-// shots a PL side averages per match, the same figure the constant above is
-// justified by — kept as its own explicit number rather than computed at the
-// call site so the rounding is decided here, once.
-export const CHANNEL_MATURITY_FULL_MATCHES = 9;
+// data", not matches played. The row's tooltip says so. Kept as its own explicit
+// number rather than computed from the shot count at the call site, so the
+// rounding is decided here, once.
+export const CHANNEL_MATURITY_FULL_MATCHES = 10;
 
 // Which roles supply each channel axis, for personnel weighting.
 // MODEL: the axes are shot-partition shares of a SEASON, so they cannot react

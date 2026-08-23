@@ -798,8 +798,15 @@ function counterMatchupTooltip(m) {
  *
  * Derived from `maturity` rather than from a raw game count, so the counter and
  * the weight the engine actually applied can never disagree: both read the same
- * number. Floors rather than rounds, so "5/5" appears only on a genuinely full
- * window and never a hair before it.
+ * number.
+ *
+ * ROUNDS, and this matters. Flooring under-reported by up to a whole unit
+ * across the entire range: a team one match in carries ~13 of the 120 shots
+ * counterMatchup needs, which is 1.08 tenths of the window — floor made that
+ * read "0/10" when a match had plainly been played. The clamp to `total - 1`
+ * handles the other end, so a metric at 96% cannot round up to "10/10" and
+ * claim a completeness it hasn't reached; that state is only ever reached by
+ * `maturity >= 1`, which returns null and hides the counter entirely.
  *
  * @param {string} key
  * @param {object} m  the breakdown entry
@@ -814,7 +821,7 @@ function maturityProgress(key, m) {
   const maturity = typeof m.maturity === 'number' ? clamp(0, 1, m.maturity) : 1;
   if (maturity >= 1) return null;
 
-  return { done: Math.min(total, Math.floor(maturity * total)), total };
+  return { done: Math.min(total - 1, Math.round(maturity * total)), total };
 }
 
 /** Tooltip for the maturity counter, in the unit that metric actually ramps on. */
@@ -827,8 +834,10 @@ function maturityTooltip(key, m, progress) {
   return key === 'teamForm'
     ? `${progress.done} of the ${progress.total} matches this metric reads once the season is `
       + `under way. ${tail}`
-    : `About ${progress.done} matches' worth of the shot data this metric needs — it ramps on `
-      + `shots, not matches, so a team that shoots a lot gets there sooner. ${tail}`;
+    : `About ${progress.done} matches' worth of the shot data this metric needs. Two things make `
+      + `that differ from matches played: it ramps on SHOTS, so a team that shoots a lot arrives `
+      + `sooner, and it reads BOTH teams — it can only be as well-evidenced as whichever side has `
+      + `published less, so a well-covered team still waits on its opponent. ${tail}`;
 }
 
 function buildBreakdownRows(breakdown, venue) {
