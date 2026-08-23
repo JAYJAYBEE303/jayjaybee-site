@@ -465,6 +465,8 @@ The Matchup Analyser shows two labelled sections per team card: **Attacking Coun
 ```
 mirroredPairing(p).value = 100 - attackingPairing(p).value
 ```
+
+**Every other field is carried across by spread**, not by an explicit list. This matters: the function originally enumerated the fields to copy (`attackForm`, `defenceForm`, `attackerCount`, `defenderCount`), and when the channel tier replaced the position tier (2026-08-21) that list was never updated. Each mirrored pairing then copied four fields that no longer existed and dropped the three the active tier actually produces (`attackShare`, `concedeShare`, `personnel`). The Matchup Analyser decides how to format a pairing by testing `attackShare !== undefined`, so every **Defending Counters** row fell through to the retired tier's formatter and rendered `Def — / Atk —`: correct scores, blank detail line, for as long as the channel tier had been live. Spreading keeps whatever the active tier emits and cannot go stale again if the position tier is switched back on.
 This is **not** a second independent `50 + edge * SENSITIVITY` calculation — it is arithmetically derived from the same computed edge, so `attackingValue + mirroredValue === 100` **exactly**, by construction, **for every pairing**. The identity holds even through `clamp(0,100,...)`: for any real `y`, `100 - clamp(0,100,y) === clamp(0,100,100-y)` (trivial by cases: `y<0` → `100-0=100` and `clamp(100-y)=clamp(>100)=100`; `y>100` → `100-100=0` and `clamp(100-y)=clamp(<0)=0`; `0≤y≤100` → both sides equal `100-y`). Verified numerically against real (non-synthetic-formula) pairing data: `stVsCb (67.590909) + cbVsSt (32.409091) = 100.0000000000`, `wmVsFb (54.216756) + fbVsWm (45.783244) = 100.0000000000`, `cmVsCbDm (56.703717) + cbDmVsCm (43.296283) = 100.0000000000`, aggregate `61.177534 + 38.822466 = 100.0000000000`.
 
 **Precision caveat (aggregate only).** The per-pairing identity is exact in
@@ -788,6 +790,33 @@ because `maturity * total` is a float division round-tripped: `3/5 * 5` is
 `2.9999999999999996`, which floor turns into 2. The clamp guards the top, so a
 metric at 96% cannot round up to `10/10` and claim a completeness it has not
 reached — unreachable anyway, since `maturity >= 1` hides the counter.
+
+### 8.8.1 Counter pairing "i" panels (`buildPairingExplainer`)
+
+Each Attacking/Defending Counters row opens onto a disclosure panel. It used to
+contain only the named players behind the pairing, which answered *who is
+involved* but never *what am I looking at* — the score and its two percentages
+were documented nowhere in the UI, so they read as arbitrary. The panel now
+leads with an explanation and keeps the player list beneath it.
+
+The explanation states, for the row's own axis:
+
+- that **both percentages are shares of a team's own xG, not volumes** — they describe *how* a side scores and concedes, not how much. This is the single most misreadable thing about the section: "Box Occupation — Def 97%" invites reading as "this team is terrible in the box" when it means "97% of what they concede is from inside it", which is close to normal for everyone.
+- what each share measures, phrased from the perspective of the section it sits in (a Defending Counters row leads with the defensive share, matching the score row above it).
+- the personnel scaling, **only when it is not 1** — a line saying "scaled to 100%" is noise.
+- that the score feeds Counter-Matchup, at a weight read live from `WEIGHTS.counterMatchup` rather than written into the copy, so a rebalance cannot leave the text lying.
+
+**Deliberately descriptive, not directional.** The panel says what each figure
+*measures* and stops there — it does not tell the reader which way a high score
+should be read. That is a considered omission, not an oversight:
+`calcChannelCounter` scores an axis as `attackShare − concedeShare`, which
+*rises as the opponent concedes less through that channel* — the reverse of the
+"my strength meets their weakness" reading §7.2's model comment describes.
+Verified with controlled inputs at the documented league spread (set-piece share
+0.170–0.370): a side that specialises in set pieces facing one that leaks them
+scores **50**, while the same side facing one that defends them well scores
+**91**. Until that direction is settled, copy asserting an interpretation would
+document behaviour the engine does not have.
 
 ---
 

@@ -569,15 +569,19 @@ export function calcCounterMatchupMirrored(attackingResult) {
       continue;
     }
 
-    pairings[mirroredKey] = {
-      value:         mirroredValue,
-      weight:        p.weight,
-      estimated:     p.estimated,
-      attackForm:    p.attackForm,
-      defenceForm:   p.defenceForm,
-      attackerCount: p.attackerCount,
-      defenderCount: p.defenderCount,
-    };
+    // SPREAD, not an explicit field list. This used to enumerate the fields to
+    // carry across — attackForm/defenceForm/attackerCount/defenderCount — which
+    // were the RETIRED position tier's fields. When the channel tier replaced it
+    // (2026-08-21) the list was never updated, so every mirrored pairing copied
+    // four fields that no longer exist (all undefined) and silently dropped the
+    // three that do: attackShare, concedeShare, personnel. The Matchup card
+    // decides how to render a pairing by testing `attackShare !== undefined`, so
+    // every Defending Counters row fell through to the retired tier's formatter
+    // and printed "Def — / Atk —" — the values were right, the detail line was
+    // empty. Spreading keeps whichever fields the active tier actually produces,
+    // and cannot go stale again if the position tier is ever switched back on.
+    // The blank-pairing branch above already did this correctly.
+    pairings[mirroredKey] = { ...p, value: mirroredValue };
 
     weightedSum += mirroredValue * p.weight;
     totalWeight += p.weight;

@@ -87,6 +87,26 @@ const PAIRING_LABELS = {
 
 // Defending mirror of PAIRING_LABELS — same units, defender-first phrasing.
 // Keys must match MIRRORED_PAIRING_KEYS in engine/counter.js.
+/**
+ * The PHASE OF PLAY each channel axis describes, as a noun phrase that reads
+ * naturally mid-sentence in the "i" panel's explanation.
+ *
+ * Keyed by both the attacking and the defending key for the same axis, mapping
+ * to the SAME phrase: a set piece is a set piece whichever end you read it
+ * from. Using the row's own label instead produced "of the xG this team
+ * concedes comes through set-piece defence", which is circular — the phase is
+ * set pieces, "defence" is the perspective, and the sentence already supplies
+ * the perspective.
+ */
+const CHANNEL_PHASE_NOUN = {
+  setPieceThreat:    'set pieces',
+  wideTransition:    'fast transitions',
+  boxThreat:         'chances inside the box',
+  setPieceDefence:   'set pieces',
+  transitionDefence: 'fast transitions',
+  boxDefence:        'chances inside the box',
+};
+
 const DEFENDING_PAIRING_LABELS = {
   cbVsSt:      'CB vs ST',
   fbVsWm:      'Fullbacks vs Wingers',
@@ -984,11 +1004,18 @@ const STYLE_RULE_LABELS = {
  * team-strength proxy, not a real player-form read. Shown as "N/A" rather
  * than the fallback number, so it doesn't read as a genuine calculated score.
  *
- * Each row is wrapped in a <details> whose summary carries a small "i" button;
- * opening it lists the actual named players behind that pairing's score, via
- * duelsForPairing() over the already-computed calcIndividualDuels result. Same
- * disclosure pattern as the Individual Duels section below — no new interaction
- * model, no new dependency.
+ * Each row is wrapped in a <details> whose summary carries a small "i" button.
+ * Opening it gives, in order: an explanation of what the score and the two
+ * percentages actually mean (buildPairingExplainer), then the named players
+ * behind that pairing via duelsForPairing() over the already-computed
+ * calcIndividualDuels result. Same disclosure pattern as the Individual Duels
+ * section below — no new interaction model, no new dependency.
+ *
+ * The explainer was added because the panel previously opened straight onto
+ * the player list: it answered "who is involved" but never "what am I looking
+ * at", leaving the score and its two percentages undocumented anywhere in the
+ * UI. Note buildPairingExplainer is deliberately descriptive rather than
+ * directional — see its doc block for why.
  *
  * @param {Object} pairings
  * @param {Object} labels       PAIRING_LABELS or DEFENDING_PAIRING_LABELS
@@ -1034,11 +1061,90 @@ function buildCounterPairings(pairings, labels, perspective, duels) {
                 title="Show the players behind this pairing">i</span>
         </summary>
         <div class="counter-pairing-info__panel">
+          ${buildPairingExplainer(p, key, perspective, isChannel, hasValue)}
           ${buildPairingPlayers(duels, key, perspective)}
         </div>
       </details>
     `.trim();
   }).join('');
+}
+
+/**
+ * Plain-language explanation of one counter pairing: what the score is, what
+ * each of the two percentages measures, and how far into the season the read
+ * is. Rendered at the top of the "i" panel, above the named players.
+ *
+ * WHY THIS EXISTS: the panel used to open straight onto the player list, so
+ * the "i" answered "who is involved" but never "what am I looking at" — the
+ * score and the two percentages beside it were undocumented anywhere in the
+ * UI, which made them read as arbitrary.
+ *
+ * DELIBERATELY DESCRIPTIVE, NOT DIRECTIONAL. This says what each percentage
+ * MEASURES and leaves it there; it does not tell the reader which way a high
+ * score should be read. That is not an oversight. `calcChannelCounter` scores
+ * an axis as `attackShare - concedeShare`, which rises as the opponent
+ * concedes LESS through a channel — the reverse of the "my strength meets
+ * their weakness" reading the model comment describes. Until that is settled,
+ * an explanation asserting a direction would be documenting behaviour the
+ * engine does not have. The two shares themselves are exactly what they say,
+ * so those are safe to explain in full.
+ *
+ * @param {object} p            the pairing (channel tier: attackShare/concedeShare)
+ * @param {string} key          pairing key, for CHANNEL_PHASE_NOUN
+ * @param {'attacking'|'defending'} perspective
+ * @param {boolean} isChannel   channel tier (shares) vs retired position tier
+ * @param {boolean} hasValue    false when Understat has not published yet
+ */
+function buildPairingExplainer(p, key, perspective, isChannel, hasValue) {
+  if (!hasValue) {
+    return `<p class="counter-pairing-info__note">`
+         + `No Understat data for this axis yet — the row fills in once the`
+         + ` season's shot data covers it. It contributes nothing to the score`
+         + ` until then.</p>`;
+  }
+  if (!isChannel) return '';   // retired position tier — no shares to explain
+
+  // Whose share is whose depends on which section the row sits in: an
+  // Attacking Counters row is this team attacking, a Defending Counters row is
+  // this team defending against the opponent's attack.
+  const atkPct = `${Math.round(p.attackShare * 100)}%`;
+  const defPct = `${Math.round(p.concedeShare * 100)}%`;
+  const phase  = esc(CHANNEL_PHASE_NOUN[key] ?? 'this phase of play');
+  const rows = perspective === 'defending'
+    ? [
+        [`Def ${defPct}`, `of the xG <strong>this team concedes</strong> comes from ${phase}.`],
+        [`Atk ${atkPct}`, `of the xG <strong>the opponent creates</strong> comes the same way.`],
+      ]
+    : [
+        [`Atk ${atkPct}`, `of the xG <strong>this team creates</strong> comes from ${phase}.`],
+        [`Def ${defPct}`, `of the xG <strong>the opponent concedes</strong> comes the same way.`],
+      ];
+
+  const personnelNote = (typeof p.personnel === 'number' && p.personnel !== 1)
+    ? `<li><span class="counter-pairing-info__term">Availability</span>`
+      + `<span>The attacking share is scaled to <strong>${Math.round(p.personnel * 100)}%</strong>`
+      + ` to reflect who is actually fit for this fixture.</span></li>`
+    : '';
+
+  return `
+    <div class="counter-pairing-info__explain">
+      <p class="counter-pairing-info__note">
+        Both figures are <strong>shares of a team's own xG</strong>, not volumes —
+        they describe <em>how</em> a side scores and concedes, not how much.
+      </p>
+      <ul class="counter-pairing-info__terms">
+        ${rows.map(([term, text]) =>
+          `<li><span class="counter-pairing-info__term">${term}</span><span>${text}</span></li>`).join('')}
+        ${personnelNote}
+      </ul>
+      <p class="counter-pairing-info__note">
+        The <strong>score</strong> compares those two shares against the spread
+        seen across the league on this axis. It is one input to Counter-Matchup,
+        which carries ${Math.round(WEIGHTS.counterMatchup * 100)}% of the fixture
+        score at full maturity — see the counter beside that row for how much of
+        that it has earned so far.
+      </p>
+    </div>`.trim();
 }
 
 /**
@@ -1058,8 +1164,9 @@ function buildPairingPlayers(duels, pairingKey, perspective) {
   const matched = duelsForPairing(duels, pairingKey);
 
   if (matched.length === 0) {
-    return `<p class="counter-pairing-info__empty">No player data available —`
-         + ` open some players in the Ranker to load their form, then revisit.</p>`;
+    return `<p class="counter-pairing-info__empty">Named players not loaded yet —`
+         + ` the score above does not depend on them. Open some players in the`
+         + ` Ranker to load their form, then revisit to see who is involved.</p>`;
   }
 
   return matched.map(d => {
