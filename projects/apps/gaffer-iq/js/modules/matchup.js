@@ -50,14 +50,14 @@ const METRIC_ORDER = Object.keys(METRIC_LABELS).sort((a, b) =>
   (WEIGHTS[b] - WEIGHTS[a])
   || (METRIC_TIEBREAK.indexOf(a) - METRIC_TIEBREAK.indexOf(b)));
 
-// Metrics whose weight ramps up with evidence, and the count each needs before
-// it carries its full configured weight. The breakdown shows a "n/N" counter
-// against these until they get there.
+// Metrics whose weight ramps up with evidence, and the matches each needs
+// before it carries its full configured weight. The breakdown shows an "n/N"
+// counter against these until they get there.
 //
-// The two units are NOT the same and the tooltips say so: teamForm's is an
-// exact count of matches played, while counterMatchup's ramp is driven by a
-// SHOT count (CHANNEL_MATURITY_FULL_SHOTS) that this expresses as its
-// match-equivalent — a high-volume side arrives sooner than a low-volume one.
+// Both are now a literal count of matches played, so both counters tick exactly
+// once per match. counterMatchup's used to be a shot count expressed as a
+// match-equivalent, which meant it could move by 0 or 2 in a week and needed a
+// caveat to read correctly — see CHANNEL_MATURITY_FULL_MATCHES in config.js.
 const MATURITY_THRESHOLDS = {
   teamForm:       FORM_WINDOW_GWS,
   counterMatchup: CHANNEL_MATURITY_FULL_MATCHES,
@@ -800,13 +800,13 @@ function counterMatchupTooltip(m) {
  * the weight the engine actually applied can never disagree: both read the same
  * number.
  *
- * ROUNDS, and this matters. Flooring under-reported by up to a whole unit
- * across the entire range: a team one match in carries ~13 of the 120 shots
- * counterMatchup needs, which is 1.08 tenths of the window — floor made that
- * read "0/10" when a match had plainly been played. The clamp to `total - 1`
- * handles the other end, so a metric at 96% cannot round up to "10/10" and
- * claim a completeness it hasn't reached; that state is only ever reached by
- * `maturity >= 1`, which returns null and hides the counter entirely.
+ * Both ramps now count matches, so `maturity * total` lands on a whole number
+ * and the rounding is exact rather than approximate. It is kept as `round`
+ * rather than `floor` because floating-point division leaves values like
+ * 0.8 * 5 = 4.000000000000001 and 3/5 * 5 = 2.9999999999999996 — floor turns
+ * the second into 2. The clamp to `total - 1` guards the top: a metric at 96%
+ * must not round up to "10/10" and claim a completeness it has not reached.
+ * That display is unreachable anyway, since `maturity >= 1` hides the counter.
  *
  * @param {string} key
  * @param {object} m  the breakdown entry
@@ -834,10 +834,9 @@ function maturityTooltip(key, m, progress) {
   return key === 'teamForm'
     ? `${progress.done} of the ${progress.total} matches this metric reads once the season is `
       + `under way. ${tail}`
-    : `About ${progress.done} matches' worth of the shot data this metric needs. Two things make `
-      + `that differ from matches played: it ramps on SHOTS, so a team that shoots a lot arrives `
-      + `sooner, and it reads BOTH teams — it can only be as well-evidenced as whichever side has `
-      + `published less, so a well-covered team still waits on its opponent. ${tail}`;
+    : `${progress.done} of the ${progress.total} matches this metric needs for full confidence. `
+      + `It reads BOTH teams, so this counts whichever side has played fewer — a team several `
+      + `matches in still waits on a newly promoted opponent. ${tail}`;
 }
 
 function buildBreakdownRows(breakdown, venue) {

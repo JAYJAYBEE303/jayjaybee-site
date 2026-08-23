@@ -561,36 +561,30 @@ export const CHANNEL_SENSITIVITY = 14;
 
 // Shots in a team's situation partition at which its channel profile is
 // considered fully mature — the TOP of the maturity ramp, not an on/off bar.
-// MODEL: a PL side takes ~13 shots a game, so 120 is roughly nine matches —
-// the point at which the set-piece share (the thinnest bucket, ~25% of shots)
-// stops being dominated by sampling noise.
+// Matches a team must have played before its channel profile carries full
+// weight in the composite. Below this the profile still scores — it is a ramp,
+// not a gate — it simply carries proportionally less (see maturity in
+// engine/channel.js and the maturity-weighted blend in engine/composite.js).
+// Gating instead of scaling threw the signal away entirely until ~GW10, which
+// cost a quarter of the season on the very thing this feature exists to provide.
 //
-// MODEL (revised 2026-08-21): this used to gate profile creation outright —
-// below 120 shots a team had no profile at all and the whole metric fell back
-// to position pairings until ~GW10. That cost a quarter of the season on the
-// signal this feature exists to provide. It is now a ramp instead: a thin
-// profile still scores, it just carries proportionally less weight in the
-// composite (see maturity in engine/channel.js and the maturity-weighted
-// blend in engine/composite.js). Early-season noise is therefore visible and
-// observable without being able to swing a fixture rating.
-export const CHANNEL_MATURITY_FULL_SHOTS = 120;
-
-// The same threshold expressed in MATCHES, for display only — the breakdown's
-// maturity counter reads "6/10" because matches are the unit a reader reasons
-// in, while the ramp itself is driven by the shot count above.
+// MODEL (revised): this counts MATCHES, replacing a shot-count threshold of 120
+// (~9–13 matches depending on the side). The shot count was the tighter reading
+// — what makes a share stable is the number of events in its thinnest bucket,
+// and shot volume varies by ~67% across the league (measured on a completed
+// season: Man City reached 120 shots in 7.7 matches, Burnley in 12.8). It was
+// dropped anyway:
 //
-// 10 to CHANNEL_MATURITY_FULL_SHOTS' 120 implies 12 shots a match, which sits
-// squarely in the Premier League's actual range (~11–13 depending on season and
-// side). A tenth of the window per match is also the reading a user naturally
-// expects from a counter, and there is no accuracy to be bought by picking a
-// denominator that is harder to reason about.
+//   — The correction is small exactly where it matters. The gap between the two
+//     readings is a point or two of a 0.25-weight metric — well under half a
+//     composite point, invisible on the card.
+//   — The cost was legibility, which is not small. A shot-driven counter ticks
+//     0, 1 or 2 in a given week and needs a "matches' WORTH of shot data, not
+//     matches played" caveat to be read at all. One per match, full at ten,
+//     needs no caveat.
 //
-// The two units are not perfectly interchangeable and the UI must not pretend
-// they are: a high-volume side reaches 120 shots in fewer than ten matches and a
-// low-volume one takes more, so this counter tracks "matches' worth of shot
-// data", not matches played. The row's tooltip says so. Kept as its own explicit
-// number rather than computed from the shot count at the call site, so the
-// rounding is decided here, once.
+// Ten also matches the horizon the app plans over, so "fully mature" lands where
+// a user is already looking.
 export const CHANNEL_MATURITY_FULL_MATCHES = 10;
 
 // Which roles supply each channel axis, for personnel weighting.

@@ -10,7 +10,7 @@
  */
 
 import {
-  CHANNEL_MATURITY_FULL_SHOTS, CHANNEL_WEIGHTS, CHANNEL_AXIS_POOLED_SD, CHANNEL_SENSITIVITY,
+  CHANNEL_MATURITY_FULL_MATCHES, CHANNEL_WEIGHTS, CHANNEL_AXIS_POOLED_SD, CHANNEL_SENSITIVITY,
   CHANNEL_ROLE_AXES, CHANNEL_PERSONNEL_MIN, CHANNEL_PERSONNEL_MAX,
   UNDERSTAT_MATCH_DATE_TOLERANCE_DAYS,
 } from '../config.js';
@@ -71,7 +71,8 @@ const NO_CHANNEL_AXES = Object.freeze({
   wideTransition: Object.freeze({ for: null, against: null }),
   boxThreat:      Object.freeze({ for: null, against: null }),
   shots: 0,
-  // 0–1 share of CHANNEL_MATURITY_FULL_SHOTS. No evidence = no weight.
+  matches: 0,
+  // 0–1 share of CHANNEL_MATURITY_FULL_MATCHES. No evidence = no weight.
   maturity: 0,
 });
 
@@ -121,7 +122,7 @@ function share(part, rest) {
  *          descriptive, not evaluative: a high setPieceThreat.for means a team
  *          leans on dead balls, which is neither good nor bad on its own.
  */
-export function buildChannelProfile(statistics) {
+export function buildChannelProfile(statistics, matchesPlayed = 0) {
   const sit = statistics?.situation;
   const sz  = statistics?.shotZone;
   const asp = statistics?.attackSpeed;
@@ -130,17 +131,38 @@ export function buildChannelProfile(statistics) {
   const DEAD = ['FromCorner', 'SetPiece', 'DirectFreekick'];
   const BOX  = ['shotSixYardBox', 'shotPenaltyArea'];
 
-  // Maturity reads SHOTS (a count), not xG (a sum of probabilities).
+  // Kept as a diagnostic — it no longer drives maturity (see below), but it is
+  // the quantity that actually governs how noisy the shares are, so it is worth
+  // having to hand when a profile looks wrong.
   let shots = 0;
   for (const k of ['OpenPlay', ...DEAD]) {
     const b = sit[k];
     if (b) shots += (typeof b.shots === 'number' ? b.shots : parseFloat(b.shots) || 0);
   }
+
   // MODEL: a ramp, not a gate. A thin profile is still the best read of how
   // this team plays; it is simply less certain, and engine/composite.js scales
   // its contribution by exactly this number. Gating instead of scaling threw
-  // the signal away entirely until ~GW10 — see CHANNEL_MATURITY_FULL_SHOTS.
-  const maturity = clamp(0, 1, shots / CHANNEL_MATURITY_FULL_SHOTS);
+  // the signal away entirely until ~GW10.
+  //
+  // MODEL (revised): the ramp counts MATCHES PLAYED, not shots. It used to
+  // divide the shot total by CHANNEL_MATURITY_FULL_SHOTS (120), which is the
+  // statistically tighter reading — what makes a share stable is the number of
+  // events in its thinnest bucket, and shot volume varies by roughly 67% across
+  // the league (measured on a completed season: Man City reached 120 shots in
+  // 7.7 matches, Burnley in 12.8). It was dropped anyway, deliberately:
+  //
+  //   — The error it corrects is small where it matters. The gap between the
+  //     two readings is a percentage point or two of a 0.25-weight metric, i.e.
+  //     well under half a composite point — invisible on the card.
+  //   — What it cost was legibility, which is not small. A counter driven by
+  //     shots ticks 0, 1 or 2 in a given week and needs a "matches' WORTH of
+  //     shot data, not matches played" caveat to be read correctly at all. One
+  //     per match, full at ten, needs no caveat.
+  //
+  // A metric nobody can read is worse than one that is slightly loose about
+  // when a low-volume side reaches full confidence.
+  const maturity = clamp(0, 1, matchesPlayed / CHANNEL_MATURITY_FULL_MATCHES);
 
   const axis = (side) => ({
     setPiece: share(sumXg(sit, DEAD, side), bucketXg(sit.OpenPlay, side)),
@@ -157,11 +179,12 @@ export function buildChannelProfile(statistics) {
   // different condition from a THIN one — thin is handled by maturity above.
   const complete = [f.setPiece, f.box, f.fast, a.setPiece, a.box, a.fast]
     .every(v => typeof v === 'number');
-  if (!complete) return { ...NO_CHANNEL_AXES, shots };
+  if (!complete) return { ...NO_CHANNEL_AXES, shots, matches: matchesPlayed };
 
   return {
     hasChannelAxes: true,
     shots,
+    matches: matchesPlayed,
     maturity,
     setPieceThreat: { for: f.setPiece, against: a.setPiece },
     wideTransition: { for: f.fast,     against: a.fast },
@@ -192,7 +215,12 @@ export function buildChannelProfilesByTeamId(teamXgBySlug, slugsByTeamId) {
   for (const [teamId, slug] of Object.entries(slugsByTeamId)) {
     const payload = teamXgBySlug[slug];
     if (!payload) continue;
-    const profile = buildChannelProfile(payload.statistics);
+    // datesData is this TEAM's fixture list; isResult marks the ones played.
+    // Absent or empty leaves matchesPlayed at 0, so the profile is built but
+    // carries no weight — abstaining on an unknown depth rather than claiming
+    // a confidence we cannot evidence.
+    const matchesPlayed = (payload.datesData || []).filter(m => m?.isResult).length;
+    const profile = buildChannelProfile(payload.statistics, matchesPlayed);
     if (profile.hasChannelAxes) out[teamId] = profile;
   }
   return out;

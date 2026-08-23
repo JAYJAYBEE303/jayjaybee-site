@@ -201,7 +201,7 @@ teamForm = normaliseLinear(rawForm, across all teams)
 
 **Maturity ramp (a thin window scales, it does not gate).** `maturity = games / FORM_WINDOW_GWS`, and `engine/composite.js` multiplies this metric's weight by it — so one match played carries **1/5 of 15% = 3%** of the composite, three carry 9%, and five or more carry the full 15%. `estimated` is now reserved for its literal meaning, **no games at all**; from one game up the reading is real and the ramp expresses how much of it there is.
 
-This replaced an all-or-nothing gate (`estimated: true` below `ceil(FORM_WINDOW_GWS / 2)`), which §8.3 reads as "discard entirely". Under that rule a team's first two matches counted for **nothing** and the third abruptly counted for all 15% — a cliff, on the metric most worth having early. Same mechanism `engine/channel.js` already used for the counter-matchup, and the same reasoning: see `CHANNEL_MATURITY_FULL_SHOTS` in config.js. Mid-season behaviour is unchanged (five games in, maturity is 1).
+This replaced an all-or-nothing gate (`estimated: true` below `ceil(FORM_WINDOW_GWS / 2)`), which §8.3 reads as "discard entirely". Under that rule a team's first two matches counted for **nothing** and the third abruptly counted for all 15% — a cliff, on the metric most worth having early. Same mechanism `engine/channel.js` already used for the counter-matchup, and the same reasoning: see `CHANNEL_MATURITY_FULL_MATCHES` in config.js. Mid-season behaviour is unchanged (five games in, maturity is 1).
 
 The Matchup Analyser surfaces the ramp as an `n/N` counter beside the row — see §8.8.
 
@@ -391,20 +391,54 @@ than falling back to a different model. `classifyRole`, `buildRoleSignature`,
 `classifyRoleFromSignature` and the `ROLE_*` groups remain LIVE — channel
 personnel weighting and `duelsForPairing` depend on them.
 
-**Maturity ramp.** `CHANNEL_MATURITY_FULL_SHOTS` (120, ~9 matches) was a gate:
-below it a team had no profile and the metric fell back until roughly GW10,
-costing a quarter of the season on the one signal this tier exists to provide.
-It is now the top of a ramp:
+**Maturity ramp.** A shot threshold (`CHANNEL_MATURITY_FULL_SHOTS`, 120) was
+originally a gate: below it a team had no profile and the metric fell back until
+roughly GW10, costing a quarter of the season on the one signal this tier exists
+to provide. It became the top of a ramp, and the ramp now counts **matches**:
 
 ```
-maturity(team)    = clamp(0, 1, situationShots / CHANNEL_MATURITY_FULL_SHOTS)
+maturity(team)    = clamp(0, 1, matchesPlayed / CHANNEL_MATURITY_FULL_MATCHES)
 maturity(pairing) = min(maturity(A), maturity(B))
 effectiveWeight   = WEIGHTS.counterMatchup * maturity(pairing)
 ```
 
-Measured on real 2025 data, effective weight ramps `0.02 → 0.043 → 0.085 →
-0.128 → 0.192 → 0.20` across 1/2/4/6/9/12 matches played. A thin profile still
-scores and is still displayed; it simply cannot swing a fixture.
+`matchesPlayed` is counted from the team's own Understat `datesData` (rows with
+`isResult`). Absent or empty leaves it at 0, so the profile is built but carries
+no weight — abstaining on an unknown depth rather than claiming a confidence
+that cannot be evidenced.
+
+**Why matches and not shots.** Shots were the statistically tighter reading:
+what makes a share stable is the number of events in its thinnest bucket
+(set pieces, ~25% of shots), and shot volume varies by roughly **67%** across the
+league. Measured on a completed season:
+
+| Team | Shots/match | Matches to 120 shots |
+|---|---|---|
+| Man City | 15.6 | 7.7 |
+| Liverpool | 15.4 | 7.8 |
+| Arsenal | 14.6 | 8.2 |
+| Everton | 11.1 | 10.8 |
+| Sunderland | 10.4 | 11.6 |
+| Burnley | 9.3 | 12.8 |
+
+It was dropped anyway, deliberately. The correction is small exactly where it
+matters — a point or two of a 0.25-weight metric, well under half a composite
+point, invisible on the card. What it cost was legibility, which is not small: a
+shot-driven counter ticks 0, 1 or 2 in a given week and needs a "matches' WORTH
+of shot data, not matches played" caveat to be read correctly at all. A metric
+nobody can read is worse than one that is slightly loose about when a
+low-volume side reaches full confidence.
+
+The consequence to keep in mind: **Burnley and Man City now reach full weight at
+the same point**, on profiles that differ in event count by about two-thirds.
+
+Effective weight is now exactly linear in matches played, and identical for
+every club — `0.025 → 0.05 → 0.10 → 0.15 → 0.225 → 0.25` across
+1/2/4/6/9/10+ matches, against `WEIGHTS.counterMatchup` of 0.25. (Under the old
+shot-driven ramp the same series was club-dependent and read roughly
+`0.02 → 0.043 → 0.085 → 0.128 → 0.192 → 0.20` for an average-volume side.)
+A thin profile still scores and is still displayed; it simply cannot swing a
+fixture.
 
 **`maturity` is not `estimated`.** `estimated` means "this reading is a
 fallback, don't use it" and always wins. `maturity` means "this reading is
@@ -737,28 +771,21 @@ same `maturity` the engine applied, so they cannot disagree with the score.
 
 | Metric | `N` | Unit |
 |---|---|---|
-| `teamForm` | `FORM_WINDOW_GWS` (5) | matches played — **exact** |
-| `counterMatchup` | `CHANNEL_MATURITY_FULL_MATCHES` (10) | matches' **worth of shot data**, for the thinner of the two sides — approximate |
+| `teamForm` | `FORM_WINDOW_GWS` (5) | matches played |
+| `counterMatchup` | `CHANNEL_MATURITY_FULL_MATCHES` (10) | matches played, by the thinner of the two sides |
 
-`counterMatchup`'s unit is the one place this is not a literal match count, for
-**two** reasons the row's tooltip spells out rather than glossing:
+Both are a literal count of matches, so both counters tick exactly once per
+match and neither needs a caveat about its unit. `counterMatchup` keeps one
+genuine wrinkle the tooltip names: it is a **pairing** reading, not a team one.
+`calcCombinedCounterMatchup` takes `min()` of the two sides' maturities — a
+blend is only as well-evidenced as its weaker half — so a team several matches
+in still shows a low counter against a newly promoted opponent.
 
-  1. It ramps on a shot total (`CHANNEL_MATURITY_FULL_SHOTS` = 120), so a
-     high-volume side arrives in fewer than ten matches and a low-volume one
-     takes more.
-  2. It is a **pairing** reading, not a team one. `calcCombinedCounterMatchup`
-     takes `min()` of the two sides' maturities — a blend is only as
-     well-evidenced as its weaker half — so a thoroughly-covered team still
-     shows a low counter while its opponent's profile is thin. Observed live:
-     Man Utd on 21 shots against Ipswich on 10 reads from Ipswich's 10.
-
-`done` is computed with **`Math.round`, clamped to `N - 1`**, not `Math.floor`.
-Flooring under-reported by up to a whole unit across the entire range: one match
-in, a team carries ~13 of the 120 shots needed, which is 1.08 tenths of the
-window — and floor rendered that as `0/10` when a match had plainly been played.
-The clamp covers the other end, so a metric at 96% cannot round up to `10/10`
-and claim a completeness it has not reached; that display is unreachable by
-construction, because `maturity >= 1` hides the counter entirely.
+`done` uses **`Math.round`, clamped to `N - 1`**. Round rather than floor
+because `maturity * total` is a float division round-tripped: `3/5 * 5` is
+`2.9999999999999996`, which floor turns into 2. The clamp guards the top, so a
+metric at 96% cannot round up to `10/10` and claim a completeness it has not
+reached — unreachable anyway, since `maturity >= 1` hides the counter.
 
 ---
 
