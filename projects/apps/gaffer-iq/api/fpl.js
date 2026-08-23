@@ -42,14 +42,62 @@ const ALLOWED_PATTERNS = [
 // embedding it in page HTML — confirmed live: the page HTML understat.com
 // serves today has zero embedded JSON, and both endpoints 404 without an
 // explicit season, so a season is REQUIRED on every path, no bare/implicit
-// "current season" form. xG data refreshes roughly daily, so a 1h cache is
-// plenty. Client-facing path stays `league/EPL/{season}` / `team/{slug}/
-// {season}` — only the upstream URL this maps to (below) changed.
+// "current season" form. Client-facing path stays `league/EPL/{season}` /
+// `team/{slug}/{season}` — only the upstream URL this maps to (below) changed.
+//
+// Cache policy for the two season-scoped entries is computed per request by
+// seasonCache() below rather than being a fixed string, because a finished
+// season and the live one deserve very different answers.
+const UNDERSTAT_FINISHED_SEASON_CACHE = 'public, max-age=31536000, s-maxage=31536000, immutable';
+const UNDERSTAT_LIVE_SEASON_CACHE     = 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400';
+
+// Cache-Control for a season-scoped Understat path (league or team).
+//
+// A FINISHED season is immutable: the 2021/22 campaign will never gain another
+// match. Those payloads were nonetheless being re-fetched every hour, forever,
+// by every visitor — measured at ~2.6MB of the ~3.1MB an app boot pulls from
+// Understat. They now cache for a year and, via s-maxage, at Vercel's edge, so
+// the cost is paid once for everyone rather than once per browser per hour.
+//
+// The CURRENT season keeps the short window it always had (it gains a match
+// every few days) but gains s-maxage + stale-while-revalidate so the edge
+// absorbs the repeat traffic, matching the FPL entries above.
+//
+// Determined from the season in the PATH, never from anything the client sends
+// — cacheability is the server's call, and a client-supplied hint here would be
+// a cache-poisoning vector.
+//
+// KNOWN TRADE-OFF of `immutable`: if Understat ever serves a corrupt payload
+// for a finished season, that response sticks for a year with no way to evict
+// it — the URL carries no version, so there is nothing to bump. Accepted here
+// because these seasons genuinely cannot change and the endpoint has been
+// stable, but if it ever bites, the fix is a cache-busting query param on the
+// client's request rather than shortening this window.
+function seasonCache(path) {
+  // Understat names a season by the calendar year it STARTED: "2026" is
+  // 2026/27, running Aug 2026 → May 2027. Trailing 4 digits on every
+  // season-scoped path this function serves.
+  const year = Number(path.slice(-4));
+  if (!Number.isFinite(year)) return UNDERSTAT_LIVE_SEASON_CACHE;
+
+  // Derived from the date rather than a constant, deliberately: js/config.js
+  // documents UNDERSTAT_SEASON as needing a manual bump every close season,
+  // and a second hand-maintained copy of that fact over here would go stale
+  // silently — as a wrong cache header, which is the hardest kind to notice.
+  // July onwards is the new campaign, matching SEASON_BOUNDARY_MONTH.
+  const now = new Date();
+  const currentSeason = now.getUTCMonth() >= 6 ? now.getUTCFullYear() : now.getUTCFullYear() - 1;
+
+  // Strictly-less-than: the season that just ended is already months past its
+  // last match by the July boundary, so it is safely final.
+  return year < currentSeason ? UNDERSTAT_FINISHED_SEASON_CACHE : UNDERSTAT_LIVE_SEASON_CACHE;
+}
+
 const ALLOWED_UNDERSTAT_PATTERNS = [
   // Full league — every PL club's match-by-match history for one season.
-  { name: 'leagueEpl',  pattern: /^league\/EPL\/\d{4}$/,      cache: 'public, max-age=3600' },
+  { name: 'leagueEpl',  pattern: /^league\/EPL\/\d{4}$/,      cacheFor: seasonCache },
   // Single-team season — e.g. team/Arsenal/2025. Slug uses underscores.
-  { name: 'teamSeason', pattern: /^team\/[A-Za-z_]+\/\d{4}$/, cache: 'public, max-age=3600' },
+  { name: 'teamSeason', pattern: /^team\/[A-Za-z_]+\/\d{4}$/, cacheFor: seasonCache },
   // Single match — e.g. match/31180. Unlike the two endpoints above this is a
   // real HTML page, not a JSON endpoint: Understat SERVER-RENDERS the match
   // timeline (every goal, card and substitution with its minute) into the
@@ -70,6 +118,21 @@ const ALLOWED_UNDERSTAT_PATTERNS = [
 const FPL_BASE        = 'https://fantasy.premierleague.com/api/';
 const UNDERSTAT_BASE  = 'https://understat.com/';
 const USER_AGENT      = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
+
+/**
+ * The Cache-Control header for a matched allowlist entry.
+ *
+ * Most entries carry a fixed `cache` string. Entries whose cacheability depends
+ * on WHICH resource was asked for (the season-scoped Understat ones) carry a
+ * `cacheFor(path)` function instead. Falling back to no-store rather than to a
+ * permissive default means a future entry that declares neither fails closed:
+ * an uncached response is a performance bug, a wrongly-cached one is a
+ * correctness bug that outlives the deploy that caused it.
+ */
+function resolveCache(match, path) {
+  if (typeof match.cacheFor === 'function') return match.cacheFor(path);
+  return match.cache ?? 'no-store, max-age=0';
+}
 
 function sendError(res, status, error, upstream = null) {
   res.status(status).json({ error, upstream });
@@ -152,7 +215,7 @@ async function handleFpl(res, path) {
     return sendError(res, 502, `Upstream returned non-JSON: ${err.message}`, upstream.status);
   }
 
-  res.setHeader('Cache-Control', match.cache);
+  res.setHeader('Cache-Control', resolveCache(match, path));
   res.status(200).json(data);
 }
 
@@ -229,7 +292,7 @@ async function handleUnderstat(res, path) {
     } catch (err) {
       return sendError(res, 502, `Understat page read failed: ${err.message}`, null);
     }
-    res.setHeader('Cache-Control', match.cache);
+    res.setHeader('Cache-Control', resolveCache(match, path));
     res.setHeader('Content-Type', 'application/json');
     return res.status(200).json({ html: markup });
   }
@@ -248,7 +311,7 @@ async function handleUnderstat(res, path) {
     return;
   }
 
-  res.setHeader('Cache-Control', match.cache);
+  res.setHeader('Cache-Control', resolveCache(match, path));
   res.setHeader('Content-Type', 'application/json');
   res.status(200).json(renameUnderstatKeys(raw));
 }

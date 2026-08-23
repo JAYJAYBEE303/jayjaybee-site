@@ -195,6 +195,7 @@ The official FPL API (`https://fantasy.premierleague.com/api/...`) does **not** 
 4. Forwards the JSON back with:
    - `Access-Control-Allow-Origin: *` (fine for a personal tool; can be tightened to the deployment origin later).
    - `Cache-Control` tuned per endpoint (bootstrap data is near-static within a GW; live data is not — see §6).
+   - Most allowlist entries carry a fixed `cache` string. The two season-scoped Understat entries carry `cacheFor(path)` instead, because their cacheability depends on **which** season was asked for: a finished season can never change and is served `immutable` for a year (and cached at the edge via `s-maxage`), while the current season keeps a short window. `seasonCache()` derives "which season is current" from the date rather than a constant, so it does not become a second thing to bump every close season alongside `UNDERSTAT_SEASON`. Entries declaring neither fail closed to `no-store`: an uncached response is a performance bug, a wrongly-cached one is a correctness bug that outlives the deploy.
 5. On upstream failure, returns the upstream status and a small JSON error envelope `{ "error": "...", "upstream": <status> }`.
 
 ### Allowlist (Phase 1)
