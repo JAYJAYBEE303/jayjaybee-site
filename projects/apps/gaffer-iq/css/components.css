@@ -4526,6 +4526,14 @@ img.fx-crest {
   border-radius: var(--radius-sm);
 }
 
+/* Both cells are pinned to row 1. Without this the AWAY row breaks: its event
+   is placed in column 3, and sparse auto-placement then refuses to put the
+   minute back in column 2 of the same row, pushing it onto a second row — the
+   away rows rendered 47px tall against the home rows' 30px, with every away
+   event floating 23px above its own minute. */
+.fx-tl__event,
+.fx-tl__minute { grid-row: 1; }
+
 /* Home: first column, mirrored so the glyph lands against the spine. */
 .fx-tl__item--home .fx-tl__event {
   grid-column: 1;
@@ -4638,21 +4646,26 @@ img.fx-crest {
   color: var(--color-muted);
 }
 
+/* The LIST owns the columns, not each row. Each .fx-xi__row used to be its
+   own grid, so an `auto` track sized to that row's content alone and the
+   minutes column landed at a different x on every line — a substituted player
+   and an ever-present one never lined up. `display: contents` lifts the rows'
+   cells into this single grid, so all five tracks are shared and the columns
+   run straight down the list. */
 .fx-xi__list {
   list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
+  display: grid;
+  grid-template-columns: 4.5ch 1fr auto auto 4ch;
+  align-items: center;
+  column-gap: var(--space-2);
+  row-gap: var(--space-1);
 }
 
 /* Substitutes read as secondary to the XI above them. */
 .fx-xi__list--subs { opacity: 0.85; }
 
 .fx-xi__row {
-  display: grid;
-  grid-template-columns: 4.5ch 1fr auto auto 4ch;
-  align-items: center;
-  gap: var(--space-2);
+  display: contents;
   font-size: var(--font-size-sm);
 }
 
@@ -4666,6 +4679,7 @@ img.fx-crest {
 }
 
 .fx-xi__name {
+  font-size: var(--font-size-sm);
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -4750,7 +4764,7 @@ img.fx-crest {
   .fx-detail__cols,
   .fx-two-col { grid-template-columns: 1fr; }
 
-  .fx-xi__row { grid-template-columns: 4.5ch 1fr auto 4ch; }
+  .fx-xi__list { grid-template-columns: 4.5ch 1fr auto 4ch; }
   .fx-xi__swap { display: none; }
 
   .fx-tl__item { grid-template-columns: 1fr 4.5ch 1fr; font-size: var(--font-size-xs); }

@@ -482,9 +482,15 @@ function lineupMarksHtml(p) {
 function lineupRowHtml(p, isSub) {
   // A starter who was replaced, and a substitute who came on, each carry the
   // minute it happened — the same number, read from opposite ends.
-  const swap = isSub
-    ? (p.cameOnFor ? `<span class="fx-xi__swap fx-xi__swap--on">${p.onAt}' for ${esc(p.cameOnFor)}</span>` : '')
-    : (p.replacedBy ? `<span class="fx-xi__swap fx-xi__swap--off">${p.minutes}' \u2192 ${esc(p.replacedBy)}</span>` : '');
+  // The cell is ALWAYS emitted, empty when there was no substitution. The list
+  // is one shared grid (see .fx-xi__list) and auto-placement fills it in DOM
+  // order, so a row that skipped this cell would shift every later column left
+  // by one and knock the whole list out of phase.
+  const swapText = isSub
+    ? (p.cameOnFor ? `${p.onAt}' for ${esc(p.cameOnFor)}` : '')
+    : (p.replacedBy ? `${p.minutes}' \u2192 ${esc(p.replacedBy)}` : '');
+  const swapClass = swapText ? ` fx-xi__swap--${isSub ? 'on' : 'off'}` : '';
+  const swap = `<span class="fx-xi__swap${swapClass}">${swapText}</span>`;
 
   return `
     <li class="fx-xi__row">
