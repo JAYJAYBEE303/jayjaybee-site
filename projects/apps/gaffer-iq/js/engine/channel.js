@@ -12,6 +12,7 @@
 import {
   CHANNEL_MATURITY_FULL_SHOTS, CHANNEL_WEIGHTS, CHANNEL_AXIS_POOLED_SD, CHANNEL_SENSITIVITY,
   CHANNEL_ROLE_AXES, CHANNEL_PERSONNEL_MIN, CHANNEL_PERSONNEL_MAX,
+  UNDERSTAT_MATCH_DATE_TOLERANCE_DAYS,
 } from '../config.js';
 import { clamp } from '../util.js';
 import { canonicalClubKey } from './normalise.js';
@@ -350,4 +351,54 @@ export function channelPersonnelFactor(players, roles, axisKey, ctx) {
 
   if (totalChain <= 0) return 1;
   return clamp(CHANNEL_PERSONNEL_MIN, CHANNEL_PERSONNEL_MAX, availableChain / totalChain);
+}
+
+/**
+ * Find the Understat match id for one FPL fixture.
+ *
+ * MODEL: matched by the two clubs' NAMES via canonicalClubKey, never by either
+ * feed's numeric team ids — those are unrelated between the two sources (see
+ * buildUnderstatSlugsByTeamId above, same reasoning). Home + away already
+ * identify a meeting almost uniquely, since each pairing occurs once per venue
+ * per season; kickoff time is a tiebreak and a sanity bound, so a rescheduled
+ * fixture still resolves but a wrong season's record cannot.
+ *
+ * @param {object} fixture     normalised Fixture
+ * @param {object} leagueXg    Understat league payload (needs datesData)
+ * @param {Object<number,object>} teamsById
+ * @returns {string|null}      Understat match id, or null when unmatched
+ */
+export function findUnderstatMatchId(fixture, leagueXg, teamsById) {
+  const dates = leagueXg?.datesData;
+  if (!fixture || !Array.isArray(dates)) return null;
+
+  const home = teamsById?.[fixture.homeTeamId];
+  const away = teamsById?.[fixture.awayTeamId];
+  if (!home || !away) return null;
+
+  const homeKey = canonicalClubKey(home.name);
+  const awayKey = canonicalClubKey(away.name);
+  const kickoffMs = fixture.kickoff ? Date.parse(fixture.kickoff) : NaN;
+  const toleranceMs = UNDERSTAT_MATCH_DATE_TOLERANCE_DAYS * 24 * 60 * 60 * 1000;
+
+  let bestId = null;
+  let bestGap = Infinity;
+
+  for (const d of dates) {
+    if (!d?.h?.title || !d?.a?.title || !d?.id) continue;
+    if (canonicalClubKey(d.h.title) !== homeKey) continue;
+    if (canonicalClubKey(d.a.title) !== awayKey) continue;
+
+    // Understat serves 'YYYY-MM-DD HH:MM:SS' in UTC, the same instant FPL's
+    // ISO kickoff_time describes — so the two are directly comparable once
+    // the space is turned into the ISO 'T' and the zone made explicit.
+    const theirMs = Date.parse(String(d.datetime).replace(' ', 'T') + 'Z');
+    const gap = (Number.isNaN(kickoffMs) || Number.isNaN(theirMs))
+      ? 0
+      : Math.abs(theirMs - kickoffMs);
+
+    if (gap < bestGap) { bestGap = gap; bestId = String(d.id); }
+  }
+
+  return bestGap <= toleranceMs ? bestId : null;
 }

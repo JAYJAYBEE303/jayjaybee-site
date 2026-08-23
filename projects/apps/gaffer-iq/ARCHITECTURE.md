@@ -209,6 +209,10 @@ The proxy permits only these path patterns:
 | Player summary | `^element-summary/\d{1,4}/$` | **parameterised** — id is 1–4 digits |
 | GW live points | `^event/\d{1,2}/live/$` | **parameterised** — GW is 1–2 digits; dashboard use, Phase 2 |
 
+> The table above is the **Phase 1** set. Later phases added more, each still an anchored pattern in the same file: `entry/…` and `me/` for squad import (Phase 4-1), and a separate `ALLOWED_UNDERSTAT_PATTERNS` array reached via `?source=understat` — `league/EPL/{season}`, `team/{slug}/{season}`, plus `match/{id}` and `matchdata/{id}` for the Fixtures tab's match feed (§7). `api/fpl.js` is the source of truth; read it before assuming an endpoint is reachable.
+>
+> `match/{id}` is the one route that forwards a **page** rather than a JSON endpoint, because Understat server-renders the match timeline and publishes those minutes nowhere in JSON. The proxy still answers JSON — it wraps the markup as `{ html }` — so the client contract is unchanged and rule 2 below still applies unmodified. Parsing happens client-side in `js/api.js`, never in the proxy.
+
 Validation contract for `api/fpl.js`:
 1. Read and `decodeURIComponent` the `path` query param. If absent → `400`.
 2. **Normalise defensively first:** reject any `path` containing `..`, a leading `/`, a scheme (`http:`, `https:`, `//`), or a host. The proxy only ever builds `https://fantasy.premierleague.com/api/<path>` from a path *fragment* — never a full URL. This is what stops it being used as an open relay.
@@ -309,7 +313,8 @@ This is the crux of why Gaffer IQ exists. The API gives raw facts; the value-add
 ### What the API does NOT provide (and how we cope)
 - Rich possession/passing/pressing data → not available. Style profiling in Phase 1 uses **proxies** derivable from FPL data (goals for/against, xG/xGA where exposed in player histories, clean sheets, cards). Phase 3 may add an external xG source through the proxy.
 - **League standings** → not available. There is no `/standings` endpoint and `bootstrap-static` carries strengths, not points. `engine/standings.js` accumulates the table from `fixtures/` instead — see the Fixtures tab's Table view.
-- **Team lineups** (starting XI, bench, formation) and **event minute timings** → not available at all. `event/{gw}/live/` gives per-player, per-fixture stat totals, so the Fixtures tab can show who scored/assisted/was booked and who featured for how many minutes, but never a teamsheet or a timeline. The UI says so rather than implying otherwise.
+- **Event minute timings and goal→assist pairing** → not in the FPL API. `event/{gw}/live/` and `fixtures/` both give unordered per-fixture totals: they say someone scored and someone assisted, never when, nor whose goal was assisted. UNDERSTAT supplies both, so the Fixtures tab's match feed reads from there — its match page server-renders a chronological timeline (goals, cards, substitutions, each with a minute) and its shots JSON carries `player_assisted`. Two allowlisted paths, `match/{id}` and `matchdata/{id}` (§5). The feed degrades to FPL's grouped totals if either is unavailable.
+- **Team lineups** (starting XI, bench, formation) → not in the FPL API. Understat's `matchdata/{id}` rosters do carry positions and substitution linkage, so this is available to build; the Fixtures tab currently still shows FPL's "who featured" list and does not claim to be a teamsheet.
 - True per-player-vs-player matchup history → not available at the granularity we'd like. Hence **position-based** counter-matchups only, to start (a striker's form vs the aggregate form of the opponent's centre-backs), per the project scope.
 
 ---

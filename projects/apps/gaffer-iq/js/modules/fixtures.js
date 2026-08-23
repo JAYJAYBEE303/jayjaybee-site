@@ -15,19 +15,25 @@
  *   team      — STILL A BLUEPRINT. Placeholder rows only.
  *   h2h       — STILL A BLUEPRINT. Placeholder rows only.
  *
- * Two things the FPL API simply does not publish, so they are not rendered:
- * team lineups (starting XI, bench, formation) and event minute timings. What
- * event/{gw}/live/ gives is per-fixture stat totals per player, so the detail
- * panel shows who scored/assisted/was booked and who featured with how many
- * minutes — labelled as such rather than dressed up as a teamsheet.
+ * The match-events feed comes from UNDERSTAT, not FPL. FPL publishes only
+ * unordered per-fixture totals — no minute for anything, and no link between a
+ * goal and its assist — so a chronological feed cannot be built from it.
+ * Understat's match page carries a server-rendered timeline (every goal, card
+ * and substitution with its minute) and its shots JSON ties each goal to its
+ * assister. Both are fetched lazily when a fixture is opened, and the feed
+ * degrades to the FPL grouping if either is unavailable.
  *
- * Subscriptions: data:ready, live:updated
+ * Still not available anywhere: a teamsheet. "Who featured" lists players with
+ * minutes from FPL, not a starting XI, bench and formation.
+ *
+ * Subscriptions: data:ready, live:updated, timeline:updated
  */
 
 import { store } from '../store.js';
 import { LEAGUE_FORM_WINDOW } from '../config.js';
-import { fetchLivePoints } from '../api.js';
+import { fetchLivePoints, fetchMatchTimeline, fetchMatchData, attachAssists } from '../api.js';
 import { calcLeagueTable, attachNextFixtures, addMovement } from '../engine/standings.js';
+import { findUnderstatMatchId } from '../engine/channel.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -57,6 +63,15 @@ const EVENT_IDENTIFIERS = [
   { id: 'yellow_cards',     icon: '\u{1f7e8}', label: 'Yellow card' },
   { id: 'red_cards',        icon: '\u{1f7e5}', label: 'Red card' },
 ];
+
+// Understat timeline event types -> glyph + label.
+const TIMELINE_ICONS = {
+  goal:     { icon: '\u26bd',     label: 'Goal' },
+  own_goal: { icon: '\u26bd',     label: 'Own goal' },
+  yellow:   { icon: '\u{1f7e8}',  label: 'Yellow card' },
+  red:      { icon: '\u{1f7e5}',  label: 'Red card' },
+  sub:      { icon: '\u21c4',     label: 'Substitution' },
+};
 
 // Reading order for a team's featured players.
 const POS_ORDER = { GKP: 0, DEF: 1, MID: 2, FWD: 3 };
@@ -123,6 +138,10 @@ const _liveRequested = new Set();
 // GWs whose live fetch failed. Rendered as a message instead of retrying in a
 // loop — a dead upstream must not turn into a request storm.
 const _liveFailed = new Set();
+
+// Same pair of guards for the Understat timeline, keyed by fixture id.
+const _timelineRequested = new Set();
+const _timelineFailed    = new Set();
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -253,12 +272,44 @@ function statusOf(fixture) {
   return 'upcoming';
 }
 
-/** One team's side of a fixture row. */
-function sideHtml(team, side) {
+// Result box shown beside each team once a fixture is complete.
+const OUTCOMES = {
+  W: { key: 'w', label: 'Won' },
+  D: { key: 'd', label: 'Drawn' },
+  L: { key: 'l', label: 'Lost' },
+};
+
+/**
+ * Each side's outcome, or nulls while the fixture has no final score.
+ * Deliberately gated on `played` rather than on `result` alone: `result` now
+ * carries the RUNNING score of a live match (normalise.js), and a team leading
+ * at half time has not won anything yet.
+ * @returns {{home: 'W'|'D'|'L'|null, away: 'W'|'D'|'L'|null}}
+ */
+function outcomesFor(fixture) {
+  if (!fixture.played || !fixture.result) return { home: null, away: null };
+  const { homeGoals, awayGoals } = fixture.result;
+  if (homeGoals > awayGoals) return { home: 'W', away: 'L' };
+  if (homeGoals < awayGoals) return { home: 'L', away: 'W' };
+  return { home: 'D', away: 'D' };
+}
+
+/**
+ * One team's side of a fixture row. The result box sits on the inside edge of
+ * each side, so the two mirror each other around the scoreline — .fx-side--away
+ * is row-reverse, so the same DOM order renders mirrored on the right.
+ */
+function sideHtml(team, side, outcome) {
+  const box = outcome
+    ? `<span class="fx-result fx-result--${OUTCOMES[outcome].key}"
+             title="${esc(OUTCOMES[outcome].label)}"
+             aria-label="${esc(OUTCOMES[outcome].label)}">${outcome}</span>`
+    : '';
   return `
     <span class="fx-side fx-side--${side}">
       ${crest(team)}
       <span class="fx-side__name" title="${esc(team?.name ?? '')}">${esc(team?.shortName ?? '???')}</span>
+      ${box}
     </span>`;
 }
 
@@ -350,6 +401,55 @@ function featuredHtml(list, team) {
 }
 
 /**
+ * One line of the chronological match feed.
+ *
+ * A goal carries its assister on the SAME line: the two are one moment, and
+ * Understat's shots JSON is what makes the pairing possible at all (FPL only
+ * reports that someone assisted, never whose goal).
+ */
+function timelineEventHtml(ev) {
+  const kind = TIMELINE_ICONS[ev.type] ?? TIMELINE_ICONS.goal;
+
+  const body = ev.type === 'sub'
+    ? `<span class="fx-tl__player fx-tl__player--off">${esc(ev.player)}</span>
+       <span class="fx-tl__arrow" aria-hidden="true">\u2192</span>
+       <span class="fx-tl__player fx-tl__player--on">${esc(ev.playerIn ?? '')}</span>`
+    : `<span class="fx-tl__player">${esc(ev.player)}</span>
+       ${ev.assist ? `<span class="fx-tl__assist">assist ${esc(ev.assist)}</span>` : ''}
+       ${ev.score ? `<span class="fx-tl__score">${esc(ev.score)}</span>` : ''}`;
+
+  return `
+    <li class="fx-tl__item fx-tl__item--${ev.side}">
+      <span class="fx-tl__minute">${ev.minute}'</span>
+      <span class="fx-tl__icon" title="${esc(kind.label)}" aria-hidden="true">${kind.icon}</span>
+      <span class="fx-tl__body">${body}</span>
+      <span class="fx-tl__side">${esc(ev.side === 'home' ? 'H' : 'A')}</span>
+    </li>`;
+}
+
+/**
+ * The chronological match feed, when Understat has one. Returns null when it
+ * doesn't, so the caller can fall back to the FPL event grouping rather than
+ * showing an empty block.
+ */
+function timelineHtml(fixture) {
+  const events = store.getTimeline(fixture.id);
+  if (!events) return null;
+  if (!events.length) return null;
+
+  return `
+    <section class="fx-detail__block">
+      <h4 class="fx-detail__title">Match events</h4>
+      <ul class="fx-tl">${events.map(timelineEventHtml).join('')}</ul>
+      <p class="fx-detail__note">
+        In order of minute, home (H) and away (A) marked at the right.
+        Timings and goal/assist pairings come from Understat — FPL publishes
+        neither.
+      </p>
+    </section>`;
+}
+
+/**
  * The expandable half of a fixture row. Content depends on what exists yet:
  * an upcoming fixture has nothing to report, a played one needs the GW's live
  * payload, which is fetched lazily when the disclosure is first opened.
@@ -375,9 +475,12 @@ function fixtureDetailHtml(fixture, home, away) {
   const { events, featured } = indexFixtureLive(live, fixture);
   const anyEvents = events.home.length || events.away.length;
 
-  return `
-    <div class="fx-detail">
+  // Understat's chronological feed is the one we want. It only exists once
+  // both its calls have landed, so until then (or if they fail) fall back to
+  // FPL's grouped totals rather than showing nothing.
+  const timeline = timelineHtml(fixture);
 
+  const eventsBlock = timeline ?? `
       <section class="fx-detail__block">
         <h4 class="fx-detail__title">Match events</h4>
         ${anyEvents ? `
@@ -386,11 +489,17 @@ function fixtureDetailHtml(fixture, home, away) {
             <ul class="fx-events fx-events--away">${events.away.map(eventHtml).join('')}</ul>
           </div>` : emptyState('No goals, assists or cards recorded.')}
         <p class="fx-detail__note">
-          Home column left. FPL publishes per-match totals, not minute timings,
-          so events are unordered within a match.${fixture.played && !fixture.bonusConfirmed
+          ${_timelineFailed.has(fixture.id)
+            ? 'Understat\u2019s timeline could not be loaded, so these are FPL\u2019s per-match totals: grouped by type, without minutes.'
+            : 'Loading the minute-by-minute feed\u2026 showing FPL\u2019s per-match totals meanwhile.'}${fixture.played && !fixture.bonusConfirmed
             ? ' Bonus points for this match are still provisional.' : ''}
         </p>
-      </section>
+      </section>`;
+
+  return `
+    <div class="fx-detail">
+
+      ${eventsBlock}
 
       <section class="fx-detail__block">
         <h4 class="fx-detail__title">Who featured</h4>
@@ -434,17 +543,19 @@ function fixtureHtml(fixture) {
     ? `<span class="fx-fixture__score">${fixture.result.homeGoals}<em>–</em>${fixture.result.awayGoals}</span>`
     : `<span class="fx-fixture__score fx-fixture__score--time">${esc(fmtTime(fixture.kickoff))}</span>`;
 
+  const outcome = outcomesFor(fixture);
+
   return `
     <li class="fx-item">
       <details class="fx-fixture" data-fixture-id="${fixture.id}"${_openFixtures.has(fixture.id) ? ' open' : ''}>
         <summary class="fx-fixture__summary">
           <span class="fx-status fx-status--${status}" title="${esc(chip.hint)}">${esc(chip.label)}</span>
-          ${sideHtml(home, 'home')}
+          ${sideHtml(home, 'home', outcome.home)}
           <span class="fx-fixture__centre">
             ${centre}
             <span class="fx-fixture__ko">${esc(fmtDateShort(fixture.kickoff))}</span>
           </span>
-          ${sideHtml(away, 'away')}
+          ${sideHtml(away, 'away', outcome.away)}
           <span class="fx-fixture__chev" aria-hidden="true">▾</span>
         </summary>
         ${fixtureDetailHtml(fixture, home, away)}
@@ -558,6 +669,60 @@ function ensureLive(gw) {
     .catch(err => {
       _liveFailed.add(gw);
       console.warn(`[fixtures] live data unavailable for GW${gw}: ${err.message ?? err}`);
+      if (_mode === 'gameweek') renderGameweekPane();
+    });
+}
+
+/**
+ * Fetch, parse and cache one fixture's Understat match timeline, once.
+ *
+ * Two upstream calls: the match page for the chronological feed (the only
+ * source of a minute for cards) and the match JSON for goal→assist pairing.
+ * The page is the backbone and the JSON a pure enrichment, so a failure of the
+ * second still yields a full timeline, just without assists.
+ *
+ * Fire-and-forget; the pane re-renders off 'timeline:updated'. Failures are
+ * swallowed to a console warning and a per-fixture flag, never
+ * store.setError() — this is an ENRICHMENT of a feed that already renders from
+ * FPL data. Same policy as the Understat fetches in main.js (CONVENTIONS.md §9).
+ */
+function ensureTimeline(fixture) {
+  if (!fixture || _timelineRequested.has(fixture.id) || _timelineFailed.has(fixture.id)) return;
+  if (store.getTimeline(fixture.id)) return;
+
+  // The fixture→match mapping is derived from Understat's league payload, which
+  // arrives asynchronously at boot. Opening a fixture before it lands is a
+  // "not yet", NOT a failure — flagging it here would permanently deny this
+  // fixture a timeline for the rest of the session.
+  const leagueXg = store.getLeagueXg();
+  if (!leagueXg) return;
+
+  const matchId = findUnderstatMatchId(fixture, leagueXg, store.getSeason()?.teamsById);
+  if (!matchId) {
+    // League data IS loaded and still no match — Understat genuinely has no
+    // record of this fixture. Flag it so the FPL fallback renders its final
+    // wording instead of a permanent "loading".
+    _timelineFailed.add(fixture.id);
+    console.warn(`[fixtures] no Understat match found for fixture ${fixture.id}`);
+    return;
+  }
+
+  _timelineRequested.add(fixture.id);
+
+  fetchMatchTimeline(matchId)
+    .then(async (events) => {
+      if (!events.length) { _timelineFailed.add(fixture.id); return; }
+      try {
+        attachAssists(events, await fetchMatchData(matchId));
+      } catch (err) {
+        // Assists are optional; the feed is still worth showing without them.
+        console.warn(`[fixtures] assists unavailable for match ${matchId}: ${err.message ?? err}`);
+      }
+      store.setTimeline(fixture.id, events);
+    })
+    .catch((err) => {
+      _timelineFailed.add(fixture.id);
+      console.warn(`[fixtures] Understat timeline unavailable for fixture ${fixture.id}: ${err.message ?? err}`);
       if (_mode === 'gameweek') renderGameweekPane();
     });
 }
@@ -911,7 +1076,10 @@ function onPanesToggle(e) {
   if (details.open) _openFixtures.add(id); else _openFixtures.delete(id);
 
   const fixture = store.getFixture(id);
-  if (details.open && fixture && statusOf(fixture) !== 'upcoming') ensureLive(fixture.gw);
+  if (details.open && fixture && statusOf(fixture) !== 'upcoming') {
+    ensureLive(fixture.gw);
+    ensureTimeline(fixture);
+  }
 }
 
 function onGwStep(e) {
@@ -969,6 +1137,11 @@ function onLiveUpdated() {
   renderGameweekPane();
 }
 
+/** One fixture's Understat timeline landed. */
+function onTimelineUpdated() {
+  renderGameweekPane();
+}
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
 export function initFixtures() {
@@ -991,6 +1164,7 @@ export function initFixtures() {
 
   store.subscribe('data:ready',   onDataReady);
   store.subscribe('live:updated', onLiveUpdated);
+  store.subscribe('timeline:updated', onTimelineUpdated);
 
   _root.querySelector('.fx-modes')?.addEventListener('click', onModeClick);
   _root.querySelector('.fx-controls')?.addEventListener('click', onGwStep);

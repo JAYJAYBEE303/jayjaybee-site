@@ -50,6 +50,21 @@ const ALLOWED_UNDERSTAT_PATTERNS = [
   { name: 'leagueEpl',  pattern: /^league\/EPL\/\d{4}$/,      cache: 'public, max-age=3600' },
   // Single-team season — e.g. team/Arsenal/2025. Slug uses underscores.
   { name: 'teamSeason', pattern: /^team\/[A-Za-z_]+\/\d{4}$/, cache: 'public, max-age=3600' },
+  // Single match — e.g. match/31180. Unlike the two endpoints above this is a
+  // real HTML page, not a JSON endpoint: Understat SERVER-RENDERS the match
+  // timeline (every goal, card and substitution with its minute) into the
+  // markup, and publishes those minutes nowhere in JSON — getMatchData carries
+  // goal minutes and rosters but only card COUNTS. A finished match never
+  // changes, so this caches for a day rather than an hour.
+  //
+  // The proxy stays JSON-only from the client's point of view: it wraps the
+  // markup as { html }. Parsing lives client-side in js/api.js.
+  { name: 'matchPage', pattern: /^match\/\d{1,8}$/, cache: 'public, max-age=86400', html: true },
+  // Same match as JSON — rosters (full lineups, positions, minutes played,
+  // substitution linkage) and shots. Shots are the ONLY place an assist is
+  // tied to the goal it set up (`player_assisted`); the HTML timeline above
+  // names the scorer but never the assister. Fetched alongside the page.
+  { name: 'matchData', pattern: /^matchdata\/\d{1,8}$/, cache: 'public, max-age=86400' },
 ];
 
 const FPL_BASE        = 'https://fantasy.premierleague.com/api/';
@@ -170,21 +185,33 @@ async function handleUnderstat(res, path) {
   // team/{slug}/{season}) — reshape to the real internal endpoint. Understat's
   // own convention: 'league/EPL/2025' -> 'getLeagueData/EPL/2025',
   // 'team/Arsenal/2025' -> 'getTeamData/Arsenal/2025'.
+  // match/{id} is already a real page URL and takes no rewrite.
   const upstreamPath = path.startsWith('league/')
     ? path.replace(/^league\//, 'getLeagueData/')
-    : path.replace(/^team\//, 'getTeamData/');
+    : path.startsWith('team/')
+      ? path.replace(/^team\//, 'getTeamData/')
+      : path.startsWith('matchdata/')
+        ? path.replace(/^matchdata\//, 'getMatchData/')
+        : path;
+
+  const wantsHtml = Boolean(match.html);
 
   let upstream;
   try {
     upstream = await fetch(`${UNDERSTAT_BASE}${upstreamPath}`, {
       headers: {
         'User-Agent': USER_AGENT,
-        Accept: 'application/json',
-        'X-Requested-With': 'XMLHttpRequest',
+        Accept: wantsHtml ? 'text/html,application/xhtml+xml' : 'application/json',
+        // Only the JSON endpoints are XHR endpoints; a page request that
+        // claims to be XHR is exactly the shape bot-detection looks for.
+        ...(wantsHtml ? {} : { 'X-Requested-With': 'XMLHttpRequest' }),
         // Understat's bot-detection has previously been sensitive to a
         // missing Referer on direct/proxied requests — send the page a real
         // browser session for this data would have come from.
-        Referer: `${UNDERSTAT_BASE}${path}`,
+        // Understat's bot-detection has previously been sensitive to a
+        // missing/implausible Referer. matchdata/{id} is our own path name,
+        // not a real page — point at the page the data is read from.
+        Referer: `${UNDERSTAT_BASE}${path.replace(/^matchdata\//, 'match/')}`,
       },
     });
   } catch (err) {
@@ -193,6 +220,18 @@ async function handleUnderstat(res, path) {
 
   if (!upstream.ok) {
     return sendError(res, upstream.status, 'Understat upstream returned non-OK', upstream.status);
+  }
+
+  if (wantsHtml) {
+    let markup;
+    try {
+      markup = await upstream.text();
+    } catch (err) {
+      return sendError(res, 502, `Understat page read failed: ${err.message}`, null);
+    }
+    res.setHeader('Cache-Control', match.cache);
+    res.setHeader('Content-Type', 'application/json');
+    return res.status(200).json({ html: markup });
   }
 
   let raw;

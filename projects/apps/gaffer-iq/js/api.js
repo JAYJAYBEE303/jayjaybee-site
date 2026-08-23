@@ -253,3 +253,197 @@ export async function fetchTeamXg(teamSlug) {
     );
   }
 }
+
+// ─── Understat match timeline (Fixtures tab) ─────────────────────────────────
+// Two calls per match, because no single Understat response carries the whole
+// picture:
+//   match/{id}      HTML page — the server-rendered timeline. The ONLY source
+//                   of a MINUTE for cards, and the only place events already
+//                   appear in chronological order.
+//   matchdata/{id}  JSON — shots, whose `player_assisted` is the ONLY link
+//                   between a goal and the assist that set it up.
+// The FPL API publishes neither: its per-fixture stats are unordered totals.
+//
+// The timeline is the backbone and the assists are a pure enrichment, so a
+// failure of the JSON call degrades to goals without assists rather than
+// losing the feed.
+
+const MATCH_ID_RE = /^\d{1,8}$/;
+
+/**
+ * Fetch one Understat match page and parse its timeline.
+ * @param {string|number} matchId  Understat match id (engine/channel.js →
+ *   findUnderstatMatchId maps an FPL fixture to one)
+ * @returns {Promise<MatchEvent[]>}  chronological events; [] if the page has
+ *   no timeline (an unplayed match)
+ * @throws {ApiError}  on network/proxy failure or unparseable markup
+ */
+export async function fetchMatchTimeline(matchId) {
+  const id = String(matchId);
+  if (!MATCH_ID_RE.test(id)) {
+    throw new ApiError(`Invalid Understat match id: ${matchId}`, { path: `match/${id}` });
+  }
+
+  let body;
+  try {
+    body = await callProxy(`match/${id}`, 'understat');
+  } catch (err) {
+    throw new ApiError(
+      `Understat match timeline unavailable for ${id}: ${err.message}`,
+      { upstreamStatus: err.upstreamStatus ?? null, path: `match/${id}` },
+    );
+  }
+
+  if (typeof body?.html !== 'string') {
+    throw new ApiError(`Understat match ${id} returned no markup`, { path: `match/${id}` });
+  }
+
+  return parseMatchTimeline(body.html);
+}
+
+/**
+ * Fetch one Understat match's JSON (rosters + shots).
+ * @param {string|number} matchId
+ * @returns {Promise<object>}  { rosters, shots, tmpl }
+ * @throws {ApiError}
+ */
+export async function fetchMatchData(matchId) {
+  const id = String(matchId);
+  if (!MATCH_ID_RE.test(id)) {
+    throw new ApiError(`Invalid Understat match id: ${matchId}`, { path: `matchdata/${id}` });
+  }
+  try {
+    return await callProxy(`matchdata/${id}`, 'understat');
+  } catch (err) {
+    throw new ApiError(
+      `Understat match data unavailable for ${id}: ${err.message}`,
+      { upstreamStatus: err.upstreamStatus ?? null, path: `matchdata/${id}` },
+    );
+  }
+}
+
+/**
+ * @typedef {object} MatchEvent
+ * @property {number} minute    match minute
+ * @property {'home'|'away'} side  which team the event belongs to
+ * @property {'goal'|'own_goal'|'yellow'|'red'|'sub'} type
+ * @property {string} player    scorer, booked player, or the player coming OFF
+ * @property {string|null} playerIn   for a substitution, the player coming on
+ * @property {string|null} assist     for a goal, who set it up (from shots JSON)
+ * @property {string|null} score      running scoreline at that moment, e.g. '1 - 0'
+ */
+
+/**
+ * Parse Understat's server-rendered match timeline into structured events.
+ *
+ * WHY HERE: this is response translation, which is api.js's job. It cannot
+ * live in engine/ — DOMParser is a browser API and everything under engine/ is
+ * required to be pure and DOM-free (ARCHITECTURE.md §3 hard rule 2).
+ *
+ * Scraping markup is inherently more fragile than reading JSON, so every step
+ * is defensive: an item that doesn't match the expected shape is skipped, and
+ * a page with no recognisable timeline yields [] rather than throwing. The
+ * caller treats the whole feed as an enrichment and falls back to the FPL
+ * event grouping when it comes back empty.
+ *
+ * Understat's structure, as served:
+ *   .timeline-item[.timeline-item-right]   one minute; -right = away team
+ *     .timeline-time                       "64'"
+ *     .timeline-row                        one event (two rows = two events
+ *                                          in the same minute)
+ *       a.timeline-player-name             player(s) — two for a substitution
+ *       .timeline-match-score              "1 - 0", goals only
+ *       i.fas[title]                       "Goal" | "Yellow card" | "Red card"
+ *       .timeline-group[title]             "Substituted off" / "Substituted on"
+ *                                          — note the sub title is on the GROUP,
+ *                                          not on the <i>, which carries only
+ *                                          .icon-sub
+ *
+ * @param {string} html  raw match-page markup
+ * @returns {MatchEvent[]}  ordered by minute
+ */
+export function parseMatchTimeline(html) {
+  let doc;
+  try {
+    doc = new DOMParser().parseFromString(html, 'text/html');
+  } catch {
+    return [];
+  }
+
+  const items = doc.querySelectorAll('.timeline-block .timeline-item');
+  const events = [];
+
+  for (const item of items) {
+    const minute = parseInt(item.querySelector('.timeline-time')?.textContent ?? '', 10);
+    if (!Number.isFinite(minute)) continue;
+
+    // Understat lays the home team's events left and the away team's right.
+    const side = item.classList.contains('timeline-item-right') ? 'away' : 'home';
+
+    for (const row of item.querySelectorAll('.timeline-row')) {
+      const names = [...row.querySelectorAll('.timeline-player-name')].map(a => a.textContent.trim());
+      if (!names.length) continue;
+
+      // Understat hangs the descriptive title in two different places: on the
+      // <i> for a goal or card, but on the wrapping .timeline-group for a
+      // substitution. Read every title in the row rather than guessing, and
+      // treat the sub icon's own class as a second, independent signal.
+      const titles = [...row.querySelectorAll('[title]')]
+        .map(el => (el.getAttribute('title') ?? '').toLowerCase());
+      const hasSubIcon = Boolean(row.querySelector('.icon-sub'));
+      const score = row.querySelector('.timeline-match-score')?.textContent.trim() ?? null;
+
+      let type = null;
+      if (titles.some(t => t.includes('own goal')))      type = 'own_goal';
+      else if (titles.some(t => t.includes('goal')))     type = 'goal';
+      else if (titles.some(t => t.includes('yellow')))   type = 'yellow';
+      else if (titles.some(t => t.includes('red')))      type = 'red';
+      else if (hasSubIcon || titles.some(t => t.includes('substitut'))) type = 'sub';
+      if (!type) continue;
+
+      events.push({
+        minute,
+        side,
+        type,
+        // For a substitution Understat prints the player going off first.
+        player:   names[0],
+        playerIn: type === 'sub' ? (names[1] ?? null) : null,
+        assist:   null,   // filled by attachAssists() from the shots JSON
+        score,
+      });
+    }
+  }
+
+  return events.sort((a, b) => a.minute - b.minute);
+}
+
+/**
+ * Attach each goal's assister, matching the shots JSON to the timeline on
+ * minute + scorer. Both come from Understat, so the names agree exactly and no
+ * fuzzy matching is needed.
+ *
+ * Mutates and returns `events` — a goal whose shot cannot be found simply
+ * keeps assist: null, which renders as a goal with no assister rather than as
+ * an error.
+ *
+ * @param {MatchEvent[]} events   from parseMatchTimeline()
+ * @param {object} matchData      from fetchMatchData()
+ * @returns {MatchEvent[]}        the same array
+ */
+export function attachAssists(events, matchData) {
+  const shots = [
+    ...(matchData?.shots?.h ?? []),
+    ...(matchData?.shots?.a ?? []),
+  ].filter(s => s?.result === 'Goal' && s?.player_assisted);
+
+  if (!shots.length) return events;
+
+  for (const ev of events) {
+    if (ev.type !== 'goal') continue;
+    const shot = shots.find(s =>
+      Number(s.minute) === ev.minute && s.player === ev.player);
+    if (shot) ev.assist = shot.player_assisted;
+  }
+
+  return events;
+}

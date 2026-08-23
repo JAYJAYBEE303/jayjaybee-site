@@ -4457,6 +4457,103 @@ img.fx-crest {
   margin-bottom: var(--space-6);
 }
 
+/* Result box beside each team on a completed fixture. Sits on the inside edge
+   of each side so the pair mirrors around the scoreline (.fx-side--away is
+   row-reverse, so identical markup lands mirrored). Same three-part treatment
+   as .fx-status: tinted ground, matching border, matching text. */
+.fx-result {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.fx-result--w { background: var(--band-good-bg);    border-color: var(--band-good);    color: var(--band-good);    }
+.fx-result--d { background: var(--band-neutral-bg); border-color: var(--band-neutral); color: var(--color-muted);  }
+.fx-result--l { background: var(--band-brutal-bg);  border-color: var(--band-brutal);  color: var(--band-brutal);  }
+
+/* ─── Match timeline (Understat) ─────────────────────────────────────────────
+   One chronological feed rather than the two mirrored columns FPL's unordered
+   totals forced. Minute on the left, then the event, then an H/A marker — a
+   single reading order beats a split one once events are actually sequenced. */
+
+.fx-tl {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.fx-tl__item {
+  display: grid;
+  grid-template-columns: 4.5ch 1.5em 1fr 2ch;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+}
+
+/* A tinted left edge separates the two teams at a glance without splitting the
+   feed into columns and losing the chronology. */
+.fx-tl__item--home { box-shadow: inset 2px 0 0 var(--color-accent); }
+.fx-tl__item--away { box-shadow: inset 2px 0 0 var(--color-muted); }
+
+.fx-tl__item:hover { background: var(--color-surface); }
+
+.fx-tl__minute {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  text-align: right;
+}
+
+.fx-tl__icon { line-height: 1; }
+
+.fx-tl__body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.fx-tl__player { font-weight: 600; }
+
+/* The assister rides on the scorer's line — one moment, one row. */
+.fx-tl__assist {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
+
+.fx-tl__score {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-raised);
+}
+
+.fx-tl__player--off { color: var(--band-brutal); font-weight: 400; }
+.fx-tl__player--on  { color: var(--band-good); }
+.fx-tl__arrow       { color: var(--color-muted); }
+
+.fx-tl__side {
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  color: var(--color-muted);
+  text-align: right;
+}
+
 /* ─── Fixtures: mobile ───────────────────────────────────────────────────── */
 
 @media (max-width: 768px) {
@@ -4495,6 +4592,9 @@ img.fx-crest {
   /* Both two-column blocks collapse to one. */
   .fx-detail__cols,
   .fx-two-col { grid-template-columns: 1fr; }
+
+  .fx-tl__item { grid-template-columns: 4ch 1.5em 1fr; gap: var(--space-2); }
+  .fx-tl__side { display: none; }
 
   .fx-row { grid-template-columns: 10ch 2ch 1fr 7ch; }
   .fx-row__tag { display: none; }

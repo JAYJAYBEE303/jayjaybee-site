@@ -43,6 +43,11 @@ const state = {
   // never mirrored to sessionStorage: the endpoint is explicitly no-store
   // (see the allowlist in api/fpl.js) because a live GW changes by the minute.
   live: {},
+  // Fixtures tab — parsed Understat match timelines keyed by FIXTURE id (not
+  // by Understat match id, so the consumer never has to re-derive the mapping).
+  // Memory-only, like `live`: a finished match never changes, so there is
+  // nothing to gain from persisting it across a session.
+  timelines: {},
   activeHorizon: 'GW1',
   // The user's squad: an ordered array of player IDs (max 15), shared by every
   // module that reads/edits it (Dashboard, Planner). Previously each module
@@ -98,6 +103,7 @@ function getLeagueXgPrev2()           { return state.leagueXgPrev2; }
 function getLeagueXgPrev3()           { return state.leagueXgPrev3; }
 function getTeamXg(teamSlug)          { return state.teamXg[teamSlug] ?? null; }
 function getLive(gw)                  { return state.live[gw] ?? null; }
+function getTimeline(fixtureId)       { return state.timelines[fixtureId] ?? null; }
 function getAllTeamXg()               { return { ...state.teamXg }; }
 function getActiveHorizon()           { return state.activeHorizon; }
 function getSquad()                   { return state.squad; }
@@ -154,6 +160,16 @@ function setLive(gw, data) {
   emit('live:updated', gw);
 }
 
+/**
+ * Cache one fixture's parsed match timeline.
+ * @param {number} fixtureId
+ * @param {object[]} events  from api.js parseMatchTimeline() + attachAssists()
+ */
+function setTimeline(fixtureId, events) {
+  state.timelines[fixtureId] = events;
+  emit('timeline:updated', fixtureId);
+}
+
 function setActiveHorizon(key) {
   if (state.activeHorizon === key) return;
   state.activeHorizon = key;
@@ -188,6 +204,7 @@ function setError(err) {
   state.leagueXgPrev2 = null;
   state.leagueXgPrev3 = null;
   state.live = {};
+  state.timelines = {};
   state.lastRefreshAt = null;
   try { sessionStorage.removeItem(SS_KEY_SEASON); } catch { /* non-fatal */ }
   state.lastError = err;
@@ -207,6 +224,7 @@ function clearCache() {
   state.leagueXgPrev3 = null;
   state.teamXg = {};
   state.live = {};
+  state.timelines = {};
   state.lastRefreshAt = null;
   state.lastError = null;
   try { sessionStorage.removeItem(SS_KEY_SEASON); } catch { /* non-fatal */ }
@@ -246,10 +264,10 @@ export const store = {
   getFixtures, getFixture, getPositions, getEvents,
   getCurrentGw, getNextGw, getPlayerSummary, getAllPlayerSummaries,
   getLeagueXg, getLeagueXgPrev, getLeagueXgPrev2, getLeagueXgPrev3, getTeamXg, getAllTeamXg,
-  getLive,
+  getLive, getTimeline,
   getActiveHorizon, getSquad, getError, getLastRefreshAt, isFresh,
   setSeason, setPlayerSummary, setLeagueXg, setLeagueXgPrev, setLeagueXgPrev2, setLeagueXgPrev3, setTeamXg,
-  setLive,
+  setLive, setTimeline,
   setActiveHorizon, setSquad, setError, markDataReady,
   clearCache,
 };
