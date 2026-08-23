@@ -7,25 +7,66 @@
  */
 
 import {
-  FORM_WINDOW_GWS, RECENCY_DECAY, W_FORM_GD, LEAGUE_AVG_STRENGTH,
+  FORM_WINDOW_GWS, RECENCY_DECAY, W_FORM_PERFORMANCE, LEAGUE_AVG_STRENGTH,
   PLAYER_FORM_GWS, W_RETURNS, W_MINUTES, W_UNDERLYING, AVAIL_PENALTY,
   PLAYER_PER90_ANCHORS, PLAYER_XG_ANCHORS, SEASON_GWS,
   STATUS_PLAY_CHANCE,
 } from '../config.js';
 import { clamp, normaliseLinear, safeDiv } from '../util.js';
+import { canonicalClubKey } from './normalise.js';
 
 // ─── §5  Team form ────────────────────────────────────────────────────────────
 
 /**
+ * Internal: one-pass index of this season's match xG, keyed by the ordered
+ * "home club|away club" name pair, so buildResultsByTeam can attach xG to
+ * each result with an O(1) lookup instead of scanning datesData per fixture.
+ * The distinction matters at scale: 380 played fixtures against 380 dates
+ * rows is 380 lookups this way, not up to 380×380 — see the boot-performance
+ * note in ARCHITECTURE.md for what an unnoticed per-fixture scan costs here.
+ *
+ * MODEL: matched by NAME via canonicalClubKey, never by either feed's numeric
+ * team id — FPL's and Understat's ids are unrelated (same convention as
+ * h2h.js / channel.js). Keyed on the ordered pair alone, with no date
+ * tiebreak: within one season a given pairing plays at a given venue at most
+ * once, so the pair is already unique. Only ctx.leagueXg (current season) is
+ * consulted — calcTeamForm's window can never reach further back than a
+ * season has been running, so there is nothing earlier seasons could answer.
+ *
+ * @param {object} leagueXg  Understat league payload, or null/absent (Understat
+ *   down, or not yet loaded — non-fatal; every result simply falls back to
+ *   actual goal difference in rawTeamForm below).
+ * @returns {Map<string, {xgH: number, xgA: number}>}
+ */
+function buildXgIndex(leagueXg) {
+  const map = new Map();
+  const dates = leagueXg?.datesData;
+  if (!Array.isArray(dates)) return map;
+  for (const d of dates) {
+    if (!d?.isResult || !d?.h?.title || !d?.a?.title) continue;
+    const xgH = Number(d.xG?.h);
+    const xgA = Number(d.xG?.a);
+    if (!Number.isFinite(xgH) || !Number.isFinite(xgA)) continue;
+    map.set(`${canonicalClubKey(d.h.title)}|${canonicalClubKey(d.a.title)}`, { xgH, xgA });
+  }
+  return map;
+}
+
+/**
  * Internal: for every team, the chronological list of their played results,
  * each enriched with the opponent's overall strength prior so calcTeamForm
- * can opponent-adjust without re-reading the fixtures array.
+ * can opponent-adjust without re-reading the fixtures array, and with that
+ * match's xG from both ends where Understat has it (null/null otherwise —
+ * rawTeamForm falls back to actual goal difference per match, not as an
+ * all-or-nothing switch for the whole team).
  *
- * @param {object} ctx  { playedFixtures, teamsById }
- * @returns {Object<number, Array<{gw, isHome, gf, ga, points, oppId, oppStrength}>>}
+ * @param {object} ctx  { playedFixtures, teamsById, leagueXg? }
+ * @returns {Object<number, Array<{gw, isHome, gf, ga, xgFor, xgAgainst,
+ *            points, oppId, oppStrength}>>}
  */
 function buildResultsByTeam(ctx) {
   const out = {};
+  const xgIndex = buildXgIndex(ctx.leagueXg);
   const sorted = (ctx.playedFixtures || [])
     .slice()
     .sort((a, b) => (a.gw ?? 0) - (b.gw ?? 0));
@@ -35,9 +76,13 @@ function buildResultsByTeam(ctx) {
     const away = ctx.teamsById?.[f.awayTeamId];
     const hg = f.result.homeGoals;
     const ag = f.result.awayGoals;
+    const xg = (home && away)
+      ? xgIndex.get(`${canonicalClubKey(home.name)}|${canonicalClubKey(away.name)}`)
+      : undefined;
     (out[f.homeTeamId] ||= []).push({
       gw: f.gw, isHome: true,
       gf: hg, ga: ag,
+      xgFor: xg?.xgH ?? null, xgAgainst: xg?.xgA ?? null,
       points: hg > ag ? 3 : hg === ag ? 1 : 0,
       oppId: f.awayTeamId,
       oppStrength: away?.strength?.overall ?? LEAGUE_AVG_STRENGTH,
@@ -45,6 +90,7 @@ function buildResultsByTeam(ctx) {
     (out[f.awayTeamId] ||= []).push({
       gw: f.gw, isHome: false,
       gf: ag, ga: hg,
+      xgFor: xg?.xgA ?? null, xgAgainst: xg?.xgH ?? null,
       points: ag > hg ? 3 : hg === ag ? 1 : 0,
       oppId: f.homeTeamId,
       oppStrength: home?.strength?.overall ?? LEAGUE_AVG_STRENGTH,
@@ -55,14 +101,16 @@ function buildResultsByTeam(ctx) {
 
 /**
  * Internal: the un-normalised form value for one team, blending
- * opponent-adjusted, recency-weighted points with a goal-difference overlay.
- * Returns null when the team has no played fixtures.
+ * opponent-adjusted, recency-weighted points with an underlying-performance
+ * overlay (xG-difference where Understat has the match, else actual goal
+ * difference for that one match). Returns null when the team has no played
+ * fixtures.
  */
 function rawTeamForm(results, leagueAvgStrength) {
   if (!results || results.length === 0) return null;
   const window = results.slice(-FORM_WINDOW_GWS);
-  let weightedPts = 0;
-  let weightedGd  = 0;
+  let weightedPts  = 0;
+  let weightedPerf = 0;
   let totalW = 0;
   for (let i = 0; i < window.length; i++) {
     // gwsAgo: 0 for the most recent match in the window, increasing toward older entries.
@@ -71,14 +119,33 @@ function rawTeamForm(results, leagueAvgStrength) {
     const r = window[i];
     const oppAdj = safeDiv(r.oppStrength, leagueAvgStrength, 1);
     weightedPts += r.points * oppAdj * recency;
-    weightedGd  += (r.gf - r.ga) * recency;
-    totalW      += recency;
+
+    const perf = (r.xgFor != null && r.xgAgainst != null)
+      ? (r.xgFor - r.xgAgainst)
+      : (r.gf - r.ga);
+
+    // Opponent-adjustment is SYMMETRIC here, unlike the points line above.
+    // Points floor at 0, so oppAdj only ever amplifies credit for beating a
+    // strong side — a loss is 0 regardless of opponent, the sign case never
+    // arises. perf can go negative, and applying the SAME multiplier would
+    // invert the intended read: oppAdj>1 for a strong opponent would make a
+    // bad loss to a title contender look worse than the identical margin lost
+    // to a relegation side, when the opposite is the more honest signal —
+    // losing badly to a weak side says more about a team's own quality. So a
+    // bad performance (perf < 0) is scaled by the RECIPROCAL instead: pulled
+    // further negative against a weak opponent, pulled toward zero against a
+    // strong one.
+    const perfAdj = perf >= 0 ? (perf * oppAdj) : safeDiv(perf, oppAdj, perf);
+
+    weightedPerf += perfAdj * recency;
+    totalW       += recency;
   }
   if (totalW === 0) return null;
-  const meanPts = weightedPts / totalW;
-  const meanGd  = weightedGd  / totalW;
-  // MODEL: results dominate; GD is a sharper-than-results overlay at W_FORM_GD.
-  return ((1 - W_FORM_GD) * meanPts) + (W_FORM_GD * meanGd);
+  const meanPts  = weightedPts  / totalW;
+  const meanPerf = weightedPerf / totalW;
+  // MODEL: results dominate; the performance overlay is a sharper-than-results
+  // signal at W_FORM_PERFORMANCE.
+  return ((1 - W_FORM_PERFORMANCE) * meanPts) + (W_FORM_PERFORMANCE * meanPerf);
 }
 
 /**
@@ -118,8 +185,16 @@ function formTrend(results) {
  *
  * `estimated` is now reserved for its literal meaning: no games at all.
  *
+ * MODEL: the 20% overlay term (W_FORM_PERFORMANCE, config.js) blends xG
+ * rather than actual goal difference wherever Understat has the match —
+ * results are noisy over a 5-game window (a single deflection or red card
+ * can dominate it), and xG is the standard industry answer to exactly that:
+ * a less noisy read on performance than the scoreline alone. Falls back to
+ * actual goal difference per match, not for the whole team, when Understat
+ * lacks that one fixture or is unavailable entirely. See buildXgIndex above.
+ *
  * @param {Team} team
- * @param {object} ctx  { teamsById, playedFixtures, leagueAvgStrength? }
+ * @param {object} ctx  { teamsById, playedFixtures, leagueXg?, leagueAvgStrength? }
  * @returns {{value: number, trend: number, estimated: boolean, games: number,
  *            maturity: number}}
  *   value: 0–100, higher = better recent form for `team`. Direction: higher = better.

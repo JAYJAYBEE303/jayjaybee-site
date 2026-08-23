@@ -312,8 +312,16 @@ export const FORM_WINDOW_GWS = 5;
 // 1.0 = flat average; lower = heavier recency weighting.
 export const RECENCY_DECAY = 0.85;
 
-// Weight of goal-difference overlay blended into rawForm.
-export const W_FORM_GD = 0.2;
+// Weight of the underlying-performance overlay blended into rawForm — xG
+// difference where Understat has the match, else actual goal difference for
+// that one match (engine/form.js, buildXgIndex). Opponent-adjustment on this
+// term is symmetric rather than one-directional like points: a good
+// performance is scaled up against a strong opponent; a bad one is scaled
+// MORE negative against a weak opponent instead — losing badly to a
+// relegation side is a worse signal than losing the same way to a
+// contender. Renamed from W_FORM_GD when the overlay switched from raw goal
+// difference to xG-difference-with-GD-fallback.
+export const W_FORM_PERFORMANCE = 0.2;
 
 // Fallback league-average strength used in opponent-quality adjustment before
 // bootstrap data has loaded. FPL priors cluster roughly 1000–1400.
