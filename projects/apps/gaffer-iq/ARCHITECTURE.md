@@ -277,6 +277,20 @@ modules/*  ──▶  read scores, render DOM for the active horizon
 - `store.js` keeps an in-memory object for the session and mirrors the big static payloads (`bootstrap`, `fixtures`) into `sessionStorage` keyed by a fetch timestamp.
 - TTL policy: bootstrap/fixtures are treated as fresh for the session unless the user hits a manual "refresh data" control. Player summaries cached for the session. Live data is never cached (always re-fetched).
 - `store` exposes a tiny pub/sub (`subscribe(event, cb)` / `emit(event)`) so modules can react to `data:ready`, `horizon:changed`, etc., without tight coupling.
+- The store also holds `activeModule` — which tab is on screen — written only by `main.js`'s router and published as `route:changed`. Modules read it to skip work while hidden; see `CONVENTIONS.md` §8 for the contract they must follow.
+
+### Enrichment fetches and re-render cost
+
+The boot-time Understat prefetch (`prefetchAllTeamXg`) fetches all 20 teams so every module scores on the same counter-matchup tier from first paint. Those fetches are parallel and cost nothing on the main thread — but each **arrival** used to emit `data:ready`, and that is a global broadcast that re-renders every module.
+
+Measured on the live dataset: ~2.4s of blocking work per emit × 21 emits ≈ **50s of startup lag**. Two changes fix it, and both are needed — either alone still leaves several seconds:
+
+1. **Coalesce the arrivals.** `main.js` batches them into one `data:ready` per `TEAM_XG_COALESCE_MS` window (a fixed window, not a resetting debounce, so a trickle of payloads cannot postpone the upgrade indefinitely). Measured: 20 payloads → 2 emits.
+2. **Do not render hidden tabs.** Modules defer expensive work via `route:changed`. Measured: ~2,400ms → ~41ms per emit.
+
+The general rule for any future enrichment fetch: **the cost of a payload landing is not the fetch, it is the re-render it triggers.** Batch arrivals, and let only the visible module pay for them.
+
+One coupling to remember: `store.clearCache()` wipes `state.teamXg`, so anything guarding those fetches against duplication must be reset alongside it (`resetTeamXgPrefetch` in `main.js`). Letting the guard outlive the cache it guards silently strands the app on the role tier — no error, just quietly worse scores.
 
 ### Processing
 - All transformation from raw JSON to the internal model happens in `engine/normalise.js` and **nowhere else**. Modules and other engine files only ever see the clean model, never raw FPL field names like `element_type` or `team_h_difficulty`. This insulates the whole codebase from the FPL API's quirky naming and from upstream schema changes — if the API renames a field, you fix it in one function.

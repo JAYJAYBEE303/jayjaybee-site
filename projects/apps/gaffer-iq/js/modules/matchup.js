@@ -7,7 +7,10 @@
  * No analytical logic lives here — all scoring delegated to engine/composite.js.
  * See ARCHITECTURE.md §10, FEATURE_ENGINE.md §11, ROADMAP.md Phase 1C.
  *
- * Subscriptions: data:ready, horizon:changed
+ * Subscriptions: data:ready, horizon:changed, route:changed, player:selected
+ * Renders only while on screen: data:ready does the cheap bookkeeping
+ * unconditionally, then defers the expensive work to route:changed when
+ * this module is hidden. See CONVENTIONS.md §8.
  */
 
 import { store } from '../store.js';
@@ -107,6 +110,7 @@ let _navIndex  = 0;     // index into _navGroups the navigator is showing
 let _teams     = [];    // all teams, alphabetical by name — _teamIndex steps through this
 let _teamIndex = 0;     // index into _teams the team navigator is showing; wraps both ends
 let _teamNavDescending = false; // true = off-season fallback (recent played, not upcoming)
+let _pendingRender = false;     // data changed while off screen — render on activation
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1147,9 +1151,32 @@ function onDataReady() {
   if (!_selectedFixtureId || !store.getFixture(_selectedFixtureId)) {
     _selectedFixtureId = fixtures[0].id;
   }
+
+  // Selecting the fixture above is cheap and keeps the module's state correct
+  // off screen; the three renders below are not. Defer them when hidden — see
+  // store.js's activeModule note.
+  if (store.getActiveModule() !== 'matchup') {
+    _pendingRender = true;
+    return;
+  }
+  _pendingRender = false;
+
   renderNav(fixtures, { descending });
   renderTeamNav(descending);
   renderMatchup();
+}
+
+/**
+ * Flush a render deferred while off screen, once Matchup is shown.
+ *
+ * Re-enters onDataReady rather than repeating the render calls: the fixture
+ * list and its `descending` flag are derived at the top of that function, and
+ * duplicating that derivation here is how the two paths would drift apart.
+ */
+function onRouteChanged(module) {
+  if (module !== 'matchup' || !_pendingRender) return;
+  _pendingRender = false;
+  onDataReady();
 }
 
 function onHorizonChanged() {
@@ -1221,6 +1248,7 @@ export function initMatchup() {
 
   store.subscribe('data:ready',      onDataReady);
   store.subscribe('horizon:changed', onHorizonChanged);
+  store.subscribe('route:changed',   onRouteChanged);
   store.subscribe('player:selected', onPlayerSelected);
 
   // Delegated on _nav (stable across renders) rather than per-row/button —

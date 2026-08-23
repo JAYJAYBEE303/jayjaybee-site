@@ -11,7 +11,10 @@
  * engine/composite.js.
  * See ARCHITECTURE.md §10, FEATURE_ENGINE.md §11, ROADMAP.md Phase 2B.
  *
- * Subscriptions: data:ready, horizon:changed
+ * Subscriptions: data:ready, horizon:changed, route:changed
+ * Renders only while on screen: data:ready does the cheap bookkeeping
+ * unconditionally, then defers the expensive work to route:changed when
+ * this module is hidden. See CONVENTIONS.md §8.
  */
 
 import { store } from '../store.js';
@@ -776,8 +779,34 @@ function onAvgPtsToggleClick() {
   }
 }
 
+/**
+ * Set when data changed while the Ranker was off screen, so activation knows
+ * it owes a rebuild. See onRouteChanged.
+ */
+let _pendingRebuild = false;
+
 function onDataReady() {
+  // Cheap enough to keep eager, and it leaves the filter correct for whenever
+  // the tab is next opened.
   populateTeamFilter();
+
+  // Ranking the full pool is by far the most expensive thing this module does
+  // (~920ms for 604 players, measured). data:ready fires once per team-xG
+  // payload at boot, so doing this off screen burned seconds ranking a table
+  // nobody was looking at. Defer to activation — store.js's activeModule note
+  // has the full measurement.
+  if (store.getActiveModule() !== 'ranker') {
+    _pendingRebuild = true;
+    return;
+  }
+  _pendingRebuild = false;
+  rebuildRowsChunked();
+}
+
+/** Flush a rebuild deferred while off screen, once the Ranker is shown. */
+function onRouteChanged(module) {
+  if (module !== 'ranker' || !_pendingRebuild) return;
+  _pendingRebuild = false;
   rebuildRowsChunked();
 }
 
@@ -888,15 +917,12 @@ export function initRanker() {
 
   store.subscribe('data:ready',      onDataReady);
   store.subscribe('horizon:changed', onHorizonChanged);
+  store.subscribe('route:changed',   onRouteChanged);
 
   // If the store already has data (hydrated from sessionStorage, or data:ready
   // fired before this module registered its subscription), render right now
-  // rather than waiting for an event that won't fire again.
-  // onDataReady() uses setTimeout(0) to yield a paint frame for data refreshes
-  // triggered mid-session; here we skip that deferral and render synchronously
-  // so the table appears immediately on first load.
-  if (store.isFresh()) {
-    populateTeamFilter();
-    rebuildRowsChunked();
-  }
+  // rather than waiting for an event that won't fire again. Routed through
+  // onDataReady so the off-screen guard applies here too — on a cold load of
+  // any other tab this now marks the rebuild pending instead of running it.
+  if (store.isFresh()) onDataReady();
 }

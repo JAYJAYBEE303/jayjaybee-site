@@ -12,7 +12,10 @@ import {
   PROJ_FORM, PROJ_FIXTURE, PROJ_COUNTER, PROJ_MINUTES,
 } from './config.js';
 import { store } from './store.js';
-import { UNDERSTAT_SEASON, UNDERSTAT_PREV_SEASON, UNDERSTAT_HISTORY_SEASONS } from './config.js';
+import {
+  UNDERSTAT_SEASON, UNDERSTAT_PREV_SEASON, UNDERSTAT_HISTORY_SEASONS,
+  TEAM_XG_COALESCE_MS,
+} from './config.js';
 import {
   fetchBootstrap, fetchFixtures, fetchPlayerSummary,
   fetchLeagueXg, fetchTeamXg, ApiError,
@@ -39,6 +42,24 @@ import { initCalibration }  from './calibration.js';
 // Slugs whose team-xG fetch has already been started this session, so a
 // re-render mid-flight can't fire a duplicate request.
 const _teamXgRequested = new Set();
+
+/**
+ * Forget which team-xG fetches have been started, so the next
+ * prefetchAllTeamXg() re-requests all of them.
+ *
+ * MUST be called alongside store.clearCache(). clearCache() wipes
+ * state.teamXg, but this Set lives in this module and used to survive it — so
+ * after a refresh every slug was skipped as "already requested" while the data
+ * it guarded was gone. The result was silent: no error, no warning, the whole
+ * app just dropped to the role tier for the rest of the session because the
+ * channel tier had no payloads left to build from.
+ *
+ * The Set guards against duplicate IN-FLIGHT requests, so its lifetime has to
+ * match the cache's rather than the page's.
+ */
+function resetTeamXgPrefetch() {
+  _teamXgRequested.clear();
+}
 
 /**
  * Fetches bootstrap + fixtures in parallel, normalises into the internal
@@ -187,6 +208,38 @@ async function loadInitialData({ force = false } = {}) {
  * markDataReady() is a bare emit with no other side effects, so re-firing it
  * is the existing and only post-boot re-render path.
  */
+// Pending coalesce timer for team-xG arrivals; null when none is scheduled.
+let _dataReadyHandle = null;
+
+/**
+ * Batch the re-render that follows a team-xG payload landing.
+ *
+ * WHY: markDataReady() is a global broadcast — every module re-renders on it.
+ * Firing it once per payload meant 20 full application-wide rescores at boot
+ * on top of the initial one. Measured on the live dataset: ~2.4s of blocking
+ * main-thread work per emit, ~50s in total, which is the startup lag this
+ * fixes. The fetches themselves were never the problem; they are parallel and
+ * cost nothing on the main thread.
+ *
+ * FIXED WINDOW, not a resetting debounce. The first arrival schedules a flush
+ * at +TEAM_XG_COALESCE_MS and later arrivals join that same flush rather than
+ * pushing it back. A resetting debounce would let a steady trickle of payloads
+ * postpone the upgrade indefinitely; this bounds the wait at one window no
+ * matter how the arrivals are spaced, so the burst collapses to a couple of
+ * emits and the UI still upgrades promptly.
+ *
+ * Payloads that land after a flush simply schedule the next one, so nothing is
+ * dropped — the store is already updated before this is called, and the emit
+ * only tells modules to re-read it.
+ */
+function scheduleDataReady() {
+  if (_dataReadyHandle !== null) return;
+  _dataReadyHandle = setTimeout(() => {
+    _dataReadyHandle = null;
+    store.markDataReady();
+  }, TEAM_XG_COALESCE_MS);
+}
+
 function prefetchAllTeamXg() {
   const season = store.getSeason();
   if (!season) return;
@@ -199,8 +252,9 @@ function prefetchAllTeamXg() {
     fetchTeamXg(slug)
       .then((data) => {
         store.setTeamXg(slug, data);
-        // Whatever tab is active upgrades in place as each payload lands.
-        store.markDataReady();
+        // Whatever tab is active upgrades in place as each payload lands —
+        // but batched, not once per payload. See scheduleDataReady.
+        scheduleDataReady();
       })
       .catch((err) => {
         console.warn(`[Gaffer IQ] team xG unavailable for ${slug}: ${err.message}`);
@@ -229,8 +283,10 @@ store.subscribe('data:ready', () => {
 
 document.getElementById('app-error-retry')?.addEventListener('click', () => {
   // Re-trigger the full data fetch sequence. clearCache() first so force:true
-  // starts from a clean slate, not a stale sessionStorage snapshot.
+  // starts from a clean slate, not a stale sessionStorage snapshot, and reset
+  // the prefetch guard alongside it so team xG is actually re-fetched.
   store.clearCache();
+  resetTeamXgPrefetch();
   loadInitialData({ force: true });
 });
 
@@ -280,9 +336,22 @@ function routeToHash() {
     const module = link.getAttribute('href')?.slice(1);
     link.classList.toggle('is-active', module === target);
   });
+
+  // Publish the route so modules can skip rendering while off screen. Set it
+  // AFTER the class toggles above: a module waking on 'route:changed' renders
+  // immediately, and it must measure a section that is already visible —
+  // measuring a display:none section is what produces the zero-width layout
+  // artefacts this codebase has hit before.
+  store.setActiveModule(target);
 }
 
 window.addEventListener('hashchange', routeToHash);
+
+// ORDER MATTERS: this must run BEFORE the module inits below. It seeds
+// store.activeModule from the URL, and each init consults that to decide
+// whether to render now or defer. Called after the inits instead, every module
+// would read the default ('matchup') and a deep link to any other tab would
+// render the wrong one eagerly while the right one sat idle.
 routeToHash();
 
 // ─── Module initialisation ────────────────────────────────────────────────────
@@ -320,7 +389,7 @@ async function loadPlayerSummary(playerId) {
 
 window.__store    = store;
 window.__horizons = HORIZONS;
-window.__refresh  = () => { store.clearCache(); loadInitialData({ force: true }); };
+window.__refresh  = () => { store.clearCache(); resetTeamXgPrefetch(); loadInitialData({ force: true }); };
 
 window.__engine = {
   // `overrides` lets a console session build a context with any option

@@ -170,8 +170,25 @@ When code implements something specified in a doc, cite it: `// see FEATURE_ENGI
 ## 8. State, events & the store
 
 - The only mutable shared state lives in `store.js`. Modules never share state directly with each other; they communicate through `store` events.
-- Event names are `domain:verb`, lowercase, colon-separated: `data:ready`, `data:error`, `horizon:changed`, `player:selected`, `squad:updated`, `live:updated`, `match:updated`.
+- Event names are `domain:verb`, lowercase, colon-separated: `data:ready`, `data:error`, `horizon:changed`, `route:changed`, `player:selected`, `squad:updated`, `live:updated`, `match:updated`.
 - Subscriptions are set up in a module's init function and described in that module's header comment. Avoid anonymous long-lived subscriptions you can't find later.
+
+### Rendering off screen (the `route:changed` contract)
+
+`data:ready` is a **global broadcast**: every module re-renders on it, whether or not it is the tab on screen. That is fine when it fires once; it is not fine when it fires in a burst. The boot-time team-xG prefetch resolves 20 payloads, and emitting per payload cost ~2.4s of blocking main-thread work each — ~50s of startup lag, most of it spent scoring tabs nobody was looking at.
+
+So modules follow one rule:
+
+> **Invalidate always, recompute lazily.**
+
+In `onDataReady`, do the cheap bookkeeping unconditionally — clearing caches, setting flags, seeding selections — so the module's state stays truthful while hidden. Then check `store.getActiveModule()`; if it is not this module, set a `_pendingRender` flag and return before the expensive work. Subscribe to `route:changed` and flush that flag when the module is shown.
+
+Two things this depends on, both load-bearing:
+
+- `main.js` calls `routeToHash()` **before** the module inits, so `getActiveModule()` is already correct when each module wires up.
+- `setActiveModule()` publishes **after** the `is-active` class toggles, so a module waking on `route:changed` measures a section that is already visible. Measuring a `display:none` section is what produces zero-width layout bugs.
+
+New modules must follow this. A module that renders eagerly while hidden re-introduces the lag for every tab, not just its own.
 
 ---
 

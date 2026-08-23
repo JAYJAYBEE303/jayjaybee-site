@@ -6,7 +6,10 @@
  * No analytical logic lives here — see FEATURE_ENGINE.md §10 and §11.
  * See ROADMAP.md Phase 2D, ARCHITECTURE.md §10.
  *
- * Subscriptions: data:ready, horizon:changed
+ * Subscriptions: data:ready, horizon:changed, route:changed, squad:updated
+ * Renders only while on screen: data:ready does the cheap bookkeeping
+ * unconditionally, then defers the expensive work to route:changed when
+ * this module is hidden. See CONVENTIONS.md §8.
  */
 
 import { store } from '../store.js';
@@ -1231,11 +1234,39 @@ function wireDom() {
 
 // ─── Store event handlers ─────────────────────────────────────────────────────
 
+/**
+ * Set when data changed while the Planner was off screen, so activation knows
+ * it owes a re-score. See onRouteChanged.
+ */
+let _pendingRender = false;
+
 function onDataReady() {
   wireDom();          // no-op after first call
   // Force a fresh full-pool rank computation for the new data (see ensureRankTiers).
   _rankTierByPlayerId = null;
   _dataReady = true;
+
+  // Invalidate always, recompute lazily — same split as Dashboard. The
+  // bookkeeping above is cheap and must stay eager; scoreSquad() below drives
+  // ensureRankTiers, a full-pool ranking measured at ~920ms. data:ready fires
+  // once per team-xG payload at boot, so off-screen recomputes here were
+  // roughly half the startup lag. See store.js's activeModule note.
+  if (store.getActiveModule() !== 'planner') {
+    _pendingRender = true;
+    return;
+  }
+  _pendingRender = false;
+
+  scoreSquad();
+  renderSquadPanel();
+  renderRecommendations();
+  renderChipsPanel();
+}
+
+/** Flush a render deferred while off screen, once the Planner is shown. */
+function onRouteChanged(module) {
+  if (module !== 'planner' || !_pendingRender) return;
+  _pendingRender = false;
   scoreSquad();
   renderSquadPanel();
   renderRecommendations();
@@ -1271,6 +1302,7 @@ function onHorizonChanged() {
 export function initPlanner() {
   store.subscribe('data:ready',      onDataReady);
   store.subscribe('horizon:changed', onHorizonChanged);
+  store.subscribe('route:changed',   onRouteChanged);
   store.subscribe('squad:updated',   afterSquadChange);
 
   // If the store is already hydrated (sessionStorage), wire up immediately.

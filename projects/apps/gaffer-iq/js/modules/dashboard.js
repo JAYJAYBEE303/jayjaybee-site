@@ -14,7 +14,10 @@
  *   - A failed live fetch shows the last known data with a "stale" indicator;
  *     the dashboard never crashes. ARCHITECTURE.md §6: live data is never cached.
  *
- * Subscriptions: data:ready
+ * Subscriptions: data:ready, route:changed, squad:updated
+ * Renders only while on screen: data:ready does the cheap bookkeeping
+ * unconditionally, then defers the expensive work to route:changed when
+ * this module is hidden. See CONVENTIONS.md §8.
  */
 
 import { store }       from '../store.js';
@@ -1191,6 +1194,12 @@ function wireDom() {
   console.log('[dashboard] DOM wired — search input listener attached');
 }
 
+/**
+ * Set when data changed while the Dashboard was off screen, so activation
+ * knows it owes a re-score. See onRouteChanged.
+ */
+let _pendingRender = false;
+
 function onDataReady() {
   wireDom();       // no-op after first call
 
@@ -1203,11 +1212,43 @@ function onDataReady() {
   _rankTierByPlayerId = null;
 
   _dataReady = true;
+
+  // Everything above is bookkeeping: cheap, and it must stay eager so the
+  // module's state stays truthful whether or not anyone is looking. Everything
+  // below is the expensive half — scoreSquad() drives ensureRankTiers, a
+  // full-pool ranking measured at ~920ms. Because data:ready fires once per
+  // team-xG payload at boot, running that off screen cost ~18s of blocking work
+  // on a tab that was not visible. Invalidate always, recompute lazily.
+  if (store.getActiveModule() !== 'dashboard') {
+    _pendingRender = true;
+    return;
+  }
+  _pendingRender = false;
+
   scoreSquad();
   renderSquadPanel();
   renderDecisions();
 
   // Start live polling if we're already on the dashboard and the GW is live.
+  reconcileLivePoll();
+}
+
+/**
+ * Flush a render deferred while off screen, once the Dashboard is shown.
+ *
+ * reconcileLivePoll() is repeated here even though the module's own hashchange
+ * handler also calls it: the deferred path above cleared _livePoints and
+ * stopped the poll, and the two listeners fire in registration order, which
+ * this module should not have to reason about. It is idempotent by design
+ * (it reads the hash itself and no-ops off the dashboard), so calling it from
+ * both places is safe and removes the ordering dependency.
+ */
+function onRouteChanged(module) {
+  if (module !== 'dashboard' || !_pendingRender) return;
+  _pendingRender = false;
+  scoreSquad();
+  renderSquadPanel();
+  renderDecisions();
   reconcileLivePoll();
 }
 
@@ -1227,6 +1268,7 @@ function onDataReady() {
  */
 export function initDashboard() {
   store.subscribe('data:ready', onDataReady);
+  store.subscribe('route:changed', onRouteChanged);
   store.subscribe('squad:updated', afterSquadChange);
 
   // If the store is already hydrated from sessionStorage, data:ready won't

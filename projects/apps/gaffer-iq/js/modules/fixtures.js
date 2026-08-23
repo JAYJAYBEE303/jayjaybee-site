@@ -36,7 +36,10 @@
  * players who APPEARED, so the second list is the substitutes used, never a
  * full bench — unused subs exist in neither feed.
  *
- * Subscriptions: data:ready, live:updated, match:updated
+ * Subscriptions: data:ready, route:changed, live:updated, match:updated
+ * Renders only while on screen: data:ready does the cheap bookkeeping
+ * unconditionally, then defers the expensive work to route:changed when
+ * this module is hidden. See CONVENTIONS.md §8.
  */
 
 import { store } from '../store.js';
@@ -1679,11 +1682,37 @@ function onScopeClick(e) {
  * only, so a re-emit can't yank the user back off a GW they stepped to or a
  * club they chose.
  */
+/**
+ * Set when data changed while Fixtures was off screen, so activation knows it
+ * owes a render. See onRouteChanged.
+ */
+let _pendingRender = false;
+
 function onDataReady() {
   if (_gw === null) _gw = store.getCurrentGw() ?? store.getNextGw() ?? FIRST_GW;
   seedSelections();
   populateTeamSelects();
 
+  // Seeding above is cheap and leaves the selects correct for whenever this
+  // tab is next opened. The four panes below each rebuild real markup — the
+  // H2H pane alone walks several seasons of meetings — so skip them while
+  // hidden. See store.js's activeModule note.
+  if (store.getActiveModule() !== 'fixtures') {
+    _pendingRender = true;
+    return;
+  }
+  _pendingRender = false;
+
+  renderGameweekPane();
+  renderTablePane();
+  renderTeamPane();
+  renderH2hPane();
+}
+
+/** Flush a render deferred while off screen, once Fixtures is shown. */
+function onRouteChanged(module) {
+  if (module !== 'fixtures' || !_pendingRender) return;
+  _pendingRender = false;
   renderGameweekPane();
   renderTablePane();
   renderTeamPane();
@@ -1720,6 +1749,7 @@ export function initFixtures() {
   renderH2hPane();
 
   store.subscribe('data:ready',   onDataReady);
+  store.subscribe('route:changed', onRouteChanged);
   store.subscribe('live:updated', onLiveUpdated);
   store.subscribe('match:updated', onMatchUpdated);
 

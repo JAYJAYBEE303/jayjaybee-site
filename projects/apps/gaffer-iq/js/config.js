@@ -856,7 +856,23 @@ export const FH_BLANK_THRESHOLD = 6;
 // considers a strong recommendation rather than a hold.
 export const BB_MIN_DOUBLES = 2;
 
-// ─── §11  Player Ranker performance ──────────────────────────────────────────
+// ─── §11  Boot and render performance ────────────────────────────────────────
+
+// How long main.js waits to batch team-xG arrivals into ONE data:ready emit.
+//
+// data:ready is a global broadcast that makes every module re-render, and the
+// boot-time prefetch resolves 20 team payloads in a burst. Emitting per payload
+// cost ~2.4s of blocking main-thread work each, ~50s in total — the startup lag
+// this constant exists to prevent. At 400ms the burst collapses to a handful of
+// emits while the counter-matchup upgrade still appears essentially at once.
+//
+// Raise it to trade upgrade latency for fewer rescores; lower it to see the
+// channel tier land sooner at the cost of more. Only worth tuning alongside the
+// activeModule guard in each module's onDataReady, which is what makes any
+// single emit cheap in the first place.
+export const TEAM_XG_COALESCE_MS = 400;
+
+// ─── §11.1  Player Ranker performance ────────────────────────────────────────
 
 // Number of players scored per setTimeout(fn, 0) chunk in the async ranker.
 // Lower = more yields (smoother UI, slower total); higher = fewer yields (faster).

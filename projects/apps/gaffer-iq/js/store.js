@@ -53,6 +53,18 @@ const state = {
   // from persisting it across a session.
   matchDetail: {},
   activeHorizon: 'GW1',
+  // Which module is on screen ('matchup' | 'fixtures' | 'ranker' | 'dashboard'
+  // | 'planner'). Written only by main.js's router, which owns the hash; read
+  // by every module to skip work it would only throw away.
+  //
+  // WHY THIS IS STORE STATE rather than each module reading location.hash
+  // itself: data:ready is a global broadcast and every module re-renders on
+  // it, so at boot the 21 emits (1 + one per team-xG payload) each cost a full
+  // application-wide rescore — ~2.4s, of which ~1.8s was two full-pool
+  // rankPlayers runs for tabs nobody was looking at. Modules now consult this
+  // and defer. Routing is app state, so it belongs here rather than being
+  // re-derived from the DOM in five places.
+  activeModule: 'matchup',
   // The user's squad: an ordered array of player IDs (max 15), shared by every
   // module that reads/edits it (Dashboard, Planner). Previously each module
   // kept its own private copy with its own sessionStorage key — this is now
@@ -109,6 +121,7 @@ function getLive(gw)                  { return state.live[gw] ?? null; }
 function getMatchDetail(fixtureId)    { return state.matchDetail[fixtureId] ?? null; }
 function getAllTeamXg()               { return { ...state.teamXg }; }
 function getActiveHorizon()           { return state.activeHorizon; }
+function getActiveModule()            { return state.activeModule; }
 function getSquad()                   { return state.squad; }
 function getError()                   { return state.lastError; }
 function getLastRefreshAt()           { return state.lastRefreshAt; }
@@ -181,6 +194,23 @@ function setActiveHorizon(key) {
   if (state.activeHorizon === key) return;
   state.activeHorizon = key;
   emit('horizon:changed', key);
+}
+
+/**
+ * Record which module is on screen. Called by main.js's router on every
+ * hashchange and once at boot.
+ *
+ * Emits 'route:changed' with the new module key AFTER updating state, so a
+ * subscriber that wakes on it already reads the new value from
+ * getActiveModule(). Modules that deferred a render while hidden use this as
+ * their cue to flush — see the _dirty pattern in each module's onDataReady.
+ *
+ * Fires only on an actual change, so re-selecting the current tab is free.
+ */
+function setActiveModule(key) {
+  if (state.activeModule === key) return;
+  state.activeModule = key;
+  emit('route:changed', key);
 }
 
 /**
@@ -270,9 +300,9 @@ export const store = {
   getCurrentGw, getNextGw, getPlayerSummary, getAllPlayerSummaries,
   getLeagueXg, getLeagueXgPrev, getLeagueXgHistory, getTeamXg, getAllTeamXg,
   getLive, getMatchDetail,
-  getActiveHorizon, getSquad, getError, getLastRefreshAt, isFresh,
+  getActiveHorizon, getActiveModule, getSquad, getError, getLastRefreshAt, isFresh,
   setSeason, setPlayerSummary, setLeagueXg, setLeagueXgPrev, setLeagueXgHistory, setTeamXg,
   setLive, setMatchDetail,
-  setActiveHorizon, setSquad, setError, markDataReady,
+  setActiveHorizon, setActiveModule, setSquad, setError, markDataReady,
   clearCache,
 };
