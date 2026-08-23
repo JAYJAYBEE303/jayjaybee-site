@@ -2,18 +2,25 @@
  * js/modules/fixtures.js
  * Layer: module. Owns the DOM for the Fixtures view.
  * Side effects: DOM writes; one lazy call to api.js's fetchLivePoints().
- * Reads from store; calls engine/standings.js. No analytical logic lives here
- * — the league table is accumulated by engine/standings.js, not by this file
+ * Reads from store; calls engine/standings.js and engine/h2h.js. No analytical
+ * logic lives here — the league table is accumulated by engine/standings.js and
+ * the head-to-head record by engine/h2h.js, not by this file
  * (ARCHITECTURE.md §3 hard rule 2).
  *
- * Four modes, switched by .fx-modes__btn:
- *   gameweek  — LIVE DATA. One GW's fixtures grouped by kickoff day: status,
- *               crests, score or kickoff time, and a per-fixture disclosure
- *               holding match events and who featured (from event/{gw}/live/).
- *   table     — LIVE DATA. The league table, accumulated from played fixtures,
- *               with an Overall/Home/Away split and European/relegation zones.
- *   team      — STILL A BLUEPRINT. Placeholder rows only.
- *   h2h       — STILL A BLUEPRINT. Placeholder rows only.
+ * Four modes, switched by .fx-modes__btn — all four now run on live data:
+ *   gameweek  — One GW's fixtures grouped by kickoff day: status, crests,
+ *               score or kickoff time, and a per-fixture disclosure holding
+ *               match events, both teamsheets and the pairing's H2H record.
+ *   table     — The league table, accumulated from played fixtures, with an
+ *               Overall/Home/Away split and European/relegation zones.
+ *   team      — One club's season: its table row, its home/away split, every
+ *               result so far and every fixture still to come.
+ *   h2h       — Every meeting between two clubs across the seasons loaded,
+ *               with the tallies, the venue split and the run of form.
+ *
+ * The three panes cross-link: a club name in the table or in a fixture row
+ * opens By team on that club; an opponent in By team, or the H2H block inside
+ * a fixture, opens Head-to-head on that pairing.
  *
  * The match-events feed comes from UNDERSTAT, not FPL. FPL publishes only
  * unordered per-fixture totals — no minute for anything, and no link between a
@@ -35,7 +42,10 @@
 import { store } from '../store.js';
 import { LEAGUE_FORM_WINDOW } from '../config.js';
 import { fetchLivePoints, fetchMatchTimeline, fetchMatchData, attachAssists } from '../api.js';
-import { calcLeagueTable, attachNextFixtures, addMovement } from '../engine/standings.js';
+import {
+  calcLeagueTable, attachNextFixtures, addMovement, buildTeamSchedule,
+} from '../engine/standings.js';
+import { buildH2hMeetings, summariseH2h } from '../engine/h2h.js';
 import { findUnderstatMatchId } from '../engine/channel.js';
 import { normaliseMatchLineups } from '../engine/normalise.js';
 
@@ -107,17 +117,39 @@ const LEAGUE_ZONES = [
   { key: 'rel',  label: 'Relegation',        from: 18, to: 20 },
 ];
 
-// ─── Blueprint volumes (team + h2h panes only) ───────────────────────────────
-// The two panes still awaiting data draw this many placeholder rows.
+// The By team header's stat strip, left to right. Keys are league-row fields
+// (engine/standings.js), so the strip and the table can never disagree.
+const TEAM_STATS = [
+  { key: 'played',         label: 'Pl'  },
+  { key: 'won',            label: 'W'   },
+  { key: 'drawn',          label: 'D'   },
+  { key: 'lost',           label: 'L'   },
+  { key: 'goalsFor',       label: 'GF'  },
+  { key: 'goalsAgainst',   label: 'GA'  },
+  { key: 'goalDifference', label: 'GD', signed: true },
+  { key: 'points',         label: 'Pts' },
+];
 
-const SKEL = { teamRows: 6, h2hMeetings: 8, trendPips: 6 };
+// The By team home/away split table. Same fields as the strip above plus the
+// position WITHIN that split, which is the only number the strip can't carry.
+const SPLIT_COLUMNS = [
+  { key: 'position',       label: 'Pos' },
+  ...TEAM_STATS,
+];
 
-const TEAM_STATS  = ['P', 'W', 'D', 'L', 'GF', 'GA', 'GD', 'Pts'];
-const H2H_COLUMNS = ['Date', 'Season', 'Venue', 'Home', 'Score', 'Away', 'Notes'];
+// Head-to-head meeting table, left to right.
+const H2H_COLUMNS = [
+  { key: 'date',   label: 'Date'   },
+  { key: 'season', label: 'Season' },
+  { key: 'venue',  label: 'Venue'  },
+  { key: 'home',   label: 'Home'   },
+  { key: 'score',  label: 'Score'  },
+  { key: 'away',   label: 'Away'   },
+  { key: 'result', label: 'Result' },
+];
 
-// Stand-in team names for the two blueprint pickers. DATA SEAM: replaced by
-// store.getTeams() when those panes are wired.
-const SKEL_TEAMS = ['Team A', 'Team B', 'Team C', 'Team D', 'Team E', 'Team F'];
+// Ordinal suffixes for league positions 1–20; anything else falls back to 'th'.
+const ORDINALS = { 1: 'st', 2: 'nd', 3: 'rd', 21: 'st', 22: 'nd', 23: 'rd' };
 
 // ─── Module-level state ───────────────────────────────────────────────────────
 
@@ -130,6 +162,9 @@ let _mode      = 'gameweek';
 
 let _gw    = null;         // gameweek the gameweek pane is showing
 let _scope = 'overall';    // league table venue split
+let _teamId = null;        // club the By team pane is showing
+let _h2hA   = null;        // the two clubs the Head-to-head pane is comparing
+let _h2hB   = null;
 
 // Fixture ids whose <details> is open, so a re-render (live data landing,
 // GW step) doesn't collapse what the user just opened.
@@ -158,21 +193,15 @@ function esc(str) {
     .replace(/"/g, '&quot;');
 }
 
-/**
- * A blank bar standing in for a value the team/h2h panes don't have yet.
- * Width is in `ch` so the bar occupies roughly the space its eventual string
- * will — the only inline style in this module, and one CONVENTIONS.md §5.3
- * explicitly allows (a computed bar width).
- */
-function ph(chars, extra = '') {
-  return `<span class="fx-ph ${esc(extra)}" style="width:${Number(chars)}ch" aria-hidden="true"></span>`;
+/** "1st", "2nd", "13th" — league positions, in prose. */
+function ordinal(n) {
+  if (!Number.isInteger(n) || n < 1) return '—';
+  return `${n}${ORDINALS[n] ?? 'th'}`;
 }
 
-/** Repeat a builder n times and join. */
-function times(n, fn) {
-  let out = '';
-  for (let i = 0; i < n; i++) out += fn(i);
-  return out;
+/** A goal difference or margin, always carrying its sign. */
+function signed(n) {
+  return `${n > 0 ? '+' : ''}${n}`;
 }
 
 /**
@@ -193,9 +222,15 @@ function crest(team, extra = '') {
 // zone — deliberate: a personal tool should show the time you'd actually watch
 // the match at. All formatting is display-only and stays in this module.
 
+/**
+ * Both feeds' date strings. FPL writes ISO-8601 with a trailing Z; Understat
+ * (which reaches these formatters through the H2H meeting list) writes
+ * 'YYYY-MM-DD HH:MM:SS' with a space and no zone, which only some engines
+ * parse — normalising the separator makes it unambiguous everywhere.
+ */
 function toDate(iso) {
   if (!iso) return null;
-  const d = new Date(iso);
+  const d = new Date(String(iso).replace(' ', 'T'));
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
@@ -250,17 +285,38 @@ function pips(form) {
   ).join('')}</span>`;
 }
 
-/** Placeholder pips, for the two panes still on the blueprint. */
-function skelPips(n) {
-  const cycle = ['w', 'd', 'l'];
-  return `<span class="fx-pips">${
-    times(n, i => `<span class="fx-pip fx-pip--${cycle[i % 3]}" aria-hidden="true"></span>`)
-  }</span>`;
-}
-
 /** A short "nothing to show" block, styled like the rest of the pane. */
 function emptyState(message) {
   return `<p class="fx-empty">${esc(message)}</p>`;
+}
+
+/**
+ * The context object engine/h2h.js reads. Assembled here rather than held in
+ * the store because it is a plain view over state the store already owns —
+ * the same shape composite.js's buildScoreContext passes that engine.
+ */
+function h2hCtx() {
+  return {
+    teamsById:     store.getSeason()?.teamsById ?? {},
+    fixtures:      store.getFixtures(),
+    leagueXg:      store.getLeagueXg(),
+    leagueXgPrev:  store.getLeagueXgPrev(),
+    leagueXgPrev2: store.getLeagueXgPrev2(),
+    leagueXgPrev3: store.getLeagueXgPrev3(),
+  };
+}
+
+/**
+ * How many Understat seasons are actually loaded. Reported to the user rather
+ * than a hardcoded number, because each season's payload is fetched
+ * independently at boot (main.js, Promise.allSettled) and any of them can fail
+ * without taking the others down — "across 4 seasons" would then be a lie.
+ */
+function loadedSeasonCount() {
+  return [
+    store.getLeagueXg(), store.getLeagueXgPrev(),
+    store.getLeagueXgPrev2(), store.getLeagueXgPrev3(),
+  ].filter(Boolean).length;
 }
 
 // ─── Gameweek pane ────────────────────────────────────────────────────────────
@@ -542,26 +598,68 @@ function lineupsHtml(fixture, home, away) {
 }
 
 /**
- * The expandable half of a fixture row. Content depends on what exists yet:
- * an upcoming fixture has nothing to report, a played one needs the GW's live
- * payload, which is fetched lazily when the disclosure is first opened.
+ * The head-to-head record for one fixture's pairing, shown inside its
+ * disclosure. Rendered for UPCOMING fixtures as well as played ones — the
+ * record is exactly what you want before a match, not only after it.
  */
-function fixtureDetailHtml(fixture, home, away) {
+function h2hMiniHtml(fixture, home, away) {
+  const meetings = buildH2hMeetings(fixture.homeTeamId, fixture.awayTeamId, h2hCtx());
+  const record   = summariseH2h(meetings);
+
+  const open = `<button class="fx-link-btn" type="button" data-fx-open-h2h
+      data-team-a="${fixture.homeTeamId}" data-team-b="${fixture.awayTeamId}"
+      >Open full head-to-head →</button>`;
+
+  if (!record.played) {
+    return `
+      <section class="fx-detail__block">
+        <h4 class="fx-detail__title">Head-to-head</h4>
+        ${emptyState(loadedSeasonCount()
+          ? `No meeting between ${home?.shortName ?? '???'} and ${away?.shortName ?? '???'} in the seasons loaded.`
+          : 'Head-to-head history is still loading.')}
+        ${open}
+      </section>`;
+  }
+
+  return `
+    <section class="fx-detail__block">
+      <h4 class="fx-detail__title">Head-to-head</h4>
+      <div class="fx-h2h-mini">
+        <span class="fx-h2h-mini__tally">${record.aWins}<em>${esc(home?.shortName ?? 'home')} wins</em></span>
+        <span class="fx-h2h-mini__tally">${record.draws}<em>draws</em></span>
+        <span class="fx-h2h-mini__tally">${record.bWins}<em>${esc(away?.shortName ?? 'away')} wins</em></span>
+        <span class="fx-h2h-mini__trend">Last ${record.trend.length} ${pips(record.trend)}</span>
+      </div>
+      ${open}
+      <p class="fx-detail__note">
+        ${record.played} ${record.played === 1 ? 'meeting' : 'meetings'} across
+        ${record.seasons} ${record.seasons === 1 ? 'season' : 'seasons'}; last met
+        ${esc(fmtDateLong(record.last.date))}. Pips read from
+        ${esc(home?.shortName ?? 'the home team')}’s perspective, oldest first.
+      </p>
+    </section>`;
+}
+
+/**
+ * The match report half of a fixture's disclosure: what happened, and who was
+ * on the pitch. An upcoming fixture has neither, and a played one needs the
+ * GW's live payload, fetched lazily when the disclosure is first opened.
+ */
+function matchReportHtml(fixture, home, away) {
   const status = statusOf(fixture);
 
   if (status === 'upcoming') {
-    return `<div class="fx-detail">${emptyState(
-      `Not played yet — kicks off ${fmtDateTime(fixture.kickoff)}.`)}</div>`;
+    return emptyState(`Not played yet — kicks off ${fmtDateTime(fixture.kickoff)}.`);
   }
 
   if (_liveFailed.has(fixture.gw)) {
-    return `<div class="fx-detail">${emptyState(
-      'Match data unavailable — the live endpoint could not be reached. Reload to retry.')}</div>`;
+    return emptyState(
+      'Match data unavailable — the live endpoint could not be reached. Reload to retry.');
   }
 
   const live = store.getLive(fixture.gw);
   if (!live) {
-    return `<div class="fx-detail">${emptyState('Loading match data…')}</div>`;
+    return emptyState('Loading match data…');
   }
 
   const { events, featured } = indexFixtureLive(live, fixture);
@@ -589,8 +687,6 @@ function fixtureDetailHtml(fixture, home, away) {
       </section>`;
 
   return `
-    <div class="fx-detail">
-
       ${eventsBlock}
 
       ${lineupsHtml(fixture, home, away) ?? `
@@ -601,24 +697,24 @@ function fixtureDetailHtml(fixture, home, away) {
           ${featuredHtml(featured.away, away)}
         </div>
         <p class="fx-detail__note">
-          Every player with minutes, longest first within each position \u2014 FPL
+          Every player with minutes, longest first within each position — FPL
           publishes no teamsheet. The real XI comes from Understat and is not
           available for this match.
         </p>
-      </section>`}
+      </section>`}`;
+}
 
-      <section class="fx-detail__block">
-        <h4 class="fx-detail__title">Head-to-head</h4>
-        <div class="fx-h2h-mini">
-          <span class="fx-h2h-mini__tally">${ph(2)}<em>wins</em></span>
-          <span class="fx-h2h-mini__tally">${ph(2)}<em>draws</em></span>
-          <span class="fx-h2h-mini__tally">${ph(2)}<em>wins</em></span>
-          <span class="fx-h2h-mini__trend">Last ${SKEL.trendPips}${skelPips(SKEL.trendPips)}</span>
-        </div>
-        <button class="fx-link-btn" type="button" data-fx-open-h2h>Open full head-to-head →</button>
-        <p class="fx-detail__note">Still a blueprint — wired with the Head-to-head tab.</p>
-      </section>
-
+/**
+ * The expandable half of a fixture row: the match report first, then the
+ * pairing's head-to-head record. The second half renders whatever the first
+ * can show, so an upcoming fixture still opens onto something worth reading —
+ * which is exactly when the H2H record is most useful.
+ */
+function fixtureDetailHtml(fixture, home, away) {
+  return `
+    <div class="fx-detail">
+      ${matchReportHtml(fixture, home, away)}
+      ${h2hMiniHtml(fixture, home, away)}
     </div>`;
 }
 
@@ -954,179 +1050,484 @@ function renderTablePane() {
   `;
 }
 
-// ─── Team pane (blueprint) ────────────────────────────────────────────────────
+// ─── Team pane ────────────────────────────────────────────────────────────────
 
-function skelTeamRow(played) {
+/**
+ * One row in either column of the By team pane. Results and upcoming fixtures
+ * share a row shape deliberately — the same six columns mean the eye reads
+ * straight across the split without re-learning the layout on the right.
+ *
+ * Every row emits exactly six cells (.fx-row is a six-column grid), so the
+ * last one falls back to an empty span rather than being omitted.
+ */
+function teamRowHtml(entry, teamId) {
+  const opp = entry.opponent;
+
+  // The opponent's name is the cross-link into Head-to-head for this pairing.
+  const oppName = opp
+    ? `<button class="fx-link-btn" type="button" data-fx-open-h2h
+              data-team-a="${teamId}" data-team-b="${opp.id}"
+              title="Head-to-head with ${esc(opp.name)}">${esc(opp.name)}</button>`
+    : '<span class="fx-league__none">TBC</span>';
+
+  const played = entry.outcome !== null;
+
+  const value = played
+    ? `<span class="fx-row__value">${entry.scored}<em>–</em>${entry.conceded}</span>`
+    : `<span class="fx-row__value fx-row__value--time">${esc(fmtTime(entry.kickoff))}</span>`;
+
+  // Played rows end in the result box; upcoming rows end in the official FPL
+  // difficulty, which is the only forward-looking number FPL publishes here.
+  const tail = played
+    ? `<span class="fx-result fx-result--${OUTCOMES[entry.outcome].key}"
+             title="${esc(OUTCOMES[entry.outcome].label)}"
+             aria-label="${esc(OUTCOMES[entry.outcome].label)}">${entry.outcome}</span>`
+    : entry.difficulty
+      ? `<span class="fx-row__tag fx-fdr--${entry.difficulty}"
+               title="Official FPL difficulty">${entry.difficulty}</span>`
+      : '<span></span>';
+
   return `
-    <li class="fx-row">
-      <span class="fx-row__date">${ph(11)}</span>
-      <span class="fx-venue" aria-hidden="true">${ph(1)}</span>
-      <span class="fx-row__opp"><span class="fx-crest fx-crest--sm" aria-hidden="true"></span>${ph(9)}</span>
-      <span class="fx-row__value">${played ? `${ph(1)}<em>–</em>${ph(1)}` : ph(5)}</span>
-      <span class="fx-row__tag">${ph(3)}</span>
+    <li class="fx-item">
+      <div class="fx-row">
+        <span class="fx-row__gw">${entry.gw === null ? '—' : `GW${entry.gw}`}</span>
+        <span class="fx-row__date">${esc(fmtDateShort(entry.kickoff))}</span>
+        <span class="fx-venue" title="${entry.isHome ? 'Home' : 'Away'}">${entry.isHome ? 'H' : 'A'}</span>
+        <span class="fx-row__opp">${crest(opp, 'fx-crest--sm')}${oppName}</span>
+        ${value}
+        ${tail}
+      </div>
     </li>`;
 }
 
-/** DATA SEAM: the selected team's fixture list, split on fixture.played. */
+/**
+ * One venue's line in the By team home/away split.
+ *
+ * Position is blanked until the team has played at that venue: with nothing
+ * to separate them every club is level, so the sort falls through to the
+ * alphabetical tiebreak and "2nd away" would be a statement about the club's
+ * name, not its record.
+ */
+function splitRowHtml(label, row) {
+  const cell = (c) => {
+    if (!row) return '—';
+    if (c.key === 'position' && !row.played) return '—';
+    return c.signed ? signed(row[c.key]) : row[c.key];
+  };
+
+  return `
+    <tr>
+      <th scope="row">${esc(label)}</th>
+      ${SPLIT_COLUMNS.map(c => `<td class="fx-league__num">${cell(c)}</td>`).join('')}
+    </tr>`;
+}
+
 function renderTeamPane() {
   if (!_panes.team) return;
-  _panes.team.innerHTML = `
-    <p class="fx-blueprint-note fx-blueprint-note--inline">
-      <strong>Blueprint.</strong> This view is still placeholders — Gameweek and
-      Table are the live ones.
-    </p>
 
+  if (!store.getSeason()) {
+    _panes.team.innerHTML = emptyState('Loading FPL data…');
+    return;
+  }
+
+  const team = _teamId === null ? null : store.getTeam(_teamId);
+  if (!team) {
+    _panes.team.innerHTML = emptyState(
+      'Pick a team above — or click a club in the Table or a fixture — to see its season.');
+    return;
+  }
+
+  const fixtures  = store.getFixtures();
+  const teams     = store.getTeams();
+  const teamsById = store.getSeason().teamsById;
+
+  const rowFor  = venue => calcLeagueTable(fixtures, teams, { venue })
+    .find(r => r.teamId === team.id) ?? null;
+  const overall = rowFor('overall');
+  const homeRow = rowFor('home');
+  const awayRow = rowFor('away');
+
+  const { results, upcoming } = buildTeamSchedule(team.id, fixtures, teamsById);
+  // Results read newest-first (what just happened matters most); upcoming keeps
+  // schedule order, because the next fixture is the one you care about there.
+  const recent = results.slice().reverse();
+  const next   = upcoming[0] ?? null;
+
+  const nextText = next
+    ? `${next.opponent?.shortName ?? 'TBC'} (${next.isHome ? 'H' : 'A'}) · ${fmtDateShort(next.kickoff)}`
+    : 'Season complete';
+
+  _panes.team.innerHTML = `
     <header class="fx-pane__head fx-pane__head--team">
       <div class="fx-teamhead">
-        <span class="fx-crest fx-crest--lg" aria-hidden="true"></span>
+        ${crest(team, 'fx-crest--lg')}
         <div class="fx-teamhead__text">
-          <h2 class="fx-pane__title" id="fx-team-name">No team selected</h2>
+          <h2 class="fx-pane__title" id="fx-team-name">${esc(team.name)}</h2>
           <p class="fx-pane__sub">
-            <span>Position ${ph(3)}</span>
-            <span>Form ${skelPips(5)}</span>
-            <span>Next ${ph(9)}</span>
+            <span>${overall?.played
+              ? `${esc(ordinal(overall.position))} in the table`
+              : 'No fixtures played yet'}</span>
+            <span>Form ${pips(overall?.form ?? [])}</span>
+            <span>Next ${esc(nextText)}</span>
           </p>
         </div>
       </div>
       <ul class="fx-stat-row">
         ${TEAM_STATS.map(s => `
           <li class="fx-stat">
-            <span class="fx-stat__label">${esc(s)}</span>
-            <span class="fx-stat__value">${ph(2)}</span>
+            <span class="fx-stat__label">${esc(s.label)}</span>
+            <span class="fx-stat__value">${overall
+              ? (s.signed ? signed(overall[s.key]) : overall[s.key])
+              : '—'}</span>
           </li>`).join('')}
       </ul>
     </header>
 
+    <section class="fx-vsplit">
+      <h3 class="fx-col__title">
+        Home / away split
+        <span class="fx-col__count">position is within that split, not the real table</span>
+      </h3>
+      <div class="fx-table-wrap">
+        <table class="fx-table">
+          <thead>
+            <tr>
+              <th scope="col">Venue</th>
+              ${SPLIT_COLUMNS.map(c => `<th scope="col" class="fx-league__num">${esc(c.label)}</th>`).join('')}
+            </tr>
+          </thead>
+          <tbody>
+            ${splitRowHtml('Home', homeRow)}
+            ${splitRowHtml('Away', awayRow)}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
     <div class="fx-two-col">
       <section class="fx-col">
-        <h3 class="fx-col__title">Results <span class="fx-col__count">most recent first</span></h3>
-        <ul class="fx-list fx-list--compact">${times(SKEL.teamRows, () => skelTeamRow(true))}</ul>
+        <h3 class="fx-col__title">
+          Results
+          <span class="fx-col__count">${recent.length} played · most recent first</span>
+        </h3>
+        ${recent.length
+          ? `<ul class="fx-list fx-list--compact">${
+              recent.map(e => teamRowHtml(e, team.id)).join('')}</ul>`
+          : emptyState('No fixtures completed yet this season.')}
       </section>
       <section class="fx-col">
-        <h3 class="fx-col__title">Upcoming <span class="fx-col__count">next ${SKEL.teamRows}</span></h3>
-        <ul class="fx-list fx-list--compact">${times(SKEL.teamRows, () => skelTeamRow(false))}</ul>
+        <h3 class="fx-col__title">
+          Upcoming
+          <span class="fx-col__count">${upcoming.length} to play</span>
+        </h3>
+        ${upcoming.length
+          ? `<ul class="fx-list fx-list--compact">${
+              upcoming.map(e => teamRowHtml(e, team.id)).join('')}</ul>`
+          : emptyState('No fixtures left to play.')}
       </section>
     </div>
+
+    <p class="fx-detail__note">
+      Accumulated from FPL's fixture list — there is no standings endpoint to
+      read this from. A fixture appears under Results only once it carries a
+      final score, so one flagged finished while FPL is still processing the
+      round stays on the right until its score lands. Kickoffs are shown in your
+      local time; the tag on an upcoming fixture is the official FPL 1–5
+      difficulty, not the Gaffer IQ score. Click any opponent for the full
+      head-to-head.
+    </p>
   `;
 }
 
-// ─── Head-to-head pane (blueprint) ────────────────────────────────────────────
+// ─── Head-to-head pane ────────────────────────────────────────────────────────
 
-/** DATA SEAM: every recorded meeting between the two selected teams. */
-function renderH2hPane() {
-  if (!_panes.h2h) return;
-  _panes.h2h.innerHTML = `
-    <p class="fx-blueprint-note fx-blueprint-note--inline">
-      <strong>Blueprint.</strong> This view is still placeholders — Gameweek and
-      Table are the live ones.
-    </p>
+/** The current unbroken run, in prose, read from team A's end. */
+function streakText(streak, teamA, teamB) {
+  if (!streak) return '—';
+  const { outcome, count } = streak;
 
+  if (count === 1) {
+    if (outcome === 'D') return 'The last meeting was drawn';
+    return `${outcome === 'W' ? teamA.shortName : teamB.shortName} won the last meeting`;
+  }
+  if (outcome === 'D') return `The last ${count} meetings were drawn`;
+  return `${outcome === 'W' ? teamA.shortName : teamB.shortName} have won the last ${count}`;
+}
+
+/** A meeting as a one-line scoreline, read from team A's end. */
+function marginText(meeting) {
+  if (!meeting) return null;
+  return `${meeting.goalsForA}–${meeting.goalsAgainstA}`
+       + ` ${meeting.aWasHome ? 'at home' : 'away'}, ${meeting.season ?? fmtDateShort(meeting.date)}`;
+}
+
+/** One meeting in the full history table. */
+function h2hRowHtml(meeting, teamA, teamB) {
+  const home = meeting.aWasHome ? teamA : teamB;
+  const away = meeting.aWasHome ? teamB : teamA;
+  const outcome = OUTCOMES[meeting.outcomeA];
+
+  return `
+    <tr>
+      <td>${esc(fmtDateShort(meeting.date))}</td>
+      <td>${esc(meeting.season ?? '—')}</td>
+      <td class="fx-venue" title="${esc(teamA.shortName)} ${meeting.aWasHome ? 'at home' : 'away'}"
+        >${meeting.aWasHome ? 'H' : 'A'}</td>
+      <td class="fx-h2h-club">${crest(home, 'fx-crest--sm')}${esc(home?.shortName ?? meeting.homeName)}</td>
+      <td class="fx-table__score">${meeting.homeGoals}<em>–</em>${meeting.awayGoals}</td>
+      <td class="fx-h2h-club">${crest(away, 'fx-crest--sm')}${esc(away?.shortName ?? meeting.awayName)}</td>
+      <td><span class="fx-result fx-result--${outcome.key}"
+                title="${esc(teamA.shortName)} ${esc(outcome.label.toLowerCase())}"
+                aria-label="${esc(teamA.shortName)} ${esc(outcome.label.toLowerCase())}"
+          >${meeting.outcomeA}</span></td>
+    </tr>`;
+}
+
+/** The pane's header, shared by the real view and every empty state. */
+function h2hHeadHtml(title, sub = '') {
+  return `
     <header class="fx-pane__head">
       <div class="fx-pane__headline">
-        <h2 class="fx-pane__title" id="fx-h2h-title">Pick two teams</h2>
-        <p class="fx-pane__sub">
-          <span>${ph(2)} meetings</span>
-          <span>Across ${ph(2)} seasons</span>
-          <span>Last met ${ph(11)}</span>
-        </p>
+        <h2 class="fx-pane__title" id="fx-h2h-title">${esc(title)}</h2>
+        ${sub ? `<p class="fx-pane__sub"><span>${esc(sub)}</span></p>` : ''}
       </div>
-    </header>
+    </header>`;
+}
+
+function renderH2hPane() {
+  if (!_panes.h2h) return;
+
+  if (!store.getSeason()) {
+    _panes.h2h.innerHTML = emptyState('Loading FPL data…');
+    return;
+  }
+
+  const teamA = _h2hA === null ? null : store.getTeam(_h2hA);
+  const teamB = _h2hB === null ? null : store.getTeam(_h2hB);
+
+  if (!teamA || !teamB) {
+    _panes.h2h.innerHTML = h2hHeadHtml('Pick two teams')
+      + emptyState('Choose a club on each side above, or open a fixture and follow its head-to-head link.');
+    return;
+  }
+
+  if (teamA.id === teamB.id) {
+    _panes.h2h.innerHTML = h2hHeadHtml('Pick two different teams')
+      + emptyState(`${teamA.name} cannot play itself.`);
+    return;
+  }
+
+  const meetings = buildH2hMeetings(teamA.id, teamB.id, h2hCtx());
+  const record   = summariseH2h(meetings);
+  const seasonsLoaded = loadedSeasonCount();
+
+  if (!record.played) {
+    return void (_panes.h2h.innerHTML = h2hHeadHtml(`${teamA.name} vs ${teamB.name}`)
+      + emptyState(seasonsLoaded
+          ? `No league meeting in the ${seasonsLoaded} ${seasonsLoaded === 1 ? 'season' : 'seasons'} loaded — the two have not been in this division together in that window.`
+          : 'Historical results are still loading.'));
+  }
+
+  const { aHome, aAway } = record.venue;
+
+  _panes.h2h.innerHTML = `
+    ${h2hHeadHtml(`${teamA.name} vs ${teamB.name}`)}
+    <p class="fx-pane__sub fx-pane__sub--standalone">
+      <span>${record.played} ${record.played === 1 ? 'meeting' : 'meetings'}</span>
+      <span>Across ${record.seasons} ${record.seasons === 1 ? 'season' : 'seasons'}</span>
+      <span>Last met ${esc(fmtDateLong(record.last.date))}</span>
+    </p>
 
     <div class="fx-h2h-summary">
       <div class="fx-h2h-tile fx-h2h-tile--a">
-        <span class="fx-h2h-tile__value">${ph(2)}</span>
-        <span class="fx-h2h-tile__label" data-fx-slot="h2h-a">Team A wins</span>
+        <span class="fx-h2h-tile__value">${record.aWins}</span>
+        <span class="fx-h2h-tile__label">${esc(teamA.name)} wins</span>
       </div>
       <div class="fx-h2h-tile fx-h2h-tile--d">
-        <span class="fx-h2h-tile__value">${ph(2)}</span>
+        <span class="fx-h2h-tile__value">${record.draws}</span>
         <span class="fx-h2h-tile__label">Draws</span>
       </div>
       <div class="fx-h2h-tile fx-h2h-tile--b">
-        <span class="fx-h2h-tile__value">${ph(2)}</span>
-        <span class="fx-h2h-tile__label" data-fx-slot="h2h-b">Team B wins</span>
+        <span class="fx-h2h-tile__value">${record.bWins}</span>
+        <span class="fx-h2h-tile__label">${esc(teamB.name)} wins</span>
       </div>
       <div class="fx-h2h-tile">
-        <span class="fx-h2h-tile__value">${ph(5)}</span>
+        <span class="fx-h2h-tile__value">${record.goalsA}<em>–</em>${record.goalsB}</span>
         <span class="fx-h2h-tile__label">Goals (aggregate)</span>
       </div>
       <div class="fx-h2h-tile">
-        <span class="fx-h2h-tile__value">${ph(4)}</span>
+        <span class="fx-h2h-tile__value">${record.avgGoals.toFixed(2)}</span>
         <span class="fx-h2h-tile__label">Avg goals / game</span>
       </div>
     </div>
 
     <div class="fx-h2h-trend">
-      <span class="fx-h2h-trend__label">Last ${SKEL.trendPips} meetings</span>
-      ${skelPips(SKEL.trendPips)}
-      <span class="fx-h2h-trend__note">read from Team A's perspective</span>
+      <span class="fx-h2h-trend__label">Last ${record.trend.length}
+        ${record.trend.length === 1 ? 'meeting' : 'meetings'}</span>
+      ${pips(record.trend)}
+      <span class="fx-h2h-trend__note">read from ${esc(teamA.name)}’s perspective, oldest first</span>
+    </div>
+
+    <div class="fx-two-col">
+      <section class="fx-col">
+        <h3 class="fx-col__title">
+          Venue split
+          <span class="fx-col__count">${esc(teamA.shortName)}’s record by where it was played</span>
+        </h3>
+        <div class="fx-table-wrap">
+          <table class="fx-table">
+            <thead>
+              <tr>
+                <th scope="col">Venue</th>
+                <th scope="col" class="fx-league__num">Pl</th>
+                <th scope="col" class="fx-league__num">W</th>
+                <th scope="col" class="fx-league__num">D</th>
+                <th scope="col" class="fx-league__num">L</th>
+                <th scope="col" class="fx-league__num">GF</th>
+                <th scope="col" class="fx-league__num">GA</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${[['At home', aHome], ['Away', aAway]].map(([label, v]) => `
+                <tr>
+                  <th scope="row">${esc(label)}</th>
+                  <td class="fx-league__num">${v.played}</td>
+                  <td class="fx-league__num">${v.wins}</td>
+                  <td class="fx-league__num">${v.draws}</td>
+                  <td class="fx-league__num">${v.losses}</td>
+                  <td class="fx-league__num">${v.goalsFor}</td>
+                  <td class="fx-league__num">${v.goalsAgainst}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="fx-col">
+        <h3 class="fx-col__title">Notable</h3>
+        <ul class="fx-notable">
+          <li class="fx-notable__item">
+            <span class="fx-notable__label">Current run</span>
+            <span class="fx-notable__value">${esc(streakText(record.streak, teamA, teamB))}</span>
+          </li>
+          <li class="fx-notable__item">
+            <span class="fx-notable__label">${esc(teamA.shortName)}’s best</span>
+            <span class="fx-notable__value">${esc(marginText(record.biggestA) ?? 'No win on record')}</span>
+          </li>
+          <li class="fx-notable__item">
+            <span class="fx-notable__label">${esc(teamB.shortName)}’s best</span>
+            <span class="fx-notable__value">${
+              record.biggestB
+                ? esc(`${record.biggestB.goalsAgainstA}–${record.biggestB.goalsForA}`
+                    + ` ${record.biggestB.aWasHome ? 'away' : 'at home'},`
+                    + ` ${record.biggestB.season ?? fmtDateShort(record.biggestB.date)}`)
+                : 'No win on record'}</span>
+          </li>
+          <li class="fx-notable__item">
+            <span class="fx-notable__label">League points taken</span>
+            <span class="fx-notable__value">${esc(teamA.shortName)} ${record.pointsA},
+              ${esc(teamB.shortName)} ${record.pointsB} <em>of ${record.played * 3} each</em></span>
+          </li>
+        </ul>
+      </section>
     </div>
 
     <div class="fx-table-wrap">
       <table class="fx-table">
         <thead>
-          <tr>${H2H_COLUMNS.map(c => `<th scope="col">${esc(c)}</th>`).join('')}</tr>
+          <tr>${H2H_COLUMNS.map(c => `<th scope="col">${esc(c.label)}</th>`).join('')}</tr>
         </thead>
         <tbody>
-          ${times(SKEL.h2hMeetings, () => `
-            <tr>
-              <td>${ph(11)}</td>
-              <td>${ph(7)}</td>
-              <td>${ph(6)}</td>
-              <td>${ph(9)}</td>
-              <td class="fx-table__score">${ph(1)}<em>–</em>${ph(1)}</td>
-              <td>${ph(9)}</td>
-              <td>${ph(10)}</td>
-            </tr>`)}
+          ${meetings.slice().reverse().map(m => h2hRowHtml(m, teamA, teamB)).join('')}
         </tbody>
       </table>
     </div>
+
+    <p class="fx-detail__note">
+      Meetings come from Understat's full-league fixture lists for the
+      ${seasonsLoaded} ${seasonsLoaded === 1 ? 'season' : 'seasons'} loaded,
+      merged with this season's FPL results — each pairing appears once per
+      venue per season, so a match carried by both feeds is counted once. Only
+      league matches are covered: cups, play-offs and any season either club
+      spent outside this division are absent. Venue, form and the run are all
+      read from ${esc(teamA.name)}’s end; swap the two to mirror them.
+    </p>
   `;
 }
 
 // ─── Pickers ──────────────────────────────────────────────────────────────────
 
-/** DATA SEAM: swap SKEL_TEAMS for store.getTeams() with the two panes below. */
+/**
+ * Fill all three team pickers from the real squad list. Called on every
+ * data:ready rather than once at init, because the teams only exist after the
+ * first fetch — and re-applies the current selection, so a re-emit (an
+ * Understat payload landing) can't silently reset a picker the user has set.
+ */
 function populateTeamSelects() {
-  const options = SKEL_TEAMS
-    .map((name, i) => `<option value="${i}">${esc(name)}</option>`)
-    .join('');
+  const teams = store.getTeams().slice().sort((a, b) => a.name.localeCompare(b.name));
+  const options = teams.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('');
 
-  const placeholders = [
-    ['fx-team-select', 'Select a team…'],
-    ['fx-h2h-a',       'Team A…'],
-    ['fx-h2h-b',       'Team B…'],
+  const selects = [
+    ['fx-team-select', 'Select a team…', _teamId],
+    ['fx-h2h-a',       'Team A…',        _h2hA],
+    ['fx-h2h-b',       'Team B…',        _h2hB],
   ];
 
-  for (const [id, placeholder] of placeholders) {
+  for (const [id, placeholder, selected] of selects) {
     const sel = _root.querySelector(`#${id}`);
-    if (sel) sel.innerHTML = `<option value="">${esc(placeholder)}</option>${options}`;
+    if (!sel) continue;
+    sel.innerHTML = `<option value="">${esc(placeholder)}</option>${options}`;
+    sel.value = selected === null ? '' : String(selected);
   }
 }
 
-function syncTeamHeading() {
-  const sel  = _root.querySelector('#fx-team-select');
-  const name = _root.querySelector('#fx-team-name');
-  if (!sel || !name) return;
-  name.textContent = sel.value === ''
-    ? 'No team selected'
-    : sel.options[sel.selectedIndex].textContent;
+/** The single mutation point for the By team selection. */
+function selectTeam(teamId) {
+  _teamId = Number.isInteger(teamId) ? teamId : null;
+  const sel = _root.querySelector('#fx-team-select');
+  if (sel) sel.value = _teamId === null ? '' : String(_teamId);
+  renderTeamPane();
 }
 
-function syncH2hHeading() {
-  const a     = _root.querySelector('#fx-h2h-a');
-  const b     = _root.querySelector('#fx-h2h-b');
-  const title = _root.querySelector('#fx-h2h-title');
-  if (!a || !b || !title) return;
+/** The single mutation point for the Head-to-head pairing. */
+function selectH2h(teamAId, teamBId) {
+  _h2hA = Number.isInteger(teamAId) ? teamAId : null;
+  _h2hB = Number.isInteger(teamBId) ? teamBId : null;
 
-  const nameA = a.value === '' ? '' : a.options[a.selectedIndex].textContent;
-  const nameB = b.value === '' ? '' : b.options[b.selectedIndex].textContent;
+  const selA = _root.querySelector('#fx-h2h-a');
+  const selB = _root.querySelector('#fx-h2h-b');
+  if (selA) selA.value = _h2hA === null ? '' : String(_h2hA);
+  if (selB) selB.value = _h2hB === null ? '' : String(_h2hB);
 
-  title.textContent = (nameA && nameB) ? `${nameA} vs ${nameB}` : 'Pick two teams';
+  renderH2hPane();
+}
 
-  const labelA = _root.querySelector('[data-fx-slot="h2h-a"]');
-  const labelB = _root.querySelector('[data-fx-slot="h2h-b"]');
-  if (labelA) labelA.textContent = `${nameA || 'Team A'} wins`;
-  if (labelB) labelB.textContent = `${nameB || 'Team B'} wins`;
+/** '' (the placeholder option) means "no selection", not team 0. */
+function selectedId(id) {
+  const value = _root.querySelector(`#${id}`)?.value ?? '';
+  return value === '' ? null : Number(value);
+}
+
+/**
+ * Seed both panes so they open onto something real rather than a prompt.
+ *
+ * The first fixture of the current gameweek supplies all three selections —
+ * one rule, both panes, and it is always available the moment data lands. Runs
+ * once: a later re-emit must not yank the user back off a club they chose.
+ */
+function seedSelections() {
+  if (_teamId !== null && _h2hA !== null) return;
+
+  const gw = store.getCurrentGw() ?? store.getNextGw() ?? FIRST_GW;
+  const fixtures = store.getFixtures();
+  const first = fixtures.find(f => f.gw === gw) ?? fixtures[0] ?? null;
+  if (!first) return;
+
+  if (_teamId === null) _teamId = first.homeTeamId;
+  if (_h2hA === null) {
+    _h2hA = first.homeTeamId;
+    _h2hB = first.awayTeamId;
+  }
 }
 
 // ─── Mode switching ───────────────────────────────────────────────────────────
@@ -1156,12 +1557,30 @@ function onModeClick(e) {
 }
 
 /**
- * Delegated on _panesWrap (stable across renders) rather than per-element —
- * every row and disclosure is rebuilt on each render.
+ * Cross-links between the panes, delegated on _panesWrap (stable across
+ * renders) rather than per-element — every row and disclosure is rebuilt on
+ * each render.
+ *
+ * A link carries its target selection in data attributes, so following one
+ * lands on the pairing or club you clicked rather than on whatever the pane
+ * happened to be showing. A link WITHOUT them just switches pane.
  */
 function onPanesClick(e) {
-  if (e.target.closest('[data-fx-open-h2h]'))  { setMode('h2h');  return; }
-  if (e.target.closest('[data-fx-open-team]')) { setMode('team'); }
+  const toH2h = e.target.closest('[data-fx-open-h2h]');
+  if (toH2h) {
+    const a = Number(toH2h.dataset.teamA);
+    const b = Number(toH2h.dataset.teamB);
+    if (Number.isInteger(a) && Number.isInteger(b)) selectH2h(a, b);
+    setMode('h2h');
+    return;
+  }
+
+  const toTeam = e.target.closest('[data-fx-open-team]');
+  if (toTeam) {
+    const id = Number(toTeam.dataset.teamId);
+    if (Number.isInteger(id)) selectTeam(id);
+    setMode('team');
+  }
 }
 
 /**
@@ -1199,12 +1618,17 @@ function onGwStep(e) {
   renderGameweekPane();
 }
 
+/** The whole H2H view is read from team A's end, so swapping mirrors it. */
 function onSwapClick() {
-  const a = _root.querySelector('#fx-h2h-a');
-  const b = _root.querySelector('#fx-h2h-b');
-  if (!a || !b) return;
-  [a.value, b.value] = [b.value, a.value];
-  syncH2hHeading();
+  selectH2h(_h2hB, _h2hA);
+}
+
+function onTeamSelectChange() {
+  selectTeam(selectedId('fx-team-select'));
+}
+
+function onH2hSelectChange() {
+  selectH2h(selectedId('fx-h2h-a'), selectedId('fx-h2h-b'));
 }
 
 function onScopeClick(e) {
@@ -1222,14 +1646,23 @@ function onScopeClick(e) {
 }
 
 /**
- * Season data has landed (or been re-emitted as an enrichment arrives). Pick
- * the opening gameweek the first time only, so a re-emit can't yank the user
- * back from a GW they stepped to.
+ * Season data has landed, or been re-emitted as an enrichment arrives (main.js
+ * re-fires data:ready when each Understat payload lands, which is what brings
+ * the cross-season half of the H2H record into view).
+ *
+ * The opening gameweek and the seeded selections are picked the FIRST TIME
+ * only, so a re-emit can't yank the user back off a GW they stepped to or a
+ * club they chose.
  */
 function onDataReady() {
   if (_gw === null) _gw = store.getCurrentGw() ?? store.getNextGw() ?? FIRST_GW;
+  seedSelections();
+  populateTeamSelects();
+
   renderGameweekPane();
   renderTablePane();
+  renderTeamPane();
+  renderH2hPane();
 }
 
 /** A GW's live payload landed — only the gameweek pane reads it. */
@@ -1256,9 +1689,8 @@ export function initFixtures() {
     _pickers[key] = _root.querySelector(`[data-fx-picker="${key}"]`);
   }
 
-  populateTeamSelects();
-
-  // The two blueprint panes have no data to wait on — build them once.
+  // Every pane now waits on data, so the only thing to draw before it lands is
+  // each pane's loading state — onDataReady rebuilds all four.
   renderTeamPane();
   renderH2hPane();
 
@@ -1274,9 +1706,9 @@ export function initFixtures() {
   // `toggle` doesn't bubble, so delegation needs the capture phase.
   _panesWrap?.addEventListener('toggle', onPanesToggle, true);
 
-  _root.querySelector('#fx-team-select')?.addEventListener('change', syncTeamHeading);
-  _root.querySelector('#fx-h2h-a')?.addEventListener('change', syncH2hHeading);
-  _root.querySelector('#fx-h2h-b')?.addEventListener('change', syncH2hHeading);
+  _root.querySelector('#fx-team-select')?.addEventListener('change', onTeamSelectChange);
+  _root.querySelector('#fx-h2h-a')?.addEventListener('change', onH2hSelectChange);
+  _root.querySelector('#fx-h2h-b')?.addEventListener('change', onH2hSelectChange);
   _root.querySelector('#fx-h2h-swap')?.addEventListener('click', onSwapClick);
 
   setMode('gameweek');

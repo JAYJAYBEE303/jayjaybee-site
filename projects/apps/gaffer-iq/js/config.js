@@ -918,3 +918,18 @@ export const LEAGUE_FORM_WINDOW = 5;
 // meeting almost uniquely (each pairing occurs once per venue per season), so
 // this is a safety check rather than the primary key.
 export const UNDERSTAT_MATCH_DATE_TOLERANCE_DAYS = 5;
+
+// ─── Head-to-head record (Fixtures tab → Head-to-head) ───────────────────────
+
+// Month index (0-based, so 6 = July) on or after which a date belongs to the
+// season STARTING in that calendar year. A Premier League season runs
+// August → May, so July onwards is the new campaign and June or earlier still
+// belongs to the one that began the previous year. Used only to label and to
+// de-duplicate a meeting — no metric reads it.
+export const SEASON_BOUNDARY_MONTH = 6;
+
+// How many of the most recent meetings the head-to-head trend strip shows.
+// Six rather than LEAGUE_FORM_WINDOW's five: clubs meet twice a season, so six
+// is three seasons of history — a natural unit here, where five would cut a
+// season in half.
+export const H2H_TREND_WINDOW = 6;

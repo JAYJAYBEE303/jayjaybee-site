@@ -1,7 +1,8 @@
 /**
  * js/engine/standings.js
  * Layer: engine (pure). No DOM, no network, no store mutation.
- * Derives the league table from played fixtures.
+ * Derives the league table from played fixtures, and one team's season from
+ * the same schedule (buildTeamSchedule — the Fixtures tab's By team view).
  *
  * WHY THIS EXISTS: the FPL API ships no standings payload — bootstrap-static
  * carries team strengths but not points, and there is no /standings endpoint.
@@ -172,6 +173,66 @@ export function attachNextFixtures(rows, fixtures, teamsById) {
     };
   }
   return rows;
+}
+
+/**
+ * The season from ONE team's point of view: what it has played, and what is
+ * still to come.
+ *
+ * The two halves are split on the same test calcLeagueTable folds a fixture in
+ * on (`played` AND a non-null `result`), so a fixture flagged finished but
+ * still missing its score — which happens briefly while FPL processes a round
+ * — lands in `upcoming` rather than in `results` as a phantom 0–0. That is the
+ * conservative side to err on: a result the table has not yet counted is not
+ * shown as a result here either.
+ *
+ * Each entry carries the fixture read from THIS team's end — `scored` /
+ * `conceded` rather than home/away goals — so the caller never re-derives the
+ * orientation per row.
+ *
+ * @param {number} teamId
+ * @param {object[]} fixtures  all fixtures, in schedule order (normalise.js
+ *   already sorts by GW then kickoff, and both output arrays inherit that)
+ * @param {Object<number,object>} teamsById
+ * @returns {{results: object[], upcoming: object[]}}  results oldest → newest,
+ *   upcoming soonest first
+ */
+export function buildTeamSchedule(teamId, fixtures, teamsById = {}) {
+  const results = [];
+  const upcoming = [];
+
+  for (const f of fixtures) {
+    const isHome = f.homeTeamId === teamId;
+    if (!isHome && f.awayTeamId !== teamId) continue;
+
+    const entry = {
+      fixtureId:  f.id,
+      gw:         f.gw,
+      kickoff:    f.kickoff,
+      isHome,
+      opponent:   teamsById[isHome ? f.awayTeamId : f.homeTeamId] ?? null,
+      // The official FPL 1–5 rating for THIS team in this fixture. Reference
+      // only — the Gaffer IQ composite is what the rest of the app scores on.
+      difficulty: isHome ? f.fplDifficulty?.home : f.fplDifficulty?.away,
+      started:    Boolean(f.started),
+      scored:     null,
+      conceded:   null,
+      outcome:    null,
+    };
+
+    if (f.played && f.result) {
+      entry.scored   = isHome ? f.result.homeGoals : f.result.awayGoals;
+      entry.conceded = isHome ? f.result.awayGoals : f.result.homeGoals;
+      entry.outcome  = entry.scored > entry.conceded ? 'W'
+                     : entry.scored < entry.conceded ? 'L'
+                     : 'D';
+      results.push(entry);
+    } else {
+      upcoming.push(entry);
+    }
+  }
+
+  return { results, upcoming };
 }
 
 /**

@@ -154,6 +154,8 @@ so the two sides of one fixture are always symmetric around 50 — a large venue
 
 **Inputs:** cross-season Understat fixture lists — `ctx.leagueXg.datesData` (this season), `ctx.leagueXgPrev.datesData` (last season), `ctx.leagueXgPrev2.datesData` (two seasons ago), `ctx.leagueXgPrev3.datesData` (three seasons ago) — each the FULL league schedule for that season (`{h:{title}, a:{title}, goals:{h,a}, isResult, datetime}` per match), not a per-team payload. Meetings between the two teams are pulled out by matching `h.title`/`a.title` against each team's name/shortName via `canonicalClubKey` (same resolver as §3.1's venue matching — never by Understat's own numeric ids). Falls back to `ctx.playedFixtures` (this-season-only FPL fixtures) when Understat has no name match for either team (promoted side, outage).
 
+**Where the collection lives:** `engine/h2h.js → collectUnderstatMeetings()`. `calcFixtureHistory` narrows its rich records (date, season, venue, both scorelines, source) down to the three fields this formula needs. The Fixtures tab's Head-to-head view reads the SAME collector and keeps the records whole — one implementation of "which matches are meetings between these two clubs", two consumers, so the scorer and the view can never disagree about what a meeting is. `engine/h2h.js` additionally merges this season's FPL results over the Understat list for the view (de-duplicated per pairing per venue per season); `calcFixtureHistory` does not use that merge — its FPL fallback stays all-or-nothing, exactly as described above, so this metric's behaviour is unchanged.
+
 **Formula:**
 ```
 meetings = last N_H2H meetings across the 4 fetched seasons (default 8), oldest→newest

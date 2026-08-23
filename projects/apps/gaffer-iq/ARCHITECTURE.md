@@ -98,6 +98,7 @@ jayjaybee-site/                   ← repo root (not Gaffer IQ's concern)
             │   ├── normalise.js
             │   ├── fixtures.js
             │   ├── standings.js
+            │   ├── h2h.js
             │   ├── form.js
             │   ├── style.js
             │   ├── counter.js
@@ -146,7 +147,8 @@ gaffer-iq/                          (= projects/gaffer-iq/ in the repo)
     ├── engine/                 # The analytical brain. Pure functions. No DOM.
     │   ├── normalise.js        # Builds clean internal models from raw FPL payloads.
     │   ├── fixtures.js         # Fixture difficulty, home/away splits, fixture history.
-    │   ├── standings.js        # League table accumulated from played fixtures.
+    │   ├── standings.js        # League table + one team's season, from played fixtures.
+    │   ├── h2h.js              # Head-to-head record between two clubs, across seasons.
     │   ├── form.js             # Team form & player form calculations.
     │   ├── style.js            # Team style profiling + style clash score.
     │   ├── counter.js          # Position-based counter-matchup scoring.
@@ -301,7 +303,9 @@ This is the crux of why Gaffer IQ exists. The API gives raw facts; the value-add
 |---|---|---|
 | **Custom fixture difficulty** | team strengths, form, home/away split, opponent style | `engine/fixtures.js` + `composite.js` |
 | **Home/away split performance** | per-fixture results & player histories filtered by venue | `engine/fixtures.js` |
-| **Fixture history (head-to-head)** | `history_past` + this season's results between the two clubs | `engine/fixtures.js` |
+| **Fixture history (head-to-head)** | cross-season Understat fixture lists + this season's FPL results between the two clubs | `engine/h2h.js` → `engine/fixtures.js` |
+| **Head-to-head record** (tallies, venue split, run of form) | the same meeting list, kept whole rather than reduced to a score | `engine/h2h.js` |
+| **One team's season** (results, upcoming, home/away split) | `fixtures/` read from a single club's end | `engine/standings.js` |
 | **Team form** | recent results/points over a rolling window (not FPL's player `form` field) | `engine/form.js` |
 | **Team style profile + style clash score** | aggregated attacking/defensive tendencies (e.g. xG for/against, goals, clean sheets, possession proxies) | `engine/style.js` |
 | **Position counter-matchup score** | one team's attackers' form vs the opponent's defenders' form, by position pairing | `engine/counter.js` |
@@ -313,6 +317,7 @@ This is the crux of why Gaffer IQ exists. The API gives raw facts; the value-add
 ### What the API does NOT provide (and how we cope)
 - Rich possession/passing/pressing data → not available. Style profiling in Phase 1 uses **proxies** derivable from FPL data (goals for/against, xG/xGA where exposed in player histories, clean sheets, cards). Phase 3 may add an external xG source through the proxy.
 - **League standings** → not available. There is no `/standings` endpoint and `bootstrap-static` carries strengths, not points. `engine/standings.js` accumulates the table from `fixtures/` instead — see the Fixtures tab's Table view.
+- **Any season but the current one** → not available. `fixtures/` covers this campaign only, so an FPL-only head-to-head can never reach past August. Understat's per-season league payloads (already fetched for xG) carry every club's full fixture list, so `engine/h2h.js` reads its history from those and merges this season's FPL results over the top — one row per pairing per venue per season, so a match both feeds carry is counted once. Only league matches exist in either feed: cups and any season a club spent in a lower division are absent from the record.
 - **Event minute timings and goal→assist pairing** → not in the FPL API. `event/{gw}/live/` and `fixtures/` both give unordered per-fixture totals: they say someone scored and someone assisted, never when, nor whose goal was assisted. UNDERSTAT supplies both, so the Fixtures tab's match feed reads from there — its match page server-renders a chronological timeline (goals, cards, substitutions, each with a minute) and its shots JSON carries `player_assisted`. Two allowlisted paths, `match/{id}` and `matchdata/{id}` (§5). The feed degrades to FPL's grouped totals if either is unavailable.
 - **Team lineups** (starting XI, formation) → not in the FPL API, which publishes no teamsheet of any kind. Understat's `matchdata/{id}` rosters carry a position code and substitution linkage per player, so `engine/normalise.js` → `normaliseMatchLineups()` builds a real XI and derives the formation from the position codes. Note Understat lists only players who APPEARED: the second list is substitutes USED, and a full bench (with unused subs) is available from neither source.
 - True per-player-vs-player matchup history → not available at the granularity we'd like. Hence **position-based** counter-matchups only, to start (a striker's form vs the aggregate form of the opponent's centre-backs), per the project scope.
@@ -465,7 +470,7 @@ All four modules consume the **same** engine output (composite scores + breakdow
 
 Relationships, concretely:
 - **Matchup Analyser** is the "view source" for a single fixture. Other modules link into it ("why is this score what it is?").
-- **Fixtures** is the schedule-level companion to the Matchup Analyser: the GW grid (kickoff times, results, per-fixture events and lineups), the league table with its European/relegation zones, one team's results/upcoming split, and the full H2H history for a pairing. It carries no scoring of its own — it is the "what and when" view that the Matchup Analyser then explains. Gameweek and Table run on live data; By team and Head-to-head are still blueprints, with their remaining data seams marked `DATA SEAM:` in `js/modules/fixtures.js`.
+- **Fixtures** is the schedule-level companion to the Matchup Analyser: the GW grid (kickoff times, results, per-fixture events and lineups), the league table with its European/relegation zones, one team's results/upcoming split, and the full H2H history for a pairing. It carries no scoring of its own — it is the "what and when" view that the Matchup Analyser then explains. All four views run on live data, and they cross-link: a club name in the Table or in a fixture row opens By team on that club, and an opponent in By team — or the head-to-head block inside any fixture, played or upcoming — opens Head-to-head on that pairing.
 - **Player Ranker** = player form × that player's fixture composite over the horizon → a ranked projected-value list. It is the bridge between team-level fixture scores and player-level decisions.
 - **GW Dashboard** is horizon-locked to `GW1` by design (it's about *this* week's decisions: captaincy, starting XI, bench order, risk flags). It consumes the ranker's projections and the live endpoint.
 - **Transfer Planner** is the most horizon-aware module: it takes your current squad (entered manually in Phase 1; possibly imported in a later phase), the ranker's projections over the chosen horizon, and budget/free-transfer constraints, and proposes the moves that most raise projected total. It depends on the ranker and, through it, the whole engine.

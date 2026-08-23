@@ -3513,49 +3513,10 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   FIXTURES — gameweek grid, per-team results/fixtures, head-to-head history
-   STRUCTURAL BLUEPRINT. Every value inside these blocks is a placeholder bar
-   (.fx-ph) rendered by js/modules/fixtures.js; the layout, hierarchy and
-   control affordances are the thing being reviewed, not the numbers.
-   Prefixed fx- throughout. BEM-lite per CONVENTIONS.md §5.1, tokens only.
+   FIXTURES — gameweek grid, league table, per-team season, head-to-head history
+   All four views run on live data. Prefixed fx- throughout. BEM-lite per
+   CONVENTIONS.md §5.1, tokens only.
    ═══════════════════════════════════════════════════════════════════════════ */
-
-/* ─── Blueprint banner ───────────────────────────────────────────────────── */
-
-.fx-blueprint-note {
-  padding: var(--space-2) var(--space-3);
-  margin-bottom: var(--space-4);
-  border: 1px var(--estimated-border-style) var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-muted);
-  font-size: var(--font-size-xs);
-  line-height: 1.6;
-}
-
-.fx-blueprint-note strong { color: var(--color-text); }
-
-/* ─── Placeholder bar ─────────────────────────────────────────────────────
-   Stands in for one unwired value. Width comes from JS in ch units so each
-   bar occupies roughly the space its eventual string will. Deliberately flat
-   and unanimated — this is a wireframe, not a loading state. */
-
-.fx-ph {
-  display: inline-block;
-  height: 0.72em;
-  vertical-align: -0.05em;
-  border-radius: var(--radius-sm);
-  background: var(--color-surface-raised);
-  border: 1px solid var(--color-border-subtle);
-  min-width: 1ch;
-}
-
-/* Time-shaped values read as outlines, not solid blocks, so a kickoff time
-   never gets mistaken for a score. */
-.fx-ph--time {
-  background: transparent;
-  border-style: var(--estimated-border-style);
-}
 
 /* ─── Controls bar ───────────────────────────────────────────────────────── */
 
@@ -4131,9 +4092,14 @@
 
 .fx-list--compact { gap: var(--space-1); }
 
+/* Six columns: gameweek, date, venue, opponent, score-or-kickoff, and a tail
+   that is the result box on a played fixture and the FPL difficulty on an
+   upcoming one. Results and upcoming fixtures share the shape deliberately, so
+   the eye reads straight across the two-column split without re-learning it.
+   Every row must emit all six cells — an omitted one shifts the rest left. */
 .fx-row {
   display: grid;
-  grid-template-columns: 12ch 3ch 1fr 8ch 5ch;
+  grid-template-columns: 5ch 11ch 2ch 1fr 7ch 3ch;
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
@@ -4149,6 +4115,14 @@
 }
 
 .fx-row__date {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
+
+/* The gameweek a fixture belongs to — mono so the column reads as a scale
+   rather than as prose, and quiet enough not to compete with the opponent. */
+.fx-row__gw {
+  font-family: var(--font-mono);
   font-size: var(--font-size-xs);
   color: var(--color-muted);
 }
@@ -4182,6 +4156,14 @@
   color: var(--color-muted);
 }
 
+/* An unplayed fixture shows its kickoff where a score would go — same slot,
+   lighter, so scanning the column separates played from pending instantly.
+   Mirrors what .fx-fixture__score--time does on the gameweek grid. */
+.fx-row__value--time {
+  font-weight: 400;
+  color: var(--color-muted);
+}
+
 .fx-row__tag {
   display: inline-flex;
   align-items: center;
@@ -4190,6 +4172,16 @@
   border: 1px var(--estimated-border-style) var(--color-border);
   border-radius: var(--radius-sm);
   font-size: var(--font-size-xs);
+}
+
+/* The home/away split table, between the header strip and the two columns.
+   Its own block rather than part of .fx-two-col because it spans the width —
+   the two venues are rows of one table, not two independent lists. */
+.fx-vsplit { margin-bottom: var(--space-6); }
+
+.fx-vsplit .fx-table th[scope="row"] {
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 /* ─── Head-to-head pane ──────────────────────────────────────────────────── */
@@ -4248,6 +4240,70 @@
   font-size: var(--font-size-xs);
   color: var(--color-muted);
 }
+
+/* The aggregate-goals tile carries a scoreline, not a single number, so its
+   separator is dimmed the same way every other score in the tab is. */
+.fx-h2h-tile__value em {
+  font-style: normal;
+  color: var(--color-muted);
+}
+
+/* A club cell in the meeting table: crest then short name, kept on one line so
+   the Home and Away columns stay the same height as the score between them. */
+.fx-h2h-club {
+  white-space: nowrap;
+}
+
+.fx-h2h-club .fx-crest {
+  margin-right: var(--space-2);
+  vertical-align: middle;
+}
+
+/* Prose facts about the pairing that no column of the table states directly —
+   the current run, each side's widest win, the points split. Label left,
+   value right, so the labels form a readable spine. */
+.fx-notable {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.fx-notable__item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  font-size: var(--font-size-sm);
+}
+
+.fx-notable__label {
+  flex-shrink: 0;
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-muted);
+}
+
+.fx-notable__value {
+  text-align: right;
+  font-weight: 600;
+}
+
+.fx-notable__value em {
+  font-style: normal;
+  font-weight: 400;
+  color: var(--color-muted);
+}
+
+/* .fx-pane__sub normally sits inside .fx-pane__head; on the head-to-head pane
+   it follows the header as its own line, so it needs the margin the header
+   would otherwise have supplied. */
+.fx-pane__sub--standalone { margin-bottom: var(--space-4); }
 
 .fx-table-wrap {
   border: 1px solid var(--color-border);
@@ -4377,12 +4433,9 @@
   vertical-align: middle;
 }
 
-/* ─── Real data: crests, empty states, badges ────────────────────────────────
-   Everything below arrived with the Gameweek and Table panes being wired to
-   live FPL data. The .fx-ph placeholder bar above still serves the two panes
-   that remain blueprints (By team, Head-to-head). */
+/* ─── Crests, empty states, badges ───────────────────────────────────────── */
 
-/* A real badge replaces the placeholder ring: no dashed outline, no fill. */
+/* A real badge replaces the empty ring .fx-crest draws: no outline, no fill. */
 img.fx-crest {
   border: none;
   background: none;
@@ -4449,13 +4502,6 @@ img.fx-crest {
 .fx-fdr--3 { border-color: var(--band-neutral); color: var(--band-neutral); }
 .fx-fdr--4 { border-color: var(--band-tough);   color: var(--band-tough);   }
 .fx-fdr--5 { border-color: var(--band-brutal);  color: var(--band-brutal);  }
-
-/* Blueprint banner, when it sits inside a pane rather than above the whole
-   tab — narrower, so it reads as a note about this view only. */
-.fx-blueprint-note--inline {
-  max-width: 52ch;
-  margin-bottom: var(--space-6);
-}
 
 /* Result box beside each team on a completed fixture. Sits on the inside edge
    of each side so the pair mirrors around the scoreline (.fx-side--away is
@@ -4771,8 +4817,17 @@ img.fx-crest {
   .fx-tl__event { padding: var(--space-1); gap: var(--space-1); }
   .fx-tl__body { gap: var(--space-1); }
 
-  .fx-row { grid-template-columns: 10ch 2ch 1fr 7ch; }
-  .fx-row__tag { display: none; }
+  /* The gameweek is the one column that drops — it is the only cell whose
+     information the date beside it already implies. Everything else stays, so
+     the row keeps five children and five tracks; hiding a cell that is present
+     on some rows and absent on others would put the grid out of phase. */
+  .fx-row { grid-template-columns: 10ch 2ch 1fr 6ch 3ch; }
+  .fx-row__gw { display: none; }
+
+  /* Both head-to-head tables scroll inside .fx-table-wrap rather than
+     squeezing; the notable list below them is already single-column. */
+  .fx-notable__item { flex-direction: column; align-items: flex-start; gap: var(--space-1); }
+  .fx-notable__value { text-align: left; }
 
   .fx-pane__head { flex-direction: column; align-items: flex-start; }
 }

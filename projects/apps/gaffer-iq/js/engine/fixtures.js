@@ -22,6 +22,7 @@ import {
 } from '../config.js';
 import { clamp, normaliseLinear } from '../util.js';
 import { canonicalClubKey } from './normalise.js';
+import { collectUnderstatMeetings } from './h2h.js';
 
 // ─── §2  Base fixture difficulty ─────────────────────────────────────────────
 
@@ -410,11 +411,13 @@ export function calcVenueEffect(homeTeam, awayTeam, ctx) {
 
 /**
  * Cross-season meetings between teamA and teamB, drawn from Understat's
- * datesData (full-league fixture lists — every match, not just one team's),
- * across ctx.leagueXg/leagueXgPrev/leagueXgPrev2/leagueXgPrev3. Matched by team NAME via
- * canonicalClubKey, same resolver buildRollingVenueStatsByTeamId uses above —
- * never by Understat's own numeric ids, which are as unstable as FPL's (see
- * that function's doc block).
+ * datesData across ctx.leagueXg/leagueXgPrev/leagueXgPrev2/leagueXgPrev3.
+ *
+ * Delegates to engine/h2h.js, which owns the collection and the name-matching
+ * (by canonicalClubKey, never by Understat's numeric ids — see that module).
+ * The Head-to-head VIEW needs each meeting's date, season, venue and both
+ * scorelines; this scorer needs only A's end of the result, so it narrows the
+ * shared record down here rather than the two keeping separate collectors.
  *
  * @returns {{date: string, goalsForA: number, goalsAgainstA: number}[]}
  *   Sorted oldest → newest. Empty when either team can't be name-matched, or
@@ -422,42 +425,8 @@ export function calcVenueEffect(homeTeam, awayTeam, ctx) {
  *   promoted side, or an Understat outage).
  */
 function buildCrossSeasonH2hMeetings(teamAId, teamBId, ctx) {
-  const teamsById = ctx.teamsById || {};
-  const teamA = teamsById[teamAId];
-  const teamB = teamsById[teamBId];
-  if (!teamA || !teamB) return [];
-
-  const keysA = new Set([teamA.name, teamA.shortName].filter(Boolean).map(canonicalClubKey));
-  const keysB = new Set([teamB.name, teamB.shortName].filter(Boolean).map(canonicalClubKey));
-
-  const allDates = [
-    ...(ctx.leagueXg?.datesData || []),
-    ...(ctx.leagueXgPrev?.datesData || []),
-    ...(ctx.leagueXgPrev2?.datesData || []),
-    ...(ctx.leagueXgPrev3?.datesData || []),
-  ];
-
-  const meetings = [];
-  for (const m of allDates) {
-    if (!m?.isResult || !m.h?.title || !m.a?.title) continue;
-    const hKey = canonicalClubKey(m.h.title);
-    const aKey = canonicalClubKey(m.a.title);
-    const aWasHome = keysA.has(hKey) && keysB.has(aKey);
-    const aWasAway = keysA.has(aKey) && keysB.has(hKey);
-    if (!aWasHome && !aWasAway) continue;
-
-    const hg = Number(m.goals?.h);
-    const ag = Number(m.goals?.a);
-    if (!Number.isFinite(hg) || !Number.isFinite(ag)) continue;
-
-    meetings.push({
-      date: m.datetime,
-      goalsForA:     aWasHome ? hg : ag,
-      goalsAgainstA: aWasHome ? ag : hg,
-    });
-  }
-  meetings.sort((x, y) => new Date(x.date) - new Date(y.date));
-  return meetings;
+  return collectUnderstatMeetings(teamAId, teamBId, ctx)
+    .map(m => ({ date: m.date, goalsForA: m.goalsForA, goalsAgainstA: m.goalsAgainstA }));
 }
 
 /**
