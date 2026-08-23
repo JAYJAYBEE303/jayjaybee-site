@@ -422,12 +422,20 @@ function timelineEventHtml(ev) {
        ${ev.assist ? `<span class="fx-tl__assist">assist ${esc(ev.assist)}</span>` : ''}
        ${ev.score ? `<span class="fx-tl__score">${esc(ev.score)}</span>` : ''}`;
 
+  // Home events sit left of the centre spine, away events right of it, with the
+  // minute in the middle. The markup is IDENTICAL for both sides — CSS mirrors
+  // the home row so its glyph ends up nearest the spine, the same technique
+  // .fx-side--away uses on the fixture row. Which side an event belongs to is
+  // then carried by position, so the old H/A column is gone; the label stays
+  // for anyone not reading the layout.
   return `
     <li class="fx-tl__item fx-tl__item--${ev.side}">
+      <span class="fx-tl__event">
+        <span class="fx-tl__icon" title="${esc(kind.label)}" aria-hidden="true">${kind.icon}</span>
+        <span class="fx-tl__body">${body}</span>
+      </span>
       <span class="fx-tl__minute">${ev.minute}'</span>
-      <span class="fx-tl__icon" title="${esc(kind.label)}" aria-hidden="true">${kind.icon}</span>
-      <span class="fx-tl__body">${body}</span>
-      <span class="fx-tl__side">${esc(ev.side === 'home' ? 'H' : 'A')}</span>
+      <span class="fx-visually-hidden">${esc(ev.side === 'home' ? 'home team' : 'away team')}</span>
     </li>`;
 }
 
@@ -445,9 +453,9 @@ function timelineHtml(fixture) {
       <h4 class="fx-detail__title">Match events</h4>
       <ul class="fx-tl">${events.map(timelineEventHtml).join('')}</ul>
       <p class="fx-detail__note">
-        In order of minute, home (H) and away (A) marked at the right.
-        Timings and goal/assist pairings come from Understat — FPL publishes
-        neither.
+        In order of minute, home team left of the centre line and away team
+        right of it. Timings and goal/assist pairings come from Understat —
+        FPL publishes neither.
       </p>
     </section>`;
 }
