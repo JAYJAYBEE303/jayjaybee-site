@@ -175,6 +175,11 @@ export const TEAM_NAME_ALIASES = {
   'leicester':       'Leicester City',
   'norwich':         'Norwich City',
   'ipswich':         'Ipswich Town',
+  // Understat says 'Coventry', FPL says 'Coventry City'. Missing this entry
+  // left Coventry the ONE club in the league that never resolved to an
+  // Understat slug, so it silently ran a tier below every other club in the
+  // counter-matchup engine (buildUnderstatSlugsByTeamId mapped 19 of 20).
+  'coventry':        'Coventry City',
   'luton':           'Luton Town',
   'hull':            'Hull City',
   'cardiff':         'Cardiff City',
@@ -196,7 +201,8 @@ export const TEAM_NAME_ALIASES = {
   'lee': 'Leeds United',           'lei': 'Leicester City',
   'nor': 'Norwich City',           'ips': 'Ipswich Town',
   'lut': 'Luton Town',             'hul': 'Hull City',
-  'car': 'Cardiff City',           'stk': 'Stoke City',
+  'cov': 'Coventry City',          'car': 'Cardiff City',
+  'stk': 'Stoke City',
   'swa': 'Swansea City',           'wba': 'West Bromwich Albion',
   'whu': 'West Ham United',        'wol': 'Wolverhampton Wanderers',
   'shu': 'Sheffield United',       'qpr': 'Queens Park Rangers',
@@ -904,3 +910,11 @@ export const POINTS_LOSS = 0;
 // How many of a team's most recent completed fixtures the table's form column
 // summarises. Five is the conventional league-table window.
 export const LEAGUE_FORM_WINDOW = 5;
+
+// How far a fixture's kickoff may sit from an Understat match's datetime and
+// still be considered the same match. Both feeds are UTC and normally agree
+// exactly; the tolerance only absorbs a rescheduled fixture whose two records
+// were updated at different times. Home team + away team already identify a
+// meeting almost uniquely (each pairing occurs once per venue per season), so
+// this is a safety check rather than the primary key.
+export const UNDERSTAT_MATCH_DATE_TOLERANCE_DAYS = 5;
