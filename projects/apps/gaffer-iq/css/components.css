@@ -570,12 +570,51 @@
 
 /* ─── Breakdown row: label | bar | value | weight | est? ─────────────────── */
 
+/* Standalone row grid — label | bar | value | weight | est marker. This is
+   dashboard.js's layout (its rows are siblings of other content, not of each
+   other). matchup.js overrides it below via .breakdown-rows. */
 .breakdown-row {
   display: grid;
   grid-template-columns: 9.5rem 1fr 2.4rem 2.4rem auto;
   gap: var(--space-2);
   align-items: center;
   padding: var(--space-1) 0;
+}
+
+/* matchup.js's Score Breakdown: label | maturity counter | bar | value | weight.
+   ONE grid for the whole block, with each row `display: contents`, so the
+   counter column is a single shared track sized by the widest counter present.
+   Six independent row grids would each size their own `auto` track instead,
+   and the bars would step in and out by the counter's width from row to row.
+   Row padding moves to row-gap, since a contents row has no box to pad. */
+.breakdown-rows {
+  display: grid;
+  grid-template-columns: 9.5rem auto 1fr 2.4rem 2.4rem;
+  column-gap: var(--space-2);
+  row-gap: var(--space-2);
+  align-items: center;
+}
+
+.breakdown-rows > .breakdown-row { display: contents; }
+
+/* How far a ramping metric is toward carrying its full weight (n/N). Mono and
+   muted: it is a progress reading, not a score, and must not compete with the
+   value or the weight either side of the bar. */
+.breakdown-row__maturity {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-muted);
+  white-space: nowrap;
+  cursor: help;
+  text-align: right;
+}
+
+/* Rows that don't ramp still emit the cell, to keep the shared grid in phase.
+   When NO row in the block has a counter the track collapses to zero width,
+   and this cancels the column gap it would otherwise leave behind. */
+.breakdown-rows:not(:has(.breakdown-row__maturity:not(:empty))) .breakdown-row__maturity {
+  margin-right: calc(var(--space-2) * -1);
 }
 
 .breakdown-row__label {
@@ -3148,10 +3187,16 @@
   /* ─── Matchup Analyser ──────────────────────────────────────────────────── */
 
   /* The matchup grid already collapses to single-column at 800px.
-     Below 768px we tighten the breakdown-row grid so the "Counter-Matchup"
-     label (9.5rem on desktop) doesn't overflow a 375px screen. */
+     Below 768px we tighten both breakdown grids so the "Counter-Matchup"
+     label (9.5rem on desktop) doesn't overflow a 375px screen. The two are
+     tightened in step: .breakdown-row is dashboard.js's standalone layout,
+     .breakdown-rows is matchup.js's shared one with the maturity column. */
   .breakdown-row {
     grid-template-columns: 7rem 1fr 2rem 2rem auto;
+  }
+
+  .breakdown-rows {
+    grid-template-columns: 7rem auto 1fr 2rem 2rem;
   }
 
   .breakdown-row__label {

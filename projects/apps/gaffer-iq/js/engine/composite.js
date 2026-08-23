@@ -186,9 +186,9 @@ const STACK_METRICS = ['counterMatchup', 'teamForm', 'history', 'homeAway', 'sty
  * letting three matches of data swing a fixture as hard as thirty.
  *
  * A metric that reports no `maturity` is binary exactly as before: 1 when
- * usable, 0 when estimated. Today only counterMatchup reports a partial value
- * (engine/channel.js), but the mechanism is general — any metric can opt in by
- * returning a `maturity` field, with no change needed here.
+ * usable, 0 when estimated. counterMatchup (engine/channel.js) and teamForm
+ * (engine/form.js) both report partial values; the mechanism is general — any
+ * metric can opt in by returning a `maturity` field, with no change needed here.
  *
  * @param {{estimated?: boolean, maturity?: number}|null} metric
  * @returns {number}  0–1. Higher = more of its configured weight applies.
@@ -221,6 +221,13 @@ export function metricMaturity(metric) {
  * With STACK_PIVOT below 50, a metric sitting on its neutral-50 fallback also
  * contributes nothing even if it is somehow flagged non-estimated.
  *
+ * MODEL: an immature metric is weighed by what it has actually EARNED
+ * (weight × maturity), the same quantity the composite sum uses. Counting a
+ * one-game form reading at its full 15% here while the sum counted 3% would let
+ * evidence the score barely trusts drive a penalty at full force — the exact
+ * asymmetry the maturity ramp exists to remove. A metric reporting no maturity
+ * is unchanged (metricMaturity treats it as 1).
+ *
  * @param {object} breakdown  scoreFixture's breakdown, pre-penalty
  * @returns {{penalty: number, stackIndex: number, countUnfavourable: number,
  *            consideredWeight: number}}
@@ -236,11 +243,13 @@ function calcStackingPenalty(breakdown) {
     const m = breakdown[key];
     // A data gap is not evidence of badness — skip without counting its weight.
     if (!m || m.estimated) continue;
-    consideredWeight += m.weight;
+    const earned = m.weight * metricMaturity(m);
+    if (earned === 0) continue;
+    consideredWeight += earned;
     if (m.value >= STACK_PIVOT) continue;
     countUnfavourable++;
     // Normalised severity: 0 at the pivot, 1 at a floored-zero metric.
-    shortfallWeighted += m.weight * ((STACK_PIVOT - m.value) / STACK_PIVOT);
+    shortfallWeighted += earned * ((STACK_PIVOT - m.value) / STACK_PIVOT);
   }
 
   if (consideredWeight === 0) {
@@ -370,7 +379,7 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
   // the small intermediate object rather than reading the breakdown after the fact.
   const stack = calcStackingPenalty({
     counterMatchup: { value: counter.value, weight: WEIGHTS.counterMatchup, estimated: counter.estimated, maturity: mCounter },
-    teamForm:       { value: form.value,    weight: WEIGHTS.teamForm,       estimated: form.estimated },
+    teamForm:       { value: form.value,    weight: WEIGHTS.teamForm,       estimated: form.estimated, maturity: mForm },
     history:        { value: history.value, weight: WEIGHTS.history,        estimated: history.estimated },
     homeAway:       { value: venue.value,   weight: WEIGHTS.homeAway,       estimated: venue.estimated },
     styleClash:     { value: style.value,   weight: WEIGHTS.styleClash,     estimated: style.estimated },
@@ -429,6 +438,10 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
         estimated: form.estimated,
         trend:     form.trend,
         games:     form.games,
+        // 0–1 share of this metric's configured weight that actually applied.
+        // FORM_WINDOW_GWS games = a full window = 1. See engine/form.js.
+        maturity:  mForm,
+        effectiveWeight: WEIGHTS.teamForm * mForm,
       },
       history: {
         value:      history.value,

@@ -188,7 +188,13 @@ teamForm = normaliseLinear(rawForm, across all teams)
 ```
 - `RECENCY_DECAY` (default **0.85**) makes the most recent match matter most. A decay of 1.0 = flat average; tune toward 0.7 to react faster to hot/cold streaks.
 - Optionally fold in goal difference with weight `W_FORM_GD` (default **0.2**) blended into `rawForm` for a sharper read than results alone.
-- Returns `{ value, trend }` where `trend` = sign/magnitude of the slope across the window (improving vs declining), used for UI arrows and as a tiebreaker, not in the composite.
+- Returns `{ value, trend, estimated, games, maturity }`. `trend` = sign/magnitude of the slope across the window (improving vs declining), used for UI arrows and as a tiebreaker, not in the composite.
+
+**Maturity ramp (a thin window scales, it does not gate).** `maturity = games / FORM_WINDOW_GWS`, and `engine/composite.js` multiplies this metric's weight by it — so one match played carries **1/5 of 15% = 3%** of the composite, three carry 9%, and five or more carry the full 15%. `estimated` is now reserved for its literal meaning, **no games at all**; from one game up the reading is real and the ramp expresses how much of it there is.
+
+This replaced an all-or-nothing gate (`estimated: true` below `ceil(FORM_WINDOW_GWS / 2)`), which §8.3 reads as "discard entirely". Under that rule a team's first two matches counted for **nothing** and the third abruptly counted for all 15% — a cliff, on the metric most worth having early. Same mechanism `engine/channel.js` already used for the counter-matchup, and the same reasoning: see `CHANNEL_MATURITY_FULL_SHOTS` in config.js. Mid-season behaviour is unchanged (five games in, maturity is 1).
+
+The Matchup Analyser surfaces the ramp as an `n/N` counter beside the row — see §8.8.
 
 ---
 
@@ -595,13 +601,16 @@ STACK_METRICS = [counterMatchup, teamForm, history, homeAway, styleClash]
 
 for each m in STACK_METRICS:
     if m.estimated:            skip entirely (do not count its weight)
-    consideredWeight += m.weight
+    earned = m.weight * metricMaturity(m)         # what it actually carries
+    if earned == 0:            skip entirely
+    consideredWeight += earned
     if m.value >= STACK_PIVOT: continue           # metric is fine
-    shortfallWeighted += m.weight * (STACK_PIVOT - m.value) / STACK_PIVOT
+    shortfallWeighted += earned * (STACK_PIVOT - m.value) / STACK_PIVOT
 
 stackIndex     = clamp(0, 1, shortfallWeighted / consideredWeight)      # 0–1
 stackingPenalty = STACK_MAX_PENALTY * (stackIndex ^ STACK_CURVE)        # 0–45
 ```
+- **Weighed by what a metric has EARNED, not by its configured maximum.** A metric on a maturity ramp (§5's teamForm, §7.2's counterMatchup) contributes `weight × maturity` here, the same quantity §8.3's sum uses. Counting a one-game form reading at its full 15% while the score itself counted 3% would let evidence the composite barely trusts drive a penalty at full force — precisely the asymmetry the ramp exists to remove. A metric reporting no maturity is unaffected (`metricMaturity` treats it as 1).
 - `STACK_PIVOT` = **45**, `STACK_CURVE` = **2.0**, `STACK_MAX_PENALTY` = **45** (`config.js`).
 - **The exponent is the mechanism.** Above 1 it makes the punishment *curve* rather than *ramp*. At 2.0 the three-unfavourable case takes roughly **9.8×** the penalty of the one-unfavourable case, despite its stack index being only ~3× larger. Lower toward 1.0 to make secondary metrics bite earlier and more linearly.
 - **Same shape and same reasoning as `calcTenurePenalty` (§2.1)** — `MAX * (deficit ^ CURVE)`, curve 2.0. The engine deliberately keeps one idiom for "punish genuine stacking, not incidental single dips."
@@ -674,6 +683,42 @@ The first two rows are the direct fix: under the old model neither team's absolu
 - `CompositeScore.breakdown` still explains `relative.ownRawValue` exactly (§8.5/§8.6's identities hold for `ownRawValue`), but no longer arithmetically reconstructs the top-level `value` on its own — `relative` is required to close that gap. The Matchup Analyser's existing breakdown rows are unchanged and still correct for what they show (`ownRawValue`'s composition); they do not currently render the new `relative` field. Flagged as a follow-up, not implemented here (out of this change's scope): surfacing `relative.opponentRawValue`/`edge` somewhere on the card would let a user see *why* the headline number differs from a manual sum of the breakdown rows.
 - Perf: `scoreFixture` now does roughly double the internal work per call (`computeRawFixtureScore` runs for both sides every time). `engine/chips.js` already memoises `scoreFixture` per `(team, fixture)` pair (`makeFxCache`), so chip planning is unaffected. `rankPlayers`/`scorePlayer` have no such cache and call `scoreOverHorizon` (and therefore `scoreFixture`) once per player with no memoisation across players sharing a team — this was already uncached before this change; it is now roughly twice as expensive per call. Not addressed here (a caching layer for `scorePlayer`/`rankPlayers` is a separate concern, unscoped for this change) but worth knowing if Ranker load time is ever noticeably slow.
 - **Further perf note (§7.2 counter-matchup blend):** `computeRawFixtureScore` itself now calls `calcCounterMatchup` twice per side (once for the attacking read, once for the opponent's attacking read that feeds the defending mirror) instead of once, roughly doubling the counter-matchup-specific cost on top of the doubling above. Same reasoning applies: no caching added, not addressed here, worth knowing if Ranker load time grows noticeably.
+
+---
+
+## 8.8 How the breakdown is displayed (`js/modules/matchup.js → buildBreakdownRows`)
+
+Presentation, not model — recorded here because it is the surface that has to
+tell the truth about §8.3's weighting, and getting that wrong makes a correct
+model look broken.
+
+**Row order is derived, not written down.** `METRIC_ORDER` sorts `WEIGHTS`
+descending, with `METRIC_TIEBREAK` separating metrics on equal weight
+(`teamForm` and `history` are both 0.15). The hand-maintained list it replaced
+had already drifted out of step with a reweighting — `homeAway` (5%) was sitting
+above `styleClash` (10%). Reweight in `config.js` and the card reorders itself.
+
+**The `%` column is the metric's configured MAXIMUM, and it is static.** It
+answers "how much can this row ever matter", which is a property of the model,
+not of today's data. It previously printed the *applied* weight
+(`effectiveWeight`), which made a ramping metric read `0%` early in the season —
+indistinguishable from a metric that had been switched off.
+
+**A ramping metric carries an `n/N` counter instead**, between the label and the
+bar, shown only while `maturity < 1`. The two numbers then say different things:
+`N%` is the ceiling, `n/N` is the progress toward it. Both are derived from the
+same `maturity` the engine applied, so they cannot disagree with the score.
+
+| Metric | `N` | Unit |
+|---|---|---|
+| `teamForm` | `FORM_WINDOW_GWS` (5) | matches played — **exact** |
+| `counterMatchup` | `CHANNEL_MATURITY_FULL_MATCHES` (9) | matches' **worth of shot data** — approximate |
+
+The counter-matchup unit is the one place this is not a literal match count: that
+ramp is driven by a shot total (`CHANNEL_MATURITY_FULL_SHOTS` = 120), so a
+high-volume side arrives in fewer than nine matches and a low-volume one takes
+more. The row's tooltip says exactly that rather than implying a precision the
+number does not have.
 
 ---
 

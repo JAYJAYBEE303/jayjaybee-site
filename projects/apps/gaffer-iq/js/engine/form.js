@@ -106,11 +106,25 @@ function formTrend(results) {
  * League-relative normalisation: each team's raw form is bounded by the spread
  * observed across every team that has played at least once.
  *
+ * MODEL (revised): a thin window is a RAMP, not a gate. This used to flag
+ * `estimated: true` below half the window, which engine/composite.js reads as
+ * "discard entirely" — so a team's first two matches counted for nothing and
+ * the third suddenly counted for all 15%. Form is the metric most worth having
+ * early, and that cliff was exactly backwards. `maturity` now scales the weight
+ * continuously (1 game = 1/5 of the window = 3% of the composite rather than
+ * 15%), so an early reading applies immediately at a strength matched to how
+ * little is behind it. Same mechanism engine/channel.js already uses for the
+ * counter-matchup; see metricMaturity in engine/composite.js.
+ *
+ * `estimated` is now reserved for its literal meaning: no games at all.
+ *
  * @param {Team} team
  * @param {object} ctx  { teamsById, playedFixtures, leagueAvgStrength? }
- * @returns {{value: number, trend: number, estimated: boolean, games: number}}
+ * @returns {{value: number, trend: number, estimated: boolean, games: number,
+ *            maturity: number}}
  *   value: 0–100, higher = better recent form for `team`. Direction: higher = better.
  *   trend: signed slope of points across the window; UI-only, not in the composite.
+ *   maturity: 0–1, share of FORM_WINDOW_GWS actually played.
  *   See FEATURE_ENGINE.md §5.
  */
 export function calcTeamForm(team, ctx) {
@@ -118,8 +132,9 @@ export function calcTeamForm(team, ctx) {
   const results = resultsByTeam[team.id] || [];
 
   if (results.length === 0) {
-    // MODEL: no games played → neutral fallback, flagged estimated.
-    return { value: 50, trend: 0, estimated: true, games: 0 };
+    // MODEL: no games played → neutral fallback, flagged estimated. This is the
+    // ONLY estimated case now; anything from one game up rides the ramp below.
+    return { value: 50, trend: 0, estimated: true, games: 0, maturity: 0 };
   }
 
   const leagueAvgStrength = ctx.leagueAvgStrength || LEAGUE_AVG_STRENGTH;
@@ -141,10 +156,11 @@ export function calcTeamForm(team, ctx) {
   return {
     value: normaliseLinear(raw, min, max),
     trend: formTrend(results),
-    // MODEL: short windows still score (the metric self-calibrates) but are
-    // flagged so confidence drops below the mid-season norm.
-    estimated: results.length < Math.ceil(FORM_WINDOW_GWS / 2),
+    // There ARE games, so this is a real reading, not a fallback — how much of
+    // one is what `maturity` says. See the MODEL note in the doc block.
+    estimated: false,
     games: results.length,
+    maturity: clamp(0, 1, results.length / FORM_WINDOW_GWS),
   };
 }
 

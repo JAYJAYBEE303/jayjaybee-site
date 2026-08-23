@@ -11,12 +11,14 @@
  */
 
 import { store } from '../store.js';
-import { BANDS, HORIZONS } from '../config.js';
+import {
+  BANDS, HORIZONS, WEIGHTS, FORM_WINDOW_GWS, CHANNEL_MATURITY_FULL_MATCHES,
+} from '../config.js';
 import { buildScoreContext, scoreFixture, scoreOverHorizon } from '../engine/composite.js';
 import {
   calcIndividualDuels, calcCounterMatchupMirrored, duelsForPairing,
 } from '../engine/counter.js';
-import { invert } from '../util.js';
+import { invert, clamp } from '../util.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -31,15 +33,33 @@ const METRIC_LABELS = {
   history:        'H2H History',
 };
 
-// Ordered so the highest-weight metrics appear first (matches config WEIGHTS order).
-const METRIC_ORDER = [
-  'baseDifficulty',
-  'counterMatchup',
-  'teamForm',
-  'history',
-  'homeAway',
-  'styleClash',
+// Tiebreak for metrics on equal weight (teamForm and history are both 0.15).
+// Read as "which is more worth reading first", and only ever consulted when
+// WEIGHTS cannot separate two rows.
+const METRIC_TIEBREAK = [
+  'baseDifficulty', 'counterMatchup', 'teamForm', 'history', 'styleClash', 'homeAway',
 ];
+
+// Heaviest metric first. DERIVED from WEIGHTS rather than written out, so a
+// reweighting in config.js reorders the card automatically — the previous
+// hand-maintained list had already drifted (homeAway at 5% sat above styleClash
+// at 10%), which is exactly the failure this removes.
+const METRIC_ORDER = Object.keys(METRIC_LABELS).sort((a, b) =>
+  (WEIGHTS[b] - WEIGHTS[a])
+  || (METRIC_TIEBREAK.indexOf(a) - METRIC_TIEBREAK.indexOf(b)));
+
+// Metrics whose weight ramps up with evidence, and the count each needs before
+// it carries its full configured weight. The breakdown shows a "n/N" counter
+// against these until they get there.
+//
+// The two units are NOT the same and the tooltips say so: teamForm's is an
+// exact count of matches played, while counterMatchup's ramp is driven by a
+// SHOT count (CHANNEL_MATURITY_FULL_SHOTS) that this expresses as its
+// match-equivalent — a high-volume side arrives sooner than a low-volume one.
+const MATURITY_THRESHOLDS = {
+  teamForm:       FORM_WINDOW_GWS,
+  counterMatchup: CHANNEL_MATURITY_FULL_MATCHES,
+};
 
 // Attacking pairing labels. Covers both the role-mode keys (stVsCb/wmVsFb/
 // cmVsCbDm — Phase 3C, active whenever ICT data is available) and the
@@ -770,16 +790,58 @@ function counterMatchupTooltip(m) {
     + `score rather than its full ${Math.round(m.weight * 100)}%.`;
 }
 
+/**
+ * Progress toward a ramping metric's full weight, or null when there is none to
+ * show — either the metric doesn't ramp, or it has already arrived.
+ *
+ * Derived from `maturity` rather than from a raw game count, so the counter and
+ * the weight the engine actually applied can never disagree: both read the same
+ * number. Floors rather than rounds, so "5/5" appears only on a genuinely full
+ * window and never a hair before it.
+ *
+ * @param {string} key
+ * @param {object} m  the breakdown entry
+ * @returns {{done: number, total: number}|null}
+ */
+function maturityProgress(key, m) {
+  const total = MATURITY_THRESHOLDS[key];
+  if (!total) return null;
+
+  // A metric with no maturity field is binary and already at full weight
+  // (metricMaturity, engine/composite.js) — nothing to count toward.
+  const maturity = typeof m.maturity === 'number' ? clamp(0, 1, m.maturity) : 1;
+  if (maturity >= 1) return null;
+
+  return { done: Math.min(total, Math.floor(maturity * total)), total };
+}
+
+/** Tooltip for the maturity counter, in the unit that metric actually ramps on. */
+function maturityTooltip(key, m, progress) {
+  const applied = Math.round((m.effectiveWeight ?? m.weight) * 100);
+  const full    = Math.round(m.weight * 100);
+  const tail = `Carrying ${applied}% of the score so far rather than its full ${full}%; `
+    + `the ${full}% on the right is what it builds to, not what it is applying now.`;
+
+  return key === 'teamForm'
+    ? `${progress.done} of the ${progress.total} matches this metric reads once the season is `
+      + `under way. ${tail}`
+    : `About ${progress.done} matches' worth of the shot data this metric needs — it ramps on `
+      + `shots, not matches, so a team that shoots a lot gets there sooner. ${tail}`;
+}
+
 function buildBreakdownRows(breakdown, venue) {
-  return METRIC_ORDER.map(key => {
+  const rows = METRIC_ORDER.map(key => {
     const m        = breakdown[key];
     const hasValue = typeof m.value === 'number';
     const val      = hasValue ? Math.round(m.value) : null;
-    // The weight shown is the weight actually APPLIED. A metric on the maturity
-    // ramp (engine/composite.js metricMaturity) earns its configured weight
-    // gradually, so printing the nominal 20% while only 2% counted would
-    // misstate how much this row is really steering the score.
-    const pct      = Math.round((m.effectiveWeight ?? m.weight) * 100);
+    // The weight shown is the metric's CONFIGURED maximum, and it is static —
+    // it answers "how much can this row ever matter", which is a property of
+    // the model and not of today's data. What a ramping metric is applying
+    // right now is carried by the n/N counter beside the label instead, so the
+    // two numbers say different things rather than one silently standing in
+    // for the other.
+    const pct      = Math.round(m.weight * 100);
+    const progress = maturityProgress(key, m);
     const barBand  = !hasValue ? 'neutral'
       : key === 'baseDifficulty' ? bandFromValue(invert(m.value)) : bandFromValue(val);
     const rowClass   = m.estimated ? ' breakdown-row--estimated' : '';
@@ -797,9 +859,19 @@ function buildBreakdownRows(breakdown, venue) {
       ? (venue === 'Home' ? 'Home Advantage' : 'Away Disadvantage')
       : METRIC_LABELS[key];
 
+    // The counter cell is ALWAYS emitted, empty when the metric doesn't ramp or
+    // has finished ramping: .breakdown-row is one grid and omitting a cell
+    // would shift every later column left by one. An empty span collapses to
+    // zero width and cancels its own gap (see .breakdown-row__maturity:empty).
+    const counter = progress
+      ? `<span class="breakdown-row__maturity" title="${esc(maturityTooltip(key, m, progress))}"
+          >${progress.done}/${progress.total}</span>`
+      : '<span class="breakdown-row__maturity"></span>';
+
     return `
       <div class="breakdown-row${rowClass}">
         <span class="breakdown-row__label"${labelTitle}>${esc(label)}</span>
+        ${counter}
         <div class="breakdown-row__bar-wrap">
           <div class="breakdown-row__bar breakdown-row__bar--${barBand}${barEstClass}" style="width:${val ?? 0}%"></div>
         </div>
@@ -808,6 +880,11 @@ function buildBreakdownRows(breakdown, venue) {
       </div>
     `.trim();
   }).join('');
+
+  // One grid wraps all six rows so the maturity column is a SHARED track — see
+  // .breakdown-rows. Without the wrapper each row sizes its own, and the bars
+  // step left and right depending on whether that row has a counter.
+  return `<div class="breakdown-rows">${rows}</div>`;
 }
 
 /**
