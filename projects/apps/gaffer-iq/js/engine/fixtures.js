@@ -411,7 +411,7 @@ export function calcVenueEffect(homeTeam, awayTeam, ctx) {
 
 /**
  * Cross-season meetings between teamA and teamB, drawn from Understat's
- * datesData across ctx.leagueXg/leagueXgPrev/leagueXgPrev2/leagueXgPrev3.
+ * datesData across ctx.leagueXg, ctx.leagueXgPrev and ctx.leagueXgHistory.
  *
  * Delegates to engine/h2h.js, which owns the collection and the name-matching
  * (by canonicalClubKey, never by Understat's numeric ids — see that module).
@@ -479,7 +479,7 @@ function buildFplH2hMeetings(teamAId, teamBId, ctx) {
  * @param {number} teamAId
  * @param {number} teamBId
  * @param {object} ctx  must contain { teamsById, leagueXg, leagueXgPrev,
- *   leagueXgPrev2, leagueXgPrev3, playedFixtures }
+ *   leagueXgHistory, playedFixtures }
  * @returns {{value: number, estimated: boolean, meetings: number, pointsForA: number}}
  *   value: 0–100, the % of available league points A took across the counted
  *   meetings. Direction: higher = better for `teamA`.

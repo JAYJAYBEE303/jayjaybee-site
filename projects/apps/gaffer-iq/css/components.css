@@ -4066,11 +4066,15 @@
   font-weight: 700;
 }
 
-/* Two-column results/upcoming split — same 1fr 1fr rhythm as .fx-detail__cols. */
+/* Two-column results/upcoming split — same 1fr 1fr rhythm as .fx-detail__cols.
+   The bottom margin matters on the head-to-head pane, where a full-width table
+   follows: the two columns are uneven by nature (one a fixed two-row table, the
+   other a list), so whichever ends lower would otherwise touch it. */
 .fx-two-col {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--space-6);
+  margin-bottom: var(--space-6);
 }
 
 .fx-col__title {
@@ -4248,6 +4252,10 @@
   color: var(--color-muted);
 }
 
+/* The meeting date now carries its year, so it needs room to stay on one line
+   — a wrapped date would make its row taller than its neighbours. */
+.fx-h2h-date { white-space: nowrap; }
+
 /* A club cell in the meeting table: crest then short name, kept on one line so
    the Home and Away columns stay the same height as the score between them. */
 .fx-h2h-club {
@@ -4377,7 +4385,12 @@
   white-space: nowrap;
 }
 
-.fx-league th.fx-league__num { text-align: right; }
+/* Right-align the HEADER of a numeric column too. Deliberately NOT scoped to
+   .fx-league: the By team split and the head-to-head venue split use the same
+   modifier on plain .fx-table markup, and a left-aligned label sitting over
+   right-aligned figures reads as two staggered columns. `th` alone is enough
+   specificity to beat .fx-table th's own text-align. */
+th.fx-league__num { text-align: right; }
 
 .fx-league__pos {
   width: 4ch;

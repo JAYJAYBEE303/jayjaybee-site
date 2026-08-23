@@ -263,8 +263,7 @@ function buildCtx() {
     playerSummariesById: store.getAllPlayerSummaries(),
     leagueXg: store.getLeagueXg(),
     leagueXgPrev: store.getLeagueXgPrev(),
-    leagueXgPrev2: store.getLeagueXgPrev2(),
-    leagueXgPrev3: store.getLeagueXgPrev3(),
+    leagueXgHistory: store.getLeagueXgHistory(),
     teamXgBySlug: store.getAllTeamXg(),
     currentGw: store.getCurrentGw() ?? store.getNextGw() ?? 1,
   });

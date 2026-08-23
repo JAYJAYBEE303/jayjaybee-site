@@ -120,8 +120,11 @@ function meetingKey(m) {
 
 /**
  * Cross-season meetings drawn from Understat's datesData (full-league fixture
- * lists — every match, not just one team's), across
- * ctx.leagueXg/leagueXgPrev/leagueXgPrev2/leagueXgPrev3.
+ * lists — every match, not just one team's), across ctx.leagueXg,
+ * ctx.leagueXgPrev and every payload in ctx.leagueXgHistory. How far back that
+ * reaches is UNDERSTAT_HISTORY_SEASONS (config.js), currently five seasons in
+ * total — clubs meet twice a season, so a shallower window leaves a pairing
+ * with too few meetings to read anything from.
  *
  * MODEL: matched by team NAME via canonicalClubKey, never by Understat's own
  * numeric ids, which are as unstable across seasons as FPL's. Same resolver
@@ -129,7 +132,7 @@ function meetingKey(m) {
  *
  * @param {number} teamAId
  * @param {number} teamBId
- * @param {object} ctx  { teamsById, leagueXg, leagueXgPrev, leagueXgPrev2, leagueXgPrev3 }
+ * @param {object} ctx  { teamsById, leagueXg, leagueXgPrev, leagueXgHistory }
  * @returns {Meeting[]}  oldest → newest. Empty when either club can't be
  *   name-matched, or no meeting appears in the fetched seasons (thin overlap,
  *   a promoted side, or an Understat outage).
@@ -146,8 +149,7 @@ export function collectUnderstatMeetings(teamAId, teamBId, ctx) {
   const allDates = [
     ...(ctx.leagueXg?.datesData || []),
     ...(ctx.leagueXgPrev?.datesData || []),
-    ...(ctx.leagueXgPrev2?.datesData || []),
-    ...(ctx.leagueXgPrev3?.datesData || []),
+    ...(ctx.leagueXgHistory || []).flatMap(payload => payload?.datesData || []),
   ];
 
   const meetings = [];
@@ -240,7 +242,7 @@ export function collectFplMeetings(teamAId, teamBId, ctx) {
  * @param {number} teamAId
  * @param {number} teamBId
  * @param {object} ctx  { teamsById, fixtures, leagueXg, leagueXgPrev,
- *                        leagueXgPrev2, leagueXgPrev3 }
+ *                        leagueXgHistory }
  * @returns {Meeting[]}  oldest → newest
  */
 export function buildH2hMeetings(teamAId, teamBId, ctx) {

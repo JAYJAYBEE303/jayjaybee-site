@@ -31,11 +31,13 @@ const state = {
   // Nothing else in the engine reads this; Style Clash/calcStyleProfile stay
   // on the current season only.
   leagueXgPrev: null,
-  // Phase 4 — two/three seasons ago's leagueXg payloads, fetched purely to
-  // deepen calcFixtureHistory's cross-season H2H window (N_H2H=8,
-  // config.js). Nothing else in the engine reads these.
-  leagueXgPrev2: null,
-  leagueXgPrev3: null,
+  // Older leagueXg payloads (UNDERSTAT_HISTORY_SEASONS, config.js), fetched
+  // purely to deepen the head-to-head record — engine/h2h.js and, through its
+  // shared collector, calcFixtureHistory's cross-season window. Nothing else in
+  // the engine reads these. An ARRAY, newest first, so adding a season to the
+  // window is a config edit rather than another named slot here; entries that
+  // failed to fetch are simply absent, never null.
+  leagueXgHistory: [],
   teamXg: {},
   // Fixtures tab — raw `event/{gw}/live/` payloads keyed by GW. This is the
   // ONLY source of per-fixture match events (scorers, assists, cards) and of
@@ -101,8 +103,7 @@ function getPlayerSummary(playerId)   { return state.playerSummaries[playerId] ?
 function getAllPlayerSummaries()       { return state.playerSummaries; }
 function getLeagueXg()                { return state.leagueXg; }
 function getLeagueXgPrev()            { return state.leagueXgPrev; }
-function getLeagueXgPrev2()           { return state.leagueXgPrev2; }
-function getLeagueXgPrev3()           { return state.leagueXgPrev3; }
+function getLeagueXgHistory()         { return state.leagueXgHistory; }
 function getTeamXg(teamSlug)          { return state.teamXg[teamSlug] ?? null; }
 function getLive(gw)                  { return state.live[gw] ?? null; }
 function getMatchDetail(fixtureId)    { return state.matchDetail[fixtureId] ?? null; }
@@ -139,12 +140,14 @@ function setLeagueXgPrev(data) {
   state.leagueXgPrev = data;
 }
 
-function setLeagueXgPrev2(data) {
-  state.leagueXgPrev2 = data;
-}
-
-function setLeagueXgPrev3(data) {
-  state.leagueXgPrev3 = data;
+/**
+ * Replace the older-seasons payload list. Callers pass only what actually
+ * loaded — a season whose fetch failed is left out rather than held as a null,
+ * so consumers can spread the array without filtering.
+ * @param {object[]} list  newest first
+ */
+function setLeagueXgHistory(list) {
+  state.leagueXgHistory = Array.isArray(list) ? list.filter(Boolean) : [];
 }
 
 function setTeamXg(teamSlug, data) {
@@ -205,8 +208,7 @@ function setError(err) {
   state.season = null;
   state.leagueXg = null;
   state.leagueXgPrev = null;
-  state.leagueXgPrev2 = null;
-  state.leagueXgPrev3 = null;
+  state.leagueXgHistory = [];
   state.live = {};
   state.matchDetail = {};
   state.lastRefreshAt = null;
@@ -224,8 +226,7 @@ function clearCache() {
   state.playerSummaries = {};
   state.leagueXg = null;
   state.leagueXgPrev = null;
-  state.leagueXgPrev2 = null;
-  state.leagueXgPrev3 = null;
+  state.leagueXgHistory = [];
   state.teamXg = {};
   state.live = {};
   state.matchDetail = {};
@@ -267,10 +268,10 @@ export const store = {
   getSeason, getTeams, getTeam, getPlayers, getPlayer,
   getFixtures, getFixture, getPositions, getEvents,
   getCurrentGw, getNextGw, getPlayerSummary, getAllPlayerSummaries,
-  getLeagueXg, getLeagueXgPrev, getLeagueXgPrev2, getLeagueXgPrev3, getTeamXg, getAllTeamXg,
+  getLeagueXg, getLeagueXgPrev, getLeagueXgHistory, getTeamXg, getAllTeamXg,
   getLive, getMatchDetail,
   getActiveHorizon, getSquad, getError, getLastRefreshAt, isFresh,
-  setSeason, setPlayerSummary, setLeagueXg, setLeagueXgPrev, setLeagueXgPrev2, setLeagueXgPrev3, setTeamXg,
+  setSeason, setPlayerSummary, setLeagueXg, setLeagueXgPrev, setLeagueXgHistory, setTeamXg,
   setLive, setMatchDetail,
   setActiveHorizon, setSquad, setError, markDataReady,
   clearCache,

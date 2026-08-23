@@ -137,10 +137,11 @@ const SPLIT_COLUMNS = [
   ...TEAM_STATS,
 ];
 
-// Head-to-head meeting table, left to right.
+// Head-to-head meeting table, left to right. Date carries its year, so there
+// is no separate Season column — which season a match fell in is a detail the
+// date already answers, and two columns saying the same thing read as noise.
 const H2H_COLUMNS = [
   { key: 'date',   label: 'Date'   },
-  { key: 'season', label: 'Season' },
   { key: 'venue',  label: 'Venue'  },
   { key: 'home',   label: 'Home'   },
   { key: 'score',  label: 'Score'  },
@@ -252,6 +253,13 @@ function fmtDateLong(iso) {
   return d ? d.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) : '';
 }
 
+/** "19 Apr 2026" — short, but unambiguous across seasons. */
+function fmtDateYear(iso) {
+  const d = toDate(iso);
+  return d ? d.toLocaleDateString(undefined,
+    { day: 'numeric', month: 'short', year: 'numeric' }) : 'TBC';
+}
+
 /** "16 Aug" */
 function fmtDateShort(iso) {
   const d = toDate(iso);
@@ -301,8 +309,7 @@ function h2hCtx() {
     fixtures:      store.getFixtures(),
     leagueXg:      store.getLeagueXg(),
     leagueXgPrev:  store.getLeagueXgPrev(),
-    leagueXgPrev2: store.getLeagueXgPrev2(),
-    leagueXgPrev3: store.getLeagueXgPrev3(),
+    leagueXgHistory: store.getLeagueXgHistory(),
   };
 }
 
@@ -313,10 +320,8 @@ function h2hCtx() {
  * without taking the others down — "across 4 seasons" would then be a lie.
  */
 function loadedSeasonCount() {
-  return [
-    store.getLeagueXg(), store.getLeagueXgPrev(),
-    store.getLeagueXgPrev2(), store.getLeagueXgPrev3(),
-  ].filter(Boolean).length;
+  return [store.getLeagueXg(), store.getLeagueXgPrev()].filter(Boolean).length
+       + store.getLeagueXgHistory().length;
 }
 
 // ─── Gameweek pane ────────────────────────────────────────────────────────────
@@ -1267,12 +1272,15 @@ function h2hRowHtml(meeting, teamA, teamB) {
   const away = meeting.aWasHome ? teamB : teamA;
   const outcome = OUTCOMES[meeting.outcomeA];
 
+  // The venue marker sits in a SPAN inside the cell, never on the <td> itself:
+  // .fx-venue is inline-flex, and an inline-flex <td> drops out of the table's
+  // cell flow entirely — the column then sizes and baselines independently of
+  // every other one in the row.
   return `
     <tr>
-      <td>${esc(fmtDateShort(meeting.date))}</td>
-      <td>${esc(meeting.season ?? '—')}</td>
-      <td class="fx-venue" title="${esc(teamA.shortName)} ${meeting.aWasHome ? 'at home' : 'away'}"
-        >${meeting.aWasHome ? 'H' : 'A'}</td>
+      <td class="fx-h2h-date">${esc(fmtDateYear(meeting.date))}</td>
+      <td><span class="fx-venue" title="${esc(teamA.shortName)} ${
+        meeting.aWasHome ? 'at home' : 'away'}">${meeting.aWasHome ? 'H' : 'A'}</span></td>
       <td class="fx-h2h-club">${crest(home, 'fx-crest--sm')}${esc(home?.shortName ?? meeting.homeName)}</td>
       <td class="fx-table__score">${meeting.homeGoals}<em>–</em>${meeting.awayGoals}</td>
       <td class="fx-h2h-club">${crest(away, 'fx-crest--sm')}${esc(away?.shortName ?? meeting.awayName)}</td>
@@ -1444,13 +1452,14 @@ function renderH2hPane() {
     </div>
 
     <p class="fx-detail__note">
-      Meetings come from Understat's full-league fixture lists for the
-      ${seasonsLoaded} ${seasonsLoaded === 1 ? 'season' : 'seasons'} loaded,
-      merged with this season's FPL results — each pairing appears once per
-      venue per season, so a match carried by both feeds is counted once. Only
-      league matches are covered: cups, play-offs and any season either club
-      spent outside this division are absent. Venue, form and the run are all
-      read from ${esc(teamA.name)}’s end; swap the two to mirror them.
+      Every league meeting in the ${seasonsLoaded} ${
+        seasonsLoaded === 1 ? 'season' : 'seasons'} loaded — Understat's
+      full-league fixture lists, merged with this season's FPL results. Each
+      pairing appears once per venue per season, so a match carried by both
+      feeds is counted once. Cups and play-offs are in neither feed, and any
+      season either club spent outside this division simply has no meeting to
+      show. Venue, form and the run are all read from ${esc(teamA.name)}’s
+      end; swap the two to mirror them.
     </p>
   `;
 }

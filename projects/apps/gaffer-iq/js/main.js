@@ -12,7 +12,7 @@ import {
   PROJ_FORM, PROJ_FIXTURE, PROJ_COUNTER, PROJ_MINUTES,
 } from './config.js';
 import { store } from './store.js';
-import { UNDERSTAT_SEASON, UNDERSTAT_PREV_SEASON, UNDERSTAT_PREV2_SEASON, UNDERSTAT_PREV3_SEASON } from './config.js';
+import { UNDERSTAT_SEASON, UNDERSTAT_PREV_SEASON, UNDERSTAT_HISTORY_SEASONS } from './config.js';
 import {
   fetchBootstrap, fetchFixtures, fetchPlayerSummary,
   fetchLeagueXg, fetchTeamXg, ApiError,
@@ -80,19 +80,25 @@ async function loadInitialData({ force = false } = {}) {
     // Phase 3B: also fetches LAST season's leagueXg — purely so
     // calcHomeAwaySplit's rolling 38-game window has real matches before this
     // season has enough of its own (see VENUE_ROLLING_GAMES, config.js).
-    // Phase 4: fetches TWO seasons further back again, purely to deepen
-    // calcFixtureHistory's cross-season H2H window (N_H2H=8, config.js).
+    // Phase 4: fetches UNDERSTAT_HISTORY_SEASONS further back again, purely to
+    // deepen the head-to-head record (engine/h2h.js, and through its shared
+    // collector calcFixtureHistory's cross-season window).
     // Each season gets its own allSettled slot: an outage on any one must not
     // block the others. Each slot is skipped (resolved with null, unused
     // below) when its own freshness flag says it's already loaded.
-    const [bootstrapRes, fixturesRes, leagueXgRes, leagueXgPrevRes, leagueXgPrev2Res, leagueXgPrev3Res] = await Promise.allSettled([
+    const settled = await Promise.allSettled([
       seasonFresh ? Promise.resolve(null) : fetchBootstrap(),
       seasonFresh ? Promise.resolve(null) : fetchFixtures(),
       xgFresh ? Promise.resolve(null) : fetchLeagueXg(UNDERSTAT_SEASON),
       xgFresh ? Promise.resolve(null) : fetchLeagueXg(UNDERSTAT_PREV_SEASON),
-      xgFresh ? Promise.resolve(null) : fetchLeagueXg(UNDERSTAT_PREV2_SEASON),
-      xgFresh ? Promise.resolve(null) : fetchLeagueXg(UNDERSTAT_PREV3_SEASON),
+      ...UNDERSTAT_HISTORY_SEASONS.map(
+        season => (xgFresh ? Promise.resolve(null) : fetchLeagueXg(season))),
     ]);
+
+    // The first four slots are fixed; everything after them is one history
+    // season each, in UNDERSTAT_HISTORY_SEASONS order.
+    const [bootstrapRes, fixturesRes, leagueXgRes, leagueXgPrevRes] = settled;
+    const historyResults = settled.slice(4);
 
     if (!seasonFresh) {
       if (bootstrapRes.status !== 'fulfilled') throw bootstrapRes.reason;
@@ -127,23 +133,19 @@ async function loadInitialData({ force = false } = {}) {
     }
 
     if (xgFresh) {
-      // Already loaded this JS lifetime — leave store.leagueXgPrev2 untouched.
-    } else if (leagueXgPrev2Res.status === 'fulfilled') {
-      store.setLeagueXgPrev2(leagueXgPrev2Res.value);
+      // Already loaded this JS lifetime — leave store.leagueXgHistory untouched.
     } else {
-      // Same non-fatal treatment — calcFixtureHistory falls back to fewer
-      // cross-season meetings (or this-season FPL fixtures) when unavailable.
-      console.warn('[Gaffer IQ] Understat two-seasons-ago xG unavailable — H2H uses a shorter window.',
-        leagueXgPrev2Res.reason?.message ?? leagueXgPrev2Res.reason);
-    }
-
-    if (xgFresh) {
-      // Already loaded this JS lifetime — leave store.leagueXgPrev3 untouched.
-    } else if (leagueXgPrev3Res.status === 'fulfilled') {
-      store.setLeagueXgPrev3(leagueXgPrev3Res.value);
-    } else {
-      console.warn('[Gaffer IQ] Understat three-seasons-ago xG unavailable — H2H uses a shorter window.',
-        leagueXgPrev3Res.reason?.message ?? leagueXgPrev3Res.reason);
+      // Same non-fatal treatment as the two above: a season that fails is left
+      // OUT of the list rather than stored as a hole, so the head-to-head record
+      // is simply one season shorter instead of breaking.
+      const loaded = [];
+      historyResults.forEach((res, i) => {
+        if (res.status === 'fulfilled') loaded.push(res.value);
+        else console.warn(
+          `[Gaffer IQ] Understat ${UNDERSTAT_HISTORY_SEASONS[i]} xG unavailable — the head-to-head record is one season shorter.`,
+          res.reason?.message ?? res.reason);
+      });
+      store.setLeagueXgHistory(loaded);
     }
 
     store.markDataReady();
@@ -336,8 +338,7 @@ window.__engine = {
       playerSummariesById: store.getAllPlayerSummaries(),
       leagueXg: store.getLeagueXg(),
       leagueXgPrev: store.getLeagueXgPrev(),
-      leagueXgPrev2: store.getLeagueXgPrev2(),
-      leagueXgPrev3: store.getLeagueXgPrev3(),
+      leagueXgHistory: store.getLeagueXgHistory(),
       teamXgBySlug: store.getAllTeamXg(),
       currentGw: gw ?? store.getCurrentGw() ?? store.getNextGw() ?? 1,
       ...opts,

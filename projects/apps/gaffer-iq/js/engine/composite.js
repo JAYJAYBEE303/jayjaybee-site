@@ -40,10 +40,9 @@ import {
  * @param {object} [opts.leagueXg]             Understat league/EPL payload, current season (Phase 3A); null when unavailable
  * @param {object} [opts.leagueXgPrev]         Understat league/EPL payload, LAST season (Phase 3B) — feeds only
  *   calcHomeAwaySplit's rolling window (engine/fixtures.js); null when unavailable
- * @param {object} [opts.leagueXgPrev2]        Understat league/EPL payload, TWO seasons ago (Phase 4) — feeds only
- *   calcFixtureHistory's cross-season H2H window (engine/fixtures.js); null when unavailable
- * @param {object} [opts.leagueXgPrev3]        Understat league/EPL payload, THREE seasons ago (Phase 4) — feeds only
- *   calcFixtureHistory's cross-season H2H window (engine/fixtures.js); null when unavailable
+ * @param {object[]} [opts.leagueXgHistory]    Understat league/EPL payloads for the seasons before those two
+ *   (UNDERSTAT_HISTORY_SEASONS, config.js), newest first — feeds only the cross-season head-to-head
+ *   window (engine/h2h.js); [] or absent when none loaded
  * @param {number} [opts.currentGw]            override; defaults to season.currentGw, then nextGw, then 1
  * @returns {object} ctx consumed by calcBase/HomeAway/Form/Style/Counter/FixtureHistory.
  *
@@ -56,8 +55,7 @@ import {
  *     leagueXg:                  object | null                   (passthrough — Phase 3A)
  *     leagueXgPrev:              object | null                   (passthrough — Phase 3B)
  *     rollingVenueStatsByTeamId: object                           (derived — Phase 3B, calcHomeAwaySplit input)
- *     leagueXgPrev2:             object | null                   (passthrough — Phase 4, calcFixtureHistory input)
- *     leagueXgPrev3:             object | null                   (passthrough — Phase 4, calcFixtureHistory input)
+ *     leagueXgHistory:           object[]                        (passthrough — Phase 4, cross-season H2H input)
  *     currentGw:                 number
  *     leagueAvgStrength:         number  (mean of team.strength.overall across the league)
  */
@@ -116,12 +114,10 @@ export function buildScoreContext(season, opts = {}) {
   const rollingVenueStatsByTeamId =
     buildRollingVenueStatsByTeamId(leagueXg, leagueXgPrev, season.teamsById);
 
-  // Phase 4: two/three-seasons-ago Understat payloads — passthrough only,
-  // read exclusively by calcFixtureHistory's cross-season H2H window
-  // (N_H2H=8, config.js) alongside leagueXg/leagueXgPrev above. Nothing else
-  // touches these.
-  const leagueXgPrev2 = opts.leagueXgPrev2 ?? null;
-  const leagueXgPrev3 = opts.leagueXgPrev3 ?? null;
+  // Phase 4: the older Understat payloads — passthrough only, read exclusively
+  // by the cross-season head-to-head collector (engine/h2h.js) alongside
+  // leagueXg/leagueXgPrev above. Nothing else touches these.
+  const leagueXgHistory = opts.leagueXgHistory ?? [];
 
   return {
     teamsById:           season.teamsById,
@@ -141,9 +137,8 @@ export function buildScoreContext(season, opts = {}) {
     // (engine/fixtures.js) and FEATURE_ENGINE.md §3.1.
     leagueXgPrev,
     rollingVenueStatsByTeamId,
-    // Phase 4 — two/three-seasons-ago Understat payloads, see above and §4.
-    leagueXgPrev2,
-    leagueXgPrev3,
+    // Phase 4 — the older Understat payloads, see above and §4.
+    leagueXgHistory,
     currentGw:           opts.currentGw ?? season.currentGw ?? season.nextGw ?? 1,
     leagueAvgStrength,
   };
