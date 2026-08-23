@@ -376,7 +376,7 @@ function sideHtml(team, side, outcome) {
   return `
     <span class="fx-side fx-side--${side}">
       ${crest(team)}
-      <span class="fx-side__name" title="${esc(team?.name ?? '')}">${esc(team?.shortName ?? '???')}</span>
+      <span class="fx-side__name" title="${esc(team?.name ?? '')}">${esc(team?.name ?? '???')}</span>
       ${box}
     </span>`;
 }

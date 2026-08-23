@@ -3827,9 +3827,18 @@
 /* The away side mirrors so both team names sit against the centre score. */
 .fx-side--away { flex-direction: row-reverse; }
 
+/* Full club name, not the abbreviation. The crest and result box either side
+   both set flex-shrink: 0, so this is the only part of a side that can give
+   way — it ellipsizes rather than pushing the scoreline off centre. The title
+   attribute carries the untruncated name for the narrow widths where that
+   actually bites (longest in the league is "Nottingham Forest"). */
 .fx-side__name {
   font-size: var(--font-size-sm);
   font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Crest slot — an empty ring until real badges land. */
