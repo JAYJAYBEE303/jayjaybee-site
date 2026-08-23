@@ -43,11 +43,13 @@ const state = {
   // never mirrored to sessionStorage: the endpoint is explicitly no-store
   // (see the allowlist in api/fpl.js) because a live GW changes by the minute.
   live: {},
-  // Fixtures tab — parsed Understat match timelines keyed by FIXTURE id (not
-  // by Understat match id, so the consumer never has to re-derive the mapping).
-  // Memory-only, like `live`: a finished match never changes, so there is
-  // nothing to gain from persisting it across a session.
-  timelines: {},
+  // Fixtures tab — Understat match detail keyed by FIXTURE id (not by Understat
+  // match id, so the consumer never has to re-derive the mapping). Each entry
+  // is { events, lineups }: the chronological feed and both teams' teamsheets,
+  // which arrive together from the same pair of upstream calls. Memory-only,
+  // like `live`: a finished match never changes, so there is nothing to gain
+  // from persisting it across a session.
+  matchDetail: {},
   activeHorizon: 'GW1',
   // The user's squad: an ordered array of player IDs (max 15), shared by every
   // module that reads/edits it (Dashboard, Planner). Previously each module
@@ -103,7 +105,7 @@ function getLeagueXgPrev2()           { return state.leagueXgPrev2; }
 function getLeagueXgPrev3()           { return state.leagueXgPrev3; }
 function getTeamXg(teamSlug)          { return state.teamXg[teamSlug] ?? null; }
 function getLive(gw)                  { return state.live[gw] ?? null; }
-function getTimeline(fixtureId)       { return state.timelines[fixtureId] ?? null; }
+function getMatchDetail(fixtureId)    { return state.matchDetail[fixtureId] ?? null; }
 function getAllTeamXg()               { return { ...state.teamXg }; }
 function getActiveHorizon()           { return state.activeHorizon; }
 function getSquad()                   { return state.squad; }
@@ -161,13 +163,15 @@ function setLive(gw, data) {
 }
 
 /**
- * Cache one fixture's parsed match timeline.
+ * Cache one fixture's Understat match detail. Events and lineups land together,
+ * so they are stored together and announced once — two emits would mean two
+ * full re-renders of the same pane for one logical arrival.
  * @param {number} fixtureId
- * @param {object[]} events  from api.js parseMatchTimeline() + attachAssists()
+ * @param {{events: object[], lineups: object|null}} detail
  */
-function setTimeline(fixtureId, events) {
-  state.timelines[fixtureId] = events;
-  emit('timeline:updated', fixtureId);
+function setMatchDetail(fixtureId, detail) {
+  state.matchDetail[fixtureId] = detail;
+  emit('match:updated', fixtureId);
 }
 
 function setActiveHorizon(key) {
@@ -204,7 +208,7 @@ function setError(err) {
   state.leagueXgPrev2 = null;
   state.leagueXgPrev3 = null;
   state.live = {};
-  state.timelines = {};
+  state.matchDetail = {};
   state.lastRefreshAt = null;
   try { sessionStorage.removeItem(SS_KEY_SEASON); } catch { /* non-fatal */ }
   state.lastError = err;
@@ -224,7 +228,7 @@ function clearCache() {
   state.leagueXgPrev3 = null;
   state.teamXg = {};
   state.live = {};
-  state.timelines = {};
+  state.matchDetail = {};
   state.lastRefreshAt = null;
   state.lastError = null;
   try { sessionStorage.removeItem(SS_KEY_SEASON); } catch { /* non-fatal */ }
@@ -264,10 +268,10 @@ export const store = {
   getFixtures, getFixture, getPositions, getEvents,
   getCurrentGw, getNextGw, getPlayerSummary, getAllPlayerSummaries,
   getLeagueXg, getLeagueXgPrev, getLeagueXgPrev2, getLeagueXgPrev3, getTeamXg, getAllTeamXg,
-  getLive, getTimeline,
+  getLive, getMatchDetail,
   getActiveHorizon, getSquad, getError, getLastRefreshAt, isFresh,
   setSeason, setPlayerSummary, setLeagueXg, setLeagueXgPrev, setLeagueXgPrev2, setLeagueXgPrev3, setTeamXg,
-  setLive, setTimeline,
+  setLive, setMatchDetail,
   setActiveHorizon, setSquad, setError, markDataReady,
   clearCache,
 };

@@ -7,6 +7,10 @@
  * names (element_type, team_h_difficulty, web_name, etc.). Everything
  * downstream speaks the internal model. A schema drift upstream breaks
  * exactly one file: this one.
+ *
+ * The same rule now covers one non-FPL payload: normaliseMatchLineups() at
+ * the foot of this file reads Understat's match rosters, which are the only
+ * source of a real teamsheet anywhere in the stack.
  */
 
 import {
@@ -390,4 +394,124 @@ export function normaliseSeason(rawBootstrap, rawFixtures) {
     positions, events,
     currentGw, nextGw,
   };
+}
+
+// ─── Understat match lineups ─────────────────────────────────────────────────
+// The one place in this file that speaks a NON-FPL raw payload. It lives here
+// for the same reason the rest does: a schema drift upstream should break
+// exactly one file. FPL publishes no teamsheet at all — no XI, no bench, no
+// formation — so this is the only route to a real lineup.
+
+/**
+ * Understat position codes, grouped into the lines a formation is written in.
+ * Order matters: it is the order the numbers appear in "4-2-3-1".
+ *
+ * The prefixes are easy to misread — DMC is a defensive MIDFIELDER, not a
+ * defender, so a naive "starts with D" test puts it in the back line and
+ * turns 4-2-3-1 into 6-3-1.
+ */
+const FORMATION_LINES = [
+  ['DR', 'DC', 'DL'],                 // defenders
+  ['DMC', 'DML', 'DMR'],              // defensive midfield
+  ['MC', 'ML', 'MR'],                 // midfield
+  ['AMC', 'AML', 'AMR'],              // attacking midfield
+  ['FW', 'FWL', 'FWR'],               // forwards
+];
+
+const GK_CODE  = 'GK';
+const SUB_CODE = 'Sub';
+
+/** Understat serves every numeric as a string; treat a missing value as 0. */
+function num(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/**
+ * Write the outfield shape as a formation string, e.g. '4-2-3-1'.
+ * Empty lines are dropped, so a side with no attacking midfielders reads
+ * 4-4-2 rather than 4-4-0-2.
+ * @param {object[]} starters
+ * @returns {string|null}  null when the shape can't be read
+ */
+function formationOf(starters) {
+  const counts = FORMATION_LINES.map(
+    codes => starters.filter(p => codes.includes(p.position)).length);
+  const shape = counts.filter(n => n > 0);
+  return shape.length ? shape.join('-') : null;
+}
+
+/**
+ * Normalise one side's roster.
+ * @param {object} roster  rosters.h or rosters.a — keyed by roster id
+ * @returns {{formation: string|null, starters: object[], subs: object[]}}
+ */
+function normaliseSide(roster) {
+  const byId = new Map(Object.entries(roster ?? {}));
+
+  const players = [...byId.values()].map(r => ({
+    rosterId:      String(r.id),
+    name:          r.player,
+    position:      r.position,
+    positionOrder: num(r.positionOrder),
+    minutes:       num(r.time),
+    goals:         num(r.goals),
+    ownGoals:      num(r.own_goals),
+    assists:       num(r.assists),
+    yellow:        num(r.yellow_card) > 0,
+    red:           num(r.red_card) > 0,
+    // roster_in points at the player who replaced them; roster_out at the
+    // player they replaced. Either is '0' when it doesn't apply.
+    cameOnForId:   num(r.roster_out) ? String(r.roster_out) : null,
+    replacedById:  num(r.roster_in) ? String(r.roster_in) : null,
+    replacedBy:    null,
+    cameOnFor:     null,
+    onAt:          null,
+  }));
+
+  const byRosterId = new Map(players.map(p => [p.rosterId, p]));
+
+  for (const p of players) {
+    if (p.replacedById) p.replacedBy = byRosterId.get(p.replacedById)?.name ?? null;
+    if (p.cameOnForId) {
+      const replaced = byRosterId.get(p.cameOnForId);
+      p.cameOnFor = replaced?.name ?? null;
+      // The minute a substitute came on is exactly the minutes the player he
+      // replaced had been on for — no arithmetic against a match length that
+      // stoppage time makes unreliable.
+      p.onAt = replaced ? replaced.minutes : null;
+    }
+  }
+
+  const starters = players
+    .filter(p => p.position !== SUB_CODE)
+    .sort((a, b) => a.positionOrder - b.positionOrder || a.name.localeCompare(b.name));
+
+  const subs = players
+    .filter(p => p.position === SUB_CODE)
+    .sort((a, b) => (a.onAt ?? 999) - (b.onAt ?? 999) || a.name.localeCompare(b.name));
+
+  return { formation: formationOf(starters), starters, subs };
+}
+
+/**
+ * Build both teams' lineups from an Understat match payload.
+ *
+ * NOTE ON "BENCH": Understat lists only players who actually appeared, so
+ * `subs` is the players who CAME ON, not a full bench — unused substitutes are
+ * absent from the feed entirely. The UI labels it accordingly rather than
+ * implying a complete teamsheet.
+ *
+ * @param {object} matchData  from api.js fetchMatchData() — needs `rosters`
+ * @returns {{home: object, away: object}|null}  null when there is no roster
+ */
+export function normaliseMatchLineups(matchData) {
+  const rosters = matchData?.rosters;
+  if (!rosters?.h || !rosters?.a) return null;
+
+  const home = normaliseSide(rosters.h);
+  const away = normaliseSide(rosters.a);
+  if (!home.starters.length && !away.starters.length) return null;
+
+  return { home, away };
 }

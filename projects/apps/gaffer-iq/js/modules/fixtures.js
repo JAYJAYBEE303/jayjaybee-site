@@ -23,10 +23,13 @@
  * assister. Both are fetched lazily when a fixture is opened, and the feed
  * degrades to the FPL grouping if either is unavailable.
  *
- * Still not available anywhere: a teamsheet. "Who featured" lists players with
- * minutes from FPL, not a starting XI, bench and formation.
+ * The teamsheet comes from the same place: Understat's match rosters carry
+ * position and substitution linkage, so the panel shows a real starting XI
+ * with a derived formation. FPL has no teamsheet at all. Understat lists only
+ * players who APPEARED, so the second list is the substitutes used, never a
+ * full bench — unused subs exist in neither feed.
  *
- * Subscriptions: data:ready, live:updated, timeline:updated
+ * Subscriptions: data:ready, live:updated, match:updated
  */
 
 import { store } from '../store.js';
@@ -34,6 +37,7 @@ import { LEAGUE_FORM_WINDOW } from '../config.js';
 import { fetchLivePoints, fetchMatchTimeline, fetchMatchData, attachAssists } from '../api.js';
 import { calcLeagueTable, attachNextFixtures, addMovement } from '../engine/standings.js';
 import { findUnderstatMatchId } from '../engine/channel.js';
+import { normaliseMatchLineups } from '../engine/normalise.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -433,9 +437,8 @@ function timelineEventHtml(ev) {
  * showing an empty block.
  */
 function timelineHtml(fixture) {
-  const events = store.getTimeline(fixture.id);
-  if (!events) return null;
-  if (!events.length) return null;
+  const events = store.getMatchDetail(fixture.id)?.events;
+  if (!events?.length) return null;
 
   return `
     <section class="fx-detail__block">
@@ -445,6 +448,81 @@ function timelineHtml(fixture) {
         In order of minute, home (H) and away (A) marked at the right.
         Timings and goal/assist pairings come from Understat — FPL publishes
         neither.
+      </p>
+    </section>`;
+}
+
+/**
+ * Per-player marks on a lineup row: what he did, in the order a matchday
+ * programme would list it. Repeats collapse to a count (a brace reads
+ * "GOAL x2" rather than two identical badges).
+ */
+function lineupMarksHtml(p) {
+  const marks = [];
+  if (p.goals)    marks.push({ cls: 'goal',   glyph: '\u26bd', n: p.goals,    label: 'Goal' });
+  if (p.ownGoals) marks.push({ cls: 'own',    glyph: '\u26bd', n: p.ownGoals, label: 'Own goal' });
+  if (p.assists)  marks.push({ cls: 'assist', glyph: '\u24b6', n: p.assists,  label: 'Assist' });
+  if (p.yellow)   marks.push({ cls: 'yellow', glyph: '\u{1f7e8}', n: 1, label: 'Yellow card' });
+  if (p.red)      marks.push({ cls: 'red',    glyph: '\u{1f7e5}', n: 1, label: 'Red card' });
+
+  return marks.map(m =>
+    `<span class="fx-xi__mark fx-xi__mark--${m.cls}" title="${esc(m.label)}">${m.glyph}${
+      m.n > 1 ? `<span class="fx-xi__markn">${m.n}</span>` : ''}</span>`).join('');
+}
+
+/** One player row in the XI or the substitutes list. */
+function lineupRowHtml(p, isSub) {
+  // A starter who was replaced, and a substitute who came on, each carry the
+  // minute it happened — the same number, read from opposite ends.
+  const swap = isSub
+    ? (p.cameOnFor ? `<span class="fx-xi__swap fx-xi__swap--on">${p.onAt}' for ${esc(p.cameOnFor)}</span>` : '')
+    : (p.replacedBy ? `<span class="fx-xi__swap fx-xi__swap--off">${p.minutes}' \u2192 ${esc(p.replacedBy)}</span>` : '');
+
+  return `
+    <li class="fx-xi__row">
+      <span class="fx-xi__pos">${esc(isSub ? 'SUB' : p.position)}</span>
+      <span class="fx-xi__name">${esc(p.name)}</span>
+      <span class="fx-xi__marks">${lineupMarksHtml(p)}</span>
+      ${swap}
+      <span class="fx-xi__mins">${p.minutes}'</span>
+    </li>`;
+}
+
+/** One team's teamsheet: formation, starting XI, then the substitutes used. */
+function lineupColumnHtml(side, team) {
+  return `
+    <div class="fx-xi">
+      <p class="fx-xi__head">
+        <span class="fx-xi__team">${esc(team?.shortName ?? '')}</span>
+        ${side.formation ? `<span class="fx-xi__formation">${esc(side.formation)}</span>` : ''}
+      </p>
+      <ol class="fx-xi__list">${side.starters.map(p => lineupRowHtml(p, false)).join('')}</ol>
+      ${side.subs.length ? `
+        <p class="fx-xi__subhead">Substitutes used</p>
+        <ul class="fx-xi__list fx-xi__list--subs">${side.subs.map(p => lineupRowHtml(p, true)).join('')}</ul>`
+        : ''}
+    </div>`;
+}
+
+/**
+ * The teamsheet block, when Understat has rosters for this match. Returns null
+ * otherwise so the caller falls back to FPL's appearance list.
+ */
+function lineupsHtml(fixture, home, away) {
+  const lineups = store.getMatchDetail(fixture.id)?.lineups;
+  if (!lineups?.home?.starters?.length || !lineups?.away?.starters?.length) return null;
+
+  return `
+    <section class="fx-detail__block">
+      <h4 class="fx-detail__title">Lineups</h4>
+      <div class="fx-detail__cols">
+        ${lineupColumnHtml(lineups.home, home)}
+        ${lineupColumnHtml(lineups.away, away)}
+      </div>
+      <p class="fx-detail__note">
+        Starting XI in position order, with the formation derived from those
+        positions. Understat lists only players who appeared, so the second
+        list is the substitutes USED — unused subs are published nowhere.
       </p>
     </section>`;
 }
@@ -501,6 +579,7 @@ function fixtureDetailHtml(fixture, home, away) {
 
       ${eventsBlock}
 
+      ${lineupsHtml(fixture, home, away) ?? `
       <section class="fx-detail__block">
         <h4 class="fx-detail__title">Who featured</h4>
         <div class="fx-detail__cols">
@@ -508,11 +587,11 @@ function fixtureDetailHtml(fixture, home, away) {
           ${featuredHtml(featured.away, away)}
         </div>
         <p class="fx-detail__note">
-          Every player with minutes, longest first within each position. FPL
-          publishes no teamsheet, so starting XI, bench and formation are not
-          available to show.
+          Every player with minutes, longest first within each position \u2014 FPL
+          publishes no teamsheet. The real XI comes from Understat and is not
+          available for this match.
         </p>
-      </section>
+      </section>`}
 
       <section class="fx-detail__block">
         <h4 class="fx-detail__title">Head-to-head</h4>
@@ -681,14 +760,14 @@ function ensureLive(gw) {
  * The page is the backbone and the JSON a pure enrichment, so a failure of the
  * second still yields a full timeline, just without assists.
  *
- * Fire-and-forget; the pane re-renders off 'timeline:updated'. Failures are
+ * Fire-and-forget; the pane re-renders off 'match:updated'. Failures are
  * swallowed to a console warning and a per-fixture flag, never
  * store.setError() — this is an ENRICHMENT of a feed that already renders from
  * FPL data. Same policy as the Understat fetches in main.js (CONVENTIONS.md §9).
  */
 function ensureTimeline(fixture) {
   if (!fixture || _timelineRequested.has(fixture.id) || _timelineFailed.has(fixture.id)) return;
-  if (store.getTimeline(fixture.id)) return;
+  if (store.getMatchDetail(fixture.id)) return;
 
   // The fixture→match mapping is derived from Understat's league payload, which
   // arrives asynchronously at boot. Opening a fixture before it lands is a
@@ -712,13 +791,20 @@ function ensureTimeline(fixture) {
   fetchMatchTimeline(matchId)
     .then(async (events) => {
       if (!events.length) { _timelineFailed.add(fixture.id); return; }
+
+      // One extra call gives BOTH the goal→assist pairing and the teamsheets.
+      // Optional: without it the feed still renders, just without assists and
+      // with the FPL appearance list in place of a lineup.
+      let lineups = null;
       try {
-        attachAssists(events, await fetchMatchData(matchId));
+        const matchData = await fetchMatchData(matchId);
+        attachAssists(events, matchData);
+        lineups = normaliseMatchLineups(matchData);
       } catch (err) {
-        // Assists are optional; the feed is still worth showing without them.
-        console.warn(`[fixtures] assists unavailable for match ${matchId}: ${err.message ?? err}`);
+        console.warn(`[fixtures] match data unavailable for match ${matchId}: ${err.message ?? err}`);
       }
-      store.setTimeline(fixture.id, events);
+
+      store.setMatchDetail(fixture.id, { events, lineups });
     })
     .catch((err) => {
       _timelineFailed.add(fixture.id);
@@ -1137,8 +1223,8 @@ function onLiveUpdated() {
   renderGameweekPane();
 }
 
-/** One fixture's Understat timeline landed. */
-function onTimelineUpdated() {
+/** One fixture's Understat match detail landed (events + lineups). */
+function onMatchUpdated() {
   renderGameweekPane();
 }
 
@@ -1164,7 +1250,7 @@ export function initFixtures() {
 
   store.subscribe('data:ready',   onDataReady);
   store.subscribe('live:updated', onLiveUpdated);
-  store.subscribe('timeline:updated', onTimelineUpdated);
+  store.subscribe('match:updated', onMatchUpdated);
 
   _root.querySelector('.fx-modes')?.addEventListener('click', onModeClick);
   _root.querySelector('.fx-controls')?.addEventListener('click', onGwStep);

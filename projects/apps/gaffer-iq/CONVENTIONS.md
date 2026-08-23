@@ -170,7 +170,7 @@ When code implements something specified in a doc, cite it: `// see FEATURE_ENGI
 ## 8. State, events & the store
 
 - The only mutable shared state lives in `store.js`. Modules never share state directly with each other; they communicate through `store` events.
-- Event names are `domain:verb`, lowercase, colon-separated: `data:ready`, `data:error`, `horizon:changed`, `player:selected`, `squad:updated`, `live:updated`.
+- Event names are `domain:verb`, lowercase, colon-separated: `data:ready`, `data:error`, `horizon:changed`, `player:selected`, `squad:updated`, `live:updated`, `match:updated`.
 - Subscriptions are set up in a module's init function and described in that module's header comment. Avoid anonymous long-lived subscriptions you can't find later.
 
 ---
