@@ -218,6 +218,21 @@ export const TEAM_NAME_ALIASES = {
   'rea': 'Reading',
 };
 
+// Display-name correction, applied to the CURRENT season's Team.name in
+// normaliseTeam (engine/normalise.js) — NOT a join key like the alias table
+// above, and deliberately not merged into it: TEAM_NAME_ALIASES exists so two
+// differently-abbreviated sources resolve to the same club, and every entry
+// there is compared post-normalisation (canonicalClubKey), so its spelling
+// never reaches the screen. This table is the opposite direction — it exists
+// purely because bootstrap-static's own `name` field is what every view
+// renders, and for Nottingham Forest that field is the abbreviation
+// "Nott'm Forest" rather than the club's actual name. Keyed by the raw FPL
+// name so a season where FPL itself starts writing it out drops the override
+// automatically rather than double-correcting it.
+export const TEAM_DISPLAY_NAME_OVERRIDES = {
+  "Nott'm Forest": 'Nottingham Forest',
+};
+
 // ─── §3  Home/away split performance ─────────────────────────────────────────
 
 // Weights for points-per-game and goal-difference in the venue score (sum to 1).

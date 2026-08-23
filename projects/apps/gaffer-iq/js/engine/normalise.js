@@ -15,6 +15,7 @@
 
 import {
   PL_SEASONS, PL_TENURE_LOOKBACK, TEAM_NAME_ALIASES, TENURE_RECENCY_DECAY,
+  TEAM_DISPLAY_NAME_OVERRIDES,
 } from '../config.js';
 
 // element_type id → internal position code. FPL uses 1=GKP, 2=DEF, 3=MID, 4=FWD.
@@ -147,7 +148,12 @@ export function buildPlTenure(name, shortName) {
 export function normaliseTeam(raw) {
   return {
     id: raw.id,
-    name: raw.name,
+    // FPL's own `name` is what every view renders, and it is not always the
+    // club's actual name — Nottingham Forest ships as the abbreviation
+    // "Nott'm Forest". TEAM_DISPLAY_NAME_OVERRIDES (config.js) corrects it
+    // here, at the one place raw FPL field names are allowed, so every
+    // downstream reader of team.name gets the fix for free.
+    name: TEAM_DISPLAY_NAME_OVERRIDES[raw.name] ?? raw.name,
     shortName: raw.short_name,
     // raw.code is a separate, stable per-club id (distinct from raw.id, which
     // is this season's fixture-list index) — it's what the official crest CDN
