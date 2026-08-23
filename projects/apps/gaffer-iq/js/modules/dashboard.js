@@ -173,7 +173,7 @@ function bandFromValue(v) {
 /**
  * scorePlayer's breakdown is { form, fixture, counter } (FEATURE_ENGINE.md §10)
  * — a different shape from scoreFixture's { baseDifficulty, counterMatchup,
- * teamForm, homeAway, styleClash, history } breakdown that matchup.js's
+ * teamForm, homeAway, history } breakdown that matchup.js's
  * buildBreakdownRows renders. Same visual pattern (bar + value + weight%),
  * different schema — so the row markup is duplicated here in miniature
  * rather than importing matchup.js's private (unexported) helper.

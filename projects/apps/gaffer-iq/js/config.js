@@ -28,17 +28,26 @@ export const W_OPP_DEFENCE = 0.5;
 export const OPP_STRENGTH_MIN = 1000;
 export const OPP_STRENGTH_MAX = 1400;
 
-// FDR fallback (bugfix, confirmed live 2026/27 preseason): FPL sometimes leaves
-// strength_attack_home/away and strength_defence_home/away at 0 for every team
-// — seen before FPL has calculated the granular attack/defence breakdown —
-// while strength_overall_home/away and the fixture's own FDR
-// (team_h_difficulty/team_a_difficulty) ARE already populated. A real strength
-// int never reads 0 (FPL's scale runs ~1000-1400), so calcBaseDifficulty
-// treats "both fields exactly 0" as "not yet published" and substitutes the
-// team's own FPL FDR for that fixture via this lookup instead of letting
-// normaliseLinear floor a missing input at 0 (which reads as "impossibly easy"
-// once inverted). Same direction as the granular calc: higher = HARDER.
-export const FDR_FALLBACK_VALUES = { 1: 10, 2: 30, 3: 50, 4: 70, 5: 90 };
+// FPL's own 1–5 fixture difficulty, mapped onto the engine's 0–100 scale.
+// Higher = HARDER, the same direction calcBaseDifficulty reports.
+//
+// This table used to be a FALLBACK, consulted only when FPL left the granular
+// strength_attack/defence fields at 0. It is now the definition: calcBaseDifficulty
+// reads nothing else. See FEATURE_ENGINE.md §2 for the reasoning — in short, a
+// metric labelled "Base FPL Difficulty" should BE FPL's difficulty, and a 2/5
+// fixture should read 30 on every card rather than a derived number that happens
+// to land near it.
+//
+// Evenly spaced on purpose: the midpoint of each fifth of the range (1 → 10,
+// 3 → 50, 5 → 90). The endpoints stop short of 0 and 100 because FPL's own scale
+// has no "impossible" or "free" fixture, and an inverted 0 would read as a
+// certainty the composite has no business expressing.
+export const FDR_DIFFICULTY_VALUES = { 1: 10, 2: 30, 3: 50, 4: 70, 5: 90 };
+
+// Where a fixture lands when FPL has published no FDR for it at all — neutral,
+// and NOT flagged estimated, because baseDifficulty being always-available is
+// what guarantees §8.3's confidence denominator is never zero.
+export const FDR_MISSING_VALUE = 50;
 
 // ─── §2.1  Premier League tenure (promoted-team awareness) ───────────────────
 
@@ -633,13 +642,42 @@ export const CHANNEL_PERSONNEL_MAX = 1.20;
 // the one weight that's never estimated (§8.3), so it's the safest place to
 // bank a cut from a metric that was reading noisier than the others wanted
 // it to be. Still sums to 1.00. See FEATURE_ENGINE.md §8.1.
+// MODEL: styleClash REMOVED and its 0.10 redistributed, together with 0.05 off
+// history. Three reasons it went, in order of weight:
+//   1. It substantially restated counterMatchup. Two of its three rules
+//      (directness × their press, territory × their compactness) describe the
+//      same interaction §7.2 already reads from real shot situations and
+//      locations, at double the weight. Two correlated weak predictors are
+//      worse than one — the shared noise gets counted twice while the
+//      dependable metrics are diluted.
+//   2. Season-aggregate style is not a stable team property. PPDA is a
+//      per-opponent game-plan decision, not a trait; averaging it across a
+//      season and applying it to one fixture assumes an exogeneity football
+//      does not have.
+//   3. Observed spread was ~45–55, so at 0.10 it moved the composite by ~±0.5
+//      points. Too small to change a decision, large enough to add noise when
+//      the mechanism reads a fixture wrong.
+// history 0.15→0.10: it is not opponent-quality-adjusted (unlike teamForm), so
+// a lopsided H2H record largely restates who has been the better side — which
+// baseDifficulty and teamForm already say from far larger samples. Its earlier
+// raise to 0.15 reasoned from better DATA (cross-season Understat) to a bigger
+// EFFECT; better data narrows the error bars on a near-zero signal, it does not
+// enlarge it. Kept non-zero: it is the one cheap pairing-specific read.
+// The freed 0.15 split evenly three ways — counterMatchup because it inherits
+// styleClash's job with better evidence and is what makes this score differ from
+// FPL's FDR at all; teamForm because it corrects baseDifficulty's preseason-seeded
+// priors in-season, so it captures what the biggest metric structurally cannot;
+// baseDifficulty because it is the only metric that is never estimated.
+// Still sums to 1.00. See FEATURE_ENGINE.md §6 and §8.1.
 export const WEIGHTS = {
-  baseDifficulty: 0.35,   // strength priors — always available, the dependable floor
-  counterMatchup: 0.20,   // attacking AND defending pairings blended (§7.2)
-  teamForm:       0.15,   // recent trajectory, opponent-quality adjusted
-  history:        0.15,   // H2H nudge — raised now that it draws on real cross-season data (§4)
+  baseDifficulty: 0.40,   // FPL's own 1–5 FDR — always available, the dependable floor
+  counterMatchup: 0.25,   // attacking AND defending pairings blended (§7.2)
+  teamForm:       0.20,   // recent trajectory, opponent-quality adjusted
+  history:        0.10,   // H2H nudge — small on purpose, see the note above
   homeAway:       0.05,   // venue performance this season
-  styleClash:     0.10,   // stylistic interaction — Understat xG-backed (Phase 3A)
+  // styleClash:  0.10,   // REMOVED — see reasons 1–3 above. engine/style.js and
+  //                      // its STYLE_RULES stay in the tree, unwired, so this is
+  //                      // one weight and a handful of call sites to restore.
 };
 
 // ─── §8.6  Stacking penalty (conditional interaction across sub-metrics) ─────

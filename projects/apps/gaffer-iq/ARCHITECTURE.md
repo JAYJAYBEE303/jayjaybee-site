@@ -150,7 +150,7 @@ gaffer-iq/                          (= projects/gaffer-iq/ in the repo)
     │   ├── standings.js        # League table + one team's season, from played fixtures.
     │   ├── h2h.js              # Head-to-head record between two clubs, across seasons.
     │   ├── form.js             # Team form & player form calculations.
-    │   ├── style.js            # Team style profiling + style clash score.
+    │   ├── style.js            # Team xG profiles (styleClash itself is unwired — FEATURE_ENGINE §8.1).
     │   ├── counter.js          # Position-based counter-matchup scoring.
     │   └── composite.js        # Combines all metrics → composite matchup score.
     │
@@ -301,13 +301,13 @@ This is the crux of why Gaffer IQ exists. The API gives raw facts; the value-add
 ### Calculated locally by Gaffer IQ (the engine)
 | Derived metric | Source inputs | Where |
 |---|---|---|
-| **Custom fixture difficulty** | team strengths, form, home/away split, opponent style | `engine/fixtures.js` + `composite.js` |
+| **Custom fixture difficulty** | FPL's own 1–5 FDR mapped to 0–100, then form, counter-matchup, H2H and venue layered on | `engine/fixtures.js` + `composite.js` |
 | **Home/away split performance** | per-fixture results & player histories filtered by venue | `engine/fixtures.js` |
 | **Fixture history (head-to-head)** | cross-season Understat fixture lists + this season's FPL results between the two clubs | `engine/h2h.js` → `engine/fixtures.js` |
 | **Head-to-head record** (tallies, venue split, run of form) | the same meeting list, kept whole rather than reduced to a score, capped at the `H2H_MEETING_WINDOW` most recent | `engine/h2h.js` |
 | **One team's season** (results, upcoming, home/away split) | `fixtures/` read from a single club's end | `engine/standings.js` |
 | **Team form** | recent results/points over a rolling window (not FPL's player `form` field) | `engine/form.js` |
-| **Team style profile + style clash score** | aggregated attacking/defensive tendencies (e.g. xG for/against, goals, clean sheets, possession proxies) | `engine/style.js` |
+| ~~**Team style clash score**~~ | REMOVED from the composite — it largely restated the counter-matchup, and season-average pressing is not a stable team property (FEATURE_ENGINE §8.1). The xG profiles in the same file are still used. | `engine/style.js` |
 | **Position counter-matchup score** | one team's attackers' form vs the opponent's defenders' form, by position pairing | `engine/counter.js` |
 | **Player form (custom)** | rolling per-90 output, minutes security, trend | `engine/form.js` |
 | **Composite matchup score** | weighted blend of all the above | `engine/composite.js` |
@@ -390,7 +390,7 @@ CompositeScore {
                          //   trustworthy as the less-certain of the two.
   breakdown: {           // each sub-metric's normalised contribution, for transparency.
                          //   Still this team's OWN read (unchanged by §8.7) — see note below.
-    baseDifficulty, homeAway, teamForm, styleClash, counterMatchup, history
+    baseDifficulty, homeAway, teamForm, counterMatchup, history
   },
   stacking: {            // conditional adjustment ACROSS sub-metrics — FEATURE_ENGINE.md §8.6
     linearValue,         //   the weighted sum BEFORE the penalty

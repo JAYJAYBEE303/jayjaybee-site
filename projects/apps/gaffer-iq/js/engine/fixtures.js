@@ -14,9 +14,10 @@
  */
 
 import {
-  W_OPP_ATTACK, W_OPP_DEFENCE, OPP_STRENGTH_MIN, OPP_STRENGTH_MAX,
-  FDR_FALLBACK_VALUES,
-  TENURE_MAX_PENALTY, TENURE_FLOOR, TENURE_CURVE,
+  FDR_DIFFICULTY_VALUES, FDR_MISSING_VALUE,
+  // Still imported for calcTenurePenalty, which stays exported on main.js's
+  // debug surface but no longer feeds any score — see calcBaseDifficulty.
+  TENURE_MAX_PENALTY, TENURE_CURVE,
   MIN_VENUE_GAMES, VENUE_ROLLING_GAMES, W_VENUE_EFFECT,
   N_H2H,
 } from '../config.js';
@@ -50,25 +51,50 @@ export function calcTenurePenalty(opponent) {
 }
 
 /**
- * Base fixture difficulty facing `team` — an absolute read of how strong
- * `opponent` is, tempered by how much top-flight history they actually have.
- * Always available — never estimated.
+ * Base fixture difficulty facing `team`: FPL's own 1–5 fixture difficulty for
+ * this fixture, mapped onto the engine's 0–100 scale via FDR_DIFFICULTY_VALUES
+ * (1→10, 2→30, 3→50, 4→70, 5→90). Always available — never estimated.
  *
- * A strong club posts the same high number in whoever's box it appears in:
- * Man City are a hard fixture for Wolves and for Arsenal alike. Two weak sides
- * meeting produces a low number on both sides of the tie.
+ * MODEL (revised): this is now a straight LOOKUP, not a derivation. It used to
+ * compute a strength read of its own — a weighted blend of the opponent's
+ * attack/defence ratings, normalised across a fixed 1000–1400 band, then
+ * reduced by a promoted-team tenure penalty — and consulted FPL's FDR only when
+ * those strength fields came back unpublished.
  *
- * @param {Team} team       team being scored (used only to resolve venue)
- * @param {Team} opponent   the side whose strength this measures
- * @param {boolean} isHome  true if `team` is the home side
- * @param {number} [fdrForTeam]  `team`'s own FPL FDR (1-5) for this fixture —
- *   fixture.fplDifficulty.home/away, picked by the caller per `isHome`. Only
- *   consulted when FPL's granular strength fields read as not-yet-published
- *   (see MODEL note below); optional so existing call sites without a fixture
- *   in scope keep working.
- * @returns {{value: number, estimated: boolean, rawStrength: number,
- *            strengthScore: number, tenurePenalty: number, tenureRatio: number,
- *            usedFdrFallback: boolean}}
+ * Two reasons it changed:
+ *
+ *   1. HONESTY. The row is labelled "Base FPL Difficulty" and sits on a card
+ *      that also prints the raw FDR. A 2/5 fixture reading 29 rather than 30
+ *      invited the reasonable question of what the number actually was, and the
+ *      honest answer — "FPL's rating, plus a strength blend, minus a tenure
+ *      curve, normalised against a hardcoded band" — is not what the label
+ *      promised. A fixed map means every 2/5 fixture reads 30 on every card.
+ *
+ *   2. THE DERIVATION ADDED LESS THAN IT LOOKED. Its inputs were FPL's own
+ *      strength_attack/defence fields, which are seeded preseason and move
+ *      slowly, so it was largely a re-expression of the same club prior FDR
+ *      already encodes. What genuinely corrects a stale prior in-season is
+ *      teamForm, which is why that metric absorbed part of this one's freed
+ *      weight (see WEIGHTS, config.js).
+ *
+ * COST, stated plainly: the output is now five discrete values, so every 3/5
+ * fixture reads exactly 50 regardless of opponent, and the promoted-team tenure
+ * penalty no longer applies here. The second matters less than it sounds —
+ * FPL's FDR already rates promoted sides as easy fixtures, which is what the
+ * penalty existed to force. calcTenurePenalty is kept (exported, still on
+ * main.js's debug surface) but is no longer wired into any score.
+ *
+ * @param {Team} team       team being scored — unused, kept so the signature
+ *   still reads as "difficulty facing THIS team" and so restoring the strength
+ *   path is a one-function change.
+ * @param {Team} opponent   likewise unused; see above.
+ * @param {boolean} isHome  likewise unused: venue is already baked in, because
+ *   the caller picks fplDifficulty.home or .away per side.
+ * @param {number} [fdrForTeam]  `team`'s own FPL FDR (1–5) for this fixture —
+ *   fixture.fplDifficulty.home/away, picked by the caller per `isHome`. THE
+ *   input now; absent only if FPL has published no rating for the fixture.
+ * @returns {{value: number, estimated: boolean, fdr: number|null,
+ *            fdrMissing: boolean}}
  *   value: 0–100.
  *   Direction: **higher = HARDER for `team`** — the one metric in the engine
  *   stored inverted relative to FEATURE_ENGINE.md §1 rule 2, because the UI
@@ -76,49 +102,17 @@ export function calcTenurePenalty(opponent) {
  *   applies invert() before weighting it. See FEATURE_ENGINE.md §2.
  */
 export function calcBaseDifficulty(team, opponent, isHome, fdrForTeam) {
-  // MODEL: the opponent is read at the venue they will actually play at — an
-  // away side is measured on its away strengths. calcHomeAwaySplit then layers
-  // a separate, data-driven venue adjustment on top.
-  const oppThreat = isHome ? opponent.strength.attackAway  : opponent.strength.attackHome;
-  const oppResist = isHome ? opponent.strength.defenceAway : opponent.strength.defenceHome;
-
-  const rawStrength = (W_OPP_ATTACK * oppThreat) + (W_OPP_DEFENCE * oppResist);
-
-  // MODEL: FPL occasionally leaves the granular attack/defence breakdown at 0
-  // for every team (confirmed live on bootstrap-static during 2026/27
-  // preseason) while the fixture's own FDR is already published. A real
-  // strength int never reads 0 (FPL's scale runs ~1000-1400), so both fields
-  // being exactly 0 is a reliable "not yet published" signal, not a real
-  // reading — fall back to FDR_FALLBACK_VALUES rather than let
-  // normaliseLinear floor this at 0 (reads as "impossibly easy" once
-  // inverted in the composite). See config.js.
-  const strengthDataMissing = oppThreat === 0 && oppResist === 0;
-  const fdrFallback = FDR_FALLBACK_VALUES[fdrForTeam];
-  const usedFdrFallback = strengthDataMissing && fdrFallback !== undefined;
-
-  const strengthScore = usedFdrFallback
-    ? fdrFallback
-    : normaliseLinear(rawStrength, OPP_STRENGTH_MIN, OPP_STRENGTH_MAX);
-
-  // Tenure can only ever pull a reading DOWN. The outer min() is what stops the
-  // floor from lifting a club that FPL already rates below TENURE_FLOOR.
-  const tenurePenalty = calcTenurePenalty(opponent);
-  const value = tenurePenalty > 0
-    ? Math.min(strengthScore, Math.max(TENURE_FLOOR, strengthScore - tenurePenalty))
-    : strengthScore;
+  const mapped = FDR_DIFFICULTY_VALUES[fdrForTeam];
+  const fdrMissing = typeof mapped !== 'number';
 
   return {
-    value,
-    // A promoted side's low reading, and the FDR fallback above, are both
-    // known facts rather than data gaps — so this stays false and confidence
-    // is untouched. Only genuinely missing inputs set estimated
-    // (CONVENTIONS.md §9, FEATURE_ENGINE.md §8.3).
+    // A fixture FPL has not rated sits neutral rather than being flagged. This
+    // metric is the ONE the confidence denominator (§8.3) relies on always
+    // being present — letting it go estimated would let confidence reach 0.
+    value: fdrMissing ? FDR_MISSING_VALUE : mapped,
     estimated: false,
-    rawStrength,
-    strengthScore,
-    tenurePenalty,
-    tenureRatio: opponent?.plTenure?.ratio ?? 0,
-    usedFdrFallback,
+    fdr: fdrMissing ? null : fdrForTeam,
+    fdrMissing,
   };
 }
 

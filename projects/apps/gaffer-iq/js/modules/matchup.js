@@ -25,25 +25,27 @@ import { invert, clamp } from '../util.js';
 const METRIC_LABELS = {
   // Suffixed — the ONE row where a high number means a tougher opponent, not a
   // better fixture (see the label's title= tooltip and buildBreakdownRows()).
-  baseDifficulty: 'Base Difficulty (opponent strength)',
+  baseDifficulty: 'Base FPL Difficulty',
   counterMatchup: 'Counter-Matchup',
   teamForm:       'Team Form',
   homeAway:       'Home/Away Split',
-  styleClash:     'Style Clash',
   history:        'H2H History',
+  // styleClash:  'Style Clash',   // removed — see WEIGHTS in config.js.
+  //   METRIC_ORDER derives from these keys, so dropping the label drops the row.
 };
 
 // Tiebreak for metrics on equal weight (teamForm and history are both 0.15).
 // Read as "which is more worth reading first", and only ever consulted when
 // WEIGHTS cannot separate two rows.
 const METRIC_TIEBREAK = [
-  'baseDifficulty', 'counterMatchup', 'teamForm', 'history', 'styleClash', 'homeAway',
+  'baseDifficulty', 'counterMatchup', 'teamForm', 'history', 'homeAway',
 ];
 
 // Heaviest metric first. DERIVED from WEIGHTS rather than written out, so a
 // reweighting in config.js reorders the card automatically — the previous
 // hand-maintained list had already drifted (homeAway at 5% sat above styleClash
-// at 10%), which is exactly the failure this removes.
+// at 10%, back when that metric existed), which is exactly the failure this
+// removes.
 const METRIC_ORDER = Object.keys(METRIC_LABELS).sort((a, b) =>
   (WEIGHTS[b] - WEIGHTS[a])
   || (METRIC_TIEBREAK.indexOf(a) - METRIC_TIEBREAK.indexOf(b)));
@@ -850,8 +852,6 @@ function buildBreakdownRows(breakdown, venue) {
       ? ' title="Shows the OPPONENT\'s strength — a high number means a tougher opponent for this team. The bar colour reflects how good this fixture is for this team, same as every other row."'
       : key === 'counterMatchup'
       ? ` title="${esc(counterMatchupTooltip(m))}"`
-      : key === 'styleClash'
-      ? ` title="${esc(styleClashTooltip(m))}"`
       : key === 'homeAway'
       ? ` title="${esc(homeAwayTooltip(m, venue))}"`
       : '';
@@ -923,36 +923,40 @@ const STYLE_RULE_LABELS = {
   'territorialThreat|defensiveCompactness': 'territory vs their compactness',
 };
 
-/**
- * Tooltip for the Style Clash breakdown row. Names the rules that actually
- * moved the number and in which direction, so a user can tell a genuine
- * stylistic edge from a rounding artefact.
- *
- * @param {object} m  breakdown.styleClash
- * @returns {string}  plain text; the caller escapes it.
- */
-function styleClashTooltip(m) {
-  if (m.estimated) {
-    return 'Not enough style data for both teams — Understat pressing and '
-      + 'territory numbers are needed for this metric, so it sits at a neutral '
-      + '50 and does not affect the score.';
-  }
-
-  // Biggest movers first; anything under half a point is noise, not a story.
-  const movers = (m.terms || [])
-    .filter(t => Math.abs(t.contribution) >= 0.5)
-    .sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution))
-    .map(t => {
-      const label = STYLE_RULE_LABELS[`${t.axisA}|${t.axisB}`] || `${t.axisA} vs ${t.axisB}`;
-      return `${t.contribution > 0 ? '+' : '−'} ${label}`;
-    });
-
-  const head = 'How these two teams play against each other, scored so the '
-    + 'home and away numbers always total 100.';
-  return movers.length
-    ? `${head} Main factors for this team: ${movers.join(', ')}.`
-    : `${head} No strong stylistic pull either way in this fixture.`;
-}
+// styleClash was removed from WEIGHTS (see config.js), so this tooltip has no
+// row to attach to. Kept commented rather than deleted: restoring the metric
+// means uncommenting this, its METRIC_LABELS entry and the branch in
+// buildBreakdownRows.
+// /**
+//  * Tooltip for the Style Clash breakdown row. Names the rules that actually
+//  * moved the number and in which direction, so a user can tell a genuine
+//  * stylistic edge from a rounding artefact.
+//  *
+//  * @param {object} m  breakdown.styleClash
+//  * @returns {string}  plain text; the caller escapes it.
+//  */
+// function styleClashTooltip(m) {
+//   if (m.estimated) {
+//     return 'Not enough style data for both teams — Understat pressing and '
+//       + 'territory numbers are needed for this metric, so it sits at a neutral '
+//       + '50 and does not affect the score.';
+//   }
+//
+//   // Biggest movers first; anything under half a point is noise, not a story.
+//   const movers = (m.terms || [])
+//     .filter(t => Math.abs(t.contribution) >= 0.5)
+//     .sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution))
+//     .map(t => {
+//       const label = STYLE_RULE_LABELS[`${t.axisA}|${t.axisB}`] || `${t.axisA} vs ${t.axisB}`;
+//       return `${t.contribution > 0 ? '+' : '−'} ${label}`;
+//     });
+//
+//   const head = 'How these two teams play against each other, scored so the '
+//     + 'home and away numbers always total 100.';
+//   return movers.length
+//     ? `${head} Main factors for this team: ${movers.join(', ')}.`
+//     : `${head} No strong stylistic pull either way in this fixture.`;
+// }
 
 // ─── Build: counter-matchup pairings ─────────────────────────────────────────
 

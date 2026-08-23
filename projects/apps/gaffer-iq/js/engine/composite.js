@@ -23,7 +23,10 @@ import {
 import {
   calcTeamForm, calcPlayerForm, calcPlayingLikelihood, buildUnderstatPlayerLookup,
 } from './form.js';
-import { calcStyleClash, buildXgProfilesByTeamId } from './style.js';
+// calcStyleClash is no longer imported — styleClash was removed from WEIGHTS
+// (config.js explains why). buildXgProfilesByTeamId stays: the xG profiles it
+// builds are still consumed by engine/counter.js and displayed by the UI.
+import { buildXgProfilesByTeamId } from './style.js';
 import { buildUnderstatSlugsByTeamId, buildChannelProfilesByTeamId } from './channel.js';
 import {
   calcCounterMatchup, calcCounterMatchupMirrored, calcCombinedCounterMatchup,
@@ -172,7 +175,7 @@ function bandFromValue(value) {
 // not one of the things that can pile up against it. Kept here rather than in
 // config.js because it is structural (which metrics are secondary), not a
 // tunable — same call as ROLE_ATTACK_GROUPS in counter.js.
-const STACK_METRICS = ['counterMatchup', 'teamForm', 'history', 'homeAway', 'styleClash'];
+const STACK_METRICS = ['counterMatchup', 'teamForm', 'history', 'homeAway'];
 
 /**
  * How much of a sub-metric's weight it has actually earned, 0–1.
@@ -320,7 +323,7 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
   const attackingCounter = calcCounterMatchup(team, opponent, ctx);
   const defendingCounter = calcCounterMatchupMirrored(calcCounterMatchup(opponent, team, ctx));
   const counter = calcCombinedCounterMatchup(attackingCounter, defendingCounter);
-  const style   = calcStyleClash(team, opponent, ctx);
+  // const style = calcStyleClash(team, opponent, ctx);   // styleClash removed
   const history = calcFixtureHistory(team.id, opponentId, ctx);
 
   // MODEL: confidence = MATURITY-weighted share of usable sub-metrics.
@@ -335,15 +338,14 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
   const mForm    = metricMaturity(form);
   const mHistory = metricMaturity(history);
   const mVenue   = metricMaturity(venue);
-  const mStyle   = metricMaturity(style);
+  // const mStyle = metricMaturity(style);                // styleClash removed
 
   const confidence =
       WEIGHTS.baseDifficulty * mBase
     + WEIGHTS.counterMatchup * mCounter
     + WEIGHTS.teamForm       * mForm
     + WEIGHTS.history        * mHistory
-    + WEIGHTS.homeAway       * mVenue
-    + WEIGHTS.styleClash     * mStyle;
+    + WEIGHTS.homeAway       * mVenue;
 
   // Weighted blend — every sub-metric is already 0–100, higher = better for `team`.
   // WEIGHTS sums to 1.00 (config.js / FEATURE_ENGINE.md §8.1).
@@ -370,8 +372,7 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
     + term(WEIGHTS.counterMatchup, mCounter, counter.value)
     + term(WEIGHTS.teamForm,       mForm,    form.value)
     + term(WEIGHTS.history,        mHistory, history.value)
-    + term(WEIGHTS.homeAway,       mVenue,   venue.value)
-    + term(WEIGHTS.styleClash,     mStyle,   style.value);
+    + term(WEIGHTS.homeAway,       mVenue,   venue.value);
   const linearValue = confidence > 0 ? rawWeightedSum / confidence : 50;
 
   // §8.6 conditional term. Built from the same sub-metric shapes the breakdown
@@ -382,7 +383,6 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
     teamForm:       { value: form.value,    weight: WEIGHTS.teamForm,       estimated: form.estimated, maturity: mForm },
     history:        { value: history.value, weight: WEIGHTS.history,        estimated: history.estimated },
     homeAway:       { value: venue.value,   weight: WEIGHTS.homeAway,       estimated: venue.estimated },
-    styleClash:     { value: style.value,   weight: WEIGHTS.styleClash,     estimated: style.estimated },
   });
 
   const value = clamp(0, 100, linearValue - stack.penalty);
@@ -406,15 +406,13 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
     },
     breakdown: {
       baseDifficulty: {
-        // Reported as stored — the opponent's strength, higher = harder. The
-        // composite above consumes invert(base.value); the UI wants this one.
+        // Reported as stored — higher = harder. The composite above consumes
+        // invert(base.value); the UI wants this one.
         value:     base.value,
         weight:    WEIGHTS.baseDifficulty,
         estimated: base.estimated,
-        strengthScore: base.strengthScore,   // before any tenure deduction
-        tenurePenalty: base.tenurePenalty,   // points deducted for thin PL history
-        tenureRatio:   base.tenureRatio,     // 0–1, opponent's recency-weighted tenure
-        usedFdrFallback: base.usedFdrFallback, // true when FPL's own FDR substituted for unpublished strength data
+        fdr:        base.fdr,         // FPL's own 1–5 for this side, or null
+        fdrMissing: base.fdrMissing,  // true when FPL published no rating at all
       },
       counterMatchup: {
         value:     counter.value,
@@ -464,21 +462,9 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
         sign:              venue.ownSplit.sign,
         combinedMagnitude: venue.combinedMagnitude,
       },
-      styleClash: {
-        value:      style.value,
-        weight:     WEIGHTS.styleClash,
-        estimated:  style.estimated,
-        profileA:   style.profileA,
-        profileB:   style.profileB,
-        clashDelta: style.clashDelta,
-        // §6.2 mirroring inputs, so the UI can explain a style verdict rather
-        // than just print it (ARCHITECTURE.md §12 rule 6). opponentClashDelta
-        // is the same rule set run the other way; `edge` is their signed gap,
-        // which is what the displayed value is actually derived from.
-        opponentClashDelta: style.opponentClashDelta,
-        edge:               style.edge,
-        terms:              style.terms,
-      },
+      // styleClash: removed from the breakdown along with its weight. Restoring
+      // it means uncommenting the four sites above, this block, its WEIGHTS
+      // entry and its STACK_METRICS entry — engine/style.js itself is untouched.
     },
   };
 }
