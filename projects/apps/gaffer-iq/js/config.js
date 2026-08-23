@@ -269,11 +269,14 @@ export const W_VENUE_EFFECT = 0.5;
 //
 // This used to be a description of the data rather than a choice: with four
 // seasons loaded, two clubs meeting twice a season topped out at ~8 meetings
-// anyway, so N_H2H=8 never actually bound. The window is five seasons now
-// (widened so the Fixtures tab's head-to-head record has enough to read), which
-// makes 10 reachable and this a REAL cap — kept at 8 deliberately: the metric
-// is a recent-pattern nudge, and a meeting five years old is a different squad,
-// a different manager and often a different division.
+// anyway, so N_H2H=8 never actually bound. The fetch window is six seasons now
+// (deepened for the Fixtures tab's H2H view — H2H_MEETING_WINDOW), which puts
+// ~12 within reach and makes this a REAL cap.
+//
+// Kept at 8 deliberately, and deliberately NOT tied to H2H_MEETING_WINDOW: the
+// view is a record you read, this is a predictive nudge you weight. A meeting
+// five years old is a different squad, a different manager and often a
+// different division — worth showing, not worth scoring on.
 export const N_H2H = 8;
 
 // ─── §5  Team form ────────────────────────────────────────────────────────────
@@ -839,11 +842,13 @@ export const UNDERSTAT_PREV_SEASON  = '2025';  // last completed season (2025/26
 // fetch slot, store field and ctx entry downstream is driven by its length, so
 // widening or narrowing the window is this line and nothing else.
 //
-// Five seasons in total (the two above plus these three) is roughly a five-year
-// window. Four was not enough to be worth reading: clubs meet twice a season,
-// so a pairing capped at eight meetings, and any club promoted inside the
-// window had far fewer — often none.
-export const UNDERSTAT_HISTORY_SEASONS = ['2024', '2023', '2022'];
+// Depth is set by what H2H_MEETING_WINDOW needs, not by a round number of
+// years: clubs meet twice a season, so six seasons in total (the two above plus
+// these four) offers twelve meetings for an ever-present pairing — enough to
+// fill a ten-meeting window at any point in the season, including August when
+// the current season has contributed none yet. Five seasons would top out at
+// exactly ten and so fall short for most of the campaign.
+export const UNDERSTAT_HISTORY_SEASONS = ['2024', '2023', '2022', '2021'];
 // FPL team id -> Understat slug tables were removed here (Phase 3B): FPL's
 // numeric team.id is REASSIGNED every season as clubs are promoted/relegated
 // (see engine/normalise.js buildPlTenure's identical warning), so an id-keyed
@@ -943,8 +948,19 @@ export const UNDERSTAT_MATCH_DATE_TOLERANCE_DAYS = 5;
 // de-duplicate a meeting — no metric reads it.
 export const SEASON_BOUNDARY_MONTH = 6;
 
-// How many of the most recent meetings the head-to-head trend strip shows.
-// Six rather than LEAGUE_FORM_WINDOW's five: clubs meet twice a season, so six
-// is three seasons of history — a natural unit here, where five would cut a
-// season in half.
-export const H2H_TREND_WINDOW = 6;
+// How many of the most recent meetings the Head-to-head view covers — the
+// tallies, the venue split, the run of form and the table all describe exactly
+// this set, so every number on the pane is answering the same question.
+//
+// A COUNT rather than a time span, deliberately. "The last N seasons" reads as
+// a different amount of history for every pairing: two ever-present clubs get
+// twice as many meetings out of it as one that spent half the window promoted,
+// and the same pairing shrinks every August as the current season resets. Ten
+// meetings is ten meetings whoever is playing and whenever you look.
+//
+// Ten also happens to be what the fetched window can actually supply: clubs
+// meet twice a season and UNDERSTAT_HISTORY_SEASONS reaches back six seasons,
+// so an ever-present pairing has twelve to choose from at any point in the
+// season. A pairing with fewer has genuinely not met more often in this
+// division, and the view says so rather than quietly showing less.
+export const H2H_MEETING_WINDOW = 10;

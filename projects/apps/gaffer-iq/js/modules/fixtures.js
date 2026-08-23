@@ -40,12 +40,12 @@
  */
 
 import { store } from '../store.js';
-import { LEAGUE_FORM_WINDOW } from '../config.js';
+import { LEAGUE_FORM_WINDOW, H2H_MEETING_WINDOW } from '../config.js';
 import { fetchLivePoints, fetchMatchTimeline, fetchMatchData, attachAssists } from '../api.js';
 import {
   calcLeagueTable, attachNextFixtures, addMovement, buildTeamSchedule,
 } from '../engine/standings.js';
-import { buildH2hMeetings, summariseH2h } from '../engine/h2h.js';
+import { buildH2hMeetings, takeRecentMeetings, summariseH2h } from '../engine/h2h.js';
 import { findUnderstatMatchId } from '../engine/channel.js';
 import { normaliseMatchLineups } from '../engine/normalise.js';
 
@@ -608,7 +608,10 @@ function lineupsHtml(fixture, home, away) {
  * record is exactly what you want before a match, not only after it.
  */
 function h2hMiniHtml(fixture, home, away) {
-  const meetings = buildH2hMeetings(fixture.homeTeamId, fixture.awayTeamId, h2hCtx());
+  // Same window as the full pane — a peek that counted a different set of
+  // matches from the view it links to would be worse than no peek at all.
+  const meetings = takeRecentMeetings(
+    buildH2hMeetings(fixture.homeTeamId, fixture.awayTeamId, h2hCtx()));
   const record   = summariseH2h(meetings);
 
   const open = `<button class="fx-link-btn" type="button" data-fx-open-h2h
@@ -633,12 +636,12 @@ function h2hMiniHtml(fixture, home, away) {
         <span class="fx-h2h-mini__tally">${record.aWins}<em>${esc(home?.shortName ?? 'home')} wins</em></span>
         <span class="fx-h2h-mini__tally">${record.draws}<em>draws</em></span>
         <span class="fx-h2h-mini__tally">${record.bWins}<em>${esc(away?.shortName ?? 'away')} wins</em></span>
-        <span class="fx-h2h-mini__trend">Last ${record.trend.length} ${pips(record.trend)}</span>
+        <span class="fx-h2h-mini__trend">${pips(record.trend)}</span>
       </div>
       ${open}
       <p class="fx-detail__note">
-        ${record.played} ${record.played === 1 ? 'meeting' : 'meetings'} across
-        ${record.seasons} ${record.seasons === 1 ? 'season' : 'seasons'}; last met
+        Their last ${record.played} ${record.played === 1 ? 'meeting' : 'meetings'},
+        spanning ${record.seasons} ${record.seasons === 1 ? 'season' : 'seasons'}; last met
         ${esc(fmtDateLong(record.last.date))}. Pips read from
         ${esc(home?.shortName ?? 'the home team')}’s perspective, oldest first.
       </p>
@@ -1325,8 +1328,12 @@ function renderH2hPane() {
     return;
   }
 
-  const meetings = buildH2hMeetings(teamA.id, teamB.id, h2hCtx());
+  // The window is applied HERE, once: everything below — tiles, venue split,
+  // run of form, table — then describes the same set of matches.
+  const onRecord = buildH2hMeetings(teamA.id, teamB.id, h2hCtx());
+  const meetings = takeRecentMeetings(onRecord);
   const record   = summariseH2h(meetings);
+  const capped   = onRecord.length > meetings.length;
   const seasonsLoaded = loadedSeasonCount();
 
   if (!record.played) {
@@ -1341,8 +1348,10 @@ function renderH2hPane() {
   _panes.h2h.innerHTML = `
     ${h2hHeadHtml(`${teamA.name} vs ${teamB.name}`)}
     <p class="fx-pane__sub fx-pane__sub--standalone">
-      <span>${record.played} ${record.played === 1 ? 'meeting' : 'meetings'}</span>
-      <span>Across ${record.seasons} ${record.seasons === 1 ? 'season' : 'seasons'}</span>
+      <span>${capped
+        ? `Last ${record.played} of ${onRecord.length} meetings`
+        : `${record.played} ${record.played === 1 ? 'meeting' : 'meetings'} on record`}</span>
+      <span>Spanning ${record.seasons} ${record.seasons === 1 ? 'season' : 'seasons'}</span>
       <span>Last met ${esc(fmtDateLong(record.last.date))}</span>
     </p>
 
@@ -1370,8 +1379,7 @@ function renderH2hPane() {
     </div>
 
     <div class="fx-h2h-trend">
-      <span class="fx-h2h-trend__label">Last ${record.trend.length}
-        ${record.trend.length === 1 ? 'meeting' : 'meetings'}</span>
+      <span class="fx-h2h-trend__label">Run of results</span>
       ${pips(record.trend)}
       <span class="fx-h2h-trend__note">read from ${esc(teamA.name)}’s perspective, oldest first</span>
     </div>
@@ -1452,14 +1460,22 @@ function renderH2hPane() {
     </div>
 
     <p class="fx-detail__note">
-      Every league meeting in the ${seasonsLoaded} ${
-        seasonsLoaded === 1 ? 'season' : 'seasons'} loaded — Understat's
-      full-league fixture lists, merged with this season's FPL results. Each
-      pairing appears once per venue per season, so a match carried by both
-      feeds is counted once. Cups and play-offs are in neither feed, and any
-      season either club spent outside this division simply has no meeting to
-      show. Venue, form and the run are all read from ${esc(teamA.name)}’s
-      end; swap the two to mirror them.
+      ${capped
+        ? `Their ${H2H_MEETING_WINDOW} most recent league meetings; ${
+            onRecord.length - meetings.length} older ${
+            onRecord.length - meetings.length === 1 ? 'meeting is' : 'meetings are'} on record but not shown.`
+        : record.played === 1
+          ? `Their only league meeting on record — the search reaches back ${seasonsLoaded} ${
+              seasonsLoaded === 1 ? 'season' : 'seasons'}, and these two have not met more often in this division.`
+          : `All ${record.played} league meetings these two have on record — the search reaches back ${seasonsLoaded} ${
+              seasonsLoaded === 1 ? 'season' : 'seasons'}, and they have not met more often in this division.`}
+      The window is a fixed count of meetings rather than a fixed number of
+      seasons, so it means the same thing for every pairing and does not shrink
+      each August. Sourced from Understat's full-league fixture lists, merged
+      with this season's FPL results — each pairing appears once per venue per
+      season, so a match carried by both feeds is counted once. Cups and
+      play-offs are in neither feed. Venue, form and the run are all read from
+      ${esc(teamA.name)}’s end; swap the two to mirror them.
     </p>
   `;
 }

@@ -18,7 +18,7 @@
  */
 
 import {
-  SEASON_BOUNDARY_MONTH, H2H_TREND_WINDOW,
+  SEASON_BOUNDARY_MONTH, H2H_MEETING_WINDOW,
   POINTS_WIN, POINTS_DRAW, POINTS_LOSS,
 } from '../config.js';
 import { canonicalClubKey } from './normalise.js';
@@ -255,6 +255,23 @@ export function buildH2hMeetings(teamAId, teamBId, ctx) {
   return [...merged.values()].sort(byDateAscending);
 }
 
+/**
+ * The most recent `limit` meetings — the window the Head-to-head view works in.
+ *
+ * Applied ONCE, before summarising, so the tallies, the venue split, the run of
+ * form and the table all describe the same set. Summarising the full list and
+ * then showing a slice of it would put a table of ten rows under tiles counting
+ * fourteen matches, which is the sort of disagreement nobody can debug by
+ * looking at it.
+ *
+ * @param {Meeting[]} meetings  oldest → newest (buildH2hMeetings output)
+ * @param {number} [limit=H2H_MEETING_WINDOW]
+ * @returns {Meeting[]}  oldest → newest, at most `limit` long
+ */
+export function takeRecentMeetings(meetings, limit = H2H_MEETING_WINDOW) {
+  return limit > 0 ? meetings.slice(-limit) : meetings.slice();
+}
+
 // ─── Tallies ─────────────────────────────────────────────────────────────────
 
 /** A blank venue bucket, before any meeting has been folded in. */
@@ -270,12 +287,13 @@ function emptyVenue() {
  * alongside. Swapping the two teams mirrors the whole summary, which is
  * exactly what the pane's swap button does.
  *
- * @param {Meeting[]} meetings  output of buildH2hMeetings (oldest → newest)
- * @param {object} [opts]
- * @param {number} [opts.trendWindow=H2H_TREND_WINDOW]
+ * Summarises exactly what it is handed and applies no window of its own — pass
+ * it through takeRecentMeetings first if you want one.
+ *
+ * @param {Meeting[]} meetings  oldest → newest
  * @returns {object}  zeroed-out but structurally complete when there are none
  */
-export function summariseH2h(meetings, { trendWindow = H2H_TREND_WINDOW } = {}) {
+export function summariseH2h(meetings) {
   const summary = {
     played: meetings.length,
     aWins: 0, draws: 0, bWins: 0,
@@ -284,7 +302,7 @@ export function summariseH2h(meetings, { trendWindow = H2H_TREND_WINDOW } = {}) 
     pointsA: 0, pointsB: 0,
     seasons: 0,
     first: null, last: null,
-    trend: [],            // A's outcomes, oldest → newest, capped at trendWindow
+    trend: [],            // A's outcomes for these meetings, oldest → newest
     streak: null,         // {outcome, count} — A's current unbroken run
     biggestA: null,       // A's widest win; null if A has never won
     biggestB: null,       // B's widest win
@@ -332,7 +350,7 @@ export function summariseH2h(meetings, { trendWindow = H2H_TREND_WINDOW } = {}) 
   summary.first    = meetings[0];
   summary.last     = meetings[meetings.length - 1];
   summary.avgGoals = (summary.goalsA + summary.goalsB) / meetings.length;
-  summary.trend    = meetings.slice(-trendWindow).map(m => m.outcomeA);
+  summary.trend    = meetings.map(m => m.outcomeA);
 
   // The current run, counted backwards from the most recent meeting. Always at
   // least 1 — the latest result is itself a run of one.
