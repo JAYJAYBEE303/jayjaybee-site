@@ -30,6 +30,7 @@ import {
   calcCounterMatchup, calcIndividualDuels, duelsForPairing,
 } from './engine/counter.js';
 
+import { initLanding }      from './modules/landing.js';
 import { initMatchup }      from './modules/matchup.js';
 import { initFixtures }     from './modules/fixtures.js';
 import { initRanker }       from './modules/ranker.js';
@@ -324,10 +325,17 @@ horizonBtns.forEach(btn => {
 const moduleSections = document.querySelectorAll('.module-view');
 const navItems       = document.querySelectorAll('.module-nav__item');
 
+// The route a bare URL resolves to. 'landing', not 'matchup': /projects/apps/
+// gaffer-iq/ is the front page a visitor arrives on, and the modules hang off
+// it by hash (#matchup, #ranker, …) exactly as before. Changing this default is
+// the entire routing change the landing page needed — every existing deep link
+// still resolves to the module it always did.
+const DEFAULT_MODULE = 'landing';
+
 function routeToHash() {
-  // Strip the leading '#'; default to 'matchup' if hash is absent or unknown.
-  const hash   = window.location.hash.slice(1) || 'matchup';
-  const target = document.querySelector(`[data-module="${hash}"]`) ? hash : 'matchup';
+  // Strip the leading '#'; fall back to the default if hash is absent/unknown.
+  const hash   = window.location.hash.slice(1) || DEFAULT_MODULE;
+  const target = document.querySelector(`[data-module="${hash}"]`) ? hash : DEFAULT_MODULE;
 
   moduleSections.forEach(section => {
     section.classList.toggle('is-active', section.dataset.module === target);
@@ -358,6 +366,7 @@ routeToHash();
 
 // Modules register their store subscriptions here, before loadInitialData() is
 // called, so they are in place when data:ready fires.
+initLanding();
 initMatchup();
 initFixtures();
 initRanker();

@@ -104,6 +104,7 @@ jayjaybee-site/                   ← repo root (not Gaffer IQ's concern)
             │   ├── counter.js
             │   └── composite.js
             └── modules/
+                ├── landing.js
                 ├── matchup.js
                 ├── fixtures.js
                 ├── ranker.js
@@ -155,6 +156,9 @@ gaffer-iq/                          (= projects/gaffer-iq/ in the repo)
     │   └── composite.js        # Combines all metrics → composite matchup score.
     │
     └── modules/                # The feature views. These OWN the DOM; engine never does.
+        ├── landing.js          # Landing page — the front page at the bare URL.
+        │                       #   Presentational; owns the scroll-reveal system
+        │                       #   and the `is-landing` body class only.
         ├── matchup.js          # Matchup Analyser.
         ├── fixtures.js         # Fixtures: GW grid, league table, team schedule, H2H.
         ├── ranker.js           # Player Ranker.

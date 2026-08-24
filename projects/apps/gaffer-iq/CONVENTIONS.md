@@ -109,7 +109,8 @@ e.g. `<span class="score-pill score-pill--good">`. The band string in `Composite
 
 ### 5.3 Design tokens
 - All colours, spacing, radii, font sizes, and the five band colours are CSS custom properties declared in `:root` in `base.css`. Components reference `var(--…)` only. No raw hex or px-spacing literals in `components.css`/`layout.css` except inside `:root`.
-- Token naming: `--color-…`, `--space-…`, `--radius-…`, `--font-…`, `--band-…`. e.g. `--band-brutal`, `--space-2`, `--color-bg`.
+- Token naming: `--color-…`, `--space-…`, `--radius-…`, `--font-…`, `--band-…`, `--shadow-…`. e.g. `--band-brutal`, `--space-2`, `--color-bg`, `--shadow-float`.
+- `--shadow-…` was added with the landing page (`base.css`, "Elevation"). Two raw `box-shadow` recipes predate it inline in `components.css` (`.dash-search-results`, `.squad-import-panel`) and are deliberately left as-is — retrofitting them is a separate change needing its own visual review. New elevation goes through a token.
 - No inline styles in HTML and no `style.foo =` in JS except for genuinely dynamic values (e.g. a computed bar width). Toggle classes, don't write style strings.
 - `--band-…` also covers the one non-`BANDS` colour added for rank-relative player colouring (`--band-light-green` — see `FEATURE_ENGINE.md` §13): same naming convention, same `:root` location, even though it isn't one of the original five score bands. Extend this block for any future colour need before reaching for a raw hex anywhere else.
 
@@ -122,6 +123,7 @@ e.g. `<span class="score-pill score-pill--good">`. The band string in `Composite
 ## 6. HTML conventions
 
 - One `index.html`. Module views are sections within it, shown/hidden by the active route (URL hash). No per-module HTML files.
+- The landing page is one of those views (`data-module="landing"`), not a separate document. `main.js`'s `DEFAULT_MODULE` resolves a bare URL to it, so `/projects/apps/gaffer-iq/` is the front page while `#matchup`, `#ranker`, `#dashboard`, `#planner` and `#fixtures` all keep resolving exactly as before. It is the only view that hides the app chrome, via a `body.is-landing` class owned by `js/modules/landing.js` (see `layout.css`).
 - Semantic elements: `<nav>`, `<main>`, `<section>`, `<table>` for tabular data (the ranker is a real table — use `<table>`, not divs).
 - `data-*` attributes carry ids the JS needs: `data-player-id`, `data-fixture-id`, `data-module`. JS reads these rather than parsing text content.
 - Module root sections are identified by `data-module="ranker"` etc., and toggled by adding/removing an `is-active` class. JS finds them by `data-module`, not by brittle nth-child selectors.

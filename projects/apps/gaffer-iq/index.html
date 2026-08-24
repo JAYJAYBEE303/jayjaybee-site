@@ -16,10 +16,13 @@
   <div class="app-shell">
 
     <header class="app-nav">
-      <div class="app-nav__brand">
+      <!-- The brand is the only route back to the landing page from inside a
+           module — the landing carries no nav of its own by design. It was
+           already styled as a link (text-decoration, colour); now it is one. -->
+      <a class="app-nav__brand" href="#landing">
         <span class="app-nav__logo">⚡</span>
         <span class="app-nav__title">Gaffer IQ</span>
-      </div>
+      </a>
 
       <nav class="module-nav" aria-label="Module navigation">
         <a class="module-nav__item is-active" href="#matchup">Matchup</a>
@@ -43,7 +46,118 @@
         <button class="app-error-banner__retry" id="app-error-retry" type="button">Retry</button>
       </div>
 
-      <section class="module-view is-active" data-module="matchup" aria-label="Matchup Analyser">
+      <!-- LANDING — the front page at /projects/apps/gaffer-iq/ (js/modules/landing.js).
+           A module view like any other, so hash routing, deep links and the
+           render-when-visible contract are unchanged; main.js just defaults to
+           this one instead of matchup when there is no hash. Presentational:
+           every number below is a worked example, not live data. The only
+           value the module rewrites is the gameweek in the eyebrow. -->
+      <section class="module-view landing is-active" data-module="landing"
+               aria-label="Gaffer IQ">
+        <div class="landing__inner">
+
+          <div class="landing__backdrop" aria-hidden="true">
+            <div class="landing__glow"></div>
+            <div class="landing__grid"></div>
+          </div>
+
+          <div class="landing__intro">
+            <p class="landing__eyebrow landing-reveal">
+              <span class="landing__eyebrow-dot" aria-hidden="true"></span>
+              <span data-landing-gw>Live for the current gameweek</span>
+            </p>
+
+            <h1 class="landing__title landing-reveal">
+              Stop guessing your<br>fixtures.
+              <span class="landing__title-accent">Start scoring them.</span>
+            </h1>
+
+            <p class="landing__subhead landing-reveal">
+              Gaffer IQ replaces the official app's blunt 1–5 difficulty rating with a
+              composite, multi-factor matchup score — built from form, style clash, and
+              confidence, gameweek by gameweek.
+            </p>
+          </div>
+
+          <div class="landing__cluster landing-reveal">
+
+            <article class="landing-card landing-card--matchup">
+              <div class="landing-card__head">
+                <span class="landing-card__teams">
+                  Arsenal <span class="landing-card__vs">vs</span> Chelsea
+                </span>
+                <span class="landing-card__meta">GW14 · Away</span>
+              </div>
+              <div class="landing-card__body">
+                <div class="landing-pill landing-pill--brutal">
+                  <span class="landing-pill__value">12</span>
+                  <span class="landing-pill__band">Brutal</span>
+                </div>
+                <div class="landing-metrics">
+                  <div class="landing-metric">
+                    <span class="landing-metric__label">Away form</span>
+                    <span class="landing-metric__track">
+                      <span class="landing-metric__fill landing-metric__fill--28"></span>
+                    </span>
+                  </div>
+                  <div class="landing-metric">
+                    <span class="landing-metric__label">Style clash</span>
+                    <span class="landing-metric__track">
+                      <span class="landing-metric__fill landing-metric__fill--18"></span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </article>
+
+            <article class="landing-card landing-card--score">
+              <div class="landing-card__row">
+                <div class="landing-pill landing-pill--great">
+                  <span class="landing-pill__value">86</span>
+                </div>
+                <div>
+                  <div class="landing-card__name">Man City</div>
+                  <div class="landing-card__sub">vs Sheffield</div>
+                </div>
+              </div>
+            </article>
+
+            <article class="landing-card landing-card--player">
+              <div class="landing-card__split">
+                <span class="landing-card__name">Salah</span>
+                <span class="landing-chip landing-chip--good">68</span>
+              </div>
+              <div class="landing-progress">
+                <span class="landing-progress__fill landing-progress__fill--68"></span>
+              </div>
+            </article>
+
+            <article class="landing-card landing-card--estimated">
+              <div class="landing-card__row">
+                <span class="landing-chip landing-chip--estimated">~44</span>
+                <span class="landing-card__caption">estimated</span>
+              </div>
+            </article>
+
+            <article class="landing-card landing-card--position">
+              <span class="landing-chip landing-chip--mid">MID</span>
+              <div class="landing-card__meta-line">4-3-3 · 90'</div>
+            </article>
+
+            <!-- Two nested elements: the outer one centres, the inner one
+                 animates. A running CSS animation replaces the whole transform
+                 property, so a single element cannot do both. -->
+            <div class="landing__cta">
+              <div class="landing__cta-float">
+                <a class="landing__cta-btn" href="#matchup">Get started →</a>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      <section class="module-view" data-module="matchup" aria-label="Matchup Analyser">
         <div class="matchup-shell">
           <aside class="gw-nav" aria-label="Gameweek navigator"></aside>
           <div class="matchup-grid">

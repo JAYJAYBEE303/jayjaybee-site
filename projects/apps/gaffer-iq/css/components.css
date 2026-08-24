@@ -4951,3 +4951,575 @@ img.fx-crest {
 
   .fx-pane__head { flex-direction: column; align-items: flex-start; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LANDING — the front page at /projects/apps/gaffer-iq/
+   Hero-only composition: eyebrow → headline → subhead → a cluster of floating
+   sample cards with the primary CTA nested inside it. Presentational; the only
+   live value is the gameweek in the eyebrow (js/modules/landing.js).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Overrides .module-view.is-active's `display: block` (equal specificity, later
+   in the cascade — components.css loads after layout.css). The section is the
+   vertical centring context for the whole page. */
+.landing.is-active {
+  display: flex;
+  align-items: center;
+  min-height: 100vh;
+  /* The backdrop is deliberately wider than the content column (100vw) — clip
+     the overhang here rather than letting it scroll the document sideways.
+     `clip`, not `hidden`: hidden on one axis forces the other axis to compute
+     as `auto`, which would turn this section into its own scroll container and
+     put a second scrollbar inside the page once the content outgrows 100vh. */
+  overflow-x: clip;
+}
+
+.landing__inner {
+  position: relative;
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: var(--space-20) var(--space-10);
+}
+
+/* ─── Backdrop: pulsing accent glow + masked grid ────────────────────────── */
+
+/* Pulled up above the content column and stretched to the full viewport so the
+   glow reads as page-level lighting rather than a box behind the text. */
+.landing__backdrop {
+  position: absolute;
+  top: -160px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100vw;
+  height: max(900px, 80vh);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.landing__glow {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(1400px, 90vw);
+  height: min(900px, 80vh);
+  background: radial-gradient(ellipse at center,
+    color-mix(in srgb, var(--color-accent) 16%, transparent) 0%,
+    color-mix(in srgb, var(--color-accent)  5%, transparent) 45%,
+    transparent 70%);
+  animation: landing-pulse 6s ease-in-out infinite;
+}
+
+/* Faint engineering-grid texture. The white alphas here are raw rgba() with no
+   token behind them — same as the existing "provisional" hatch overlays, which
+   are the only other place the system tints with white rather than a palette
+   colour. */
+.landing__grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 64px 64px;
+  /* Fades the grid out before it reaches the edges, so it never reads as a
+     hard-edged panel. */
+  -webkit-mask-image: radial-gradient(ellipse min(700px, 45vw) min(400px, 40vh) at 50% 18%, black, transparent);
+  mask-image: radial-gradient(ellipse min(700px, 45vw) min(400px, 40vh) at 50% 18%, black, transparent);
+}
+
+/* ─── Intro: eyebrow, headline, subhead ──────────────────────────────────── */
+
+.landing__intro {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-6);
+}
+
+.landing__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
+
+.landing__eyebrow-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--band-good);
+  flex-shrink: 0;
+}
+
+.landing__title {
+  font-size: var(--font-size-hero);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.02;
+  max-width: 920px;
+}
+
+.landing__title-accent {
+  background: linear-gradient(90deg, var(--color-accent), var(--pos-mid));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.landing__subhead {
+  font-size: var(--font-size-lg);
+  color: var(--color-muted);
+  max-width: 620px;
+  line-height: 1.6;
+}
+
+/* ─── Floating card cluster ──────────────────────────────────────────────── */
+
+/* Fixed height because every child is absolutely positioned — the cluster has
+   no flow content of its own to size it. */
+.landing__cluster {
+  position: relative;
+  margin-top: var(--space-24);
+  height: 340px;
+}
+
+.landing-card {
+  position: absolute;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-float);
+}
+
+/* Centre card — a full matchup card in the brutal band, left-bordered by band
+   colour exactly as .matchup-card does. */
+.landing-card--matchup {
+  left: 50%;
+  top: 10px;
+  transform: translateX(-50%);
+  width: min(560px, 88vw);
+  padding: var(--space-7);
+  border-left: 3px solid var(--band-brutal);
+  box-shadow: var(--shadow-raised);
+  z-index: 3;
+}
+
+.landing-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-5);
+}
+
+.landing-card__teams {
+  font-weight: 700;
+  font-size: var(--font-size-md);
+  letter-spacing: -0.01em;
+}
+
+.landing-card__vs {
+  color: var(--color-muted);
+  font-weight: 400;
+}
+
+.landing-card__meta {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.landing-card__body {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+}
+
+/* Score pill — same {tint, border, text} trio as .score-pill, keyed off a band. */
+.landing-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+}
+
+.landing-pill--brutal {
+  background: var(--band-brutal-bg);
+  border-color: var(--band-brutal);
+  color: var(--band-brutal);
+  padding: var(--space-3) var(--space-5);
+  min-width: 76px;
+}
+
+.landing-pill--great {
+  background: var(--band-great-bg);
+  border-color: var(--band-great);
+  color: var(--band-great);
+  padding: var(--space-2) var(--space-3);
+  min-width: 52px;
+}
+
+.landing-pill__value {
+  font-size: var(--font-size-3xl);
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.landing-pill--great .landing-pill__value {
+  font-size: var(--font-size-xl);
+}
+
+.landing-pill__band {
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-top: var(--space-1);
+}
+
+/* Metric bars — the .bar-track / .bar-fill recipe at the matchup card's size. */
+.landing-metrics {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.landing-metric {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.landing-metric__label {
+  width: 76px;
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  flex-shrink: 0;
+}
+
+.landing-metric__track {
+  flex: 1;
+  height: 6px;
+  background: var(--color-surface-raised);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.landing-metric__fill {
+  height: 100%;
+  border-radius: var(--radius-sm);
+  background: var(--band-brutal);
+}
+
+/* Fixed widths, not computed ones — this card is a worked example, so the fill
+   percentages belong in CSS rather than as inline styles set by JS (the
+   exemption in CONVENTIONS.md §5.3 is for genuinely dynamic values). */
+.landing-metric__fill--28 { width: 28%; }
+.landing-metric__fill--18 { width: 18%; }
+
+/* ─── Satellite cards ────────────────────────────────────────────────────── */
+
+.landing-card--score {
+  left: calc(50% - 460px);
+  top: 60px;
+  width: 180px;
+  padding: var(--space-4);
+  animation: landing-float-1 5.5s ease-in-out infinite;
+  z-index: 2;
+}
+
+.landing-card--player {
+  right: calc(50% - 450px);
+  top: 110px;
+  width: 170px;
+  padding: var(--space-4);
+  animation: landing-float-2 6.5s ease-in-out infinite;
+  z-index: 2;
+}
+
+.landing-card--estimated {
+  left: calc(50% - 400px);
+  bottom: 0;
+  width: 150px;
+  padding: var(--space-3);
+  border-style: var(--estimated-border-style);
+  border-color: var(--band-tough);
+  box-shadow: var(--shadow-float-soft);
+  opacity: 0.92;
+  animation: landing-float-3 7s ease-in-out infinite;
+  z-index: 1;
+}
+
+.landing-card--position {
+  right: calc(50% - 410px);
+  bottom: 20px;
+  width: 150px;
+  padding: var(--space-3);
+  border-color: var(--pos-mid);
+  box-shadow: var(--shadow-float-soft);
+  /* Reversed so the cluster never drifts in sync — same keyframes as --score,
+     a different duration and direction. */
+  animation: landing-float-1 6s ease-in-out infinite reverse;
+  z-index: 1;
+}
+
+.landing-card__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.landing-card__name {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+}
+
+.landing-card__sub {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
+
+.landing-card__split {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-2);
+}
+
+/* Inline score chip — .score-chip's shape at badge size. */
+.landing-chip {
+  display: inline-flex;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+  font-size: var(--font-size-xs);
+}
+
+.landing-chip--good {
+  background: var(--band-good-bg);
+  color: var(--band-good);
+}
+
+/* Dashed + amber, matching how the app flags a score below the confidence
+   floor everywhere else. */
+.landing-chip--estimated {
+  border: 1px solid var(--band-tough);
+  border-style: var(--estimated-border-style);
+  color: var(--band-tough);
+}
+
+.landing-chip--mid {
+  background: color-mix(in srgb, var(--pos-mid) 12%, transparent);
+  color: var(--pos-mid);
+}
+
+.landing-card__caption {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
+
+.landing-card__meta-line {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  margin-top: var(--space-2);
+}
+
+/* Player progress bar — the planner's thin pill-radius variant. */
+.landing-progress {
+  height: 4px;
+  background: var(--color-border);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.landing-progress__fill {
+  height: 100%;
+  background: var(--color-accent);
+  border-radius: var(--radius-pill);
+}
+
+.landing-progress__fill--68 { width: 68%; }
+
+/* ─── CTA ────────────────────────────────────────────────────────────────── */
+
+/* TWO NESTED ELEMENTS ON PURPOSE. A CSS animation replaces the whole
+   `transform` property while it runs, so putting the float animation on the
+   same element as the centring translateX(-50%) drops the centring the moment
+   the animation starts. Outer element centres; inner element animates.
+   Do not merge these. */
+.landing__cta {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-10);
+  transform: translateX(-50%);
+  z-index: 4;
+}
+
+.landing__cta-float {
+  animation: landing-float-3 5.8s ease-in-out infinite;
+}
+
+/* Solid-fill primary action — the .squad-import-go recipe (opacity-only
+   hover/active, #fff label) at hero size. */
+.landing__cta-btn {
+  display: inline-block;
+  background: var(--color-accent);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: #fff;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  font-weight: 700;
+  padding: var(--space-3) var(--space-8);
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: var(--shadow-accent);
+  transition: opacity 0.15s;
+}
+
+.landing__cta-btn:hover  { opacity: 0.85; }
+.landing__cta-btn:active { opacity: 0.70; }
+
+/* ─── Scroll reveal ──────────────────────────────────────────────────────── */
+
+/* Applied to each top-level block. js/modules/landing.js adds .is-visible,
+   staggering the batch through --reveal-delay. */
+.landing-reveal {
+  opacity: 0;
+  transform: translateY(10px);
+  transition:
+    opacity   620ms cubic-bezier(.2, 0, 0, 1),
+    transform 620ms cubic-bezier(.2, 0, 0, 1);
+  transition-delay: var(--reveal-delay, 0ms);
+  will-change: opacity, transform;
+}
+
+.landing-reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* ─── Motion ─────────────────────────────────────────────────────────────── */
+
+@keyframes landing-pulse {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 0.90; }
+}
+
+@keyframes landing-float-1 {
+  0%, 100% { transform: translateY(0)     rotate(-2deg); }
+  50%      { transform: translateY(-14px) rotate(-1deg); }
+}
+
+@keyframes landing-float-2 {
+  0%, 100% { transform: translateY(0)     rotate(2deg); }
+  50%      { transform: translateY(-20px) rotate(3deg); }
+}
+
+@keyframes landing-float-3 {
+  0%, 100% { transform: translateY(0)     rotate(-1deg); }
+  50%      { transform: translateY(-10px) rotate(0deg); }
+}
+
+/* The reference only silenced the reveal transition. Everything decorative
+   goes quiet here: an infinite drift loop is exactly what this media query
+   exists to stop. The cards keep their resting rotation, so the composition
+   still reads as a scattered cluster rather than a flat stack. */
+@media (prefers-reduced-motion: reduce) {
+  .landing-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .landing__glow,
+  .landing__cta-float {
+    animation: none;
+  }
+
+  .landing-card--score     { animation: none; transform: rotate(-2deg); }
+  .landing-card--player    { animation: none; transform: rotate(2deg); }
+  .landing-card--estimated { animation: none; transform: rotate(-1deg); }
+  .landing-card--position  { animation: none; transform: rotate(-2deg); }
+}
+
+/* ─── Narrow viewports ───────────────────────────────────────────────────── */
+
+/* The satellite cards are positioned from the centre line at fixed pixel
+   offsets (±400–460px), so below roughly 1000px they slide off-canvas and get
+   clipped. Rather than let them half-disappear, drop them and let the matchup
+   card carry the composition on its own, with the CTA below it in flow. */
+@media (max-width: 1000px) {
+  .landing-card--score,
+  .landing-card--player,
+  .landing-card--estimated,
+  .landing-card--position {
+    display: none;
+  }
+
+  .landing__cluster {
+    height: auto;
+    margin-top: var(--space-10);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-8);
+  }
+
+  .landing-card--matchup {
+    position: static;
+    transform: none;
+    width: 100%;
+    max-width: 560px;
+  }
+
+  .landing__cta {
+    position: static;
+    transform: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .landing__inner {
+    padding: var(--space-10) var(--space-4);
+  }
+
+  .landing-card--matchup {
+    padding: var(--space-5);
+  }
+
+  /* Pill above the bars rather than beside them — at phone width the 76px
+     labels plus the pill leave the tracks too short to read. */
+  .landing-card__body {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-3);
+  }
+
+  .landing-pill--brutal {
+    flex-direction: row;
+    justify-content: center;
+    align-items: baseline;
+    gap: var(--space-2);
+  }
+
+  .landing-pill--brutal .landing-pill__band {
+    margin-top: 0;
+  }
+}

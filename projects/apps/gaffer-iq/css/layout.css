@@ -138,6 +138,55 @@
   display: block;
 }
 
+/* ─── Landing route ──────────────────────────────────────────────────────── */
+
+/* The landing page is a module view like any other (data-module="landing", see
+   CONVENTIONS.md §6) so hash routing, deep links and the render-when-visible
+   contract all keep working untouched. It just needs the app chrome out of the
+   way: it carries no nav of its own by design, and it is a full-bleed,
+   viewport-height composition rather than a padded document inside .app-main.
+
+   `is-landing` is toggled on <body> by js/modules/landing.js off the same
+   route:changed event every other module listens to. */
+
+/* NOT `display: none` on .app-nav. assets/js/back-to-jayjaybee.js injects the
+   shared "‹ jayjaybee.com" link as the first child of this header, so hiding
+   the header outright would take that link with it and strand the landing page
+   with no route back to the parent site. Instead the bar is emptied of app
+   chrome and left in place, transparent, carrying only the injected link.
+
+   position: fixed rather than sticky so the bar leaves the flex flow entirely
+   and the landing keeps the full viewport height it centres against. */
+body.is-landing .app-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: transparent;
+  border-bottom: none;
+}
+
+body.is-landing .app-nav__brand,
+body.is-landing .module-nav,
+body.is-landing .horizon-switcher {
+  display: none;
+}
+
+/* Drop .app-main's centred 1400px column and its padding so the landing can
+   own the full viewport. The landing section re-establishes its own 1280px
+   max-width internally. */
+body.is-landing .app-main {
+  max-width: none;
+  padding: 0;
+}
+
+/* The FPL error banner is app chrome too. Data still loads behind the landing
+   and the banner still populates — it is only visually suppressed here, and
+   reappears intact the moment the visitor enters a module. */
+body.is-landing .app-error-banner {
+  display: none;
+}
+
 /* ─── Error banner ───────────────────────────────────────────────────────── */
 
 .app-error-banner {
