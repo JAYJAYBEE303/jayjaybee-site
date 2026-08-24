@@ -1303,25 +1303,16 @@
 
 .ranker-table {
   width: 100%;
-  /* Floor beneath which nothing shrinks (see below) — comfortable for the
-     This-GW/Next-3-GWs horizons, where the fixtures column only ever needs
-     room for 1-3 cells. Next 6 GWs needs much more (see the
-     [data-horizon="GW6"] override below) — rather than permanently widen
-     the WHOLE table (and force scrolling even on the common 1/3-GW case) to
-     cover that one horizon's worst case, the table widens only while GW6 is
-     actually selected. Below whichever min-width is active, the surrounding
-     .ranker-table-wrap's overflow-x:auto takes over, same as any ordinary
-     responsive table. */
-  min-width: 1150px;
+  /* Floor beneath which nothing shrinks. Sized for the only horizon that now
+     exists: the switcher was removed and the horizon is fixed at 6 GWs, so
+     the fixtures column always carries 6 cells and the old narrower 1150px
+     floor (plus its [data-horizon="GW6"] override) had no remaining purpose.
+     Below this, .ranker-table-wrap's overflow-x:auto takes over, same as any
+     ordinary responsive table. */
+  min-width: 1560px;
   border-collapse: collapse;
   font-size: var(--font-size-sm);
   table-layout: fixed;
-}
-
-/* renderThead() (ranker.js) stamps the active horizon key onto the table
-   element itself specifically so this rule can target it. */
-.ranker-table[data-horizon="GW6"] {
-  min-width: 1500px;
 }
 
 /* Explicit per-column widths (percentages sum to 100) so proportions stay
@@ -1331,27 +1322,23 @@
    same data-sort/data-col attributes thead already renders, so no new markup
    is needed. Keyed on the <th> row specifically: fixed layout takes column
    widths from the FIRST row's cells. */
-.ranker-table__th[data-sort="name"]             { width: 17%; }
-.ranker-table__th[data-sort="team"]             { width: 6%; }
+/* Budgeted against the widest real content each column carries, not split
+   evenly: Player holds surnames up to "Alexander-Arnold", Fixtures holds six
+   pgw cells plus their gaps, and the numeric columns hold at most five
+   glyphs ("£10.5m", "128", "5.3"), so they are deliberately narrow. */
+.ranker-table__th[data-sort="name"]             { width: 13%; }
+.ranker-table__th[data-sort="team"]             { width: 7%; }
 .ranker-table__th[data-col="pos"]               { width: 5%; }
-.ranker-table__th[data-sort="price"]            { width: 7%; }
+.ranker-table__th[data-sort="price"]            { width: 6.5%; }
+.ranker-table__th[data-sort="costPerPoint"]     { width: 8%; }
+.ranker-table__th[data-sort="avgPointsPerGw"]   { width: 7.5%; }
+.ranker-table__th[data-sort="totalPoints"]      { width: 6%; }
+.ranker-table__th[data-sort="fplForm"]          { width: 5.5%; }
 .ranker-table__th[data-sort="value"]            { width: 6%; }
-.ranker-table__th[data-sort="costPerPoint"]     { width: 9%; }
-.ranker-table__th[data-sort="avgPointsPerGw"]   { width: 9%; }
-.ranker-table__th[data-sort="nextFixtureScore"] { width: 11%; }
-.ranker-table__th[data-col="fixtures"]          { width: 12%; }
-.ranker-table__th[data-sort="minutesSecurity"]  { width: 9%; }
-.ranker-table__th[data-col="price-change"]      { width: 9%; }
-
-/* GW6-only reallocation: fixtures needs to grow from 12%→16% to fit 6 full-
-   size cells (16% of the 1500px min-width above, minus the td's own 24px
-   horizontal padding, = 216px content — the 6 cells + 5 gaps need 178px, a
-   comfortable margin). name gives up the matching 4 points, down to 13% —
-   but of a table that's now 350px wider, so this is still ~195px in
-   practice vs. ~196px at 17% of the narrower default table: essentially a
-   wash, not a real reduction. */
-.ranker-table[data-horizon="GW6"] .ranker-table__th[data-sort="name"] { width: 13%; }
-.ranker-table[data-horizon="GW6"] .ranker-table__th[data-col="fixtures"] { width: 16%; }
+.ranker-table__th[data-sort="nextFixtureScore"] { width: 8.5%; }
+.ranker-table__th[data-col="fixtures"]          { width: 12.5%; }
+.ranker-table__th[data-sort="playtime"]         { width: 8.5%; }
+.ranker-table__th[data-col="price-change"]      { width: 6%; }
 
 /* Header cells */
 .ranker-table__th {
@@ -1397,12 +1384,36 @@
    min-width) now that its column has a fixed % width (above) — a long name
    wraps to two lines rather than forcing the table wider than its container. */
 .ranker-table__td--name          { font-weight: 500; }
-.ranker-table__td--team          { white-space: nowrap; color: var(--color-muted); }
+.ranker-table__td--team          { white-space: nowrap; color: var(--color-muted); gap: var(--space-2); }
+
+/* Club crest ahead of the abbreviation. Small on purpose — it is a glance
+   aid, not a logo. alt="" because the three-letter code beside it already
+   names the club, so announcing it twice only adds noise for screen readers.
+   A crest that fails to load collapses to nothing and leaves the code intact,
+   which is why the code was kept rather than replaced. */
+.ranker-team-badge {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  vertical-align: text-bottom;
+  margin-right: var(--space-1);
+  flex-shrink: 0;
+}
+
+/* Early-season playtime figures still lean on the price-implied prior rather
+   than the observed record — dashed, matching how every other provisional
+   number in the app is marked. */
+.ranker-min-badge--estimated {
+  border-style: var(--estimated-border-style);
+  opacity: 0.82;
+}
 .ranker-table__td--pos           { white-space: nowrap; }
 .ranker-table__td--price         { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ranker-table__td--value         { white-space: nowrap; }
 .ranker-table__td--cost-per-point{ font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ranker-table__td--avg-pts       { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ranker-table__td--total-pts     { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ranker-table__td--form          { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ranker-table__td--next-fixture  { white-space: nowrap; }
 
 /* Value + Next Fixture chips drop the "~" prefix — the dashed border
@@ -3397,10 +3408,13 @@
     display: none;
   }
 
-  /* Cost/Pt, Avg Pts/GW, Next Fixture: hidden on mobile, same reasoning as
-     Team/Min above — the compact card keeps only Value + fixture strip. */
+  /* Cost/Pt, Avg Pts/GW, Total Pts, Form, Next Fixture: hidden on mobile, same
+     reasoning as Team/Min above — the compact card keeps only Value + fixture
+     strip. */
   .ranker-table__td--cost-per-point,
   .ranker-table__td--avg-pts,
+  .ranker-table__td--total-pts,
+  .ranker-table__td--form,
   .ranker-table__td--next-fixture {
     display: none;
   }

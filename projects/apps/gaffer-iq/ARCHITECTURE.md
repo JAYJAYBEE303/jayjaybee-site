@@ -133,12 +133,12 @@ gaffer-iq/                          (= projects/gaffer-iq/ in the repo)
 │
 ├── css/
 │   ├── base.css                # Reset, CSS variables (design tokens), typography.
-│   ├── layout.css              # App shell, grid, nav, horizon switcher.
+│   ├── layout.css              # App shell, grid, nav.
 │   └── components.css          # Reusable component styles (cards, tables, badges, pills).
 │
 └── js/
     ├── main.js                 # ENTRY POINT (ESM). Imports modules, reads URL hash to
-    │                           #   pick the active view, wires nav + horizon switcher,
+    │                           #   pick the active view, wires nav,
     │                           #   subscribes to store events. The ONLY script in index.html.
     ├── config.js               # Constants: weights, thresholds, horizon defs, endpoints.
     ├── api.js                  # Data-access layer. The ONLY file that calls fetch().
@@ -179,7 +179,7 @@ gaffer-iq/                          (= projects/gaffer-iq/ in the repo)
 Because there is no build step, modules are loaded as **native ES modules**, and there is exactly one entry point: **`js/main.js`**.
 
 - `index.html` includes **one and only one** script tag: `<script type="module" src="js/main.js"></script>`. Nothing else. Every other file enters the dependency graph by being `import`ed (directly or transitively) from `main.js`.
-- `main.js` is the bootstrap. Its responsibilities, and *only* these: import the four modules, kick off the initial data load via `api.js`/`store`, read the URL hash to decide which module view is active, wire up the nav and the horizon switcher, and subscribe to `store` events (`data:ready`, `data:error`, `horizon:changed`). It contains **no analytical logic** and **no per-module rendering** — it delegates to the modules.
+- `main.js` is the bootstrap. Its responsibilities, and *only* these: import the four modules, kick off the initial data load via `api.js`/`store`, read the URL hash to decide which module view is active, wire up the nav, and subscribe to `store` events (`data:ready`, `data:error`). It contains **no analytical logic** and **no per-module rendering** — it delegates to the modules.
 - Use `import`/`export` (ESM) throughout. No global `window.GafferIQ` namespace, no IIFE pattern, no `<script>` tag per file. One entry module, dependency graph resolved by the browser.
 - This works on Vercel and locally with any static file server. It does **not** work from `file://` (ESM + CORS), so local dev uses `npx serve` or `vercel dev` (documented in README).
 
@@ -449,7 +449,7 @@ HORIZONS = {
 ```
 
 ### How they work
-- A single global "active horizon" lives in `store` and is changed by a horizon switcher in the app shell (`layout.css`). Changing it emits `horizon:changed`; every module re-renders against the new horizon.
+- A single global "active horizon" lives in `store`, fixed at `GW6`. It was previously driven by a switcher in the app shell; that control was removed and nothing writes the value any more. `setActiveHorizon()` and the `horizon:changed` event are deliberately kept, and every module still reads `getActiveHorizon()` and subscribes to the event, so restoring a control means re-adding markup and one listener in `main.js` rather than re-plumbing five modules.
 - For multi-GW horizons, a team/player's score is the **aggregate of its per-fixture composite scores across the horizon's GWs**, with a configurable aggregation method (default: mean, with an option for "worst-case" / minimum to surface fixture traps). The aggregation method and any GW-distance decay live in `config.js` and are detailed in `FEATURE_ENGINE.md`.
 - **Blank and double gameweeks** must be handled explicitly: a team with no fixture in a GW contributes a defined "blank" value (not zero, not skipped silently); a team with two fixtures contributes both, aggregated. `engine/fixtures.js` is responsible for resolving each team's fixture list per horizon correctly, including these cases. Do not assume one-fixture-per-GW anywhere.
 

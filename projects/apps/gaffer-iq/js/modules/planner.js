@@ -187,7 +187,7 @@ function buildCtx() {
 
 /** Resolve the active horizon object from the store. */
 function getHorizon() {
-  return HORIZONS[store.getActiveHorizon()] ?? HORIZONS.GW1;
+  return HORIZONS[store.getActiveHorizon()] ?? HORIZONS.GW6;
 }
 
 // ─── Chip-usage persistence (Phase 4-3) ──────────────────────────────────────

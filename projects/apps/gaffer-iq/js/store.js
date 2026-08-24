@@ -52,7 +52,11 @@ const state = {
   // like `live`: a finished match never changes, so there is nothing to gain
   // from persisting it across a session.
   matchDetail: {},
-  activeHorizon: 'GW1',
+  // Planning horizon. Fixed at GW6 since the switcher was removed from the
+  // nav — every module reads this, nothing writes it any more. setActiveHorizon
+  // and the horizon:changed event are kept so a future control can restore the
+  // behaviour without re-plumbing five modules.
+  activeHorizon: 'GW6',
   // Which module is on screen ('matchup' | 'fixtures' | 'ranker' | 'dashboard'
   // | 'planner'). Written only by main.js's router, which owns the hash; read
   // by every module to skip work it would only throw away.

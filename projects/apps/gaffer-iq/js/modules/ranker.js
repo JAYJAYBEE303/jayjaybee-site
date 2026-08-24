@@ -30,17 +30,12 @@ import {
 import { fetchPlayerSummary } from '../api.js';
 import { normalisePlayerSummary } from '../engine/normalise.js';
 import { calcPriceChangeRisk } from '../engine/prices.js';
+import { playtimeBand } from '../engine/form.js';
 
-// ─── Minutes-security display thresholds ─────────────────────────────────────
-// Maps 0–1 minutesSecurity (from scorePlayer breakdown.form) onto a human
-// label and band. Checked in order; first threshold met wins.
-
-const MIN_SEC_LEVELS = [
-  { threshold: 0.85, label: 'Guaranteed', band: 'great' },
-  { threshold: 0.65, label: 'Likely',     band: 'good' },
-  { threshold: 0.40, label: 'Rotation',   band: 'neutral' },
-  { threshold: 0,    label: 'Risk',       band: 'tough' },
-];
+// ─── Playtime display ────────────────────────────────────────────────────────
+// Playtime labels/bands live in config.js (PLAYTIME_BANDS) and are applied by
+// engine/form.js's playtimeBand(), so the column, the filter pills and the
+// engine can never disagree about where 'Likely' stops and 'Rotation' starts.
 
 // ─── Module-level state ───────────────────────────────────────────────────────
 
@@ -80,7 +75,8 @@ let _activePosSet    = new Set();
 let _activePriceBand = 'all';      // 'all' | numeric-string maximum price threshold
 let _activeTeamId    = 'all';
 let _activeMinSecSet = new Set();
-let _sortBy          = 'value';    // 'value' | 'costPerPoint' | 'price' | 'minutesSecurity' | 'name' | 'team' | 'avgPointsPerGw' | 'nextFixtureScore'
+let _sortBy          = 'value';    // 'value' | 'costPerPoint' | 'price' | 'playtime' | 'name' | 'team'
+                                   //   | 'avgPointsPerGw' | 'totalPoints' | 'fplForm' | 'nextFixtureScore'
 let _sortDesc        = true;
 
 // In-flight lazy loads keyed by playerId so concurrent clicks on the same
@@ -173,13 +169,42 @@ function rankTierTitle(rankTier, position) {
   return '';
 }
 
-/** Return the label+band object for a 0–1 minutesSecurity value. */
-function minSecLevel(ms) {
-  const v = ms ?? 0;
-  for (const level of MIN_SEC_LEVELS) {
-    if (v >= level.threshold) return level;
+/**
+ * Hover text for the Playtime badge. The column shows one word; the model has
+ * four inputs, and which of them is dragging a player down is exactly what the
+ * user needs to know — "Rotation because his club plays seven midfielders" is
+ * a different decision from "Rotation because he is carrying a knock".
+ *
+ * @param {object} pt  breakdown.playtime from scorePlayer (§7.3b)
+ * @returns {string}   plain text, inserted as a title attribute
+ */
+function playtimeTitle(pt) {
+  const pct = v => `${Math.round((v ?? 0) * 100)}%`;
+  const parts = [
+    `Starts ${pct(pt.startRate)} of games`,
+    `${pct(pt.minutesShare)} of available minutes`,
+  ];
+  // Only mention crowding when there is actually something to say about it.
+  if ((pt.crowding ?? 1) > 1.35) {
+    parts.push(`squad is rotating ${pt.crowding.toFixed(1)} players per slot in this position`);
   }
-  return MIN_SEC_LEVELS[MIN_SEC_LEVELS.length - 1];
+  if ((pt.availability ?? 100) < 100) {
+    parts.push(`${Math.round(pt.availability)}% chance of playing`);
+  }
+  if (pt.estimated) {
+    parts.push('early season — still weighted toward the price-implied role');
+  }
+  return parts.join(' · ');
+}
+
+/**
+ * Playtime read for one scored row. Prefers the §7.3b squad-context model that
+ * scorePlayer attaches; falls back to banding the raw form ratio only if a
+ * caller somehow supplies a score from before that existed.
+ */
+function playtimeOf(score) {
+  return score?.breakdown?.playtime
+    ?? playtimeBand(score?.breakdown?.form?.minutesSecurity ?? 0);
 }
 
 /**
@@ -300,9 +325,8 @@ function applyFilters(rows) {
     if (!priceInBand(player.price, _activePriceBand)) return false;
     if (_activeTeamId !== 'all' &&
         String(player.teamId) !== _activeTeamId)      return false;
-    const ms = score.breakdown?.form?.minutesSecurity ?? 0;
     if (_activeMinSecSet.size > 0 &&
-        !_activeMinSecSet.has(minSecLevel(ms).label)) return false;
+        !_activeMinSecSet.has(playtimeOf(score).label)) return false;
     return true;
   });
 }
@@ -369,9 +393,15 @@ function applySort(rows, lastSeasonByPlayerId = null) {
     let av, bv;
     if (_sortBy === 'price') {
       av = a.player.price; bv = b.player.price;
-    } else if (_sortBy === 'minutesSecurity') {
-      av = a.score.breakdown?.form?.minutesSecurity ?? 0;
-      bv = b.score.breakdown?.form?.minutesSecurity ?? 0;
+    } else if (_sortBy === 'playtime') {
+      av = playtimeOf(a.score).value ?? 0;
+      bv = playtimeOf(b.score).value ?? 0;
+    } else if (_sortBy === 'totalPoints') {
+      av = a.player.totals?.points ?? 0;
+      bv = b.player.totals?.points ?? 0;
+    } else if (_sortBy === 'fplForm') {
+      av = a.player.fplForm ?? 0;
+      bv = b.player.fplForm ?? 0;
     } else if (_sortBy === 'avgPointsPerGw') {
       av = a.score.avgPointsPerGw.value; bv = b.score.avgPointsPerGw.value;
     } else if (_sortBy === 'nextFixtureScore') {
@@ -450,8 +480,7 @@ function buildRow({ player, team, score, rankTier }, nextFixtureRankById, lastSe
   const statusMark = player.status !== 'available'
     ? `<span class="ranker-status-badge" title="${esc(player.statusNote || player.status)}">!</span>`
     : '';
-  const ms       = score.breakdown?.form?.minutesSecurity ?? 0;
-  const lvl      = minSecLevel(ms);
+  const pt       = playtimeOf(score);
   const estClass = isScoreEstimated(score) ? ' score-chip--estimated' : '';
 
   let avgPtsDisplay, costPerPointDisplay;
@@ -509,7 +538,8 @@ function buildRow({ player, team, score, rankTier }, nextFixtureRankById, lastSe
         ${esc(player.name)}${statusMark}
       </td>
       <td class="ranker-table__td ranker-table__td--team">
-        ${team ? esc(team.shortName) : '—'}
+        ${team ? `<img class="ranker-team-badge" src="${esc(team.badgeUrl)}" alt=""
+                       width="16" height="16" loading="lazy" decoding="async">` : ''}${team ? esc(team.shortName) : '—'}
       </td>
       <td class="ranker-table__td ranker-table__td--pos">
         <span class="ranker-pos-badge ranker-pos-badge--${player.position.toLowerCase()}">${esc(player.position)}</span>
@@ -517,15 +547,22 @@ function buildRow({ player, team, score, rankTier }, nextFixtureRankById, lastSe
       <td class="ranker-table__td ranker-table__td--price">
         £${esc(player.price.toFixed(1))}m
       </td>
-      <td class="ranker-table__td ranker-table__td--value">
-        <span class="score-chip score-chip--${esc(score.band)}${estClass}${rankTierClass(rankTier)}"
-              title="${rankTier ? esc(rankTierTitle(rankTier, player.position)) : ''}">${Math.round(score.value)}</span>
-      </td>
       <td class="ranker-table__td ranker-table__td--cost-per-point">
         ${costPerPointDisplay}
       </td>
       <td class="ranker-table__td ranker-table__td--avg-pts">
         ${avgPtsDisplay}
+      </td>
+      <td class="ranker-table__td ranker-table__td--total-pts">
+        ${player.totals?.points ?? 0}
+      </td>
+      <td class="ranker-table__td ranker-table__td--form"
+          title="FPL's own form figure — average points per match over the last 30 days">
+        ${(player.fplForm ?? 0).toFixed(1)}
+      </td>
+      <td class="ranker-table__td ranker-table__td--value">
+        <span class="score-chip score-chip--${esc(score.band)}${estClass}${rankTierClass(rankTier)}"
+              title="${rankTier ? esc(rankTierTitle(rankTier, player.position)) : ''}">${Math.round(score.value)}</span>
       </td>
       <td class="ranker-table__td ranker-table__td--next-fixture"
           title="Fixture + counter-matchup favourability, excluding form">
@@ -536,7 +573,8 @@ function buildRow({ player, team, score, rankTier }, nextFixtureRankById, lastSe
         ${buildFixtureStrip(score.perGw)}
       </td>
       <td class="ranker-table__td ranker-table__td--min">
-        <span class="ranker-min-badge ranker-min-badge--${esc(lvl.band)}">${esc(lvl.label)}</span>
+        <span class="ranker-min-badge ranker-min-badge--${esc(pt.band)}${pt.estimated ? ' ranker-min-badge--estimated' : ''}"
+              title="${esc(playtimeTitle(pt))}">${esc(pt.label)}</span>
       </td>
       ${buildPriceChangeCell(player)}
     </tr>
@@ -546,11 +584,12 @@ function buildRow({ player, team, score, rankTier }, nextFixtureRankById, lastSe
 // ─── Price change helpers ─────────────────────────────────────────────────────
 
 /**
- * Fixed column count: Player, Team, Pos, Price, Value, Cost/Pt, Avg Pts,
- * Next Fixture, Fixtures, Playtime, Price Change — always all 11, no toggle.
+ * Fixed column count: Player, Team, Pos, Price, Cost/Pt, Avg Pts, Total Pts,
+ * Form, Value, Next Fixture, Fixtures, Playtime, Price Change — always all 13,
+ * no toggle.
  */
 function colCount() {
-  return 11;
+  return 13;
 }
 
 /**
@@ -584,8 +623,11 @@ function renderThead() {
   const horizonKey = store.getActiveHorizon();
   const horizon    = HORIZONS[horizonKey] ?? HORIZONS.GW1;
 
-  // Lets components.css widen the fixtures column (and the table's min-width)
-  // only while GW6 is active — see .ranker-table[data-horizon="GW6"].
+  // Stamps the active horizon onto the table element. Nothing in components.css
+  // keys off it any more — the horizon is fixed at GW6 since the switcher was
+  // removed, so the per-horizon width overrides were folded into the base
+  // rules. Kept because it costs nothing and is the hook a restored switcher
+  // would need back.
   if (_table) _table.dataset.horizon = horizonKey;
 
   function thSortable(label, col) {
@@ -610,12 +652,14 @@ function renderThead() {
       ${thSortable('Team',      'team')}
       ${thStatic('Pos',         'pos')}
       ${thSortable('Price',     'price')}
-      ${thSortable('Value',     'value')}
-      ${thSortable(`Cost/Pt${seasonSuffix}`,   'costPerPoint')}
+      ${thSortable(`Cost/Pt${seasonSuffix}`,    'costPerPoint')}
       ${thSortable(`Avg Pts/GW${seasonSuffix}`, 'avgPointsPerGw')}
+      ${thSortable('Total Pts', 'totalPoints')}
+      ${thSortable('Form',      'fplForm')}
+      ${thSortable('Value',     'value')}
       ${thSortable('Next Fixture', 'nextFixtureScore')}
       ${thStatic(horizon.label, 'fixtures')}
-      ${thSortable('Playtime',  'minutesSecurity')}
+      ${thSortable('Playtime',  'playtime')}
       ${thStatic('£↑↓',         'price-change')}
     </tr>
   `;

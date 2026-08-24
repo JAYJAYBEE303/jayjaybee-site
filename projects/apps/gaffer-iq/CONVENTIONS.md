@@ -92,7 +92,7 @@ Use a pragmatic BEM (Block / Element / Modifier). Lowercase, kebab-case, no IDs 
 .matchup-card--brutal         /* modifier (double hyphen) */
 ```
 
-- **Block** = a standalone component (`.matchup-card`, `.ranker-table`, `.horizon-switcher`).
+- **Block** = a standalone component (`.matchup-card`, `.ranker-table`, `.score-pill`).
 - **Element** = a part of a block, `block__element`.
 - **Modifier** = a variant/state, `block--modifier` or `block__element--modifier`.
 

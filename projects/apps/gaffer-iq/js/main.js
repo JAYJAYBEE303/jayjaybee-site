@@ -2,7 +2,7 @@
  * js/main.js
  * Layer: entry point. Bootstrap only — kicks off the initial data load,
  * subscribes to store events, reads URL hash to pick the active view,
- * wires the nav and horizon switcher, and delegates all rendering to modules.
+ * wires the nav, and delegates all rendering to modules.
  * Contains no analytical logic and no per-module rendering.
  * See ARCHITECTURE.md §4 for the module loading strategy.
  */
@@ -302,23 +302,10 @@ store.subscribe('data:ready', () => {
   );
 });
 
-// ─── Horizon switcher ─────────────────────────────────────────────────────────
-
-const horizonBtns = document.querySelectorAll('.horizon-switcher__btn');
-
-// Set initial active state from store (store defaults to 'GW1', HTML marks GW1 active;
-// this keeps them in sync if the store default ever changes).
-const initialHorizon = store.getActiveHorizon();
-horizonBtns.forEach(btn => {
-  btn.classList.toggle('is-active', btn.dataset.horizon === initialHorizon);
-});
-
-horizonBtns.forEach(btn => {
-  btn.addEventListener('click', () => {
-    store.setActiveHorizon(btn.dataset.horizon);
-    horizonBtns.forEach(b => b.classList.toggle('is-active', b === btn));
-  });
-});
+// ─── Horizon ─────────────────────────────────────────────────────────────────
+// The switcher was removed from the nav; the horizon is fixed at store's
+// default (GW6). Modules still read store.getActiveHorizon(), so restoring a
+// control later means re-adding markup and a listener here, nothing more.
 
 // ─── Hash-based routing ───────────────────────────────────────────────────────
 
