@@ -5088,11 +5088,11 @@ img.fx-crest {
    no flow content of its own to size it. */
 .landing__cluster {
   position: relative;
-  /* 80px, down from 96px. The satellite cards sit well above the matchup
-     card's top edge, so the optical gap after the subhead already reads
-     larger than the measured one — pulled in one rung, not more, or the
-     headline block and the cluster start to crowd each other. */
-  margin-top: var(--space-20);
+  /* 40px, half the reference's 96px. The satellite cards top out well above
+     the matchup card's own top edge, so the measured gap and the optical one
+     are not the same thing — at the reference value the hero read as two
+     disconnected blocks rather than one composition. */
+  margin-top: var(--space-10);
   height: 340px;
 }
 
@@ -5479,7 +5479,7 @@ img.fx-crest {
 
   .landing__cluster {
     height: auto;
-    margin-top: var(--space-10);
+    /* margin-top is inherited from the desktop rule — it is already --space-10. */
     display: flex;
     flex-direction: column;
     align-items: center;
