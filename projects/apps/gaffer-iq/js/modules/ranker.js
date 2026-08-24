@@ -118,6 +118,24 @@ function buildCtx() {
 }
 
 /**
+ * What the Player column shows.
+ *
+ * FPL's `web_name` is a surname or a nickname — "Szoboszlai", "Gakpo" — which
+ * is compact but ambiguous across a 700-player pool. `fullName` is first_name
+ * and second_name joined by normalise.js.
+ *
+ * `||` rather than `??`: normalise.js builds fullName by trimming a template
+ * string, so a player FPL published neither part for arrives as '' rather than
+ * null, and `??` would let that empty string through to the cell.
+ *
+ * @param {Player} player
+ * @returns {string}
+ */
+function displayName(player) {
+  return player.fullName || player.name;
+}
+
+/**
  * Map a 0–100 value to a band string, reading thresholds from config so this
  * render helper stays in sync with the engine. Not analytical — display only.
  * Mirrors the identical helper in modules/matchup.js (CONVENTIONS.md §5.2).
@@ -385,8 +403,8 @@ function applySort(rows, lastSeasonByPlayerId = null) {
     // convention as every numeric column, for consistency (first click = 'Z'
     // first) — the sort-arrow indicator shows the direction either way.
     if (_sortBy === 'name' || _sortBy === 'team') {
-      const av = _sortBy === 'name' ? a.player.name : (a.team?.name ?? '');
-      const bv = _sortBy === 'name' ? b.player.name : (b.team?.name ?? '');
+      const av = _sortBy === 'name' ? displayName(a.player) : (a.team?.name ?? '');
+      const bv = _sortBy === 'name' ? displayName(b.player) : (b.team?.name ?? '');
       const cmp = av.localeCompare(bv);
       return _sortDesc ? -cmp : cmp;
     }
@@ -533,9 +551,9 @@ function buildRow({ player, team, score, rankTier }, nextFixtureRankById, lastSe
   return `
     <tr class="ranker-table__row" data-player-id="${player.id}"
         tabindex="0" role="button"
-        aria-label="Analyse ${esc(player.name)} in Matchup Analyser">
-      <td class="ranker-table__td ranker-table__td--name">
-        ${esc(player.name)}${statusMark}
+        aria-label="Analyse ${esc(displayName(player))} in Matchup Analyser">
+      <td class="ranker-table__td ranker-table__td--name" title="${esc(displayName(player))}">
+        ${esc(displayName(player))}${statusMark}
       </td>
       <td class="ranker-table__td ranker-table__td--team">
         ${team ? `<img class="ranker-team-badge" src="${esc(team.badgeUrl)}" alt=""
