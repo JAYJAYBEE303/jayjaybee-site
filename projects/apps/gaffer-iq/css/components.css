@@ -1307,9 +1307,11 @@
      exists: the switcher was removed and the horizon is fixed at 6 GWs, so
      the fixtures column always carries 6 cells and the old narrower 1150px
      floor (plus its [data-horizon="GW6"] override) had no remaining purpose.
+     Sized to clear a 1080p viewport without a horizontal scrollbar — the first
+     pass at 1560px overflowed one by roughly a third of the last column.
      Below this, .ranker-table-wrap's overflow-x:auto takes over, same as any
      ordinary responsive table. */
-  min-width: 1560px;
+  min-width: 1480px;
   border-collapse: collapse;
   font-size: var(--font-size-sm);
   table-layout: fixed;
@@ -1326,19 +1328,19 @@
    evenly: Player holds surnames up to "Alexander-Arnold", Fixtures holds six
    pgw cells plus their gaps, and the numeric columns hold at most five
    glyphs ("£10.5m", "128", "5.3"), so they are deliberately narrow. */
-.ranker-table__th[data-sort="name"]             { width: 13%; }
-.ranker-table__th[data-sort="team"]             { width: 7%; }
-.ranker-table__th[data-col="pos"]               { width: 5%; }
+.ranker-table__th[data-sort="name"]             { width: 11.5%; }
+.ranker-table__th[data-sort="team"]             { width: 6.5%; }
+.ranker-table__th[data-col="pos"]               { width: 4.5%; }
 .ranker-table__th[data-sort="price"]            { width: 6.5%; }
 .ranker-table__th[data-sort="costPerPoint"]     { width: 8%; }
 .ranker-table__th[data-sort="avgPointsPerGw"]   { width: 7.5%; }
-.ranker-table__th[data-sort="totalPoints"]      { width: 6%; }
+.ranker-table__th[data-sort="totalPoints"]      { width: 5.5%; }
 .ranker-table__th[data-sort="fplForm"]          { width: 5.5%; }
 .ranker-table__th[data-sort="value"]            { width: 6%; }
 .ranker-table__th[data-sort="nextFixtureScore"] { width: 8.5%; }
-.ranker-table__th[data-col="fixtures"]          { width: 12.5%; }
-.ranker-table__th[data-sort="playtime"]         { width: 8.5%; }
-.ranker-table__th[data-col="price-change"]      { width: 6%; }
+.ranker-table__th[data-col="fixtures"]          { width: 13.5%; }
+.ranker-table__th[data-sort="playtime"]         { width: 9%; }
+.ranker-table__th[data-col="price-change"]      { width: 7.5%; }
 
 /* Header cells */
 .ranker-table__th {
@@ -1383,7 +1385,16 @@
 /* Column-specific widths. name deliberately allows wrapping (no nowrap, no
    min-width) now that its column has a fixed % width (above) — a long name
    wraps to two lines rather than forcing the table wider than its container. */
-.ranker-table__td--name          { font-weight: 500; }
+.ranker-table__td--name {
+  font-weight: 500;
+  /* Clip rather than wrap. At this width the longest real web_name still fits,
+     but one that did wrap would grow its row taller than every other and break
+     the eye's run down the column. The full name is on the row's aria-label
+     either way. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .ranker-table__td--team          { white-space: nowrap; color: var(--color-muted); gap: var(--space-2); }
 
 /* Club crest ahead of the abbreviation. Small on purpose — it is a glance
@@ -1401,11 +1412,12 @@
 }
 
 /* Early-season playtime figures still lean on the price-implied prior rather
-   than the observed record — dashed, matching how every other provisional
-   number in the app is marked. */
+   than the observed record. Same treatment as the Value column's estimated
+   chip (.score-chip--estimated) — 1px, in the badge's own colour. Setting only
+   border-style, as this first did, left border-width at its `medium` initial
+   value and drew a 3px slab around the badge. */
 .ranker-min-badge--estimated {
-  border-style: var(--estimated-border-style);
-  opacity: 0.82;
+  border: 1px var(--estimated-border-style) currentColor;
 }
 .ranker-table__td--pos           { white-space: nowrap; }
 .ranker-table__td--price         { font-variant-numeric: tabular-nums; white-space: nowrap; }
