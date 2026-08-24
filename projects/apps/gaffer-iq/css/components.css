@@ -5278,9 +5278,9 @@ img.fx-crest {
 }
 
 .landing-card--player {
-  right: calc(50% - 450px);
+  right: calc(50% - 480px);
   top: 110px;
-  width: 170px;
+  width: 200px;
   padding: var(--space-4);
   animation: landing-float-2 6.5s ease-in-out infinite;
   z-index: 2;
@@ -5321,6 +5321,18 @@ img.fx-crest {
 .landing-card__name {
   font-size: var(--font-size-xs);
   font-weight: 600;
+  /* Lets a long name shrink and ellipsise rather than shoving the score chip
+     out of the card. Without min-width:0 a flex item refuses to shrink below
+     its content width. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The chip keeps its size whatever the name does. */
+.landing-card__split .landing-chip {
+  flex-shrink: 0;
 }
 
 .landing-card__sub {
