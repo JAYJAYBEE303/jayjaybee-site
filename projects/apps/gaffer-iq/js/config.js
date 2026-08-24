@@ -830,6 +830,79 @@ export const STATUS_PLAY_CHANCE = {
   unavailable:   0,
 };
 
+// ─── §7.3b  Playtime security ────────────────────────────────────────────────
+//
+// How safe is this player's place in the starting XI? Distinct from
+// `minutesSecurity` inside calcPlayerForm, which is a single backward-looking
+// ratio. This model answers the forward question the Ranker's Playtime column
+// actually asks, and is built to behave sanely in GW1 as well as GW30.
+//
+// Four inputs, all available for the WHOLE player pool without per-player
+// summary fetches (which are lazy — see ARCHITECTURE.md §6 — so anything
+// needing them would be null for almost every row the Ranker draws):
+//   1. start rate      — starts ÷ gameweeks played
+//   2. minutes share   — minutes ÷ minutes available, i.e. what fraction of a
+//                        starting slot the player actually holds
+//   3. completion      — minutes ÷ (starts × 90): does he finish matches, or
+//                        come off on 60?
+//   4. squad crowding  — how many bodies the club is rotating through this
+//                        position relative to how many slots it actually has
+//
+// See FEATURE_ENGINE.md §7.3b.
+
+// Weight of the price-derived prior, expressed in gameweeks of evidence.
+// MODEL: this is what stops GW1 being nonsense. With one match played, raw
+// start rate is either 0.0 or 1.0 and neither is believable; blending in
+// PLAYTIME_PRIOR_GWS gameweeks of "what does his price say his role is"
+// dominates early and fades to irrelevance by ~GW10. Set to 4 so a player has
+// to sustain a pattern for about a month before the model fully believes it.
+export const PLAYTIME_PRIOR_GWS = 4;
+
+// Price percentile within a position maps onto an expected share of minutes.
+// MODEL: price is the only pool-wide, forward-looking role signal FPL exposes
+// before a ball is kicked — the game prices nailed-on starters up and bench
+// fodder down. The floor is not 0: even the cheapest player in a position is
+// not certain to never start.
+export const PLAYTIME_PRIOR_MIN = 0.20;
+export const PLAYTIME_PRIOR_MAX = 0.90;
+
+// The three positive terms. Sum to 1.
+// MODEL: start rate leads because starting is the binary that matters most in
+// FPL; minutes share is close behind because it catches the 60-minute
+// substitute that start rate alone would score as fully nailed. Completion is
+// a deliberately small tiebreaker — being subbed late is normal squad
+// management, not insecurity.
+export const PLAYTIME_W_START      = 0.45;
+export const PLAYTIME_W_MINUTES    = 0.40;
+export const PLAYTIME_W_COMPLETION = 0.15;
+
+// A teammate counts as a body competing for this position group if he is
+// taking at least this share of the minutes available in one slot.
+export const PLAYTIME_BODY_SHARE = 0.25;
+
+// Crowding = bodies ÷ slots. A back four with five defenders in rotation
+// scores 1.25; a midfield playing seven bodies through three slots scores 2.3.
+// At or below 1.0 there is no competition to speak of; at PLAYTIME_CROWDING_FULL
+// the penalty is at maximum.
+export const PLAYTIME_CROWDING_FULL = 2.0;
+
+// How much crowding can subtract from the positive terms.
+// MODEL: applied scaled by (1 − minutes share), so it barely touches a player
+// already commanding his slot and bites hardest on the genuinely rotated. This
+// is what separates a nailed starter at a squad-heavy club from his rotating
+// team-mate — the crowding figure itself is identical for both, because it is
+// a property of the club's position group, not of the player.
+export const PLAYTIME_W_CROWDING = 0.20;
+
+// Playtime bands. Keyed to the labels the Ranker's Playtime column renders and
+// its filter pills match on, so the two can never drift apart.
+export const PLAYTIME_BANDS = [
+  { threshold: 0.78, label: 'Nailed',   band: 'great'   },
+  { threshold: 0.60, label: 'Likely',   band: 'good'    },
+  { threshold: 0.38, label: 'Rotation', band: 'neutral' },
+  { threshold: 0,    label: 'Risk',     band: 'tough'   },
+];
+
 // ─── Phase 4-3  Chip planning ────────────────────────────────────────────────
 
 // How many candidate GWs ahead of currentGw to evaluate for each chip.

@@ -526,6 +526,70 @@ Supplementary to §7.2's position-group aggregate: pairs specific players (a str
 
 ---
 
+## 7.3b Playtime security (`engine/form.js → calcPlaytimeSecurity`)
+
+**Output:** `0–1`, higher = more secure a place in the starting XI. Banded to a label by `playtimeBand()` against `PLAYTIME_BANDS`.
+
+Answers a different question from §7.3. `calcPlayingLikelihood` asks *"will he be on the pitch this weekend"* and feeds `PROJ_MINUTES` in the projection. This asks *"how safe is his place in the side"*, and drives the Ranker's Playtime column only — it is **not** a weighted term in any composite, because `PROJ_MINUTES` already carries minutes and a second term would double-count them.
+
+### Why the old column was wrong
+
+The Playtime column previously banded `calcPlayerForm`'s `minutesSecurity`. In the fallback branch — which is the branch essentially every Ranker row takes, because element summaries are lazily fetched (ARCHITECTURE.md §6) and are absent for almost the whole pool — that was:
+
+```js
+minutesSecurity = minutes / (SEASON_GWS * 90)     // 38 × 90 = 3420
+```
+
+A player who had started and completed every match scored `90/3420 = 0.03` after GW1 and `0.53` by GW20, against a `Rotation` threshold of `0.40`. The column therefore read `Risk` for nearly the entire pool for most of the season, and because `W_MINUTES` puts the same figure inside the form score, it quietly suppressed every player's form too. The denominator is now elapsed gameweeks, not the whole season.
+
+(The likely-XI selection in `engine/counter.js` also sorts on `minutesSecurity`. It was unaffected: the bug scaled every player by the same constant, so the relative ordering it depends on was preserved.)
+
+### Inputs
+
+All four are available for the **whole pool** from `bootstrap-static` alone. Anything requiring element-summary history would be null for almost every row the Ranker draws, which is what made the old proxy necessary in the first place.
+
+| Term | Formula | Why |
+|---|---|---|
+| `startRate` | `starts ÷ elapsedGws` | Starting is the binary that matters most in FPL. |
+| `minutesShare` | `minutes ÷ (elapsedGws × 90)` | What fraction of a starting slot he actually holds. Catches the nailed starter who is hooked on 60 every week — `startRate` alone scores him identically to a player finishing matches. |
+| `completion` | `minutes ÷ (starts × 90)` | Does he see games out? Deliberately the smallest weight: a late substitution is ordinary squad management, not insecurity. |
+| `crowding` | `bodies ÷ slots` in the club's group at his position | How many players the club is actually rotating through the position. |
+
+`slots` is derived, not assumed: `groupMinutes ÷ (elapsedGws × 90)`, so a back four playing every minute totals four slots' worth of minutes and a manager switching to a back three moves the figure without anyone hard-coding a formation. `bodies` counts group members clearing `PLAYTIME_BODY_SHARE` of one slot.
+
+### Combination
+
+```
+base  = PLAYTIME_W_START      × startRate
+      + PLAYTIME_W_MINUTES    × minutesShare
+      + PLAYTIME_W_COMPLETION × completion          # weights sum to 1
+
+crowdingRisk = clamp(0,1, (crowding − 1) / (PLAYTIME_CROWDING_FULL − 1))
+             × (1 − minutesShare)
+
+value = clamp(0,1, base − PLAYTIME_W_CROWDING × crowdingRisk) × (availability / 100)
+```
+
+Crowding is scaled by `(1 − minutesShare)` for a specific reason: the crowding figure is a property of the **club's position group**, identical for every player in it. Left unscaled it would punish a nailed starter at a squad-heavy club exactly as hard as his rotating team-mate. Scaling it means it barely touches a player already commanding his slot, and bites hardest on the genuinely rotated — which is the distinction the column exists to draw.
+
+Availability multiplies rather than caps: an injured player with a cast-iron place is still a zero for the gameweek in front of him.
+
+### Early-season shrinkage
+
+Both rate terms are shrunk toward a prior worth `PLAYTIME_PRIOR_GWS` gameweeks of evidence:
+
+```
+startRate = (starts + PLAYTIME_PRIOR_GWS × prior) / (elapsedGws + PLAYTIME_PRIOR_GWS)
+```
+
+**MODEL:** with one match played, a raw start rate is either `0.0` or `1.0` and neither is believable. The prior comes from the player's price percentile **within his position**, mapped onto `PLAYTIME_PRIOR_MIN … PLAYTIME_PRIOR_MAX` — price is the only pool-wide, forward-looking role signal FPL exposes before a ball is kicked, and the game prices nailed-on starters up and bench fodder down. Position-relative because a £5.5m defender and a £5.5m forward imply completely different roles. The prior dominates in GW1–2 and is effectively irrelevant by ~GW10. While it still outweighs the observed record the result carries `estimated: true`, and the badge renders dashed.
+
+### elapsedGws
+
+Derived from the data, not from a gameweek counter: the highest season minutes total in the pool, ÷ 90, rounded. The most-played footballer in the league defines how many rounds have actually been played, which stays honest through postponements, blanks and doubles — and needs no agreement about whether `currentGw` means "in progress" or "last completed". Computed once per context in `buildScoreContext` (`buildPlaytimeContext`), alongside the per-player prior and crowding figures, because all three are `O(pool)` aggregates and recomputing them per player would make a full-pool render quadratic.
+
+---
+
 ## 8. The composite matchup score (`engine/composite.js → scoreFixture`)
 
 This is where everything combines into the single 0–100 number (per team, per fixture) that drives the whole app.

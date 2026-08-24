@@ -14,6 +14,7 @@ import {
   PROJ_FORM, PROJ_FIXTURE, PROJ_COUNTER, PROJ_MINUTES, EXPECTED_PTS_FIXTURE_SWING,
   RANK_ELITE_COUNT_BY_POS, RANK_STRONG_COUNT_BY_POS, RANK_TOP_PERCENTILE, RANK_BOTTOM_PERCENTILE,
   SEASON_GWS,
+  PLAYTIME_PRIOR_MIN, PLAYTIME_PRIOR_MAX, PLAYTIME_BODY_SHARE,
 } from '../config.js';
 import { clamp, invert } from '../util.js';
 import {
@@ -21,7 +22,8 @@ import {
   buildRollingVenueStatsByTeamId,
 } from './fixtures.js';
 import {
-  calcTeamForm, calcPlayerForm, calcPlayingLikelihood, buildUnderstatPlayerLookup,
+  calcTeamForm, calcPlayerForm, calcPlayingLikelihood, calcPlaytimeSecurity,
+  buildUnderstatPlayerLookup,
 } from './form.js';
 // calcStyleClash is no longer imported — styleClash was removed from WEIGHTS
 // (config.js explains why). buildXgProfilesByTeamId stays: the xG profiles it
@@ -62,12 +64,96 @@ import {
  *     currentGw:                 number
  *     leagueAvgStrength:         number  (mean of team.strength.overall across the league)
  */
+/**
+ * Precompute everything engine/form.js's calcPlaytimeSecurity needs that is a
+ * property of the POOL rather than of one player: how far into the season we
+ * are, each player's price-derived role prior, and how crowded his club's
+ * group at his position is.
+ *
+ * Done once per context because both are O(pool) aggregates — recomputing them
+ * inside a per-player call would make the Ranker's full-pool render quadratic.
+ *
+ * @param {Player[]} players  the whole pool
+ * @returns {{elapsedGws: number, playtimeByPlayerId: Object<number, {prior: number, crowding: number}>}}
+ */
+function buildPlaytimeContext(players) {
+  const pool = players || [];
+
+  // MODEL: elapsed gameweeks are derived from the DATA, not from a gameweek
+  // counter. The most-played footballer in the league defines how many rounds
+  // have actually been played, which stays honest through postponements,
+  // blanks and doubles in a way currentGw does not — and needs no agreement
+  // about whether currentGw means "in progress" or "last completed".
+  let maxMinutes = 0;
+  for (const p of pool) {
+    const m = p?.totals?.minutes ?? 0;
+    if (m > maxMinutes) maxMinutes = m;
+  }
+  const elapsedGws = Math.max(1, Math.round(maxMinutes / 90));
+
+  // Price range per position, for the role prior. Position-relative because a
+  // £5.5m defender and a £5.5m forward imply completely different roles.
+  const priceRangeByPos = {};
+  for (const p of pool) {
+    const pos = p?.position;
+    const price = p?.price ?? 0;
+    if (!pos || !(price > 0)) continue;
+    const r = (priceRangeByPos[pos] ||= { min: Infinity, max: -Infinity });
+    if (price < r.min) r.min = price;
+    if (price > r.max) r.max = price;
+  }
+
+  // Club + position groups, for crowding.
+  const groups = {};
+  for (const p of pool) {
+    if (!p?.position || p.teamId == null) continue;
+    (groups[`${p.teamId}|${p.position}`] ||= []).push(p);
+  }
+
+  const slotMinutes = elapsedGws * 90;
+  const crowdingByGroup = {};
+  for (const [key, members] of Object.entries(groups)) {
+    const groupMinutes = members.reduce((sum, p) => sum + (p?.totals?.minutes ?? 0), 0);
+    // Fractional count of starting slots this position occupies for this club:
+    // a back four playing every minute totals four slots' worth of minutes.
+    // Derived rather than assumed, so it follows a manager who switches to a
+    // back three without anyone hard-coding a formation.
+    const slots  = groupMinutes / slotMinutes;
+    const bodies = members.filter(
+      p => (p?.totals?.minutes ?? 0) >= PLAYTIME_BODY_SHARE * slotMinutes).length;
+    // Below one slot there is nothing to be crowded out of — a group with no
+    // minutes yet (preseason) must not read as infinitely contested.
+    crowdingByGroup[key] = slots >= 1 ? (bodies / slots) : 1;
+  }
+
+  const playtimeByPlayerId = {};
+  for (const p of pool) {
+    if (!p?.id) continue;
+    const r = priceRangeByPos[p.position];
+    // Flat midpoint when a position has no spread to speak of, rather than a
+    // division by zero.
+    const span = r && r.max > r.min ? (r.max - r.min) : 0;
+    const pct  = span > 0 ? clamp(0, 1, ((p.price ?? 0) - r.min) / span) : 0.5;
+    playtimeByPlayerId[p.id] = {
+      prior: PLAYTIME_PRIOR_MIN + (pct * (PLAYTIME_PRIOR_MAX - PLAYTIME_PRIOR_MIN)),
+      crowding: crowdingByGroup[`${p.teamId}|${p.position}`] ?? 1,
+    };
+  }
+
+  return { elapsedGws, playtimeByPlayerId };
+}
+
 export function buildScoreContext(season, opts = {}) {
   if (!season || !season.teamsById) {
     throw new TypeError('buildScoreContext: season (from normaliseSeason) is required');
   }
 
   const playedFixtures = (season.fixtures || []).filter(f => f.played && f.result);
+
+  // Pool-wide aggregates for the playtime model (FEATURE_ENGINE.md §7.3b).
+  // elapsedGws is also what fixes calcPlayerForm's minutesSecurity — see the
+  // MODEL note in engine/form.js's fallbackPlayerForm.
+  const { elapsedGws, playtimeByPlayerId } = buildPlaytimeContext(season.players);
 
   const playersByTeamId = {};
   for (const p of (season.players || [])) {
@@ -144,6 +230,10 @@ export function buildScoreContext(season, opts = {}) {
     leagueXgHistory,
     currentGw:           opts.currentGw ?? season.currentGw ?? season.nextGw ?? 1,
     leagueAvgStrength,
+    // Gameweeks actually played, derived from the pool's minutes rather than a
+    // counter — see buildPlaytimeContext.
+    elapsedGws:          opts.elapsedGws ?? elapsedGws,
+    playtimeByPlayerId,
   };
 }
 
@@ -972,6 +1062,12 @@ export function scorePlayer(player, horizon, ctx) {
   const avgPointsPerGw = calcAvgPointsPerGw(player, ctx);
   // §7.3 — reuses formResult so minutesSecurity isn't recomputed.
   const playing        = calcPlayingLikelihood(player, formResult);
+  // §7.3b — the richer squad-context model behind the Ranker's Playtime column.
+  // Deliberately NOT folded into `value` below: PROJ_MINUTES already carries a
+  // minutes term through calcPlayingLikelihood, and adding a second would
+  // double-count playing time in the composite. This is a display metric that
+  // travels with the score, not a fourth weighted input.
+  const playtime       = calcPlaytimeSecurity(player, ctx);
 
   const value = clamp(0, 100,
     (PROJ_FORM    * formResult.value)
@@ -1004,6 +1100,10 @@ export function scorePlayer(player, horizon, ctx) {
         // re-call calcPlayerForm — avoids doubling the work per player row.
         minutesSecurity: formResult.minutesSecurity ?? null,
       },
+      // Squad-context playtime read (§7.3b). Carries its own band/label so the
+      // Ranker never re-derives the mapping, and its sub-terms so the UI can
+      // explain WHY a player scores low: crowded out, benched, or unavailable.
+      playtime,
       fixture: { value: horizonResult.value, weight: PROJ_FIXTURE, estimated: false },
       counter: { value: counterEdge.value,   weight: PROJ_COUNTER, estimated: counterEdge.estimated },
       minutes: {

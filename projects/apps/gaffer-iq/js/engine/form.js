@@ -9,7 +9,10 @@
 import {
   FORM_WINDOW_GWS, RECENCY_DECAY, W_FORM_PERFORMANCE, LEAGUE_AVG_STRENGTH,
   PLAYER_FORM_GWS, W_RETURNS, W_MINUTES, W_UNDERLYING, AVAIL_PENALTY,
-  PLAYER_PER90_ANCHORS, PLAYER_XG_ANCHORS, SEASON_GWS,
+  PLAYER_PER90_ANCHORS, PLAYER_XG_ANCHORS,
+  PLAYTIME_PRIOR_GWS, PLAYTIME_W_START, PLAYTIME_W_MINUTES,
+  PLAYTIME_W_COMPLETION, PLAYTIME_W_CROWDING, PLAYTIME_CROWDING_FULL,
+  PLAYTIME_BANDS, PLAYTIME_PRIOR_MIN, PLAYTIME_PRIOR_MAX,
   STATUS_PLAY_CHANCE,
 } from '../config.js';
 import { clamp, normaliseLinear, safeDiv } from '../util.js';
@@ -309,9 +312,17 @@ function fallbackPlayerForm(player, mode, ctx) {
   const { per90: per90A, xg: xgA } = anchorsFor(mode);
   const per90Norm = normaliseLinear(per90, per90A.min, per90A.max);
 
-  // MODEL: without per-GW data we proxy minutesSecurity by season minutes / a
-  // full season's max (SEASON_GWS * 90). Crude — flagged estimated below.
-  const minutesSecurity = clamp(0, 1, safeDiv(minutes, SEASON_GWS * 90, 0));
+  // MODEL: without per-GW data we proxy minutesSecurity by season minutes over
+  // the minutes that have actually BEEN AVAILABLE so far — elapsed gameweeks,
+  // not the full 38. Dividing by SEASON_GWS * 90 (as this did) meant an
+  // ever-present player scored 90/3420 = 0.03 after GW1 and only 0.53 by GW20,
+  // so essentially the entire pool read as a rotation risk for most of the
+  // season, and the W_MINUTES term below dragged every form score down with
+  // it. ctx.elapsedGws is derived from the data itself (composite.js) rather
+  // than from a gameweek counter, so it stays correct through blanks and
+  // doubles. Still crude — flagged estimated below.
+  const elapsedGws = Math.max(1, ctx?.elapsedGws ?? 1);
+  const minutesSecurity = clamp(0, 1, safeDiv(minutes, elapsedGws * 90, 0));
 
   const upXg = understatXgPer90(player, ctx);
   let xgOverlay;
@@ -491,6 +502,138 @@ export function calcPlayingLikelihood(player, formResult) {
     // the crude season-minutes proxy, so startShare is only as good as that.
     estimated: Boolean(formResult?.estimated),
     startShare,
+    availability,
+    availabilitySource: hasFplChance ? 'fpl' : 'status',
+  };
+}
+
+// ─── §7.3b  Playtime security ─────────────────────────────────────────────────
+
+/**
+ * Map a 0–1 playtime security value onto its display band.
+ * Single source of truth for the label — the Ranker's Playtime column renders
+ * it and its filter pills match on it, so neither can drift from the other.
+ *
+ * @param {number} value  0–1
+ * @returns {{threshold: number, label: string, band: string}}
+ */
+export function playtimeBand(value) {
+  const v = Number.isFinite(value) ? value : 0;
+  for (const level of PLAYTIME_BANDS) {
+    if (v >= level.threshold) return level;
+  }
+  return PLAYTIME_BANDS[PLAYTIME_BANDS.length - 1];
+}
+
+/**
+ * How safe is this player's place in the starting XI?
+ *
+ * Answers the forward-looking question the Ranker's Playtime column asks,
+ * which the single backward ratio in calcPlayerForm never could. Built from
+ * pool-wide data only (bootstrap totals + squad composition), never from
+ * element-summary history — that is lazily fetched, so a model needing it
+ * would have nothing to work with for almost every row the Ranker draws.
+ *
+ * Four inputs, combined as three positive terms and one penalty:
+ *
+ *   startRate   starts ÷ elapsed GWs. The binary that matters most in FPL.
+ *   minShare    minutes ÷ minutes available. Catches the nailed-on starter who
+ *               is nonetheless hooked on 60 every week — start rate alone
+ *               scores him identically to a player finishing matches.
+ *   completion  minutes ÷ (starts × 90). Small tiebreaker; being subbed late
+ *               is ordinary squad management, not insecurity.
+ *   crowding    bodies ÷ slots in this club's group at this position. Scaled
+ *               by (1 − minShare) so it barely touches a player already
+ *               commanding his slot, and bites hardest on the genuinely
+ *               rotated. This is what separates a nailed starter at a
+ *               squad-heavy club from his rotating team-mate: the crowding
+ *               number is identical for both, because it describes the club's
+ *               position group rather than the player.
+ *
+ * MODEL: both rate terms are shrunk toward a price-derived prior worth
+ * PLAYTIME_PRIOR_GWS gameweeks of evidence. This is what makes GW1 behave —
+ * with one match played, a raw start rate is either 0.0 or 1.0 and neither is
+ * believable, so early on the prior dominates and by roughly GW10 the observed
+ * record has fully taken over. Price is the only pool-wide forward-looking
+ * role signal FPL exposes before a ball is kicked.
+ *
+ * Availability multiplies the result rather than capping it: an injured player
+ * with a cast-iron place is still a zero for the gameweek in front of him, and
+ * a doubtful one is genuinely half a player.
+ *
+ * @param {Player} player
+ * @param {object} ctx  needs { elapsedGws, playtimeByPlayerId } from buildScoreContext
+ * @returns {{value: number, band: string, label: string, estimated: boolean,
+ *            startRate: number, minutesShare: number, completion: number,
+ *            crowding: number, prior: number, availability: number,
+ *            availabilitySource: 'fpl'|'status'}}
+ *   value: 0–1, higher = more secure a starter. Direction: higher = better.
+ *   See FEATURE_ENGINE.md §7.3b.
+ */
+export function calcPlaytimeSecurity(player, ctx) {
+  const elapsedGws = Math.max(1, ctx?.elapsedGws ?? 1);
+  const entry      = ctx?.playtimeByPlayerId?.[player?.id] ?? null;
+
+  const minutes = player?.totals?.minutes ?? 0;
+  const starts  = player?.totals?.starts  ?? 0;
+
+  // Price-derived expected role. Falls back to the midpoint of the prior range
+  // when the pool context is missing, rather than to zero — an unknown player
+  // is an average one, not a certain non-starter.
+  const prior = entry?.prior ?? ((PLAYTIME_PRIOR_MIN + PLAYTIME_PRIOR_MAX) / 2);
+
+  // Shrunk toward the prior, in units of gameweeks and of 90-minute blocks
+  // respectively. Both denominators carry the same PLAYTIME_PRIOR_GWS of
+  // synthetic evidence, so the two terms stay on the same footing.
+  const startRate = clamp(0, 1, safeDiv(
+    starts + (PLAYTIME_PRIOR_GWS * prior),
+    elapsedGws + PLAYTIME_PRIOR_GWS, 0));
+
+  const minutesShare = clamp(0, 1, safeDiv(
+    minutes + (PLAYTIME_PRIOR_GWS * 90 * prior),
+    (elapsedGws + PLAYTIME_PRIOR_GWS) * 90, 0));
+
+  // Minutes per start. A player with no starts yet has nothing to say here, so
+  // he inherits the prior rather than scoring zero and being punished twice
+  // for the same absence.
+  const completion = starts > 0
+    ? clamp(0, 1, safeDiv(minutes, starts * 90, 0))
+    : prior;
+
+  const crowding = entry?.crowding ?? 1;
+  // Only the excess over one slot per body counts as pressure.
+  const crowdingExcess = clamp(0, 1,
+    safeDiv(crowding - 1, PLAYTIME_CROWDING_FULL - 1, 0));
+  const crowdingRisk = crowdingExcess * (1 - minutesShare);
+
+  const base =
+      (PLAYTIME_W_START      * startRate)
+    + (PLAYTIME_W_MINUTES    * minutesShare)
+    + (PLAYTIME_W_COMPLETION * completion);
+
+  const fplChance    = player?.chanceOfPlayingNext;
+  const hasFplChance = typeof fplChance === 'number' && Number.isFinite(fplChance);
+  const availability = hasFplChance
+    ? clamp(0, 100, fplChance)
+    : (STATUS_PLAY_CHANCE[player?.status] ?? STATUS_PLAY_CHANCE.available);
+
+  const value = clamp(0, 1,
+    (base - (PLAYTIME_W_CROWDING * crowdingRisk)) * (availability / 100));
+
+  const level = playtimeBand(value);
+
+  return {
+    value,
+    band:  level.band,
+    label: level.label,
+    // Honest about its own confidence: while the prior still outweighs the
+    // observed record, this figure is a projection rather than a measurement.
+    estimated: elapsedGws < PLAYTIME_PRIOR_GWS,
+    startRate,
+    minutesShare,
+    completion,
+    crowding,
+    prior,
     availability,
     availabilitySource: hasFplChance ? 'fpl' : 'status',
   };

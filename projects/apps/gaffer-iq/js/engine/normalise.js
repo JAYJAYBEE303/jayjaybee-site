@@ -203,9 +203,22 @@ export function normalisePlayer(raw) {
     chanceOfPlayingNext: typeof raw.chance_of_playing_next_round === 'number'
       ? raw.chance_of_playing_next_round
       : null,
+    // FPL's own rolling form figure: average points per match over the last 30
+    // days, as a decimal string upstream. NOT the same thing as `form` below,
+    // which engine/form.js computes — hence the distinct name. Surfaced raw in
+    // the Ranker's Form column so it can be read against our own model.
+    fplForm: parseFloat(raw.form) || 0,
     totals: {
       points:      raw.total_points || 0,
       minutes:     raw.minutes || 0,
+      // Appearances in the starting XI. Present in bootstrap-static since
+      // 2021/22. Defensive fallback: if the field ever disappears, estimate
+      // from minutes so engine/form.js's playtime model degrades to "assume a
+      // full game per 90 played" instead of reading every player as a
+      // never-starter, which is the single most damaging way this could fail.
+      starts:      typeof raw.starts === 'number'
+        ? raw.starts
+        : Math.round((raw.minutes || 0) / 90),
       goals:       raw.goals_scored || 0,
       assists:     raw.assists || 0,
       xG:          parseFloat(raw.expected_goals)   || 0,
