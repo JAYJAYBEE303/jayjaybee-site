@@ -40,6 +40,21 @@
      against this dark palette. */
   --band-light-green: #6fcf78;
 
+  /* --- Competition-zone colour (league table stripes and legend, NOT a
+     0-100 band — see components.css .fx-zone-key). The three European
+     places used to borrow --band-great, --band-good and --band-light-green,
+     which put three greens in one legend and read as a severity scale
+     rather than three separate competitions. Deep blue and orange are the
+     two colours the palette was missing; Conference keeps a green and takes
+     --band-good, the same green the form column uses for a win, so the
+     table carries one green meaning "good" instead of three meaning
+     nothing in particular. Held to the --band-… prefix per CONVENTIONS.md
+     §5.3 rather than opening a new one. Same Primer steps as the greens
+     they sit beside: blue-6 against --band-great's green-6, orange-4
+     against --band-good's green-4. */
+  --band-deep-blue: #1f6feb;
+  --band-orange:    #f0883e;
+
   /* --- Band background tints (card/chip backgrounds) --------------------- */
   --band-great-bg:       rgba(31, 140, 72,  0.15);
   --band-good-bg:        rgba(63, 185, 80,  0.12);

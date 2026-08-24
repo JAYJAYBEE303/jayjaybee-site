@@ -4545,9 +4545,13 @@
   background: var(--band-neutral);
 }
 
-.fx-zone-key--ucl  { background: var(--band-great); }
-.fx-zone-key--uel  { background: var(--band-good); }
-.fx-zone-key--uecl { background: var(--band-light-green); }
+/* One colour per competition, not a shade of one colour per finishing
+   position — these four zones are different destinations, not a ranking.
+   Deep blue and orange are the competitions' own colours; Conference takes
+   the same green .fx-pip--w uses for a win. See base.css. */
+.fx-zone-key--ucl  { background: var(--band-deep-blue); }
+.fx-zone-key--uel  { background: var(--band-orange); }
+.fx-zone-key--uecl { background: var(--band-good); }
 .fx-zone-key--rel  { background: var(--band-brutal); }
 
 /* Below this width .fx-table-wrap scrolls rather than crushing 13 columns. */
@@ -4589,9 +4593,9 @@ th.fx-league__num { text-align: right; }
 
 /* Zone stripe rides on the position cell as an inset shadow — a border-left on
    a border-collapse table is unreliable across the first-cell boundary. */
-.fx-league__row--ucl  .fx-league__pos { box-shadow: inset 3px 0 0 var(--band-great); }
-.fx-league__row--uel  .fx-league__pos { box-shadow: inset 3px 0 0 var(--band-good); }
-.fx-league__row--uecl .fx-league__pos { box-shadow: inset 3px 0 0 var(--band-light-green); }
+.fx-league__row--ucl  .fx-league__pos { box-shadow: inset 3px 0 0 var(--band-deep-blue); }
+.fx-league__row--uel  .fx-league__pos { box-shadow: inset 3px 0 0 var(--band-orange); }
+.fx-league__row--uecl .fx-league__pos { box-shadow: inset 3px 0 0 var(--band-good); }
 .fx-league__row--rel  .fx-league__pos { box-shadow: inset 3px 0 0 var(--band-brutal); }
 
 .fx-league__move {
