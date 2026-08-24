@@ -5088,7 +5088,11 @@ img.fx-crest {
    no flow content of its own to size it. */
 .landing__cluster {
   position: relative;
-  margin-top: var(--space-24);
+  /* 80px, down from 96px. The satellite cards sit well above the matchup
+     card's top edge, so the optical gap after the subhead already reads
+     larger than the measured one — pulled in one rung, not more, or the
+     headline block and the cluster start to crowd each other. */
+  margin-top: var(--space-20);
   height: 340px;
 }
 

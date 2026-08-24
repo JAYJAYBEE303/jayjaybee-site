@@ -5,13 +5,15 @@
  * visitor lands on before entering any module.
  *
  * Almost entirely presentational: the markup lives in index.html and the
- * styling in components.css. This file owns three things:
- *   1. the `is-landing` body class that hides the app chrome (see layout.css),
- *   2. the scroll-reveal system that fades each block in,
- *   3. one live value — the gameweek named in the eyebrow pill.
+ * styling in components.css. This file owns two things:
+ *   1. the scroll-reveal system that fades each block in,
+ *   2. one live value — the gameweek named in the eyebrow pill.
+ *
+ * Hiding the app chrome is NOT one of them — layout.css does that from the
+ * markup alone, so it survives first paint. See onRouteChanged().
  *
  * Store subscriptions:
- *   route:changed — toggles the body class and, on first entry, runs the reveal.
+ *   route:changed — on first entry to this route, runs the reveal.
  *   data:ready    — fills in the real gameweek number.
  */
 
@@ -123,12 +125,17 @@ function renderGameweek() {
   slot.textContent = `Live for Gameweek ${gw}`;
 }
 
-/** Show or hide the app chrome, and run the reveal the first time we are shown. */
+/**
+ * Run the reveal the first time this route is shown.
+ *
+ * Hiding the app chrome is deliberately NOT done here. This module cannot run
+ * until its whole import graph has downloaded, which is well after first paint
+ * — a class applied from JS made the nav render and then disappear. layout.css
+ * derives that state from `body:has(.landing.is-active)` instead, which is true
+ * in the shipped markup and costs no script.
+ */
 function onRouteChanged(moduleKey) {
-  const isLanding = moduleKey === MODULE_KEY;
-  document.body.classList.toggle('is-landing', isLanding);
-
-  if (!isLanding || hasRevealed) return;
+  if (moduleKey !== MODULE_KEY || hasRevealed) return;
   hasRevealed = true;
   initReveal();
 }
