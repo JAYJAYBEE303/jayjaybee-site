@@ -1119,10 +1119,21 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* ─── Two-column shell: filters (left) + table (right) ─────────────────────
-   Mirrors .dash-shell / .planner-shell's 300px-sidebar + 1fr-main pattern. */
+   Same shape as .dash-shell / .planner-shell, but deliberately not their fixed
+   300px sidebar: those panels hold squad cards that need the room, whereas the
+   Ranker's sidebar holds five narrow controls and its table is the widest
+   thing in the app. The track is content-sized instead — see below. */
 .ranker-shell {
   display: grid;
-  grid-template-columns: 300px 1fr;
+  /* The sidebar takes the width of its widest control and no more. That
+     control is the price <select>: browsers size a <select> to its widest
+     option, and "£10.0m and below" is the longest string either dropdown
+     can show — so the column stays correct on its own if PRICE_FILTER_MAX
+     ever moves, with no measured constant to keep in sync. The old fixed
+     300px was budgeted for four filter pills sitting side by side; those are
+     stacked now (.ranker-filter-group), and every pixel the sidebar gives up
+     goes to the table. */
+  grid-template-columns: max-content 1fr;
   gap: var(--space-6);
   padding: 0 var(--space-4) var(--space-8);
   align-items: start;
@@ -1156,12 +1167,23 @@
   min-width: 0; /* allow the table wrapper to shrink/scroll inside the grid track */
 }
 
-/* Position filter button group */
-.ranker-controls__pos-group {
+/* ─── Filter button groups ─────────────────────────────────────────────────
+   One button per row. Stacking is what lets .ranker-shell's max-content track
+   collapse to the width of the dropdowns — a wrapping strip of four pills
+   needed roughly twice that, so the table was paying for the sidebar's
+   layout. Nothing is hidden or shrunk to get the width back. */
+.ranker-filter-group {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
+  flex-direction: column;
   gap: var(--space-1);
+}
+
+/* Hairline above the second group so Position and Playtime read as two filter
+   axes rather than one run of eight buttons. --color-border-subtle, not
+   --color-border: this separates two things, it doesn't enclose either. */
+.ranker-filter-group--divided {
+  border-top: 1px solid var(--color-border-subtle);
+  padding-top: var(--space-4);
 }
 
 .ranker-pos-btn,
@@ -1174,7 +1196,10 @@
   font-weight: 700;
   font-family: var(--font-sans);
   letter-spacing: 0.06em;
-  padding: var(--space-1) var(--space-2);
+  /* Square padding: these are full-width rows now, not pills sized to their
+     text, so the horizontal half no longer does anything and 4px of vertical
+     padding read as cramped once each button spanned the sidebar. */
+  padding: var(--space-2);
   cursor: pointer;
   transition: background 0.12s, color 0.12s, border-color 0.12s;
   text-transform: uppercase;
@@ -1200,12 +1225,27 @@
   gap: 2px;
 }
 
-.ranker-controls__label {
+.ranker-controls__label,
+.ranker-filters__heading {
   font-size: var(--font-size-xs);
   color: var(--color-muted);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+  /* A label must never be the thing that sets the sidebar's width — that job
+     belongs to the control it describes. A definite width makes its
+     max-content contribution zero; the percentage min-width is ignored during
+     that same intrinsic sizing pass but resolves to the full column at layout
+     time. Net effect: renders full width, wraps if it has to, and "Avg Pts/GW
+     source" can never out-measure the dropdown below it. */
+  width: 0;
+  min-width: 100%;
+}
+
+/* Section headings for the two button groups. Same look as the <label>s above
+   the selects, since they do the same job one row up. */
+.ranker-filters__heading {
+  margin: 0 0 2px;
 }
 
 .ranker-select {
@@ -3463,8 +3503,9 @@
     width: 100%;
   }
 
-  /* Position filter buttons: 44px tap targets */
-  .ranker-pos-btn {
+  /* Filter buttons: 44px tap targets */
+  .ranker-pos-btn,
+  .ranker-minsec-btn {
     min-height: 44px;
     padding: var(--space-2) var(--space-2);
     display: inline-flex;

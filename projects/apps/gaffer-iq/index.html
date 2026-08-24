@@ -249,19 +249,28 @@
             <!-- Start deselected: no pill active means no filter on this axis
                  (see ranker.js's _activePosSet/_activeMinSecSet) — click a
                  position to narrow to just it, instead of deselecting the
-                 other three. -->
-            <div class="ranker-controls__pos-group" role="group" aria-label="Filter by position">
+                 other three.
+
+                 One button per row rather than a wrapping strip: the sidebar
+                 is sized to its widest child now (see .ranker-shell), and four
+                 pills side by side were the only thing making that wider than
+                 the dropdowns. Each group carries its own heading so the two
+                 filter axes stay legible once they're stacked. -->
+            <div class="ranker-filter-group" role="group" aria-labelledby="ranker-pos-heading">
+              <h3 class="ranker-filters__heading" id="ranker-pos-heading">Position</h3>
               <button class="ranker-pos-btn" data-pos="GKP" type="button">GKP</button>
               <button class="ranker-pos-btn" data-pos="DEF" type="button">DEF</button>
               <button class="ranker-pos-btn" data-pos="MID" type="button">MID</button>
               <button class="ranker-pos-btn" data-pos="FWD" type="button">FWD</button>
             </div>
 
-            <div class="ranker-controls__pos-group" role="group" aria-label="Filter by playtime security">
-              <button class="ranker-minsec-btn" data-minsec="Nailed" type="button">Nailed</button>
-              <button class="ranker-minsec-btn" data-minsec="Likely"     type="button">Likely</button>
-              <button class="ranker-minsec-btn" data-minsec="Rotation"   type="button">Rotation</button>
-              <button class="ranker-minsec-btn" data-minsec="Risk"       type="button">Risk</button>
+            <div class="ranker-filter-group ranker-filter-group--divided"
+                 role="group" aria-labelledby="ranker-playtime-heading">
+              <h3 class="ranker-filters__heading" id="ranker-playtime-heading">Playtime</h3>
+              <button class="ranker-minsec-btn" data-minsec="Nailed"   type="button">Nailed</button>
+              <button class="ranker-minsec-btn" data-minsec="Likely"   type="button">Likely</button>
+              <button class="ranker-minsec-btn" data-minsec="Rotation" type="button">Rotation</button>
+              <button class="ranker-minsec-btn" data-minsec="Risk"     type="button">Risk</button>
             </div>
 
             <div class="ranker-controls__select-wrap">
