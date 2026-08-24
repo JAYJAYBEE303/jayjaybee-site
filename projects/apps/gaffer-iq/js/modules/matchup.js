@@ -1129,7 +1129,9 @@ function buildPairingExplainer(p, key, perspective, isChannel, hasValue) {
   return `
     <div class="counter-pairing-info__explain">
       <p class="counter-pairing-info__note">
-        Both figures are <strong>shares of a team's own xG</strong>, not volumes —
+        Both figures are <strong>shares of a team's own xG</strong> —
+        <em>expected goals</em>, which rates every shot from 0 to 1 by how likely
+        it was to be scored, whether or not it went in. Shares, not volumes:
         they describe <em>how</em> a side scores and concedes, not how much.
       </p>
       <ul class="counter-pairing-info__terms">
@@ -1152,9 +1154,10 @@ function buildPairingExplainer(p, key, perspective, isChannel, hasValue) {
  * existing .individual-duel classes so the panel matches the Individual Duels
  * section visually.
  *
- * Renders an explicit no-data state rather than blank: duels are empty whenever
- * player summaries or ICT data haven't loaded (pre-season, or before the user
- * has browsed the Ranker), which is a normal condition, not an error.
+ * Renders NOTHING when there are no duels to show — see the note at the guard
+ * below. Duels are empty whenever player summaries or ICT data haven't loaded
+ * (pre-season, or before the user has browsed the Ranker), which is the common
+ * case and a normal condition, not an error worth announcing.
  *
  * @param {Array} duels                 calcIndividualDuels result, attacking side
  * @param {string} pairingKey
@@ -1163,11 +1166,14 @@ function buildPairingExplainer(p, key, perspective, isChannel, hasValue) {
 function buildPairingPlayers(duels, pairingKey, perspective) {
   const matched = duelsForPairing(duels, pairingKey);
 
-  if (matched.length === 0) {
-    return `<p class="counter-pairing-info__empty">Named players not loaded yet —`
-         + ` the score above does not depend on them. Open some players in the`
-         + ` Ranker to load their form, then revisit to see who is involved.</p>`;
-  }
+  // Nothing at all when there are no players to name. This used to render a
+  // "not loaded yet — open some players in the Ranker" line, which appeared in
+  // EVERY panel (duels need lazily-fetched player summaries, so the common case
+  // is empty) and read as a warning about the score. It is not one: the pairing
+  // score is computed from team-level shot data and does not use duels at all.
+  // A permanent notice about an optional extra was pure noise, so the section
+  // is simply absent until it has something to show.
+  if (matched.length === 0) return '';
 
   return matched.map(d => {
     const atkForm = Math.round(d.attacker.formValue);

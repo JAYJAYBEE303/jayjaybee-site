@@ -787,13 +787,6 @@
   margin-left: var(--space-2);
 }
 
-.counter-pairing-info__empty {
-  margin: 0;
-  font-size: var(--font-size-xs);
-  color: var(--color-muted);
-  font-style: italic;
-}
-
 /* Explanation block at the top of a pairing's "i" panel — what the score and
    the two percentages mean, above the named players. Separated from the player
    rows by a rule so the two halves of the panel read as distinct answers. */

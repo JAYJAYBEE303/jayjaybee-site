@@ -797,7 +797,12 @@ Each Attacking/Defending Counters row opens onto a disclosure panel. It used to
 contain only the named players behind the pairing, which answered *who is
 involved* but never *what am I looking at* — the score and its two percentages
 were documented nowhere in the UI, so they read as arbitrary. The panel now
-leads with an explanation and keeps the player list beneath it.
+leads with an explanation and keeps the player list beneath it — when there is
+one. Duels depend on lazily-fetched player summaries, so the common case is no
+players at all; that section is now simply absent rather than carrying a
+"not loaded yet" notice, which appeared in every panel and read as a caveat
+about the score. It is not one — the pairing score comes from team-level shot
+data and never consults duels.
 
 The explanation states, for the row's own axis:
 
