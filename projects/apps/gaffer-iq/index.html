@@ -4,6 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gaffer IQ</title>
+
+  <!-- Anton — the landing hero headline only (--font-display, base.css). The
+       app is otherwise system-fonts-only; this is the single web font, and the
+       only external asset request the page makes. display=swap so the headline
+       renders in the fallback stack immediately rather than sitting invisible
+       if Google Fonts is slow or blocked. The preconnects open the two
+       connections (stylesheet host, then font-file host) before the CSS is
+       parsed, which is most of the round-trip cost. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&display=swap">
+
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/layout.css">
   <link rel="stylesheet" href="css/components.css">

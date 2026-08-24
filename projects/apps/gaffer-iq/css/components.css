@@ -5060,12 +5060,18 @@ img.fx-crest {
   flex-shrink: 0;
 }
 
+/* The one place in the app that does not use --font-sans. Anton is a
+   single-weight display face, so this stays at 400 — the tight tracking and
+   negative letter-spacing the sans headline needed are wrong for it, hence the
+   positive 0.005em and the sub-1 line-height instead. */
 .landing__title {
+  font-family: var(--font-display);
   font-size: var(--font-size-hero);
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  line-height: 1.02;
-  max-width: 920px;
+  font-weight: 400;
+  letter-spacing: 0.005em;
+  line-height: 0.98;
+  text-transform: uppercase;
+  max-width: 960px;
 }
 
 .landing__title-accent {
