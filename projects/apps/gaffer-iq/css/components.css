@@ -4559,6 +4559,22 @@
   white-space: nowrap;
 }
 
+/* Pl through GD are the workings; PTS is the answer. Eight columns of
+   identically-weighted figures gave the eye nothing to aim at, so everything
+   feeding into the total drops to --color-muted and .fx-league__pts keeps
+   --color-text plus its 700 weight — the contrast is what locates the column,
+   not the position on the row.
+
+   Scoped to .fx-league deliberately, for the same reason th.fx-league__num
+   above is NOT: the By team split and the head-to-head venue split reuse this
+   modifier on plain .fx-table markup and have no points column to set off, so
+   greying them there would just dim an entire table for no gain.
+
+   :not() rather than leaning on source order — the points cell carries both
+   classes, so without the exclusion this rule's higher specificity would grey
+   the one figure it exists to make stand out. */
+.fx-league td.fx-league__num:not(.fx-league__pts) { color: var(--color-muted); }
+
 /* Right-align the HEADER of a numeric column too. Deliberately NOT scoped to
    .fx-league: the By team split and the head-to-head venue split use the same
    modifier on plain .fx-table markup, and a left-aligned label sitting over
