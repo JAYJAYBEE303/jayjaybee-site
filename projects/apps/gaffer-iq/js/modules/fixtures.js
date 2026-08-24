@@ -656,6 +656,30 @@ function h2hMiniHtml(fixture, home, away) {
  * on the pitch. An upcoming fixture has neither, and a played one needs the
  * GW's live payload, fetched lazily when the disclosure is first opened.
  */
+/**
+ * Is a match's Understat payload still on its way?
+ *
+ * Both blocks of the match report -- the event timeline and the lineups --
+ * come from the same store.matchDetail entry, and both have an FPL-derived
+ * fallback that looks nothing like the real thing: grouped totals in two
+ * left-aligned lists, versus a centred minute-by-minute feed. Rendering that
+ * fallback while the real payload was a second away meant opening a fixture
+ * showed one layout and then visibly swapped to a different one. This lets the
+ * caller say "wait" instead, so the fallback appears only when it is the final
+ * answer rather than a placeholder for one.
+ *
+ * @param {Fixture} fixture
+ * @returns {boolean}  true while the payload may still arrive
+ */
+function timelinePending(fixture) {
+  if (_timelineFailed.has(fixture.id)) return false;
+  if (store.getMatchDetail(fixture.id)) return false;
+  // The fixture->match lookup is derived from Understat's league payload.
+  // Until that lands ensureTimeline cannot even ask, so nothing is in flight
+  // and the FPL fallback is the best available answer, not a placeholder.
+  return Boolean(store.getLeagueXg());
+}
+
 function matchReportHtml(fixture, home, away) {
   const status = statusOf(fixture);
 
@@ -680,8 +704,13 @@ function matchReportHtml(fixture, home, away) {
   // both its calls have landed, so until then (or if they fail) fall back to
   // FPL's grouped totals rather than showing nothing.
   const timeline = timelineHtml(fixture);
+  const pending  = timelinePending(fixture);
 
-  const eventsBlock = timeline ?? `
+  const eventsBlock = timeline ?? (pending ? `
+      <section class="fx-detail__block">
+        <h4 class="fx-detail__title">Match events</h4>
+        ${emptyState('Loading the minute-by-minute feed\u2026')}
+      </section>` : `
       <section class="fx-detail__block">
         <h4 class="fx-detail__title">Match events</h4>
         ${anyEvents ? `
@@ -690,17 +719,21 @@ function matchReportHtml(fixture, home, away) {
             <ul class="fx-events fx-events--away">${events.away.map(eventHtml).join('')}</ul>
           </div>` : emptyState('No goals, assists or cards recorded.')}
         <p class="fx-detail__note">
-          ${_timelineFailed.has(fixture.id)
-            ? 'Understat\u2019s timeline could not be loaded, so these are FPL\u2019s per-match totals: grouped by type, without minutes.'
-            : 'Loading the minute-by-minute feed\u2026 showing FPL\u2019s per-match totals meanwhile.'}${fixture.played && !fixture.bonusConfirmed
+          Understat\u2019s timeline is unavailable for this match, so these are
+          FPL\u2019s per-match totals: grouped by type, without
+          minutes.${fixture.played && !fixture.bonusConfirmed
             ? ' Bonus points for this match are still provisional.' : ''}
         </p>
-      </section>`;
+      </section>`);
 
   return `
       ${eventsBlock}
 
-      ${lineupsHtml(fixture, home, away) ?? `
+      ${lineupsHtml(fixture, home, away) ?? (pending ? `
+      <section class="fx-detail__block">
+        <h4 class="fx-detail__title">Lineups</h4>
+        ${emptyState('Loading the teamsheets\u2026')}
+      </section>` : `
       <section class="fx-detail__block">
         <h4 class="fx-detail__title">Who featured</h4>
         <div class="fx-detail__cols">
@@ -712,7 +745,7 @@ function matchReportHtml(fixture, home, away) {
           publishes no teamsheet. The real XI comes from Understat and is not
           available for this match.
         </p>
-      </section>`}`;
+      </section>`)}`;
 }
 
 /**
@@ -791,6 +824,18 @@ function renderGameweekPane() {
   const event    = store.getEvents().find(e => e.id === gw) ?? null;
   const fixtures = store.getFixtures().filter(f => f.gw === gw);
   const groups   = groupByDay(fixtures);
+
+  // Every fixture rendered OPEN needs its timeline request started, not just
+  // the one the user last toggled. A pane can paint with fixtures already open
+  // — a repaint once live data lands, or Understat's league payload arriving
+  // after the user had opened one — and matchReportHtml shows a pending
+  // placeholder whenever a timeline could still arrive. Requesting here keeps
+  // the invariant that nothing ever renders that placeholder without a live
+  // request behind it. ensureTimeline is a no-op for anything already
+  // requested, failed, or loaded, so this costs nothing on a repaint.
+  for (const f of fixtures) {
+    if (_openFixtures.has(f.id) && statusOf(f) !== 'upcoming') ensureTimeline(f);
+  }
 
   const legend = STATUS_CHIPS.map(c => `
     <span class="fx-legend__item">
@@ -874,6 +919,49 @@ function ensureLive(gw) {
 }
 
 /**
+ * Give up on a fixture's timeline, and repaint so the UI stops waiting for it.
+ *
+ * The repaint is not optional. matchReportHtml now renders a "loading"
+ * placeholder for as long as timelinePending() is true, and this flag is what
+ * makes it false -- so a path that sets the flag without repainting leaves the
+ * placeholder on screen permanently. Two of the three call sites below used to
+ * do exactly that; only the .catch() repainted.
+ *
+ * Deferred to a microtask because the "no match id" path runs synchronously
+ * inside the <details> toggle handler, and replacing the pane's markup
+ * mid-dispatch would pull the element being toggled out from under the event.
+ *
+ * @param {number} fixtureId
+ * @param {string} reason  logged, not shown -- the UI wording is fixed copy
+ */
+function failTimeline(fixtureId, reason) {
+  _timelineFailed.add(fixtureId);
+  console.warn(`[fixtures] ${reason}`);
+  queueGameweekRepaint();
+}
+
+// Set while a repaint is already queued, so a gameweek where several fixtures
+// have no Understat match collapses to one repaint instead of one per fixture.
+let _repaintQueued = false;
+
+/**
+ * Repaint the gameweek pane once, after the current task finishes.
+ *
+ * Deferred rather than immediate because failTimeline's "no match id" path runs
+ * synchronously inside the <details> toggle handler, and replacing the pane's
+ * markup mid-dispatch would pull the element being toggled out from under the
+ * event.
+ */
+function queueGameweekRepaint() {
+  if (_repaintQueued) return;
+  _repaintQueued = true;
+  queueMicrotask(() => {
+    _repaintQueued = false;
+    if (_mode === 'gameweek') renderGameweekPane();
+  });
+}
+
+/**
  * Fetch, parse and cache one fixture's Understat match timeline, once.
  *
  * Two upstream calls: the match page for the chronological feed (the only
@@ -900,10 +988,9 @@ function ensureTimeline(fixture) {
   const matchId = findUnderstatMatchId(fixture, leagueXg, store.getSeason()?.teamsById);
   if (!matchId) {
     // League data IS loaded and still no match — Understat genuinely has no
-    // record of this fixture. Flag it so the FPL fallback renders its final
-    // wording instead of a permanent "loading".
-    _timelineFailed.add(fixture.id);
-    console.warn(`[fixtures] no Understat match found for fixture ${fixture.id}`);
+    // record of this fixture. Flag it so the FPL fallback replaces the loading
+    // placeholder instead of the placeholder sitting there for ever.
+    failTimeline(fixture.id, `no Understat match found for fixture ${fixture.id}`);
     return;
   }
 
@@ -911,7 +998,10 @@ function ensureTimeline(fixture) {
 
   fetchMatchTimeline(matchId)
     .then(async (events) => {
-      if (!events.length) { _timelineFailed.add(fixture.id); return; }
+      if (!events.length) {
+        failTimeline(fixture.id, `Understat returned an empty timeline for fixture ${fixture.id}`);
+        return;
+      }
 
       // One extra call gives BOTH the goal→assist pairing and the teamsheets.
       // Optional: without it the feed still renders, just without assists and
@@ -928,9 +1018,8 @@ function ensureTimeline(fixture) {
       store.setMatchDetail(fixture.id, { events, lineups });
     })
     .catch((err) => {
-      _timelineFailed.add(fixture.id);
-      console.warn(`[fixtures] Understat timeline unavailable for fixture ${fixture.id}: ${err.message ?? err}`);
-      if (_mode === 'gameweek') renderGameweekPane();
+      failTimeline(fixture.id,
+        `Understat timeline unavailable for fixture ${fixture.id}: ${err.message ?? err}`);
     });
 }
 
