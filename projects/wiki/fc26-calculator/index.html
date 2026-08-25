@@ -1,0 +1,95 @@
+---
+layout: wiki-entry
+slug: fc26-calculator
+order: 20
+group: Tools
+title: FC26 Feel Calculator
+kind: Application
+revised: 2026-08-25
+steward: Josh Bailey
+status: draft
+app_url: /projects/apps/fc26-calculator/
+description: FC26 Feel Calculator — models what a player actually feels like on the pitch in EA FC 26, past the raw card numbers into chemistry, PlayStyles and the game's hidden curves.
+lede: The card says 87 pace. The player does not feel like 87 pace. This works out the difference.
+summary: About 2,500 lines of HTML and vanilla JS in a single file with no build step, rebuilt in Tailwind once the formulas stopped moving, with separate layouts for a focused mobile read and a comparison-heavy desktop one.
+info:
+  Status: Live · iterating
+  Stack: HTML · JS · Tailwind
+  Build step: None
+  Size: ~2,500 lines · one file
+  Layouts: Mobile read · desktop compare
+  First shipped: 2026
+---
+
+<!-- =============================================================
+     PLACEHOLDER COPY. The structure, metadata, links, footnotes
+     and cross-references below are real and final. The prose is a
+     representative stand-in written from the existing /projects
+     summary — it is not the finished write-up.
+
+     Two markup conventions are available in this body and are compiled
+     at build time: the double-square-bracket internal wiki link and the
+     double-parenthesis footnote. Both are documented, with literal
+     examples, in _includes/wiki-body.html - which is also why the
+     examples are NOT repeated here. A literal example inside this
+     comment would be compiled too, and would inject a phantom footnote
+     into the page.
+     ============================================================= -->
+
+<p>An EA FC card is a list of two-digit numbers. What a player feels
+like under your thumb is something else: the numbers after chemistry
+has been applied, after PlayStyles have moved the curves, and after
+the game's own non-linear scaling has decided that the gap between 84
+and 88 is not the same size as the gap between 88 and 92.</p>
+
+<p>This calculator models that second thing. It exists because I wanted
+the version of it I could not find.</p>
+
+<h2>What it models</h2>
+
+<ul>
+  <li><strong>Chemistry</strong> — the actual applied boosts at each
+  chemistry level, not the headline figure.</li>
+  <li><strong>PlayStyles</strong> — including the plus tiers, which
+  change behaviour rather than just adding points.</li>
+  <li><strong>The underlying curves</strong> — the diminishing returns
+  the game runs that make raw stat comparison misleading at the top of
+  the range.((These were derived from in-game testing across several
+  rounds of tuning, not from any published source. They are a model of
+  the game's behaviour, not a reading of its code.))</li>
+</ul>
+
+<h2>How it is built</h2>
+
+<h3 class="mono-label">One file, no build</h3>
+
+<p>Around 2,500 lines of HTML and vanilla JavaScript in a single
+document. No bundler, no framework, no build step — which means the
+thing that ships is the thing I edited, and there is no toolchain to
+rot between one game cycle and the next.</p>
+
+<h3 class="mono-label">Two layouts</h3>
+
+<p>Mobile gets a single focused read: one player, the numbers that
+matter, nothing else. Desktop gets the comparison view, because
+comparison is what people actually open a calculator for and it needs
+horizontal room. The UI was rebuilt in Tailwind once the maths had
+stopped moving — deliberately in that order, so styling effort was not
+spent on layouts the formulas were about to invalidate.</p>
+
+<h2>What it taught me</h2>
+
+<p>More about state management in plain JavaScript than any framework
+tutorial has. With no framework holding the state, every stale-value
+bug is yours, visible, and instructive.</p>
+
+<p>It also set the pattern the rest of the work follows: model the
+thing properly first, argue with the model against reality, and only
+then make it look like something. [[gaffer-iq|Gaffer IQ]] was built the
+same way round.</p>
+
+<h2>Still to write</h2>
+
+<p>The formula-tuning log — what the first version got wrong, which
+in-game tests moved the numbers most, and where the model is still
+knowingly approximate.</p>

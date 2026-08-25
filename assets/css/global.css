@@ -9,11 +9,16 @@
    Cascade order matters — variables first (so role tokens exist before
    anything tries to use them), then layout, then components, then the
    base rules below.
+
+   wiki.css is the /projects/wiki layer. It is imported last so it can
+   lean on every token and component above it, and it is the only
+   partial that is page-specific rather than site-wide.
    ========================================================================= */
 
 @import url('variables.css?v=41');
 @import url('layout.css?v=43');
 @import url('components.css?v=47');
+@import url('wiki.css?v=1');
 
 /* =========================================================================
    RESET + BASE

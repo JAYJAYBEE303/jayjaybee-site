@@ -1,0 +1,105 @@
+---
+layout: wiki-entry
+slug: gaffer-iq
+order: 10
+group: Tools
+title: Gaffer IQ
+kind: Application
+revised: 2026-08-25
+steward: Josh Bailey
+status: draft
+app_url: /projects/apps/gaffer-iq/
+description: Gaffer IQ — a Fantasy Premier League analysis tool with fixture difficulty ratings built from form, home/away splits, style clashes and positional counter-matchups.
+lede: A Fantasy Premier League tool that stops treating fixture difficulty as a single colour-coded number, and starts treating it as a matchup.
+summary: Four modules over one scoring engine — Matchup Analyser, Player Ranker, GW Decision Dashboard, Transfer Planner — fed by the FPL API through a Vercel proxy and supplemented with Understat xG for style profiling.
+info:
+  Status: Live · iterating
+  Stack: HTML · JS · vanilla CSS
+  Backend: Vercel serverless proxy
+  Data: FPL API · Understat xG
+  Modules: Matchup · Ranker · Dashboard · Planner
+  First shipped: 2026
+---
+
+<!-- =============================================================
+     PLACEHOLDER COPY. The structure, metadata, links, footnotes
+     and cross-references below are real and final. The prose is a
+     representative stand-in written from the existing /projects
+     summary — it is not the finished write-up.
+
+     Two markup conventions are available in this body and are compiled
+     at build time: the double-square-bracket internal wiki link and the
+     double-parenthesis footnote. Both are documented, with literal
+     examples, in _includes/wiki-body.html - which is also why the
+     examples are NOT repeated here. A literal example inside this
+     comment would be compiled too, and would inject a phantom footnote
+     into the page.
+     ============================================================= -->
+
+<p>Every Fantasy Premier League tool will tell you that a fixture is
+green or red. Almost none will tell you <em>why</em>, and none of them
+account for the thing that decides most gameweeks: that difficulty is
+not a property of a team, it is a property of a pairing. Gaffer IQ
+exists to model the pairing.</p>
+
+<h2>What it does</h2>
+
+<p>The engine scores a fixture by combining four signals rather than
+one: current team form, the home and away split for both sides, a
+style clash rating derived from how each team actually creates and
+concedes chances, and a position-level counter-matchup — how this
+defence tends to handle this kind of attacker.((Style profiling uses
+Understat expected-goals data rather than the FPL API's own numbers,
+which carry no shot-quality information at all.))</p>
+
+<p>That score then drives four modules that all read from the same
+engine:</p>
+
+<ul>
+  <li><strong>Matchup Analyser</strong> — one fixture, taken apart into
+  its contributing signals, so the rating can be argued with rather
+  than just trusted.</li>
+  <li><strong>Player Ranker</strong> — every player sorted by projected
+  return over a chosen horizon, with full names rather than the FPL
+  API's web names.</li>
+  <li><strong>GW Decision Dashboard</strong> — captain, bench order and
+  the marginal calls for the coming gameweek.</li>
+  <li><strong>Transfer Planner</strong> — multi-week planning against
+  the fixture ticker, including hit maths.</li>
+</ul>
+
+<h2>How it is built</h2>
+
+<h3 class="mono-label">The proxy</h3>
+
+<p>The FPL API sends no CORS headers, so a browser cannot call it
+directly. A small Vercel serverless function sits in front of it and
+forwards the responses. That one function is the only server-side code
+in the project; everything else is static.</p>
+
+<h3 class="mono-label">The engine</h3>
+
+<p>Scoring is a pure function: fixtures and form data in, a rating out,
+no reads from anything the caller cannot see. That constraint was not
+architectural purity for its own sake — it is what makes the ratings
+testable against real results at the end of a gameweek, which is the
+only way a model like this ever gets calibrated.</p>
+
+<blockquote>A rating you cannot check against last Saturday is a
+horoscope with extra steps.</blockquote>
+
+<h2>What it shares with the rest of the site</h2>
+
+<p>Nothing. Gaffer IQ owns its entire document — its own head, fonts,
+tokens and stylesheets — and inherits none of jayjaybee.com's design
+system, exactly like [[fc26-calculator|the FC26 Feel Calculator]]. The
+only connection in either direction is the launch link at the top of
+this entry.((Sub-projects under <code>/projects/apps/</code> are
+excluded from the site layout in <code>_config.yml</code> so this stays
+true even if one of them later grows front matter.))</p>
+
+<h2>Still to write</h2>
+
+<p>The calibration story — how the weights were tuned across a season,
+what the model got badly wrong in the first month, and which signal
+turned out to matter least.</p>

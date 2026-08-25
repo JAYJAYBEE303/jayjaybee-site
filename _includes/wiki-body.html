@@ -1,0 +1,68 @@
+{%- comment -%}
+=============================================================================
+  wiki-body.html — compiles the two wiki markup conventions at BUILD time.
+
+    [[slug|label]]   internal wiki link  ->  <a class="wl" href="/projects/wiki/slug/">label</a>
+    ((text))         footnote            ->  <sup class="wk-fn">n</sup> + a numbered
+                                              note in the Notes list, per entry
+
+  Carried forward from wiki-bundle/ds/pages/wiki.html, which did the same
+  two transforms in the browser. Doing them at build time instead means the
+  finished prose is in the HTML source, so the site's own search.js — which
+  walks <main id="main"> — indexes wiki entries for free, and the page still
+  reads correctly with JavaScript off.
+
+  Usage, from _layouts/wiki-entry.html:
+      {% capture wk_raw %}{{ content }}{% endcapture %}
+      {% include wiki-body.html html=wk_raw %}
+
+  Outputs the <div class="wk-body"> and, if the entry has any footnotes,
+  the Notes section after it.
+
+  Authoring rules this relies on:
+    * Every [[slug|…]] must name a slug that exists as an entry page.
+      An unknown slug will not be matched and its trailing ]] will still
+      close, producing visibly broken markup — which is the point: it
+      fails loudly at build rather than silently linking nowhere.
+    * `]]` is reserved. It cannot appear in body copy for any other reason.
+    * Links are compiled BEFORE footnotes, so a footnote may contain a
+      [[link]] but a link label may not contain a ((footnote)).
+=============================================================================
+{%- endcomment -%}
+
+{%- assign wk_entries = site.pages | where_exp: "p", "p.layout == 'wiki-entry'" | sort: "order" -%}
+{%- assign out = include.html -%}
+
+{%- comment -%} ---- pass 1: internal links ---- {%- endcomment -%}
+{%- for e in wk_entries -%}
+  {%- capture wk_needle -%}[[{{ e.slug }}|{%- endcapture -%}
+  {%- capture wk_tag -%}<a class="wl" href="{{ e.url }}" data-peek-kind="{{ e.kind | escape }}" data-peek-title="{{ e.title | escape }}" data-peek-lede="{{ e.lede | escape }}">{%- endcapture -%}
+  {%- assign out = out | replace: wk_needle, wk_tag -%}
+{%- endfor -%}
+{%- assign out = out | replace: "]]", "</a>" -%}
+
+{%- comment -%} ---- pass 2: footnotes ---- {%- endcomment -%}
+{%- assign wk_chunks = out | split: "((" -%}
+{%- assign wk_body = wk_chunks[0] -%}
+{%- assign wk_notes = "" -%}
+{%- if wk_chunks.size > 1 -%}
+  {%- for c in wk_chunks offset: 1 -%}
+    {%- assign n = forloop.index -%}
+    {%- assign note = c | split: "))" | first -%}
+    {%- assign cut = note | size | plus: 2 -%}
+    {%- assign rest = c | slice: cut, 200000 -%}
+    {%- capture wk_marker -%}<sup class="wk-fn" id="wk-fnref-{{ n }}"><a href="#wk-note-{{ n }}" aria-label="Footnote {{ n }}">{{ n }}</a></sup>{%- endcapture -%}
+    {%- assign wk_body = wk_body | append: wk_marker | append: rest -%}
+    {%- capture wk_li -%}<li id="wk-note-{{ n }}">{{ note }} <a class="wk-notes__back" href="#wk-fnref-{{ n }}" aria-label="Back to text">&#8617;</a></li>{%- endcapture -%}
+    {%- assign wk_notes = wk_notes | append: wk_li -%}
+  {%- endfor -%}
+{%- endif -%}
+
+<div class="wk-body" id="wk-body">{{ wk_body }}</div>
+
+{%- if wk_notes != "" %}
+<section class="wk-notes" aria-labelledby="wk-notes-h">
+  <p class="wk-notes__h mono-label" id="wk-notes-h">Notes</p>
+  <ol>{{ wk_notes }}</ol>
+</section>
+{%- endif -%}

@@ -1,0 +1,87 @@
+---
+layout: default
+title: Wiki — Projects — Josh Bailey
+description: Write-ups for the things I've built. What each one is, why it exists, how it works, and what it taught me — with a link out to the live app.
+scroll_gate: false
+---
+
+<!-- =============================================================
+     /projects/wiki — the index of write-ups.
+
+     Deliberately built from the site's OWN .work-* components, the
+     same ones /projects/index.html uses. That means this page needs
+     nothing at all from assets/css/wiki.css: it inherits the type,
+     colour, rhythm, hover behaviour and reveal-on-scroll animation
+     that the projects landing page already has, and it will follow
+     any future change to them for free.
+
+     The list is generated from the entry pages themselves — every
+     page whose layout is `wiki-entry` — sorted by their `order`
+     front matter. There is no separate manifest to keep in sync;
+     adding a folder under /projects/wiki/ adds a row here.
+
+     `scroll_gate: false` matches /projects: there is no hero to
+     read first, so the work should just be there. Per-element
+     reveal still runs.
+     ============================================================= -->
+
+{%- assign wk_entries = site.pages | where_exp: "p", "p.layout == 'wiki-entry'" | sort: "order" -%}
+
+<section class="work" aria-labelledby="wiki-heading">
+  <header class="section-head">
+    <span class="mono-label">Project&nbsp;wiki</span>
+    <h1 id="wiki-heading" class="section-title section-title--display">How they work.</h1>
+  </header>
+
+  <p class="prose">
+    One entry per project: what it is, why it exists, how the thing
+    actually works underneath, and what broke on the way. Each entry
+    links out to the live app it describes — the apps themselves are
+    standalone and share no code with this site or with each other.
+  </p>
+
+  <ol class="work-list" role="list">
+
+    {%- for e in wk_entries %}
+    <li class="work-item work-item--featured">
+      <div class="work-meta">
+        <span class="mono">{{ e.kind }}</span>
+        <span class="mono-sep" aria-hidden="true">·</span>
+        <span class="mono">{{ e.group }}</span>
+        <span class="mono-sep" aria-hidden="true">·</span>
+        <span class="mono">Revised {{ e.revised }}</span>
+        {%- if e.status == 'draft' %}
+        <span class="mono-sep" aria-hidden="true">·</span>
+        <span class="mono">Draft</span>
+        {%- endif %}
+      </div>
+
+      <h3 class="work-title">
+        <a href="{{ e.url }}" class="work-link">{{ e.title }}</a>
+      </h3>
+
+      <p class="work-lede">{{ e.lede }}</p>
+
+      {%- if e.summary %}
+      <p class="work-body">{{ e.summary }}</p>
+      {%- endif %}
+
+      <dl class="work-attrs">
+        <div class="work-attr">
+          <dt class="mono-label">Kind</dt>
+          <dd>{{ e.kind }}</dd>
+        </div>
+        <div class="work-attr">
+          <dt class="mono-label">Steward</dt>
+          <dd>{{ e.steward }}</dd>
+        </div>
+        <div class="work-attr">
+          <dt class="mono-label">Entry</dt>
+          <dd>{{ forloop.index | prepend: '0' | slice: -2, 2 }} / {{ wk_entries.size | prepend: '0' | slice: -2, 2 }}</dd>
+        </div>
+      </dl>
+    </li>
+    {%- endfor %}
+
+  </ol>
+</section>

@@ -1,0 +1,181 @@
+---
+layout: default
+---
+{%- comment -%}
+=============================================================================
+  wiki-entry.html — the shell around every /projects/wiki/<slug>/ write-up.
+
+  Nests inside _layouts/default.html, so the header, nav, search, footer,
+  theme toggle, paper grain, type scale and reveal animations all come from
+  the main site with nothing restated here. An entry page therefore carries
+  front matter plus body prose and nothing else.
+
+  Front matter an entry page declares:
+      layout:   wiki-entry          (required)
+      slug:     gaffer-iq           (must match the folder name)
+      order:    10                  (sort position across the whole wiki)
+      group:    Tools               (rail grouping; the string is the label)
+      title:    Gaffer IQ
+      kind:     Application         (shown in the meta strip and hover peek)
+      revised:  2026-08-25
+      steward:  Josh Bailey
+      lede:     one italic sentence
+      status:   draft               (optional — renders the draft banner)
+      app_url:  /projects/apps/gaffer-iq/   (optional — the Launch button)
+      info:     mapping of key/value rows for the infobox (optional)
+
+  Everything derived below — the rail index, numbering, backlinks, pager —
+  is read from those pages at build time. There is no second manifest to
+  keep in sync.
+=============================================================================
+{%- endcomment -%}
+
+{%- assign wk_entries = site.pages | where_exp: "p", "p.layout == 'wiki-entry'" | sort: "order" -%}
+{%- assign wk_groups = wk_entries | map: "group" | uniq -%}
+
+{%- comment -%} Position of this entry, for the meta strip and the pager. {%- endcomment -%}
+{%- assign wk_idx = 0 -%}
+{%- for e in wk_entries -%}
+  {%- if e.slug == page.slug -%}{%- assign wk_idx = forloop.index0 -%}{%- endif -%}
+{%- endfor -%}
+{%- assign wk_pi = wk_idx | minus: 1 -%}
+{%- assign wk_ni = wk_idx | plus: 1 -%}
+
+<section class="wk" aria-labelledby="wk-title">
+  <div class="wk-layout">
+
+    <!-- ===================================================================
+         Left rail — the whole wiki index, plus the on-this-page list that
+         wiki.js fills in from the article's own headings.
+         =================================================================== -->
+    <aside class="wk-rail" aria-label="Wiki navigation">
+
+      {%- assign wk_n = 0 -%}
+      {%- for g in wk_groups -%}
+      {%- assign wk_gitems = wk_entries | where: "group", g -%}
+      <div class="wk-rail__block">
+        <p class="wk-rail__h">
+          <span class="mono-label">{{ g }}</span>
+          <span class="mono-label">{{ wk_gitems.size | prepend: '0' | slice: -2, 2 }}</span>
+        </p>
+        <nav class="wk-nav">
+          {%- for e in wk_gitems -%}
+          {%- assign wk_n = wk_n | plus: 1 -%}
+          <a href="{{ e.url }}"{% if e.slug == page.slug %} aria-current="page"{% endif %}>
+            <span class="wk-nav__n">{{ wk_n | prepend: '0' | slice: -2, 2 }}</span>
+            <span class="wk-nav__t">{{ e.title }}</span>
+          </a>
+          {%- endfor -%}
+        </nav>
+      </div>
+      {%- endfor -%}
+
+      <!-- Built by wiki.js; the block stays hidden until it adds .is-built,
+           so no empty ruled-off label is left hanging with JS disabled. -->
+      <div class="wk-rail__block wk-rail__block--toc" id="wk-toc-block">
+        <p class="wk-rail__h"><span class="mono-label">On this page</span></p>
+        <nav class="wk-toc" id="wk-toc"></nav>
+      </div>
+
+    </aside>
+
+    <!-- ===================================================================
+         Article
+         =================================================================== -->
+    <article class="wk-art">
+
+      <p class="wk-crumb mono-label">
+        <a href="/projects/">Projects</a>
+        <span class="wk-crumb__sep" aria-hidden="true">/</span>
+        <a href="/projects/wiki/">Wiki</a>
+        <span class="wk-crumb__sep" aria-hidden="true">/</span>
+        <span class="wk-crumb__here">{{ page.title }}</span>
+      </p>
+
+      <h1 id="wk-title" class="section-title">{{ page.title }}</h1>
+
+      {%- if page.lede %}
+      <p class="work-lede wk-art__lede">{{ page.lede }}</p>
+      {%- endif %}
+
+      <div class="wk-art__meta mono">
+        <span><b>Entry</b>{{ wk_idx | plus: 1 | prepend: '0' | slice: -2, 2 }} / {{ wk_entries.size | prepend: '0' | slice: -2, 2 }}</span>
+        <span><b>Kind</b>{{ page.kind }}</span>
+        <span><b>Revised</b>{{ page.revised }}</span>
+        <span><b>Steward</b>{{ page.steward }}</span>
+        <span><b>Words</b>{{ page.content | strip_html | number_of_words }}</span>
+      </div>
+
+      {%- if page.status == 'draft' %}
+      <p class="wk-draft mono">
+        <span class="wk-draft__tag">Draft</span>
+        <span>This write-up is placeholder copy standing in for the finished
+        entry. The structure, links and metadata are real; the prose is not
+        final.</span>
+      </p>
+      {%- endif %}
+
+      {%- comment -%}
+        The single, deliberate coupling between a wiki entry and its app.
+        Nothing else on this page knows or cares that /projects/apps/ exists.
+      {%- endcomment -%}
+      {%- if page.app_url %}
+      <p>
+        <a class="wk-launch mono-label" href="{{ page.app_url }}">
+          Launch app <span aria-hidden="true">&#8599;</span>
+        </a>
+      </p>
+      {%- endif %}
+
+      {%- if page.info %}
+      <aside class="wk-info" aria-label="{{ page.title }} at a glance">
+        <p class="wk-info__head mono-label">{{ page.title }}</p>
+        <dl>
+          {%- for row in page.info %}
+          <dt class="mono-label">{{ row[0] }}</dt>
+          <dd>{{ row[1] }}</dd>
+          {%- endfor %}
+        </dl>
+      </aside>
+      {%- endif %}
+
+      {%- capture wk_raw %}{{ content }}{% endcapture -%}
+      {% include wiki-body.html html=wk_raw %}
+
+      {%- comment -%}
+        Backlinks, derived from the [[slug|…]] convention itself rather than
+        from a declared list, so the two can never drift apart.
+      {%- endcomment -%}
+      {%- capture wk_needle -%}[[{{ page.slug }}|{%- endcapture -%}
+      {%- capture wk_backs -%}
+        {%- for e in wk_entries -%}
+          {%- if e.slug != page.slug and e.content contains wk_needle -%}
+            <a class="wl" href="{{ e.url }}" data-peek-kind="{{ e.kind | escape }}" data-peek-title="{{ e.title | escape }}" data-peek-lede="{{ e.lede | escape }}">{{ e.title }}</a>
+          {%- endif -%}
+        {%- endfor -%}
+      {%- endcapture -%}
+      <div class="wk-back">
+        <p class="wk-back__h mono-label">Referenced by</p>
+        <div class="wk-back__list">
+          {%- if wk_backs != '' -%}{{ wk_backs }}
+          {%- else -%}<span class="wk-back__none mono">Nothing yet — an orphan entry.</span>
+          {%- endif -%}
+        </div>
+      </div>
+
+      <nav class="wk-pager mono-label" aria-label="Wiki entries">
+        {%- if wk_idx > 0 -%}
+          {%- assign wk_prev = wk_entries[wk_pi] -%}
+          <a href="{{ wk_prev.url }}">Previous<span class="wk-pager__t">{{ wk_prev.title }}</span></a>
+        {%- else -%}<span></span>{%- endif -%}
+        {%- if wk_ni < wk_entries.size -%}
+          {%- assign wk_next = wk_entries[wk_ni] -%}
+          <a href="{{ wk_next.url }}">Next<span class="wk-pager__t">{{ wk_next.title }}</span></a>
+        {%- else -%}<span></span>{%- endif -%}
+      </nav>
+
+    </article>
+  </div>
+</section>
+
+<script src="/assets/js/wiki.js?v=1" defer></script>

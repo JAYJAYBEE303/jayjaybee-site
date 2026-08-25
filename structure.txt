@@ -10,6 +10,7 @@ Root files
 |
 |----_layouts/
 	|default.html — the shared page chrome (head, body, header, footer, theme script, asset links) that wraps every page declaring layout: default.
+	|wiki-entry.html — the shell around every /projects/wiki/<slug>/ write-up. Nests inside default.html, so it adds only the rail, article head, infobox, backlinks and pager. Reads every entry page at build time; there is no separate manifest.
 |
 |-----templates/
 	|starting-template.html — blank page scaffold to copy when creating a new page: front matter + an empty body, since header, footer, background, and type all come from _layouts/default.html and assets/css/global.css. Excluded from the built site; repo reference only.
@@ -19,13 +20,28 @@ Root files
 	|global.css — base resets and element-level defaults (typography, links, body) that apply site-wide.
 	|components.css — styles for reusable UI pieces (buttons, chips, cards, nav, etc.).
 	|layout.css — page-level structure and section rhythm (the .page, .section-head, role/work/now list layouts).
+	|wiki.css — the /projects/wiki layer only: entry rail, article head, infobox, footnotes, backlinks, pager, launch button. Token-only; declares no colour, size or spacing of its own.
 |
 |assets/js/
 	|main.js — placeholder for site-wide non-motion JS, loaded on every page.
 	|animations.js — theme toggle, nav dropdowns, reveal-on-scroll, stagger, and anchor behavior.
+	|wiki.js — loaded only on wiki entry pages. Builds the "On this page" rail from the article headings and shows the hover preview on internal wiki links. Pure progressive enhancement.
 |
 |assets/fonts/ and assets/images/
 	|.gitkeep — empty marker files so Git tracks the otherwise-empty directories.
 |
 |files/
 	|CV.pdf — your downloadable CV, linked from the site.
+|
+|-----_includes/
+	|wiki-body.html — compiles the two wiki markup conventions at build time: [[slug|label]] into an internal link, ((text)) into a numbered footnote. Carried forward from the design bundle, which did the same two transforms in the browser.
+|
+|projects/
+	|index.html — the projects landing page. Buttons point at /projects/wiki/<slug>/, not at the apps.
+	|
+	|----wiki/
+		|index.html — index of write-ups, generated from the entry pages themselves. Built from the site's own .work-* components, so it needs nothing from wiki.css.
+		|<slug>/index.html — one write-up per project (gaffer-iq, fc26-calculator). Front matter plus body prose; everything else comes from _layouts/wiki-entry.html. Each carries a single "Launch app" link out to /projects/apps/<slug>/.
+	|
+	|----apps/
+		|<slug>/ — standalone apps. Own their entire document, share no code with the site or with each other, and are excluded from the Jekyll layout in _config.yml. Nothing outside them links in except the one Launch button per wiki entry.
