@@ -41,36 +41,46 @@ info:
 
 <h2>What is it?</h2>
 
-<p>The official Fantasy Premier League app rates every fixture on a
-scale of one to five. That number is attached to a team and left there:
-it cannot express that a side is brittle away and stubborn at home,
-that its form has turned since August, or that this particular attack
-is the wrong shape to hurt this particular defence.</p>
+<p>If you play Fantasy Premier League but aren't an expert in football,
+it can be really tough to make the right transfers, predict the best
+fixtures, and know when and how to use your chips.</p>
 
-<p>Gaffer IQ replaces it. Difficulty is treated as a property of the
-pairing rather than of either team, built from five weighted signals,
-recomputed as the season moves, and — crucially — scored <em>relative
-to the opponent</em>, so the two ratings for a single fixture always sum
-to exactly 100.</p>
+<p>There is a built-in difficulty rating for matchups scaling from 1
+for easiest to 5 for toughest; that number is attached to a team and
+left there, but it cannot express that a side is brittle away and
+stubborn at home, that its form has turned since August, or that this
+particular attack is the wrong shape to hurt this particular
+defence.</p>
 
-<p>It is a personal tool, not a product. No accounts, no sign-up, no
-multi-tenancy. A static frontend and exactly one serverless function.</p>
+<p>I made Gaffer IQ to try to mitigate this problem. It is a personal
+tool, not a product. No accounts, no sign-up, no multi-tenancy. Its
+purpose is to provide a comprehensive insight into what the Premier
+League looks like further ahead, and to provide as much clear
+information as could be needed to make the right call in your Fantasy
+Premier League season.</p>
 
 <h2>Design Philosophy</h2>
 
-<p>Three commitments, made early and kept: the data is honest about
-where it came from, the engine is checkable against reality, and the
-interface shows its working rather than handing down a verdict.</p>
+<p>The idea was to pull as much data as possible and use that data to
+make accurate predictions for every player and every fixture. There is
+a lot of data to process, so to make this with accessibility and
+intuitiveness was a fundamental I've tried to stick to. The data comes
+from two main locations in its current phase and is processed to
+provide a new perspective on team and player performance. On the back
+end, it was important to have the platform modular so that data can
+easily be parsed globally across the site and to allow for a scalable
+design.</p>
 
 <h3 class="mono-label">The data</h3>
 
-<p>The governing rule is <strong>the proxy is dumb, the client is
-smart</strong>. Every piece of analytical logic runs in the browser. The
-one serverless function on Vercel exists solely because the FPL API
-sends no CORS headers — it fetches from an allowlist and forwards, and
-does nothing else.</p>
+<p>Every piece of analytical logic runs in the browser. The one
+serverless function on Vercel exists solely because the FPL API sends
+no CORS headers — it fetches from an allowlist and forwards, and does
+nothing else.</p>
 
-<p>FPL supplies the spine: squads, prices, positions, fixtures, per-player
+<p>The FPL API (<a href="https://fantasy.premierleague.com/api/"
+target="_blank" rel="noopener">fantasy.premierleague.com/api</a>)
+supplies the spine: squads, prices, positions, fixtures, per-player
 histories, live gameweek scoring. What it conspicuously does not supply
 is most of what makes a matchup readable. There is no standings
 endpoint, so the league table is accumulated from the fixtures feed
@@ -78,53 +88,52 @@ instead. There is no access to any season but the current one. There
 are no minute timings, no goal-to-assist pairing, and no teamsheet of
 any kind.</p>
 
-<p>Understat fills those gaps: expected goals for the shot-quality FPL
-never exposes, six seasons of cross-season fixture lists so head-to-head
-records can reach past August, chronological match timelines with
-minutes, and rosters carrying position codes and substitution linkage
-so a real starting XI and formation can be derived.((This is the one
-dependency outside FPL, and it is a deliberate trade — better evidence
-in exchange for a second thing that can break. Where a feed is missing,
-the match view degrades to FPL's grouped totals rather than failing.))</p>
+<p>Understat, although not an API (<a href="https://understat.com"
+target="_blank" rel="noopener">understat.com</a>), fills those gaps:
+expected goals for the shot-quality FPL never exposes, six seasons of
+cross-season fixture lists so head-to-head records can reach past
+August, chronological match timelines with minutes, and rosters
+carrying position codes and substitution linkage so a real starting XI
+and formation can be derived.</p>
 
 <h3 class="mono-label">The engine</h3>
 
-<p>All scoring lives in <code>engine/</code> and nowhere else. Modules
-consume scores; they never compute them. If a view needs a number the
-engine does not expose, the number is added to the engine and its
-breakdown rather than inlined at the point of use. The dependency chain
-runs strictly one way — modules to engine to normalise to store to api
-to proxy to FPL — and nothing points back up it.</p>
+<p>To be able to predict how strong a player or fixture is, all the
+number-crunching lives in one place — <code>engine/</code>, containing
+js files. If a view needs a new number, it gets added to the engine
+properly, not bolted on as a shortcut. That's what keeps every screen
+showing the same story.</p>
 
-<p>Every tunable constant lives in <code>config.js</code>. Tuning the
-model means editing that file; it never means editing a formula. That
-separation is what makes the weights arguable rather than buried, and
-it is why they can be quoted on this page at all.</p>
+<p>The settings that control the model (how much recent form matters,
+how much a tough opponent counts) live in one config file, separate
+from the formulas. Changing the model means adjusting a setting, never
+rewriting a formula.</p>
 
-<blockquote>A rating you cannot check against last Saturday is a
-horoscope with extra steps.</blockquote>
-
-<p>Every metric function has to restate its direction in its own
-docblock, because a single inverted sub-metric quietly poisons the
-composite and is the hardest class of bug to see. The engine carries
-unit tests, and weights are treated as informed priors — documented so
-they can be disagreed with — until a season of stored pre-deadline
-scores can calibrate them empirically.</p>
+<p>Every calculation has to clearly state which way it points, as well
+as an acknowledged confidence level in each output according to max
+weight contribution to the overall player or fixture score. There are
+automated tests to catch it, and the current weightings are an honest
+best guess, written down so they can be challenged — not treated as
+fact — until enough data is available after enough fixtures that can
+prove them right.</p>
 
 <h3 class="mono-label">The interface</h3>
 
-<p>Five views, one engine underneath. None of them recomputes anything,
-so a rating can never disagree with itself between two screens. No
-framework, no bundler, no transpilation — files are served exactly as
-authored.</p>
+<p>Without care and intention towards the UI styling and structuring,
+the platform is virtually useless. I designed Gaffer IQ to split and
+separate data in a way that tries to avoid overwhelming a user where it
+can. Having clear containers, colouring, spacing, and appropriate
+separate areas for different views and data allows a user to find
+information relevant to the fixtures they're interested in as easily as
+possible with the data density considered.</p>
 
-<p>The app owns its entire document — its own head, fonts, tokens and
-stylesheets — and inherits none of jayjaybee.com's design system,
-exactly like [[fc26-calculator|the FC26 Feel Calculator]]. The only
-connection in either direction is the launch link at the top of this
-entry.((Sub-projects under <code>/projects/apps/</code> are excluded
-from the site layout in <code>_config.yml</code> so this stays true
-even if one of them later grows front matter.))</p>
+<p>It's also important that there are multiple ways of finding
+information so that the platform feels intuitive in a similar way to
+Apple's accessible design philosophy, with buttons clear and animations
+in contextually appropriate places to show what items are interactive.
+I intentionally leant towards a style that feels appropriate for modern
+English football and I am confident that the styling represents the
+platform's purpose accurately.</p>
 
 <h2>Matchups</h2>
 
@@ -134,64 +143,99 @@ players behind it. It is the "view source" for any score anywhere else
 in the app — every other view links into it to answer <em>why is this
 number what it is?</em></p>
 
-<h3 class="mono-label">Scoring philosophy</h3>
+<h3 class="mono-label">Scoring Philosophy</h3>
 
-<p>Three ideas do most of the work.</p>
+<p>Every FPL tool gives you the same thing: a 1-to-5 star rating pulled
+straight from the official app. Gaffer IQ builds its own rating from
+scratch, and answers a sharper question: not "is this fixture hard,"
+but "is this fixture hard for this specific player, doing this specific
+job, right now." FPL's rating calls a match "easy" because the
+opponent's bottom of the table. Gaffer IQ checks whether your striker's
+opponent specifically has leaky centre-backs, whether that team plays
+completely differently at home versus away, and whether their rating is
+outdated and overrated. Several angles, calculated separately, then
+combined, because "hard fixture" and "hard fixture for a winger" are
+different questions, and most tools collapse them into one.</p>
 
-<p><strong>Keep the signals separate.</strong> Each sub-metric is
-computed independently and reported independently, and they only
-combine at the very end. When a rating looks wrong you can see which
-signal is responsible instead of arguing with one opaque figure.</p>
+<p>The part that makes it trustworthy is how it handles weight and
+confidence. Not every signal gets an equal vote; recent form and team
+strength carry real weight; head-to-head history barely moves the
+needle, because a rivalry from three managers ago isn't strong evidence
+today. And when the data's too thin (a promoted team with no track
+record) the model doesn't fake confidence. It knows the difference
+between "no strong opinion" and "bad fixture," and never confuses the
+two. Most tools will happily hand you a confident number standing on
+almost nothing.</p>
 
-<p><strong>Score relative, not absolute.</strong> Every sub-metric is
-naturally computed against a fixed internal scale, with no reference to
-what the opponent scores on the same measure. Left there, two weak
-teams both rate well for facing a soft opponent, and two strong teams
-both rate badly for facing a tough one — neither of which says anything
-about who has the edge. So the composite is computed twice, once from
-each side, and the final value is derived from the difference between
-them. The two ratings for a fixture therefore sum to exactly 100 by
-construction rather than by coincidence.((The zero-sum property follows
-from a clamp identity rather than a tuning constant, so it holds at any
-edge sensitivity. It was verified by exhaustive sampling across the
-full input space including the clamping extremes.)) This flattens
-nothing: a genuine gap still produces a lopsided split, because the gap
-flows straight through the difference.</p>
+<p>Every score also comes with its reasoning attached — you can see
+exactly what pushed it up or down. It's not "trust us," it's "here's
+the case." In one line: this isn't a smarter-looking star rating; it's
+a tool that tells you where an edge is coming from, and how much to
+believe it.</p>
 
-<p><strong>Don't let an unreliable reading vote.</strong> Sub-metrics
-report whether they are estimated. Estimated ones are excluded from the
-weighted sum entirely and the remaining weights are scaled back up to
-cover the full range. An earlier design let them pass through at a
-neutral 50, which meant a genuinely unreliable reading diluted the
-score at full weight while pretending to be information. The score is
-still always produced — never hidden — but a low-confidence one is
-flagged as provisional.</p>
+<h3 class="mono-label">Calculations</h3>
 
-<h3 class="mono-label">How they're calculated</h3>
-
-<p>Five weighted sub-metrics, summing to one:</p>
+<p>Five weighted sub-metrics result in the overall score, known as the
+<code>CompositeScore</code>, as one number:</p>
 
 <ul>
-  <li><strong>Base difficulty — 0.40.</strong> Opponent strength priors.
-  The largest weight because it is the only sub-metric that is never
-  estimated: available from day one of a season, and it never degrades
-  when player summaries or external data are missing.</li>
-  <li><strong>Counter-matchup — 0.25.</strong> The signature metric, and
-  most of what makes this score differ from FPL's own. One side's
-  attacking pairings blended with its defensive ones, by position, so a
-  team's attack and defence both earn credit on its own composite.</li>
-  <li><strong>Team form — 0.20.</strong> Recent trajectory,
+  <li><strong>Base difficulty</strong> — the difficulty metric from FPL
+  directly, to use as a base. A fetch from <code>api/fpl.js</code>
+  reaches <a href="https://fantasy.premierleague.com/api/fixtures"
+  target="_blank"
+  rel="noopener">fantasy.premierleague.com/api/fixtures</a> through
+  Vercel, and harvests the <code>team_h_difficulty</code> and
+  <code>team_a_difficulty</code>. This is then converted to a 10 if 1,
+  30 if 2, 50 if 3, 70 if 4, and 90 if 5.</li>
+  <li><strong>Counter-matchup</strong> — this is the heaviest
+  calculation. What this does, rather than defining a team's strength,
+  it instead calculates where a team is strongest and weakest. For
+  example, if a team who concedes mostly set pieces plays against a team
+  that scores mostly from set pieces, the counter-matchup score will
+  swing strongly one way, but if two teams' strengths and weaknesses
+  don't counter each other, then this will remain balanced. The relevant
+  data is fetched from understat.com's <code>getTeamData</code>
+  endpoint. It will fetch shots, goals, situation, and total predicted
+  goals from those shots, and calculate the average predicted goals for
+  that situation, known as shared xG — otherwise where the biggest
+  threat comes from for that team. It will then do this for all
+  situations such as transition play (fast play) and box occupation
+  (close up slow play) as well as set pieces, both for attacking and
+  conceding, calculate a score out of 100 based on how good or bad the
+  counter is, and then calculate the average of all the counters,
+  resulting in Counter-matchup. This also has a maturity value of 10
+  fixtures, elevating to a max 0.25 weight towards the total
+  CompositeScore in a linear ascent, to weaken the contribution of wild
+  early-season data.</li>
+  <li><strong>Team form</strong> — recent trajectory,
   opponent-adjusted. It exists to correct base difficulty's
-  preseason-seeded priors in-season — it captures precisely what the
-  largest metric structurally cannot.</li>
-  <li><strong>Head-to-head — 0.10.</strong> Real cross-season meetings
-  from the Understat history window. Kept deliberately small: it is
-  <em>not</em> opponent-quality-adjusted, so a lopsided record mostly
-  restates who has been the better side, which two larger metrics
-  already say from far bigger samples.</li>
-  <li><strong>Home and away — 0.05.</strong> Venue performance this
-  season, held separately for both sides. The smallest of the five: real,
-  but a clearer read rather than a bigger driver.</li>
+  preseason-seeded priors in-season. It's simply fetched from
+  <a href="https://fantasy.premierleague.com/api" target="_blank"
+  rel="noopener">fantasy.premierleague.com/api</a> through Vercel, pulls
+  the <code>bootstrap-static/</code> endpoint, and harvests the
+  <code>strength_overall_home</code> and
+  <code>strength_overall_away</code> values. It then runs <code>oppAdj =
+  oppStrength / leagueAvgStrength</code> in order to swing form one way
+  or the other based on whether the form is against stronger teams or
+  weaker teams. This also has a maturity, but of 5 fixtures, to reach a
+  max weight of 0.2 — to account for teams that appear in perfect form
+  after only 1 or 2 games.</li>
+  <li><strong>Head-to-head</strong> — real cross-season meetings from
+  the Understat history window. Kept deliberately small, as testing
+  revealed that this weakens prediction accuracy if this holds more than
+  a weight of 0.1. The last 10 meetings (or last 5 seasons) are fetched
+  from <a href="https://understat.com" target="_blank"
+  rel="noopener">understat.com</a> through their
+  <code>getLeagueData/EPL/{season}</code> endpoint, looping until 5
+  seasons are fetched. The head-to-head score is then calculated by
+  <code>100 × (TotalPointsWon / TotalPossiblePoints)</code>, to account
+  for the validity of all wins, losses, and draws.</li>
+  <li><strong>Home and away</strong> — home advantage strength compares
+  how many points a team wins per game at home versus away, then
+  measures how big that gap is compared to every other team in the
+  league. A bigger gap means venue matters more for that team. Both
+  teams' gaps get averaged and turned into a boost for the home side and
+  an equal penalty for the away side, centred around a neutral 50.</li>
 </ul>
 
 <p>A <strong>stacking penalty</strong> then applies across the
@@ -218,9 +262,7 @@ season-average pressing is a stable team property, which it is not: a
 side presses a promoted team and sits off against a title contender.
 And its observed spread was narrow enough that it could move the
 composite by roughly half a point — too small to change a decision,
-large enough to add noise whenever it read a fixture wrong.((The style
-profiles themselves are still computed and still used elsewhere. It is
-the composite weight that was removed, not the code.))</p>
+large enough to add noise whenever it read a fixture wrong.</p>
 
 <h2>Fixtures</h2>
 
