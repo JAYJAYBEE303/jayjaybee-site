@@ -29,7 +29,7 @@ import {
 } from '../engine/composite.js';
 import { fetchPlayerSummary } from '../api.js';
 import { normalisePlayerSummary } from '../engine/normalise.js';
-import { calcPriceChangeRisk } from '../engine/prices.js';
+import { calcSeasonPriceChange } from '../engine/prices.js';
 import { playtimeBand } from '../engine/form.js';
 
 // ─── Playtime display ────────────────────────────────────────────────────────
@@ -77,6 +77,7 @@ let _activeTeamId    = 'all';
 let _activeMinSecSet = new Set();
 let _sortBy          = 'value';    // 'value' | 'costPerPoint' | 'price' | 'playtime' | 'name' | 'team'
                                    //   | 'avgPointsPerGw' | 'totalPoints' | 'fplForm' | 'nextFixtureScore'
+                                   //   | 'priceChange' | 'transfersInEvent' | 'transfersOutEvent'
 let _sortDesc        = true;
 
 // In-flight lazy loads keyed by playerId so concurrent clicks on the same
@@ -420,6 +421,19 @@ function applySort(rows, lastSeasonByPlayerId = null) {
     } else if (_sortBy === 'fplForm') {
       av = a.player.fplForm ?? 0;
       bv = b.player.fplForm ?? 0;
+    } else if (_sortBy === 'priceChange') {
+      // Sorted on the RAW tenths, not calcSeasonPriceChange's millions: the
+      // divide by 10 is monotonic, so the ordering is identical and this skips
+      // ~7,000 object allocations per sort. Signed, so descending puts the
+      // season's biggest risers on top and the biggest fallers at the bottom.
+      av = a.player.costChangeStart ?? 0;
+      bv = b.player.costChangeStart ?? 0;
+    } else if (_sortBy === 'transfersInEvent') {
+      av = a.player.transfersInEvent ?? 0;
+      bv = b.player.transfersInEvent ?? 0;
+    } else if (_sortBy === 'transfersOutEvent') {
+      av = a.player.transfersOutEvent ?? 0;
+      bv = b.player.transfersOutEvent ?? 0;
     } else if (_sortBy === 'avgPointsPerGw') {
       av = a.score.avgPointsPerGw.value; bv = b.score.avgPointsPerGw.value;
     } else if (_sortBy === 'nextFixtureScore') {
@@ -565,6 +579,7 @@ function buildRow({ player, team, score, rankTier }, nextFixtureRankById, lastSe
       <td class="ranker-table__td ranker-table__td--price">
         £${esc(player.price.toFixed(1))}m
       </td>
+      ${buildPriceChangeCell(player)}
       <td class="ranker-table__td ranker-table__td--cost-per-point">
         ${costPerPointDisplay}
       </td>
@@ -577,6 +592,14 @@ function buildRow({ player, team, score, rankTier }, nextFixtureRankById, lastSe
       <td class="ranker-table__td ranker-table__td--form"
           title="FPL's own form figure — average points per match over the last 30 days">
         ${(player.fplForm ?? 0).toFixed(1)}
+      </td>
+      <td class="ranker-table__td ranker-table__td--tsfr-in"
+          title="Transfers IN this gameweek">
+        ${esc(fmtCount(player.transfersInEvent))}
+      </td>
+      <td class="ranker-table__td ranker-table__td--tsfr-out"
+          title="Transfers OUT this gameweek">
+        ${esc(fmtCount(player.transfersOutEvent))}
       </td>
       <td class="ranker-table__td ranker-table__td--value">
         <span class="score-chip score-chip--${esc(score.band)}${estClass}${rankTierClass(rankTier)}"
@@ -594,7 +617,6 @@ function buildRow({ player, team, score, rankTier }, nextFixtureRankById, lastSe
         <span class="ranker-min-badge ranker-min-badge--${esc(pt.band)}${pt.estimated ? ' ranker-min-badge--estimated' : ''}"
               title="${esc(playtimeTitle(pt))}">${esc(pt.label)}</span>
       </td>
-      ${buildPriceChangeCell(player)}
     </tr>
   `.trim();
 }
@@ -602,36 +624,56 @@ function buildRow({ player, team, score, rankTier }, nextFixtureRankById, lastSe
 // ─── Price change helpers ─────────────────────────────────────────────────────
 
 /**
- * Fixed column count: Player, Team, Pos, Price, Cost/Pt, Avg Pts, Total Pts,
- * Form, Value, Next Fixture, Fixtures, Playtime, Price Change — always all 13,
- * no toggle.
+ * Fixed column count: Player, Team, Pos, Price, £ ↑/↓, Cost/Pt, Avg Pts,
+ * Total Pts, Form, Tsfr In, Tsfr Out, Value, Next Fixture, Fixtures,
+ * Playtime — always all 15, no toggle.
+ *
+ * Anything that spans the whole table (the empty/loading rows here, the
+ * fallback colspan in index.html) must agree with this number.
  */
 function colCount() {
-  return 13;
+  return 15;
 }
 
 /**
- * Build the price change <td> for one player row.
- * ↑ (green) = likely rise, ↓ (red) = likely fall, — = stable / no signal.
- * Confidence is shown on hover via the title attribute.
+ * Build the season price-change <td> for one player row.
+ * ↑ (green) = risen since the season opened, ↓ (red) = fallen, no arrow
+ * (muted) = unmoved. This is banked FACT, not the transfer-flow forecast that
+ * calcPriceChangeRisk produces — that prediction column was removed from the
+ * Ranker; the Transfer Planner still carries it.
  * @param {Player} player
  * @returns {string} HTML <td> string
  */
 function buildPriceChangeCell(player) {
-  const risk = calcPriceChangeRisk(player);
-  if (risk.direction === 'stable' || risk.confidence === 0) {
+  const change = calcSeasonPriceChange(player);
+
+  // Flat is a real reading, not missing data — it shows "£0.0m" in the muted
+  // style rather than a dash, so an unmoved player is visibly distinct from
+  // one whose data failed to load.
+  if (change.direction === 'flat') {
     return `<td class="ranker-table__td ranker-table__td--price-change">
-      <span class="ranker-price-change ranker-price-change--stable" title="No price move predicted">—</span>
+      <span class="ranker-price-change ranker-price-change--stable" title="Unchanged since the start of the season">${esc(change.label)}</span>
     </td>`.trim();
   }
-  const isRise = risk.direction === 'rise';
-  const pct    = Math.round(risk.confidence * 100);
+  const isRise = change.direction === 'rise';
   const arrow  = isRise ? '↑' : '↓';
   const mod    = isRise ? 'rise' : 'fall';
-  const title  = `${isRise ? 'Likely rise' : 'Likely fall'} (${pct}% confidence) — ${esc(risk.reasoning)}`;
+  const title  = `${isRise ? 'Risen' : 'Fallen'} ${esc(change.label)} since the start of the season`;
   return `<td class="ranker-table__td ranker-table__td--price-change">
-    <span class="ranker-price-change ranker-price-change--${mod}" title="${title}">${arrow} ${pct}%</span>
+    <span class="ranker-price-change ranker-price-change--${mod}" title="${title}">${arrow} ${esc(change.label)}</span>
   </td>`.trim();
+}
+
+/**
+ * Thousands-separated integer for the transfer columns — 45231 → "45,231".
+ * Deliberately NOT the "45.2k" shortening engine/prices.js uses in its
+ * reasoning strings: this column is read as a magnitude to compare across
+ * rows, and the full figure sorts visually as well as it sorts numerically.
+ * @param {number} n
+ * @returns {string}
+ */
+function fmtCount(n) {
+  return Number(n ?? 0).toLocaleString('en-GB');
 }
 
 // ─── Render ───────────────────────────────────────────────────────────────────
@@ -670,15 +712,17 @@ function renderThead() {
       ${thSortable('Team',      'team')}
       ${thStatic('Pos',         'pos')}
       ${thSortable('Price',     'price')}
+      ${thSortable('£ ↑/↓',     'priceChange')}
       ${thSortable(`Cost/Pt${seasonSuffix}`,    'costPerPoint')}
       ${thSortable(`Avg Pts/GW${seasonSuffix}`, 'avgPointsPerGw')}
       ${thSortable('Total Pts', 'totalPoints')}
       ${thSortable('Form',      'fplForm')}
+      ${thSortable('Tsfr In',   'transfersInEvent')}
+      ${thSortable('Tsfr Out',  'transfersOutEvent')}
       ${thSortable('Value',     'value')}
       ${thSortable('Next Fixture', 'nextFixtureScore')}
       ${thStatic(horizon.label, 'fixtures')}
       ${thSortable('Playtime',  'playtime')}
-      ${thStatic('£↑↓',         'price-change')}
     </tr>
   `;
 }

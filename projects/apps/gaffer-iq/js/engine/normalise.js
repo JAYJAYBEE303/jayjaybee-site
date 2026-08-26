@@ -237,6 +237,12 @@ export function normalisePlayer(raw) {
     // Phase 4-4: present in bootstrap-static.elements[]; zero-safe.
     transfersInEvent:  raw.transfers_in_event  || 0,
     transfersOutEvent: raw.transfers_out_event || 0,
+    // Total price movement since the season opened, in TENTHS of a million
+    // (3 → +£0.3m, -1 → -£0.1m) — same unit as now_cost above, NOT the same
+    // unit as `price`. Kept in raw tenths here so the divide happens once, in
+    // engine/prices.js → calcSeasonPriceChange, rather than at every call site.
+    // Present in bootstrap-static.elements[]; zero-safe.
+    costChangeStart:   raw.cost_change_start   || 0,
     history: null,   // populated lazily by normalisePlayerSummary
     form:    null,   // filled by engine/form.js
   };

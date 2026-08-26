@@ -1009,12 +1009,62 @@ expectedPoints.value = avgPointsPerGw.value
 
 ---
 
+### 10.3 Ranker column set (`modules/ranker.js → renderThead`, `buildRow`, `colCount`)
+
+Fifteen columns, fixed — there is no per-column toggle. Left to right:
+
+| # | Header | `data-sort` / `data-col` | Source |
+|---|---|---|---|
+| 1 | Player | `name` | `player.name` |
+| 2 | Team | `team` | `team.shortName` + badge |
+| 3 | Pos | `pos` (static) | `player.position` |
+| 4 | Price | `price` | `player.price` (`now_cost / 10`) |
+| 5 | £ ↑/↓ | `priceChange` | `calcSeasonPriceChange` (§10.4) |
+| 6 | Cost/Pt | `costPerPoint` | `score.costPerPoint` — §10.1 toggle applies |
+| 7 | Avg Pts/GW | `avgPointsPerGw` | `score.avgPointsPerGw` — §10.1 toggle applies |
+| 8 | Total Pts | `totalPoints` | `player.totals.points` |
+| 9 | Form | `fplForm` | `player.fplForm` (FPL's own 30-day average) |
+| 10 | Tsfr In | `transfersInEvent` | `player.transfersInEvent` |
+| 11 | Tsfr Out | `transfersOutEvent` | `player.transfersOutEvent` |
+| 12 | Value | `value` | `score.value` — the headline chip (§13 colouring) |
+| 13 | Next Fixture | `nextFixtureScore` | `score.nextFixtureScore` + rank tag |
+| 14 | *(horizon label)* | `fixtures` (static) | per-GW fixture strip |
+| 15 | Playtime | `playtime` | `calcPlaytimeSecurity` band (§7.3b) |
+
+Every column except Pos and the fixture strip is sortable through the one `_sortBy`/`_sortDesc` pair and the single delegated `<thead>` click handler — there is no second sort mechanism. Numeric columns sort descending on first click.
+
+**Tsfr In / Tsfr Out are the GW's flow (`transfers_in_event` / `transfers_out_event`), not the cumulative season totals** (`transfers_in` / `transfers_out`), which the app does not retain. They are the same two figures `calcPriceChangeRisk` reads, surfaced raw so the prediction that used to occupy column 15 can be read off its inputs directly.
+
+`colCount()` returns 15 and is the single source of truth for anything spanning the table — the empty/loading rows in `renderTable`/`rebuildRowsChunked`, and the fallback `colspan` in `index.html`. The `<th>` width percentages in `components.css` must sum to 100: `table-layout: fixed` silently redistributes a shortfall.
+
+### 10.4 Season price change (`engine/prices.js → calcSeasonPriceChange`)
+
+```
+value     = costChangeStart / 10
+direction = costChangeStart > 0 ? 'rise' : < 0 ? 'fall' : 'flat'
+label     = sign + '£' + (|costChangeStart| / 10).toFixed(1) + 'm'
+```
+
+`costChangeStart` is bootstrap-static's `cost_change_start` in **tenths of a million** — the same unit as `now_cost`, not the same unit as the normalised `price`. The divide happens once, here.
+
+**This is a fact, not a forecast, and is deliberately separate from `calcPriceChangeRisk`** (which predicts the *next* move from in-GW transfer flow). They answer different questions and must never be merged: this one reports movement already banked since the season opened; that one reports probability of imminent movement. The Ranker shows this one; the Transfer Planner shows that one.
+
+Formatting rules the tests pin (`tests/engine/prices.test.js`):
+- The sign belongs to the number, not the symbol — `-£0.1m`, never `£-0.1m`. The label is built from the absolute value with the sign prepended.
+- **Zero is a real reading, not missing data**: `£0.0m`, no sign, muted styling — never blank, never a dash (which would be indistinguishable from a load failure), and never `+£0.0m` (which reads as a rise that never happened).
+- Always one decimal place: `-£1.0m`, not `-£1m`.
+- A missing `costChangeStart` is treated as zero, matching the zero-safe contract on `transfersInEvent`/`transfersOutEvent` beside it in `normalisePlayer`.
+
+Colour vocabulary is shared with the Planner's price warnings: `--band-great` green for a rise, `--band-brutal` red for a fall, `--color-muted` for flat.
+
+---
+
 ## 11. How the engine feeds each module
 
 | Module | Primary engine call | What it shows |
 |---|---|---|
 | **Matchup Analyser** (`modules/matchup.js`) | `scoreFixture(team, fixture)` for **both** sides | Full side-by-side breakdown of one fixture: each sub-metric, the counter-matchup pairings (each with an info disclosure naming the players behind it, via `duelsForPairing` §7.2), style clash, confidence. The "view source" for any score elsewhere. Since §8.7, the two cards' `value`s are guaranteed to sum to 100 — a genuinely relative read of the matchup, not two independent absolute scores. |
-| **Player Ranker** (`modules/ranker.js`) | `rankPlayers(players, horizon)` → sortable by `value`, `costPerPoint`, `price`, or `minutesSecurity` | Ranked, filterable table (position, price threshold, team, minutes-security) of projected value over the active horizon — permanent Value and Cost/Pt columns, Avg Pts/GW, Next Fixture (rank + score), and a per-GW fixture strip per player. |
+| **Player Ranker** (`modules/ranker.js`) | `rankPlayers(players, horizon)` → sortable by every column bar Pos and the fixture strip | Ranked, filterable table (position, price threshold, team, minutes-security) of projected value over the active horizon — 15 columns (§10.3): permanent Value and Cost/Pt, Avg Pts/GW, season price change (§10.4), in-GW transfers in/out, Next Fixture (rank + score), and a per-GW fixture strip per player. |
 | **GW Dashboard** (`modules/dashboard.js`) | `scorePlayer(p, HORIZON.GW1)` for owned squad + `event/<gw>/live` | Captaincy pick (top `expectedPoints`, §10.2, in squad), start/bench order, risk flags (low minutesSecurity, brutal band, low confidence), and live points when the GW is in progress. Horizon-locked to GW1. |
 | **Transfer Planner** (`modules/planner.js`) | `rankPlayers` over horizon + current squad + constraints | For each candidate out→in swap, computes Δ projected horizon score; ranks transfers by gain per cost, respecting budget and free transfers (−4 hit modelled). Surfaces the moves that most raise total projected score over the horizon. Triple Captain candidate picked by top `expectedPoints` (§10.2), same as Dashboard captaincy. |
 

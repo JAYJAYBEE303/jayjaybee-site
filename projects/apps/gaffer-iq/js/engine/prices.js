@@ -103,6 +103,34 @@ export function rankByPriceFall(players) {
     .sort((a, b) => b.priceRisk.confidence - a.priceRisk.confidence);
 }
 
+/**
+ * Actual price movement since the season opened — a FACT, not a prediction.
+ * The sibling of calcPriceChangeRisk above, and deliberately separate from it:
+ * that one forecasts the next move from transfer flow, this one reports the
+ * moves already banked. Never merge them.
+ *
+ * `costChangeStart` arrives in TENTHS of a million (bootstrap-static's
+ * cost_change_start), so the divide happens here, once.
+ *
+ * @param {Player} player  normalised Player (must have costChangeStart)
+ * @returns {{ value: number, direction: 'rise'|'fall'|'flat', label: string }}
+ *          value is in millions; label is signed and always one decimal place
+ *          ("+£0.3m", "-£0.1m", "£0.0m" — no sign at all when flat).
+ */
+export function calcSeasonPriceChange(player) {
+  const tenths = player.costChangeStart ?? 0;
+
+  const direction = tenths > 0 ? 'rise' : tenths < 0 ? 'fall' : 'flat';
+  const sign      = tenths > 0 ? '+' : tenths < 0 ? '-' : '';
+
+  // Format from the ABSOLUTE value and prepend the sign, so a fall renders
+  // "-£0.1m" rather than "£-0.1m". Zero gets no sign — "+£0.0m" would read as
+  // a rise that never happened.
+  const label = `${sign}£${(Math.abs(tenths) / 10).toFixed(1)}m`;
+
+  return { value: tenths / 10, direction, label };
+}
+
 // ─── Private helpers ──────────────────────────────────────────────────────────
 
 function _reasonRise(transfersIn, transfersOut, ownership) {

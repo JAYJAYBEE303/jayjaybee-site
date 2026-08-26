@@ -1381,19 +1381,21 @@
    If you retune these, the invariant to keep is that they still sum to 100 --
    table-layout:fixed will happily distribute a shortfall for you and quietly
    undo the budgeting. */
-.ranker-table__th[data-sort="name"]             { width: 14.93%; }
-.ranker-table__th[data-sort="team"]             { width: 6.25%; }
-.ranker-table__th[data-col="pos"]               { width: 4.32%; }
-.ranker-table__th[data-sort="price"]            { width: 6.25%; }
-.ranker-table__th[data-sort="costPerPoint"]     { width: 7.69%; }
-.ranker-table__th[data-sort="avgPointsPerGw"]   { width: 7.21%; }
-.ranker-table__th[data-sort="totalPoints"]      { width: 5.29%; }
-.ranker-table__th[data-sort="fplForm"]          { width: 5.29%; }
-.ranker-table__th[data-sort="value"]            { width: 5.77%; }
-.ranker-table__th[data-sort="nextFixtureScore"] { width: 8.17%; }
-.ranker-table__th[data-col="fixtures"]          { width: 12.97%; }
-.ranker-table__th[data-sort="playtime"]         { width: 8.65%; }
-.ranker-table__th[data-col="price-change"]      { width: 7.21%; }
+.ranker-table__th[data-sort="name"]              { width: 13.60%; }
+.ranker-table__th[data-sort="team"]              { width: 5.60%; }
+.ranker-table__th[data-col="pos"]                { width: 4.00%; }
+.ranker-table__th[data-sort="price"]             { width: 5.60%; }
+.ranker-table__th[data-sort="priceChange"]       { width: 6.00%; }
+.ranker-table__th[data-sort="costPerPoint"]      { width: 6.80%; }
+.ranker-table__th[data-sort="avgPointsPerGw"]    { width: 6.40%; }
+.ranker-table__th[data-sort="totalPoints"]       { width: 4.80%; }
+.ranker-table__th[data-sort="fplForm"]           { width: 4.80%; }
+.ranker-table__th[data-sort="transfersInEvent"]  { width: 6.00%; }
+.ranker-table__th[data-sort="transfersOutEvent"] { width: 6.00%; }
+.ranker-table__th[data-sort="value"]             { width: 5.20%; }
+.ranker-table__th[data-sort="nextFixtureScore"]  { width: 7.00%; }
+.ranker-table__th[data-col="fixtures"]           { width: 11.00%; }
+.ranker-table__th[data-sort="playtime"]          { width: 7.20%; }
 
 /* Header cells */
 .ranker-table__th {
@@ -1479,6 +1481,12 @@
 .ranker-table__td--avg-pts       { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ranker-table__td--total-pts     { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ranker-table__td--form          { font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Tabular figures so the thousands separators line up down the column and a
+   6-figure count is instantly distinguishable from a 4-figure one. Left
+   alignment, matching every other numeric column here and the left-aligned
+   <th> above them — not right, which would detach the digits from the header. */
+.ranker-table__td--tsfr-in,
+.ranker-table__td--tsfr-out      { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ranker-table__td--next-fixture  { white-space: nowrap; }
 
 /* Value + Next Fixture chips drop the "~" prefix — the dashed border
@@ -3243,9 +3251,16 @@
 
 /* ── Ranker: price change column cell ──────────────────────────────────────── */
 
+/* NOTE: the Ranker's column now shows the season-to-date change actually
+   banked (engine/prices.js → calcSeasonPriceChange), not the transfer-flow
+   forecast it originally carried — that prediction column was removed from the
+   Ranker and survives only in the Transfer Planner (.planner-price-warning--*
+   below). The rise/fall/stable colour vocabulary is shared deliberately: green
+   up, red down, muted flat means the same thing in both places. */
 .ranker-table__td--price-change {
   white-space: nowrap;
   text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
 .ranker-price-change {
@@ -3473,18 +3488,24 @@
     display: none;
   }
 
-  /* Cost/Pt, Avg Pts/GW, Total Pts, Form, Next Fixture: hidden on mobile, same
-     reasoning as Team/Min above — the compact card keeps only Value + fixture
-     strip. */
+  /* Cost/Pt, Avg Pts/GW, Total Pts, Form, Tsfr In, Tsfr Out, Next Fixture:
+     hidden on mobile, same reasoning as Team/Min above — the compact card keeps
+     only Value + fixture strip. The transfer counts are the widest numbers in
+     the table and the least useful at a glance, so they go first. */
   .ranker-table__td--cost-per-point,
   .ranker-table__td--avg-pts,
   .ranker-table__td--total-pts,
   .ranker-table__td--form,
+  .ranker-table__td--tsfr-in,
+  .ranker-table__td--tsfr-out,
   .ranker-table__td--next-fixture {
     display: none;
   }
 
-  /* Price-change cell: stays visible after the value chip */
+  /* Price-change cell: one of the few kept on the compact card. It now sits
+     immediately after Price in DOM order (it moved from last to column 5), so
+     on mobile it reads as "£7.5m  ↑ +£0.3m" rather than trailing the value
+     chip as it used to. */
   .ranker-table__td--price-change {
     flex-shrink: 0;
     white-space: nowrap;
