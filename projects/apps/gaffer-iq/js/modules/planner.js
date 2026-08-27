@@ -16,6 +16,7 @@ import { store } from '../store.js';
 import { HORIZONS, PRICE_BUY_NOW_CONFIDENCE, PRICE_BUY_NOW_SCORE_MIN } from '../config.js';
 import { buildScoreContext, scorePlayer, rankPlayers, attachRankTiers } from '../engine/composite.js';
 import { calcPriceChangeRisk } from '../engine/prices.js';
+import { groupPerGwSlots } from '../engine/fixtures.js';
 import {
   scoreWildcardTiming, scoreFreeHitTiming,
   scoreBenchBoostTiming, scoreTripleCaptainTiming,
@@ -428,12 +429,23 @@ function renderPlayerProjection(player, score, team, direction) {
     ? `<span class="ranker-status-badge" title="${esc(player.statusNote || player.status)}">!</span>`
     : '';
 
+  // Schedule shape for the nearest gameweek. Shown on BOTH sides of a swap on
+  // purpose: transferring OUT of a double, or INTO a blank, is the mistake this
+  // marker exists to catch, and the delta alone does not make either obvious.
+  const slot = groupPerGwSlots(score?.perGw ?? [])[0];
+  const scheduleMark = !slot ? ''
+    : slot.isDouble
+      ? '<span class="planner-schedule-mark planner-schedule-mark--double" title="Double gameweek — plays twice">··</span>'
+      : slot.isBlank
+        ? '<span class="planner-schedule-mark planner-schedule-mark--blank" title="Blank gameweek — does not play">∅</span>'
+        : '';
+
   return `
     <div class="planner-player planner-player--${esc(direction)}">
       <span class="planner-player__dir planner-player__dir--${esc(direction)}" aria-label="${direction === 'out' ? 'Transfer out' : 'Transfer in'}">${direction === 'out' ? 'OUT' : 'IN'}</span>
       <div class="planner-player__info">
         <div class="planner-player__name">
-          ${esc(player.name)}${statusMark}
+          ${esc(player.name)}${statusMark}${scheduleMark}
           <span class="planner-player__team-inline">${team ? esc(team.shortName) : '—'}</span>
           <span class="ranker-pos-badge ranker-pos-badge--${player.position.toLowerCase()}">${esc(player.position)}</span>
           <span class="planner-player__price">£${price}m</span>

@@ -5814,3 +5814,46 @@ img.fx-crest {
   background: var(--color-border);
   flex: none;
 }
+
+/* Schedule marker on Planner transfer cards. Shown on both sides of a swap:
+   transferring OUT of a double or INTO a blank is the mistake it exists to
+   catch. Same vocabulary as the fixture strip — accent for a double, muted for
+   a blank — so the two read as one system. */
+.planner-schedule-mark {
+  margin-left: var(--space-1);
+  font-size: 0.625rem;
+  font-weight: 700;
+}
+
+.planner-schedule-mark--double { color: var(--color-accent); }
+.planner-schedule-mark--blank  { color: var(--color-muted); }
+
+/* Postponed fixtures on the Fixtures gameweek pane. Dashed, muted, and set
+   apart from the day groups — these belong to no day and no gameweek, and the
+   styling should not imply otherwise. Same dashed-pill vocabulary as
+   .pgw-pending on the fixture strips. */
+.fx-pending {
+  border-top: 1px dashed var(--color-border);
+  padding-top: var(--space-3);
+}
+
+.fx-pending__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.fx-pending__item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--band-neutral) 6%, transparent);
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
+
+.fx-pending__team { font-weight: 700; color: var(--color-text); }
+.fx-pending__v    { color: var(--color-muted); }

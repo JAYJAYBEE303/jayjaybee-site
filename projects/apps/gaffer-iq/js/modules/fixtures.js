@@ -874,9 +874,48 @@ function renderGameweekPane() {
         <ul class="fx-list">${g.fixtures.map(fixtureHtml).join('')}</ul>
       </section>`).join('')
       : emptyState(`No fixtures scheduled for gameweek ${gw}.`)}
+
+    ${pendingSectionHtml()}
   `;
 
   syncGwPicker(gw);
+}
+
+/**
+ * Postponed fixtures — no gameweek assigned, awaiting a rearranged date.
+ *
+ * These were previously invisible everywhere in the app: they sit in the
+ * fixtures array with gw === null, and every view filters by gameweek. A team
+ * with a pending rearrangement simply looked like a team playing fewer games.
+ *
+ * Rendered once at the foot of the gameweek pane rather than inside a day
+ * group, because they belong to no day and no gameweek. Returns '' when there
+ * are none, which is the normal state.
+ *
+ * @returns {string} HTML
+ */
+function pendingSectionHtml() {
+  const pending = store.getSeason()?.pendingFixtures ?? [];
+  if (pending.length === 0) return '';
+
+  const items = pending.map(f => {
+    const h = store.getTeam(f.homeTeamId);
+    const a = store.getTeam(f.awayTeamId);
+    return `<li class="fx-pending__item">`
+      + `<span class="fx-pending__team">${esc(h?.shortName ?? '?')}</span>`
+      + `<span class="fx-pending__v">v</span>`
+      + `<span class="fx-pending__team">${esc(a?.shortName ?? '?')}</span>`
+      + `</li>`;
+  }).join('');
+
+  return `
+    <section class="fx-daygroup fx-pending">
+      <h3 class="fx-daygroup__title">
+        <span class="fx-daygroup__day">Postponed</span>
+        <span class="fx-daygroup__date">awaiting a date</span>
+      </h3>
+      <ul class="fx-list fx-pending__list">${items}</ul>
+    </section>`;
 }
 
 /** Keep the stepper label and its bounds in step with the selected GW. */
