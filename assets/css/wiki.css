@@ -75,7 +75,7 @@
 }
 
 /* =========================================================================
-   LEFT RAIL — entry index + on-this-page
+   LEFT RAIL — entry index
    ========================================================================= */
 
 .wk-rail {
@@ -167,6 +167,18 @@
   color: var(--fg-quiet);
 }
 
+/* =========================================================================
+   RIGHT RAIL — on this page, recently read, entry status
+   The sticky/overflow behaviour is shared with the left rail and lives on
+   the base .wk-rail rule above; nothing here restates it.
+   ========================================================================= */
+
+/* Both JS-built blocks stay hidden until wiki.js adds .is-built, so
+   neither leaves an empty ruled-off label hanging with JS disabled.
+   Entry status carries no such guard — it is compiled. */
+.wk-rail__block--toc:not(.is-built),
+.wk-rail__block--recent:not(.is-built) { display: none; }
+
 /* ---- on this page (built by wiki.js) ------------------------------------- */
 .wk-toc { display: flex; flex-direction: column; }
 .wk-toc a {
@@ -183,22 +195,6 @@
 .wk-toc a:hover { color: var(--fg); }
 .wk-toc a.is-sub { padding-left: var(--space-5); }
 .wk-toc a.is-active { color: var(--accent); border-left-color: var(--accent); }
-
-/* No JS, or an entry with no headings: hide the whole block rather than
-   leave an empty ruled-off label hanging in the rail. */
-.wk-rail__block--toc:not(.is-built) { display: none; }
-
-/* =========================================================================
-   RIGHT RAIL — on this page, recently read, entry status
-   The sticky/overflow behaviour is shared with the left rail and lives on
-   the base .wk-rail rule above; nothing here restates it.
-   ========================================================================= */
-
-/* Both JS-built blocks stay hidden until wiki.js adds .is-built, so
-   neither leaves an empty ruled-off label hanging with JS disabled.
-   Entry status carries no such guard — it is compiled. */
-.wk-rail__block--toc:not(.is-built),
-.wk-rail__block--recent:not(.is-built) { display: none; }
 
 .wk-recent { display: flex; flex-direction: column; gap: var(--space-2); }
 .wk-recent a {
