@@ -69,3 +69,15 @@ exclude:
   - "projects/apps/**/*.md"
   - projects/apps/gaffer-iq/docs
   - projects/apps/gaffer-iq/tests
+
+  # -----------------------------------------------------------------------
+  # Same trap as projects/apps/ above: docs/superpowers/ holds the plan and
+  # spec documents for this work, and they contain literal Liquid examples
+  # (e.g. `{% include ... %}` snippets shown as text). jekyll-optional-
+  # front-matter promotes every .md file to a rendered page and runs it
+  # through Liquid regardless of front matter, so those examples parse as
+  # real tags and fail the build for the whole site. These are internal
+  # engineering notes, not site content — leaving them unexcluded would
+  # also publish them at jayjaybee.com/docs/superpowers/.
+  # -----------------------------------------------------------------------
+  - docs
