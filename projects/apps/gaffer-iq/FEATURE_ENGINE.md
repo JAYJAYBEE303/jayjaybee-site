@@ -910,8 +910,63 @@ horizonScore = (AGG_METHOD == 'mean') ? aggregateMean
 - **Default `AGG_METHOD = 'blend'`** with `W_MEAN = 0.75`, `W_MIN = 0.25` — rewards a good run but punishes a single brutal fixture hiding in an otherwise green sequence (critical for transfer/captaincy decisions). All in `config.js`.
 - **`HORIZON_DECAY` (0.9):** GW+0 weighted fully, GW+5 weighted ~0.59. Reflects that near fixtures are more certain and more decision-relevant.
 - **Blank GW handling:** a team with no fixture in a GW contributes a configurable `BLANK_GW_VALUE` (default **40** — a blank is mildly bad for that team's assets, not neutral, because you get zero return). It is included in the aggregation, never silently skipped. Flagged in the breakdown.
-- **Double GW handling:** both fixtures are scored and included; the team effectively gets two entries in the window, naturally boosting its horizon score (correctly — doubles are valuable). The UI must label DGW teams.
-- Output mirrors `CompositeScore` plus a `perGw: [{ gw, value, band, opponent, venue }]` array so modules can render the fixture run as a strip of coloured cells.
+- **Double GW handling:** a gameweek's fixtures are **collapsed to one aggregation entry** — their mean — and the extra fixture is then priced through `applyDgwUplift`:
+
+```
+gwValue = mean(scoreFixture(team, f).value for f in that gw)
+gwValue = gwValue + (100 − gwValue) × DGW_UPLIFT × (n − 1)
+```
+
+  At `DGW_UPLIFT = 0.35` a double at 30 becomes 54.5 and a double at 70 becomes 80.5. The uplift is a fraction of the **remaining headroom to 100**, so it is asymptotic — a double can never overflow the band scale, and a great fixture gains proportionally less than a poor one (a double is worth most to the player you would otherwise have benched). `aggregateMin` takes the minimum of the **adjusted per-GW values**, not the worst individual fixture, or `W_MIN` would keep punishing a double that contains one hard game.
+
+  **History:** this section previously claimed that pushing one entry per fixture "naturally boosts" the horizon score. It did not. Two entries at the same `gwOffset` doubled that gameweek's *weight* in the denominator without adding any return, which inverts for poor fixtures — a double against two hard opponents scored **lower** than a single hard fixture (39.2 vs 42.6 at `HORIZON_DECAY 0.9` over three GWs with fixtures at 30, 50, 50). Good doubles did lift the aggregate, which is why it went unnoticed. There is no value of `DGW_UPLIFT` that reproduces the old behaviour: collapsing to a per-GW mean is itself a change.
+
+  The UI labels DGW teams — see §9.1.
+- Output mirrors `CompositeScore` plus a `perGw: [{ gw, value, band, opponent, venue, isBlank, provisional, provisionalKickoff }]` array so modules can render the fixture run as a strip of coloured cells. **`perGw` is one entry per FIXTURE, not per gameweek** — a double produces two entries sharing a `gw`, so its length does not equal the horizon length. Fold it with `groupPerGwSlots` (§9.1) before rendering. The aggregation collapse described above does **not** apply to `perGw`; the two are deliberately separate.
+
+---
+
+## 9.1 Schedule irregularities (`engine/fixtures.js`, `modules/scheduleBar.js`)
+
+FPL's calendar is not one-fixture-per-team-per-gameweek. Four states occur, and all four are surfaced:
+
+| State | Meaning | Source |
+|---|---|---|
+| **Double** | team plays 2+ fixtures in one gameweek | two `perGw` entries sharing a `gw` |
+| **Blank** | team plays none | one `perGw` entry with `isBlank: true` |
+| **Postponed** | fixture exists, no gameweek assigned | `season.pendingFixtures` (`event: null`) |
+| **Kickoff TBC** | gameweek assigned, kickoff unconfirmed | `fixture.provisionalKickoff` (`provisional_start_time`) |
+
+### The one rule
+
+**Schedule structure is carried by geometry; fixture quality is carried by colour. The two never overlap.**
+
+Both alternatives were already committed: the five band colours mean fixture quality in all four modules (CONVENTIONS §5.2), and `--estimated-border-style` (dashed) means low **model** confidence. A kickoff-TBC marker cannot be dashed, because that would collide with a different axis — schedule confidence and model confidence must stay separately legible. A double against brutal opposition reads as red-and-grouped.
+
+| Signal | Treatment |
+|---|---|
+| Double | slot's cells wrapped in a `--color-accent` tinted group with an accent outline; label gains `··` |
+| Blank | hatched cell showing `∅` — a bare `–` was indistinguishable from a failed load |
+| Kickoff TBC | 4px `--band-tough` corner dot |
+| Postponed | dashed `+n TBD` pill, after the strip — it has no gameweek to sit inside |
+
+`--color-accent` is used for doubles precisely because it is **not** one of the five band colours, so it cannot be read as a quality signal.
+
+### `groupPerGwSlots(perGw)`
+
+Folds the flat per-fixture array into `[{ gw, fixtures, isDouble, isBlank }]`, ordered by gameweek. A **derived view**, not a change to `scoreOverHorizon`'s output — the engine contract stays stable while renderers migrate independently. `isDouble` and `isBlank` are mutually exclusive by construction: a blank is always exactly one entry.
+
+Consumed by the Ranker strip, the Matchup strip, `buildFixtureContextLabel` (Dashboard) and the Planner's transfer cards.
+
+### `summariseGwIrregularities(ctx, fromGw, count)`
+
+Returns `[{ gw, doubleTeams, blankTeams }]` for **only** the irregular gameweeks in a window. An ordinary window returns `[]`, and that emptiness is the signal `modules/scheduleBar.js` uses to render nothing at all — a bar that always showed would cost vertical space on every view for information that is usually "nothing unusual".
+
+The bar exists because the per-team strip only appears in the Ranker and Matchup Analyser. Dashboard, Planner and Fixtures render no strip, so without it three of five tabs would say nothing about the schedule.
+
+### `pendingFixturesForTeam(teamId, ctx)`
+
+**Display-only.** Postponed fixtures have no gameweek, so nothing that aggregates over a gameweek window may read them — `fixturesForTeamInWindow` keeps its `f.gw === null` guard, and that guard is what makes retaining them safe.
 
 ---
 
@@ -999,11 +1054,14 @@ Confirms the same underlying arithmetic as before — only how (and when) it's s
 expectedPoints.value = avgPointsPerGw.value
                       * (1 + EXPECTED_PTS_FIXTURE_SWING * (nextFixtureScore.value − 50) / 50)
                       * (playing.value / 100)
+                      * max(0, 1 + DGW_EXPECTED_PTS_FACTOR * (fixtureCount − 1))
 ```
 
 - `avgPointsPerGw.value` (§10 above) is a real points figure that already reflects each position's true scoring ceiling — forwards/mids naturally average more points per gameweek than defenders — so no separate per-position scaling is needed.
 - The fixture-quality term scales that average by up to `± EXPECTED_PTS_FIXTURE_SWING` (config.js, default `0.5`): a `nextFixtureScore` of 50 (neutral) applies ×1.0, 100 (best possible) applies ×1.5, 0 (worst) applies ×0.5.
 - The playing-likelihood term (`playing.value / 100`, §7.3) suppresses the projection for anyone unlikely to start, so a high season-average player who's now injured/benched doesn't still look like the best captain pick.
+- **The fixture-count term** (`DGW_EXPECTED_PTS_FACTOR`, default `0.9`) is how many games the player's team actually plays in the nearest gameweek: `0` on a blank, `2` on a double. A blank therefore projects **zero** — the team does not play — and a double projects ×1.9. `0.9` rather than `1.0` is a rotation-risk haircut: managers rest players across a congested double far more often than across a single, so a straight doubling over-projects. Clamped at 0 so a nonsense count cannot invert the projection into negative points. **Added because the projection previously had no fixture-count term at all**, so a double-gameweek captain projected identically to a single-gameweek one and a blank-gameweek player projected a full score — and double-gameweek captaincy is the highest-leverage use of schedule knowledge in FPL.
+- **`DGW_EXPECTED_PTS_FACTOR` applies only here; `DGW_UPLIFT` (§9) applies only to `value`.** One fact, two axes, one treatment each — never apply either to the other, or a double is counted twice.
 - **`value` and `expectedPoints` are two different axes and must never be merged**: `value` (0–100) answers "how good a pick is this player right now, relative to others at his position" (Ranker's job); `expectedPoints` (real points) answers "how many points will he actually score" (captaincy/TC's job).
 - **Callers:** `modules/dashboard.js → renderDecisions()` picks the XI's `expectedPoints.value` max as captain (and shows it on the Captain Pick card, "Predicted X.X pts"); `modules/planner.js → pickTcCandidate()` picks the squad's `expectedPoints.value` max as the Triple Captain candidate. Neither reads `score.value` for this decision anymore.
 
