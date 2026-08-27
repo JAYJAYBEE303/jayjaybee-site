@@ -15,17 +15,18 @@ scroll_gate: false
      that the projects landing page already has, and it will follow
      any future change to them for free.
 
-     The list is generated from the entry pages themselves — every
-     page whose layout is `wiki-entry` — sorted by their `order`
-     front matter. There is no separate manifest to keep in sync;
-     adding a folder under /projects/wiki/ adds a row here.
+     The list is generated from the app pages themselves — every page
+     whose layout is `wiki-app` — sorted by their `order` front matter.
+     There is no separate manifest to keep in sync; adding an app folder
+     under /projects/wiki/ adds a row here. The sections inside an app
+     are not listed: they are the app's own rail, not wiki-wide entries.
 
      `scroll_gate: false` matches /projects: there is no hero to
      read first, so the work should just be there. Per-element
      reveal still runs.
      ============================================================= -->
 
-{%- assign wk_entries = site.pages | where_exp: "p", "p.layout == 'wiki-entry'" | sort: "order" -%}
+{%- assign wk_entries = site.pages | where_exp: "p", "p.layout == 'wiki-app'" | sort: "order" -%}
 
 <section class="work" aria-labelledby="wiki-heading">
   <header class="section-head">
