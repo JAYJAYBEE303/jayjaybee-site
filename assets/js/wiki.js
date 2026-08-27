@@ -1,12 +1,15 @@
 /* =========================================================================
    jayjaybee.com — wiki.js
-   Loaded only by _layouts/wiki-entry.html, i.e. only on /projects/wiki/<slug>/.
+   Loaded only by _layouts/wiki-entry.html, i.e. only on
+   /projects/wiki/<app>/<section>/.
 
    Progressive enhancement only. Everything this file does is optional:
    the entry's prose, its internal links, its footnotes, backlinks and
    pager are all compiled at build time (see _includes/wiki-body.html), so
    with JavaScript off the page still reads and navigates correctly. All
-   that is lost is the on-this-page rail and the hover preview.
+   that is lost is the on-this-page rail, the rail filter, the Recently
+   read list, and the popovers (infobox term definitions and the link
+   hover preview).
 
    Five jobs:
      1. Build the "On this page" list from the section's own h2/h3, and
@@ -278,10 +281,10 @@
     term.textContent = btn.textContent.trim();
     el.appendChild(term);
 
-    var body = document.createElement('p');
-    body.className = 'wk-pop__body';
-    body.textContent = btn.getAttribute('data-term-text') || '';
-    el.appendChild(body);
+    var bodyEl = document.createElement('p');
+    bodyEl.className = 'wk-pop__body';
+    bodyEl.textContent = btn.getAttribute('data-term-text') || '';
+    el.appendChild(bodyEl);
 
     var href = btn.getAttribute('data-term-href');
     if (href) {

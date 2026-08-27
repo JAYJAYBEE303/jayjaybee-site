@@ -29,7 +29,7 @@
     <span class="mono-label">{{ g }}</span>
     <span class="mono-label" data-rail-count>{{ wk_gitems.size | prepend: '0' | slice: -2, 2 }}</span>
   </p>
-  <nav class="wk-nav">
+  <nav class="wk-nav" aria-label="{{ g }}">
     {%- for e in wk_gitems -%}
     {%- assign wk_n = 0 -%}
     {%- for s in include.sections -%}

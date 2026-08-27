@@ -80,6 +80,17 @@
 @media (max-width: 56rem) {
   .wk-layout { grid-template-columns: minmax(0, 1fr); }
   .wk-rail--right { grid-template-columns: minmax(0, 1fr); }
+  /* Same cascade question as the 74rem block above: grid-row: 1 there
+     is set on `.wk-rail.wk-rail--right` at (0,2,0), so a same-specificity
+     `.wk-rail--right` override here would lose regardless of source
+     order — the right rail would stay pinned above the article even
+     though the grid is single-column below this breakpoint, pushing
+     the article title below both rails on a phone. Matching the
+     doubled class raises this to (0,2,0) too, so this rule — coming
+     later in the file — wins on source order and the rail falls back
+     into normal document flow, after the article. Do not simplify
+     this back to `.wk-rail--right`. */
+  .wk-rail.wk-rail--right { grid-row: auto; }
 }
 
 /* =========================================================================
@@ -105,6 +116,17 @@
 }
 
 .wk-rail__block + .wk-rail__block { margin-top: var(--space-6); }
+
+/* :empty is true whenever wiki.js never fills the filter mount — JS
+   is off, or buildFilter() bails because the app has only one entry.
+   The mount is already zero-height in that state, but the adjacent-
+   sibling rule above still fires on the group block that follows it:
+   `+` matches on DOM position, not on the display of the element it
+   follows, so display: none alone would leave a var(--space-6) gap
+   above the first group that exists only because the filter was
+   never injected. The second rule cancels that margin explicitly. */
+.wk-rail__block--filter:empty { display: none; }
+.wk-rail__block--filter:empty + .wk-rail__block { margin-top: 0; }
 
 /* Head of each rail block. Typography comes from .mono-label in markup;
    this only lays it out and rules it off. */
