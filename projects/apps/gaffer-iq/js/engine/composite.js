@@ -765,8 +765,15 @@ function calcPlayerCounterEdge(player, gwWindow, teamFixturesByGw, ctx) {
  * @param {object} ctx   output of buildScoreContext
  * @returns {object}  CompositeScore shape + perGw strip
  *   value: 0–100, higher = better fixture run for `team`. Direction: higher = better.
- *   perGw: [{gw, value, band, opponent, venue, isBlank}] one entry per scored slot;
- *     DGWs produce two entries for the same gw, blanks one with isBlank: true.
+ *   perGw: [{gw, value, band, opponent, venue, isBlank, provisional,
+ *     provisionalKickoff}] one entry per FIXTURE; DGWs produce two entries for
+ *     the same gw, blanks one with isBlank: true. Fold it into one slot per
+ *     gameweek with groupPerGwSlots (engine/fixtures.js) — do not assume the
+ *     array length equals the horizon length.
+ *
+ *   AGGREGATION collapses each gameweek's fixtures to a mean and then applies
+ *   applyDgwUplift, so a double adds RETURN rather than doubling that week's
+ *   weight. perGw is unaffected by that collapse and stays per-fixture.
  *   See FEATURE_ENGINE.md §9.
  */
 /**
@@ -802,8 +809,13 @@ export function scoreOverHorizon(team, horizon, ctx) {
 
   const teamFixturesByGw = fixturesForTeamInWindow(team, gwSet, ctx);
 
-  const entries = [];  // { gwOffset, value, fixtureScore | null }
-  const perGw   = [];  // public per-GW strip array
+  // ONE ENTRY PER GAMEWEEK, not per fixture. This is the load-bearing change:
+  // the previous version pushed one entry per fixture, so a double gameweek's
+  // two entries doubled that GW's WEIGHT in the mean below without adding any
+  // return — and a double against two hard opponents therefore scored LOWER
+  // than a single hard fixture. See FEATURE_ENGINE.md §9.
+  const entries = [];  // { gwOffset, value, fixtureScores: [] }
+  const perGw   = [];  // public per-GW strip array — still one entry per FIXTURE
 
   for (let i = 0; i < gwWindow.length; i++) {
     const gw       = gwWindow[i];
@@ -813,39 +825,65 @@ export function scoreOverHorizon(team, horizon, ctx) {
     if (fixtures.length === 0) {
       // MODEL: blank GW — BLANK_GW_VALUE (40) reflects zero return for assets;
       // mildly bad rather than neutral, never silently skipped. FEATURE_ENGINE.md §9.
-      entries.push({ gwOffset, value: BLANK_GW_VALUE, fixtureScore: null });
+      entries.push({ gwOffset, value: BLANK_GW_VALUE, fixtureScores: [] });
       perGw.push({
         gw, value: BLANK_GW_VALUE, band: bandFromValue(BLANK_GW_VALUE),
         opponent: null, venue: null, isBlank: true,
       });
-    } else {
-      for (const f of fixtures) {
-        const score  = scoreFixture(team, f, ctx);
-        const isHome = f.homeTeamId === team.id;
-        const oppId  = isHome ? f.awayTeamId : f.homeTeamId;
-        const opp    = ctx.teamsById[oppId];
-        entries.push({ gwOffset, value: score.value, fixtureScore: score });
-        perGw.push({
-          gw,
-          value:       score.value,
-          band:        score.band,
-          opponent:    opp?.shortName ?? null,
-          venue:       isHome ? 'H' : 'A',
-          isBlank:     false,
-          provisional: score.provisional,
-        });
-      }
+      continue;
     }
+
+    // Collapse this gameweek's fixtures to a single aggregation entry, then
+    // price the extra fixture(s) through the uplift rather than through weight.
+    const scores     = fixtures.map(f => scoreFixture(team, f, ctx));
+    const rawGwValue = scores.reduce((s, x) => s + x.value, 0) / scores.length;
+    const gwValue    = applyDgwUplift(rawGwValue, fixtures.length);
+
+    entries.push({ gwOffset, value: gwValue, fixtureScores: scores });
+
+    // perGw stays ONE ENTRY PER FIXTURE — its shape is unchanged and every
+    // renderer depends on it. groupPerGwSlots (engine/fixtures.js) is what
+    // folds it into gameweeks for display, so the engine contract holds still
+    // while the strips migrate.
+    fixtures.forEach((f, fi) => {
+      const score  = scores[fi];
+      const isHome = f.homeTeamId === team.id;
+      const oppId  = isHome ? f.awayTeamId : f.homeTeamId;
+      const opp    = ctx.teamsById[oppId];
+      perGw.push({
+        gw,
+        value:       score.value,
+        band:        score.band,
+        opponent:    opp?.shortName ?? null,
+        venue:       isHome ? 'H' : 'A',
+        isBlank:     false,
+        provisional: score.provisional,
+        // Additive field — schedule confidence, distinct from `provisional`
+        // above, which is MODEL confidence. See engine/normalise.js.
+        provisionalKickoff: Boolean(f.provisionalKickoff),
+      });
+    });
   }
 
   if (entries.length === 0) {
     return {
       value: 50, band: bandFromValue(50), confidence: 1, provisional: false, perGw: [],
-      breakdown: { aggregateMean: 50, aggregateMin: 50, aggMethod: AGG_METHOD, numGws, numBlanks: 0 },
+      breakdown: {
+        aggregateMean: 50, aggregateMin: 50, aggMethod: AGG_METHOD,
+        numGws, numBlanks: 0, numDoubles: 0,
+      },
     };
   }
 
   // Weighted mean with GW-distance decay; nearer GWs have more weight.
+  //
+  // `entries` is now ONE PER GAMEWEEK, so each gameweek contributes exactly one
+  // weight regardless of how many fixtures it holds — a double's extra return
+  // is already priced into e.value by applyDgwUplift above. minVal therefore
+  // tracks the worst ADJUSTED GAMEWEEK, not the worst individual fixture, which
+  // is the point: leaving it on raw fixtures would let W_MIN keep punishing a
+  // double that contains one hard game, re-introducing the very defect the
+  // uplift fixes through the 25% blend weight.
   let wSum   = 0;
   let wTotal = 0;
   let minVal = 100;
@@ -873,10 +911,13 @@ export function scoreOverHorizon(team, horizon, ctx) {
 
   const value = clamp(0, 100, rawValue);
 
-  const scoredEntries = entries.filter(e => e.fixtureScore !== null);
-  const avgConfidence = scoredEntries.length === 0 ? 0.5
-    : scoredEntries.reduce((s, e) => s + (e.fixtureScore.confidence ?? 0), 0) / scoredEntries.length;
-  const numBlanks = entries.length - scoredEntries.length;
+  // Confidence averages over every FIXTURE, not every gameweek — a double's two
+  // fixtures each carry their own confidence and both inform how much to trust
+  // the run. numBlanks still counts GAMEWEEKS, which is what it has always meant.
+  const allScores = entries.flatMap(e => e.fixtureScores);
+  const avgConfidence = allScores.length === 0 ? 0.5
+    : allScores.reduce((s, x) => s + (x.confidence ?? 0), 0) / allScores.length;
+  const numBlanks = entries.filter(e => e.fixtureScores.length === 0).length;
 
   return {
     value,
@@ -890,6 +931,7 @@ export function scoreOverHorizon(team, horizon, ctx) {
       aggMethod:  AGG_METHOD,
       numGws,
       numBlanks,
+      numDoubles: entries.filter(e => e.fixtureScores.length > 1).length,
     },
   };
 }
