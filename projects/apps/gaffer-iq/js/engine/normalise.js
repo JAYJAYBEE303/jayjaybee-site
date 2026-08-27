@@ -273,6 +273,12 @@ export function normaliseFixture(raw) {
     id: raw.id,
     gw: raw.event,                  // null for unscheduled fixtures (rare)
     kickoff: raw.kickoff_time,       // ISO string; engine never reformats
+    // FPL sets provisional_start_time while a kickoff is unconfirmed — often the
+    // precursor to a postponement. This is SCHEDULE confidence, a different axis
+    // from the MODEL confidence that `provisional` carries on a CompositeScore,
+    // so it must never be rendered with --estimated-border-style: that style is
+    // already spoken for. See FEATURE_ENGINE.md §9.1.
+    provisionalKickoff: Boolean(raw.provisional_start_time),
     homeTeamId: raw.team_h,
     awayTeamId: raw.team_a,
     played: complete,
@@ -352,8 +358,9 @@ export function normalisePlayerSummary(raw) {
  * @param {object}   rawBootstrap   bootstrap-static/ response
  * @param {object[]} rawFixtures    fixtures/ response (raw array)
  * @returns {Season}  { teams, teamsById, players, playersById,
- *                      fixtures, fixturesById, positions, events,
- *                      currentGw, nextGw }
+ *                      fixtures, fixturesById,
+ *                      pendingFixtures, pendingFixturesByTeam,
+ *                      positions, events, currentGw, nextGw }
  */
 export function normaliseSeason(rawBootstrap, rawFixtures) {
   if (!rawBootstrap || !Array.isArray(rawBootstrap.teams)) {
@@ -387,6 +394,25 @@ export function normaliseSeason(rawBootstrap, rawFixtures) {
   }
   const teams = teamsRaw.map(t => ({ ...t, fixtures: fixtureIdsByTeam[t.id] || [] }));
 
+  // Postponed fixtures — no gameweek assigned yet, awaiting a rearranged date.
+  //
+  // A DERIVED VIEW, not a separate list: these entries stay in `fixtures` where
+  // they have always been (the sort above parks them at the end via `?? 999`).
+  // Removing them would be a behaviour change nothing asked for — every
+  // aggregation already skips them through the `f.gw === null` guard in
+  // composite.js's fixturesForTeamInWindow, so they are harmless where they sit.
+  // What was missing is a way to FIND them, which is what this index provides.
+  //
+  // Display-only. Nothing that aggregates over a gameweek window may read this,
+  // because these fixtures have no gameweek to be aggregated into.
+  const pendingFixtures = sortedFixtures.filter(f => f.gw === null);
+
+  const pendingFixturesByTeam = {};
+  for (const f of pendingFixtures) {
+    (pendingFixturesByTeam[f.homeTeamId] ||= []).push(f);
+    (pendingFixturesByTeam[f.awayTeamId] ||= []).push(f);
+  }
+
   const positions = (rawBootstrap.element_types || []).map(et => ({
     id:   et.id,
     code: et.singular_name_short,
@@ -416,6 +442,7 @@ export function normaliseSeason(rawBootstrap, rawFixtures) {
     teams, teamsById,
     players, playersById,
     fixtures: sortedFixtures, fixturesById,
+    pendingFixtures, pendingFixturesByTeam,
     positions, events,
     currentGw, nextGw,
   };
