@@ -12,6 +12,7 @@ import {
   STACK_PIVOT, STACK_CURVE, STACK_MAX_PENALTY, RELATIVE_EDGE_SENSITIVITY,
   HORIZON_DECAY, AGG_METHOD, W_MEAN, W_MIN, BLANK_GW_VALUE, DGW_UPLIFT,
   PROJ_FORM, PROJ_FIXTURE, PROJ_COUNTER, PROJ_MINUTES, EXPECTED_PTS_FIXTURE_SWING,
+  DGW_EXPECTED_PTS_FACTOR,
   RANK_ELITE_COUNT_BY_POS, RANK_STRONG_COUNT_BY_POS, RANK_TOP_PERCENTILE, RANK_BOTTOM_PERCENTILE,
   SEASON_GWS,
   PLAYTIME_PRIOR_MIN, PLAYTIME_PRIOR_MAX, PLAYTIME_BODY_SHARE,
@@ -1051,11 +1052,16 @@ export function calcLastSeasonAvgPointsPerGw(player, ctx) {
  * @returns {{value: number, estimated: boolean}}
  *   value: expected FPL points for the upcoming game (real points scale, not 0–100).
  */
-export function calcExpectedPoints(avgPointsPerGw, nextFixtureScore, playing) {
+export function calcExpectedPoints(avgPointsPerGw, nextFixtureScore, playing, fixtureCount = 1) {
   const fixtureMultiplier = 1 + EXPECTED_PTS_FIXTURE_SWING * ((nextFixtureScore.value - 50) / 50);
   const minutesMultiplier = playing.value / 100;
+  // How many games he actually plays that week. A blank yields 0 — the team does
+  // not play, so no projection is possible; a double yields ~1.9x. Clamped at 0
+  // so a nonsense negative count can never invert the projection into negative
+  // points. Defaults to 1 for callers with no fixture context.
+  const countMultiplier   = Math.max(0, 1 + DGW_EXPECTED_PTS_FACTOR * (fixtureCount - 1));
   return {
-    value:     avgPointsPerGw.value * fixtureMultiplier * minutesMultiplier,
+    value:     avgPointsPerGw.value * fixtureMultiplier * minutesMultiplier * countMultiplier,
     estimated: avgPointsPerGw.estimated || playing.estimated,
   };
 }
@@ -1185,7 +1191,14 @@ export function scorePlayer(player, horizon, ctx) {
     costPerPoint: (player.price > 0 && avgPointsPerGw.value > 0)
       ? player.price / avgPointsPerGw.value : null,
     nextFixtureScore,
-    expectedPoints: calcExpectedPoints(avgPointsPerGw, nextFixtureScore, playing),
+    // The fourth argument is how many fixtures the team plays in the NEAREST
+    // gameweek of the window — 2 on a double, 0 on a blank. Taken from
+    // gwWindow[0] rather than ctx.currentGw so it can never disagree with the
+    // window the rest of this function scored.
+    expectedPoints: calcExpectedPoints(
+      avgPointsPerGw, nextFixtureScore, playing,
+      (teamFixturesByGw.get(gwWindow[0]) ?? []).length,
+    ),
   };
 }
 

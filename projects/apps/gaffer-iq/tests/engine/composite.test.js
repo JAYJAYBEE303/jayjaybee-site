@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { metricMaturity, applyDgwUplift } from '../../js/engine/composite.js';
+import { metricMaturity, applyDgwUplift, calcExpectedPoints } from '../../js/engine/composite.js';
 
 test('metricMaturity is 1 for a normal, non-estimated metric', () => {
   // The five metrics that don't opt into the ramp report no maturity at all
@@ -77,4 +77,40 @@ test('applyDgwUplift returns a blank gameweek value unchanged', () => {
   // fixtureCount 0 means the caller already substituted BLANK_GW_VALUE.
   // A negative (n-1) must never DROP the value further.
   assert.equal(applyDgwUplift(40, 0), 40);
+});
+
+// ─── calcExpectedPoints fixture count (FEATURE_ENGINE §10.2) ─────────────────
+
+const EP_NEUTRAL_FIXTURE = { value: 50 };
+const EP_FULL_PLAYING    = { value: 100, estimated: false };
+
+test('calcExpectedPoints is unchanged for a single-fixture gameweek', () => {
+  const r = calcExpectedPoints({ value: 5, estimated: false }, EP_NEUTRAL_FIXTURE, EP_FULL_PLAYING, 1);
+  assert.equal(r.value, 5);
+});
+
+test('calcExpectedPoints nearly doubles for a double gameweek', () => {
+  // 1 + 0.9*(2-1) = 1.9 — a rotation-risk haircut on a straight doubling.
+  const r = calcExpectedPoints({ value: 5, estimated: false }, EP_NEUTRAL_FIXTURE, EP_FULL_PLAYING, 2);
+  assert.equal(r.value, 9.5);
+});
+
+test('calcExpectedPoints is zero for a blank gameweek', () => {
+  // A player whose team does not play cannot score. Before the count term this
+  // returned a full projection, which is how a blank-gameweek player could be
+  // picked as captain.
+  const r = calcExpectedPoints({ value: 5, estimated: false }, EP_NEUTRAL_FIXTURE, EP_FULL_PLAYING, 0);
+  assert.equal(r.value, 0);
+});
+
+test('calcExpectedPoints defaults to a single fixture when the count is omitted', () => {
+  // The early-return path in scorePlayer has no fixture context and relies on
+  // this default.
+  const r = calcExpectedPoints({ value: 5, estimated: false }, EP_NEUTRAL_FIXTURE, EP_FULL_PLAYING);
+  assert.equal(r.value, 5);
+});
+
+test('calcExpectedPoints never returns negative points for a nonsense count', () => {
+  const r = calcExpectedPoints({ value: 5, estimated: false }, EP_NEUTRAL_FIXTURE, EP_FULL_PLAYING, -3);
+  assert.equal(r.value, 0);
 });

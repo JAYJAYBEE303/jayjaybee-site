@@ -836,6 +836,25 @@ export const PROJ_MINUTES = 0.20;   // playing likelihood — will he actually s
 // meaningfully swing the pick without ever driving the multiplier negative.
 export const EXPECTED_PTS_FIXTURE_SWING = 0.5;
 
+// How much the SECOND (and each further) fixture of a double gameweek is worth
+// to a real-points projection, relative to the first.
+//
+// MODEL: expectedPoints had no fixture-count term at all, so a double-gameweek
+// captain projected identically to a single-gameweek one, and a blank-gameweek
+// player projected a full score instead of zero. Double-gameweek captaincy is
+// the highest-leverage use of schedule knowledge in FPL, and the model was
+// blind to it.
+//
+// 0.9 rather than 1.0 is a rotation-risk haircut: managers rest players across
+// a congested double far more often than across a single, so a straight
+// doubling would over-project. A blank yields a multiplier of 0 — correct, the
+// team does not play.
+//
+// Applies ONLY to expectedPoints. `value` prices the same fact through
+// DGW_UPLIFT (§9) — one fact, two axes, one treatment each. See
+// FEATURE_ENGINE.md §10.2.
+export const DGW_EXPECTED_PTS_FACTOR = 0.9;
+
 // Fallback playing-chance percentage per internal status string, used by
 // calcPlayingLikelihood ONLY when FPL's own chance_of_playing_next_round is
 // null (which is the normal case — FPL populates it only when there is news).
