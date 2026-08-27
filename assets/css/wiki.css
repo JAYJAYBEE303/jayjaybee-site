@@ -21,13 +21,14 @@
      * The wiki INDEX page (/projects/wiki/) uses the site's own .work-*
        components verbatim and needs nothing from this file at all.
 
-   The five --wk-* properties below are the only new values in the file.
+   The six --wk-* properties below are the only new values in the file.
    Each is a structural measure with no site-wide counterpart, and none
    restates an existing token.
    ========================================================================= */
 
 :root {
   --wk-container: 88rem; /* three-column shell — wider than --container     */
+  --wk-measure: 68ch;   /* prose measure — wider than --measure-prose       */
   --wk-rail-w: 14rem;   /* left index column                                */
   --wk-rail-r-w: 14rem; /* right rail column                                */
   --wk-info-w: 17rem;   /* floated infobox                                  */
@@ -385,12 +386,19 @@ a.wk-launch:focus-visible {
 
 /* =========================================================================
    BODY PROSE
-   Serif at --fs-body over --measure-prose. Distinct from .prose, which is
+   Serif at --fs-body over --wk-measure. Distinct from .prose, which is
    --fs-lede over --measure-wide for single narrative paragraphs.
+
+   --wk-measure (68ch) rather than the site's --measure-prose (62ch): a
+   wiki entry is read at a desk against a three-column shell, not skimmed
+   down a single narrative column, and 62ch left the prose visibly narrow
+   inside the widened article column. 68ch stays inside the 45–75ch band
+   that measure guidance treats as comfortable, so this widens the line
+   without abandoning the rule. Every other page keeps 62ch.
    ========================================================================= */
 
 .wk-body {
-  max-width: var(--measure-prose);
+  max-width: var(--wk-measure);
   margin-top: var(--space-6);
   font-family: var(--font-serif);
   font-size: var(--fs-body);
