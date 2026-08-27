@@ -1,0 +1,55 @@
+{%- comment -%}
+=============================================================================
+  wiki-infobox.html — the floated "at a glance" box, with glossary matching.
+
+  Usage, from _layouts/wiki-entry.html:
+      {% include wiki-infobox.html app=wk_app %}
+
+  Each value is looked up in _data/glossary.yml: the WHOLE value first, so
+  a multi-word value like "5 weighted sub-metrics" matches as one key,
+  then each "·"-separated part. A hit becomes a real <button> carrying the
+  definition in data attributes; a miss renders as text.
+
+  Matching here rather than in JavaScript keeps the glossary out of the
+  payload and puts the definitions in the HTML source, where the site's
+  own search can see them.
+
+  The "click an underlined value" hint renders only if the box actually
+  produced a term — an infobox with nothing clickable must not invite a
+  click. wk_terms survives the loop because Liquid `assign` is not
+  block-scoped.
+=============================================================================
+{%- endcomment -%}
+{%- assign wk_terms = 0 -%}
+<aside class="wk-info" aria-label="{{ include.app.title }} at a glance">
+  <p class="wk-info__head mono-label">{{ include.app.title }}</p>
+  <dl>
+    {%- for row in include.app.info %}
+    <dt class="mono-label">{{ row[0] }}</dt>
+    <dd>
+      {%- assign wk_val = row[1] -%}
+      {%- assign wk_whole = wk_val | strip | downcase -%}
+      {%- assign wk_hit = site.data.glossary[wk_whole] -%}
+      {%- if wk_hit -%}
+        {%- assign wk_terms = wk_terms | plus: 1 -%}
+        {%- include wiki-term.html g=wk_hit label=wk_val -%}
+      {%- else -%}
+        {%- assign wk_parts = wk_val | split: "·" -%}
+        {%- for p in wk_parts -%}
+          {%- assign wk_p = p | strip -%}
+          {%- unless forloop.first %}<span class="wk-info__sep" aria-hidden="true">·</span>{% endunless -%}
+          {%- assign wk_pk = wk_p | downcase -%}
+          {%- assign wk_ph = site.data.glossary[wk_pk] -%}
+          {%- if wk_ph -%}
+            {%- assign wk_terms = wk_terms | plus: 1 -%}
+            {%- include wiki-term.html g=wk_ph label=wk_p -%}
+          {%- else -%}{{ wk_p }}{%- endif -%}
+        {%- endfor -%}
+      {%- endif -%}
+    </dd>
+    {%- endfor %}
+  </dl>
+  {%- if wk_terms > 0 %}
+  <p class="wk-info__hint mono-label">Click an underlined value</p>
+  {%- endif %}
+</aside>

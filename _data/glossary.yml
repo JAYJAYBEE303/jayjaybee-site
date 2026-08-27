@@ -1,0 +1,89 @@
+# =============================================================================
+# glossary.yml — definitions behind the clickable values in a wiki infobox.
+#
+# A key is an infobox value, LOWERCASED and trimmed. _includes/wiki-infobox.html
+# tries each value whole first, then splits it on "·" and tries each part, so
+# both "live · iterating" as a whole and "live" on its own can be defined.
+# A part with no key here renders as plain text — that is the normal case,
+# not a failure.
+#
+#   kind:  the small accent label at the top of the card
+#   text:  the definition
+#   ref:   optional — a SECTION slug. Renders "Full entry: <title> →".
+#          An unresolvable slug renders no link rather than a broken one.
+# =============================================================================
+
+"live · iterating":
+  kind: Status
+  text: >
+    Deployed and in use, with the model still being retuned between
+    gameweeks. Not a finished product and not pretending to be one.
+
+"one vercel function":
+  kind: Backend
+  text: >
+    The single serverless function exists only because the FPL API sends
+    no CORS headers. It fetches from an allowlist and forwards. It holds
+    no state, no keys, and no logic of its own.
+  ref: the-data
+
+"fpl api":
+  kind: Source
+  text: >
+    Supplies the spine — squads, prices, positions, fixtures, per-player
+    histories and live gameweek scoring. It has no standings endpoint and
+    no access to any season but the current one.
+  ref: the-data
+
+"understat":
+  kind: Source
+  text: >
+    Not an API, but it fills the gaps the FPL feed leaves: expected goals,
+    six seasons of fixture lists, chronological match timelines, and
+    rosters with position codes and substitution linkage.
+  ref: the-data
+
+"5 weighted sub-metrics":
+  kind: Model
+  text: >
+    Base difficulty, counter-matchup, team form, head-to-head and home
+    and away. Each is scored separately, weighted, and combined into one
+    CompositeScore — because "hard fixture" and "hard fixture for a
+    winger" are different questions.
+  ref: calculations
+
+"none":
+  kind: Build step
+  text: >
+    No bundler, no framework, no compile. The thing that ships is the
+    thing that was edited, and there is no toolchain to rot between one
+    season and the next.
+
+"html · js · vanilla css":
+  kind: Stack
+  text: >
+    Everything analytical runs in the browser. No framework, and no CSS
+    library — the tokens and components are the app's own.
+
+"html · js · tailwind":
+  kind: Stack
+  text: >
+    Rebuilt in Tailwind once the formulas had stopped moving —
+    deliberately in that order, so styling effort was not spent on
+    layouts the maths was about to invalidate.
+  ref: two-layouts
+
+"mobile read · desktop compare":
+  kind: Layouts
+  text: >
+    Mobile gets one player and the numbers that matter. Desktop gets the
+    comparison view, because comparison is what people open a calculator
+    for and it needs horizontal room.
+  ref: two-layouts
+
+"~2,500 lines · one file":
+  kind: Size
+  text: >
+    A single document holding markup and logic together. Large for one
+    file, and the deliberate trade for having no build step at all.
+  ref: one-file-no-build

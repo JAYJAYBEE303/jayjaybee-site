@@ -1,0 +1,16 @@
+{%- comment -%}
+  wiki-term.html — one clickable glossary value.
+      include wiki-term.html g=<glossary entry> label=<text to show>
+  A `ref` that names no section renders no link, rather than a link to
+  nowhere.
+{%- endcomment -%}
+{%- assign wk_ref = "" -%}
+{%- assign wk_ref_title = "" -%}
+{%- if include.g.ref -%}
+  {%- assign wk_rp = site.pages | where_exp: "p", "p.layout == 'wiki-entry'" | where: "slug", include.g.ref | first -%}
+  {%- if wk_rp -%}
+    {%- assign wk_ref = wk_rp.url -%}
+    {%- assign wk_ref_title = wk_rp.title -%}
+  {%- endif -%}
+{%- endif -%}
+<button type="button" class="wk-term" aria-expanded="false" data-term-kind="{{ include.g.kind | escape }}" data-term-text="{{ include.g.text | strip_newlines | strip | escape }}"{% if wk_ref != "" %} data-term-href="{{ wk_ref }}" data-term-ref="{{ wk_ref_title | escape }}"{% endif %}>{{ include.label }}</button>
