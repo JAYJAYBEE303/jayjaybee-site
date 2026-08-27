@@ -507,3 +507,95 @@ export function calcFixtureHistory(teamAId, teamBId, ctx) {
     pointsForA,
   };
 }
+
+// ─── Schedule irregularities (FEATURE_ENGINE.md §9.1) ────────────────────────
+
+/**
+ * Fold scoreOverHorizon's flat perGw array into one slot per GAMEWEEK.
+ *
+ * perGw carries one entry per FIXTURE, so a double gameweek appears as two
+ * entries sharing a `gw`. Rendered flat, a 6-GW horizon containing a double
+ * shows seven cells with nothing tying two of them together — the gameweek
+ * number survives only in a tooltip. This is the fold that makes the strip say
+ * what it means.
+ *
+ * Deliberately a DERIVED view rather than a change to scoreOverHorizon's
+ * output: the engine's contract stays stable while renderers migrate one at a
+ * time, which matters because the aggregation underneath perGw changed in the
+ * same piece of work.
+ *
+ * @param {Array} perGw  from scoreOverHorizon
+ * @returns {Array<{gw:number, fixtures:Array, isDouble:boolean, isBlank:boolean}>}
+ *          ordered by gameweek ascending
+ */
+export function groupPerGwSlots(perGw) {
+  if (!perGw || perGw.length === 0) return [];
+
+  const byGw = new Map();
+  for (const entry of perGw) {
+    const list = byGw.get(entry.gw) ?? [];
+    list.push(entry);
+    byGw.set(entry.gw, list);
+  }
+
+  return [...byGw.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([gw, fixtures]) => ({
+      gw,
+      fixtures,
+      // A blank is ONE entry flagged isBlank, never two, so these two flags are
+      // mutually exclusive by construction rather than by assertion.
+      isDouble: fixtures.length > 1,
+      isBlank:  fixtures.length === 1 && Boolean(fixtures[0].isBlank),
+    }));
+}
+
+/**
+ * Postponed fixtures awaiting a rearranged date, for one team.
+ *
+ * Display-only. These fixtures have no gameweek, so nothing that aggregates
+ * over a gameweek window may read them — composite.js's fixturesForTeamInWindow
+ * skips them through its `f.gw === null` guard, and that guard stays.
+ *
+ * @param {number} teamId
+ * @param {object} ctx  must carry pendingFixturesByTeam (engine/normalise.js)
+ * @returns {Array}
+ */
+export function pendingFixturesForTeam(teamId, ctx) {
+  return ctx?.pendingFixturesByTeam?.[teamId] ?? [];
+}
+
+/**
+ * Which gameweeks in a window are irregular, and how many teams each affects.
+ *
+ * Returns ONLY irregular gameweeks — an ordinary window returns an empty array,
+ * which is the signal the schedule bar uses to render nothing at all. Most of
+ * the season is ordinary, so that is the common case, not the edge case.
+ *
+ * @param {object} ctx     must carry `fixtures` and `teams`
+ * @param {number} fromGw  first gameweek in the window
+ * @param {number} count   how many gameweeks to inspect
+ * @returns {Array<{gw:number, doubleTeams:number, blankTeams:number}>}
+ */
+export function summariseGwIrregularities(ctx, fromGw, count) {
+  const teams = ctx?.teams ?? [];
+  if (teams.length === 0 || !Number.isFinite(fromGw)) return [];
+
+  const out = [];
+  for (let gw = fromGw; gw < fromGw + count; gw++) {
+    const playCount = new Map(teams.map(t => [t.id, 0]));
+    for (const f of ctx.fixtures ?? []) {
+      if (f.gw !== gw) continue;
+      if (playCount.has(f.homeTeamId)) playCount.set(f.homeTeamId, playCount.get(f.homeTeamId) + 1);
+      if (playCount.has(f.awayTeamId)) playCount.set(f.awayTeamId, playCount.get(f.awayTeamId) + 1);
+    }
+    let doubleTeams = 0;
+    let blankTeams  = 0;
+    for (const n of playCount.values()) {
+      if (n > 1) doubleTeams++;
+      else if (n === 0) blankTeams++;
+    }
+    if (doubleTeams > 0 || blankTeams > 0) out.push({ gw, doubleTeams, blankTeams });
+  }
+  return out;
+}
