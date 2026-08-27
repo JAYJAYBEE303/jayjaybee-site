@@ -1,7 +1,8 @@
 /* =========================================================================
    jayjaybee.com — wiki.css
    The /projects/wiki layer. Entry-page article shell only: rail, article
-   head, infobox, footnotes, backlinks, pager, launch button.
+   head, infobox, footnotes, backlinks, pager, launch button, right rail,
+   glossary popover.
 
    Imported by global.css after components.css, so it is the last partial
    in the cascade but still lands BEFORE global.css's own base rules
@@ -20,13 +21,14 @@
      * The wiki INDEX page (/projects/wiki/) uses the site's own .work-*
        components verbatim and needs nothing from this file at all.
 
-   The three --wk-* properties below are the only new values in the file.
+   The four --wk-* properties below are the only new values in the file.
    Each is a structural measure with no site-wide counterpart, and none
    restates an existing token.
    ========================================================================= */
 
 :root {
   --wk-rail-w: 14rem;   /* left index column                                */
+  --wk-rail-r-w: 14rem; /* right rail column                                */
   --wk-info-w: 17rem;   /* floated infobox                                  */
   --wk-peek-w: 20rem;   /* hover preview card                               */
 }
@@ -39,16 +41,37 @@
 
 .wk-layout {
   display: grid;
-  grid-template-columns: var(--wk-rail-w) minmax(0, 1fr);
+  grid-template-columns: var(--wk-rail-w) minmax(0, 1fr) var(--wk-rail-r-w);
   gap: clamp(var(--space-6), 4vw, var(--space-8));
   align-items: start;
 }
 
+/* 74rem is the one new breakpoint in this file: below it the third
+   column no longer leaves a readable measure for the prose. The right
+   rail drops out of the grid and becomes a row of its three blocks
+   above the article — hidden entirely would lose Entry status, which
+   needs no JS and is worth keeping at every width. */
+@media (max-width: 74rem) {
+  .wk-layout { grid-template-columns: var(--wk-rail-w) minmax(0, 1fr); }
+  .wk-rail--right {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    position: static;
+    max-height: none;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(var(--wk-rail-w), 1fr));
+    gap: var(--space-5);
+    padding-bottom: var(--space-6);
+    margin-bottom: var(--space-6);
+    border-bottom: var(--border-rule);
+  }
+}
+
 /* 56rem is an existing site breakpoint (components.css) — reused rather
-   than introducing a new one. Below it the rail stops being a column and
-   becomes a masthead block above the article. */
+   than introducing a new one. Below it neither rail is a column. */
 @media (max-width: 56rem) {
   .wk-layout { grid-template-columns: minmax(0, 1fr); }
+  .wk-rail--right { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* =========================================================================
@@ -110,6 +133,40 @@
 }
 .wk-nav a[aria-current="page"] .wk-nav__n { color: var(--accent); }
 
+/* ---- filter (injected by wiki.js) ---------------------------------------- */
+.wk-filter { position: relative; }
+.wk-filter input {
+  width: 100%;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-bottom: var(--border-hairline);
+  padding: var(--space-2) 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono);
+  color: var(--fg);
+  outline: none;
+  transition: border-color var(--dur-1) var(--ease);
+}
+.wk-filter input::placeholder {
+  color: var(--fg-faint);
+  letter-spacing: var(--tr-mono-caps);
+  text-transform: uppercase;
+}
+.wk-filter input:focus { border-bottom-color: var(--accent); }
+
+/* Set by wiki.js on a row or a group with no match left in it. */
+.wk-nav a[hidden],
+.wk-rail__group[hidden] { display: none; }
+
+.wk-rail__empty {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: var(--fs-small);
+  color: var(--fg-quiet);
+}
+
 /* ---- on this page (built by wiki.js) ------------------------------------- */
 .wk-toc { display: flex; flex-direction: column; }
 .wk-toc a {
@@ -130,6 +187,34 @@
 /* No JS, or an entry with no headings: hide the whole block rather than
    leave an empty ruled-off label hanging in the rail. */
 .wk-rail__block--toc:not(.is-built) { display: none; }
+
+/* =========================================================================
+   RIGHT RAIL — on this page, recently read, entry status
+   The sticky/overflow behaviour is shared with the left rail and lives on
+   the base .wk-rail rule above; nothing here restates it.
+   ========================================================================= */
+
+/* Both JS-built blocks stay hidden until wiki.js adds .is-built, so
+   neither leaves an empty ruled-off label hanging with JS disabled.
+   Entry status carries no such guard — it is compiled. */
+.wk-rail__block--toc:not(.is-built),
+.wk-rail__block--recent:not(.is-built) { display: none; }
+
+.wk-recent { display: flex; flex-direction: column; gap: var(--space-2); }
+.wk-recent a {
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  line-height: var(--lh-ui);
+  color: var(--fg-quiet);
+  text-decoration: none;
+  transition: color var(--dur-1) var(--ease);
+}
+.wk-recent a:hover { color: var(--accent); }
+.wk-recent a[aria-current="page"] { color: var(--fg); }
+
+.wk-stats { display: grid; gap: var(--space-1); color: var(--fg-quiet); }
+.wk-stats span { display: flex; justify-content: space-between; gap: var(--space-3); }
+.wk-stats b { font-weight: var(--fw-regular); color: var(--fg); }
 
 /* =========================================================================
    ARTICLE
@@ -411,6 +496,97 @@ a.wl:hover { color: var(--link-hover); border-bottom-style: solid; }
   line-height: var(--lh-ui);
   color: var(--fg);
 }
+
+/* =========================================================================
+   GLOSSARY TERMS + POPOVER
+   A term is a real <button> compiled by _includes/wiki-term.html. The
+   popover is a single element wiki.js appends to <body>, so its absolute
+   coordinates are page coordinates whatever the article's layout does.
+   ========================================================================= */
+
+.wk-info__sep { color: var(--fg-faint); padding: 0 var(--space-1); }
+.wk-info > .wk-info__hint {
+  display: block;
+  margin: 0;
+  padding: 0 var(--space-4) var(--space-3);
+  color: var(--fg-faint);
+}
+
+button.wk-term {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px dotted var(--fg-faint);
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: color var(--dur-1) var(--ease),
+              border-color var(--dur-1) var(--ease);
+}
+button.wk-term:hover { color: var(--accent); border-bottom-color: var(--accent); }
+button.wk-term[aria-expanded="true"] {
+  color: var(--accent);
+  border-bottom: 1px solid var(--accent);
+}
+button.wk-term:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Above the hover peek (z 60) — a term click is deliberate, a hover is
+   not, so the deliberate one wins. Still below the skip link (z 100). */
+.wk-pop {
+  position: absolute;
+  z-index: 70;
+  width: var(--wk-peek-w);
+  padding: var(--space-4);
+  background: var(--bg);
+  border: var(--border-rule);
+  box-shadow: var(--shadow-2);
+  display: none;
+}
+.wk-pop.is-on { display: block; }
+.wk-pop__kind {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: 0;
+  color: var(--accent);
+}
+.wk-pop__x {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  letter-spacing: 0;
+  color: var(--fg-faint);
+  cursor: pointer;
+}
+.wk-pop__x:hover { color: var(--accent); }
+.wk-pop__term {
+  margin: var(--space-2) 0 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-ui);
+  line-height: var(--lh-snug);
+  letter-spacing: var(--tr-mono);
+  color: var(--fg);
+}
+.wk-pop__body {
+  margin: var(--space-3) 0 0;
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
+  line-height: var(--lh-ui);
+  color: var(--fg-muted);
+  text-wrap: pretty;
+}
+.wk-pop__ref {
+  display: inline-block;
+  margin-top: var(--space-3);
+  color: var(--accent);
+  text-decoration: none;
+}
+.wk-pop__ref:hover { border-bottom: 1px solid var(--accent); }
 
 /* =========================================================================
    FOOTNOTES — ((text)) compiles to sup.wk-fn + the notes list
