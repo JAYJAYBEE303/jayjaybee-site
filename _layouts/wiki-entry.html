@@ -72,7 +72,12 @@ layout: default
 
 {%- comment -%}
   Backlinks, derived from the [[slug|…]] convention itself rather than
-  from a declared list, so the two can never drift apart.
+  from a declared list, so the two can never drift apart. A section
+  that is its app's front door (wk_idx == 0) ALSO inherits the app's
+  inbound links: [[app-slug|…]] is the only form wiki-body.html lets an
+  author write when linking to a write-up in general (see its own
+  comment), and it resolves to that write-up's first section — so this
+  is where a link written that way has to land.
 {%- endcomment -%}
 {%- comment -%}
   Built with `capture` and a counter rather than by accumulating an
@@ -82,12 +87,18 @@ layout: default
   one pass instead.
 {%- endcomment -%}
 {%- capture wk_needle -%}[[{{ page.slug }}|{%- endcapture -%}
+{%- capture wk_needle_app -%}[[{{ wk_app.slug }}|{%- endcapture -%}
 {%- assign wk_backs_count = 0 -%}
 {%- capture wk_backs_html -%}
   {%- for s in wk_all -%}
-    {%- if s.url != page.url and s.content contains wk_needle -%}
+    {%- assign wk_is_back = false -%}
+    {%- if s.content contains wk_needle -%}{%- assign wk_is_back = true -%}{%- endif -%}
+    {%- if wk_idx == 0 and s.content contains wk_needle_app -%}{%- assign wk_is_back = true -%}{%- endif -%}
+    {%- if s.url != page.url and wk_is_back -%}
       {%- assign wk_backs_count = wk_backs_count | plus: 1 -%}
-      {%- assign wk_bk = s.kind | default: wk_app.kind -%}
+      {%- comment -%} The backlinking section's OWN app, not the current page's — a cross-app backlink must show the source's kind, not the destination's. {%- endcomment -%}
+      {%- assign wk_bapp = wk_apps | where: "slug", s.parent | first -%}
+      {%- assign wk_bk = s.kind | default: wk_bapp.kind -%}
       <a class="wl" href="{{ s.url }}" data-peek-kind="{{ wk_bk | escape }}" data-peek-title="{{ s.title | escape }}" data-peek-lede="{{ s.lede | escape }}">{{ s.title }}</a>
     {%- endif -%}
   {%- endfor -%}
