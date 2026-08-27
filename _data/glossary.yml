@@ -87,3 +87,111 @@
     A single document holding markup and logic together. Large for one
     file, and the deliberate trade for having no build step at all.
   ref: one-file-no-build
+
+# -----------------------------------------------------------------------------
+# Gaffer IQ's shape panel — the vocabulary the write-up assumes. Same keys and
+# same shape as everything above; these are just grouped in the infobox by
+# `shape` on the app page rather than sitting on the right of a key/value row.
+# -----------------------------------------------------------------------------
+
+"static":
+  kind: App shape
+  text: >
+    The app's files (HTML/CSS/JS) are served exactly as written, with
+    nothing generated per-request.
+  ref: approach
+
+"frontend-built":
+  kind: App shape
+  text: >
+    Nearly all the logic runs in the browser, not on a server. This is
+    the app's core design choice.
+  ref: approach
+
+"single-page application (spa)":
+  kind: App shape
+  text: >
+    One HTML page, JavaScript swaps content in and out instead of
+    loading new pages.
+  ref: the-interface
+
+"vanilla js":
+  kind: Build approach
+  text: >
+    No framework (no React/Vue). Plain JavaScript, run as-is.
+  ref: approach
+
+"es modules":
+  kind: Build approach
+  text: >
+    The browser-native way files import each other (import/export), no
+    bundler needed.
+  ref: approach
+
+"no build step":
+  kind: Build approach
+  text: >
+    The code that runs is exactly the code you wrote, nothing compiles
+    or transforms it first.
+  ref: approach
+
+"cors":
+  kind: Servers
+  text: >
+    The browser security rule that blocks a webpage from calling a
+    different site's API directly. It's why the proxy exists.
+  ref: the-data
+
+"serverless":
+  kind: Servers
+  text: >
+    Backend code that runs on-demand in short bursts, with no server you
+    keep running yourself. The proxy is this.
+  ref: the-data
+
+"proxy":
+  kind: Servers
+  text: >
+    The serverless function's job: forward requests, don't process them.
+  ref: the-data
+
+"allowlist":
+  kind: Servers
+  text: >
+    The proxy only forwards requests matching pre-approved URL patterns,
+    rejecting everything else.
+  ref: the-data
+
+"rest api":
+  kind: Servers
+  text: >
+    FPL's data source is fixed-endpoint REST, not GraphQL.
+  ref: the-data
+
+"client-side rendering":
+  kind: Runtime
+  text: >
+    The browser builds and updates the page with JavaScript, rather than
+    receiving a finished page from a server.
+  ref: the-interface
+
+"pure functions":
+  kind: Runtime
+  text: >
+    The scoring engine's code style: same input always gives same
+    output, no side effects.
+  ref: the-engine
+
+"state management / pub-sub":
+  kind: Runtime
+  text: >
+    How the app tracks data and notifies its parts when new data
+    arrives.
+  ref: the-engine
+
+"caching / ttl":
+  kind: Runtime
+  text: >
+    Storing fetched data temporarily instead of re-fetching, with an
+    expiry rule for staleness.
+  ref: the-data

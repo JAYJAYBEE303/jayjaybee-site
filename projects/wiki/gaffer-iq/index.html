@@ -11,13 +11,28 @@ app_url: /projects/apps/gaffer-iq/
 description: Gaffer IQ — a Fantasy Premier League tool that replaces the official 1–5 fixture difficulty rating with a five-signal composite model, scored zero-sum so a fixture's two ratings always sum to 100.
 lede: A Fantasy Premier League tool that stops treating fixture difficulty as a property of a team, and starts treating it as a property of a pairing.
 summary: Five views over one scoring engine — Matchups, Fixtures, Ranker, Dashboard and Planner — replacing FPL's 1–5 difficulty rating with a weighted composite of five sub-metrics, scored relative to the opponent so both sides of a fixture sum to 100.
-info:
-  Status: Live · iterating
-  Stack: HTML · JS · vanilla CSS
-  Build step: None
-  Backend: One Vercel function
-  Data: FPL API · Understat
-  Views: Matchups · Fixtures · Ranker · Dashboard · Planner
-  Model: 5 weighted sub-metrics
-  First shipped: 2026
+shape:
+  - group: App Shape
+    terms:
+      - Static
+      - Frontend-built
+      - Single-page application (SPA)
+  - group: Build Approach
+    terms:
+      - Vanilla JS
+      - ES modules
+      - No build step
+  - group: Talking to Servers
+    terms:
+      - CORS
+      - Serverless
+      - Proxy
+      - Allowlist
+      - REST API
+  - group: Runtime Behaviour
+    terms:
+      - Client-side rendering
+      - Pure functions
+      - State management / pub-sub
+      - Caching / TTL
 ---

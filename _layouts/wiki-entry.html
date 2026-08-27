@@ -178,8 +178,10 @@ page_wide: true
         than reference material, so it lives in the right rail instead and
         is present on every section. See the rail below.
       {%- endcomment -%}
-      {%- if wk_idx == 0 and wk_app.info %}
+      {%- if wk_idx == 0 %}
+        {%- if wk_app.shape or wk_app.info %}
         {% include wiki-infobox.html app=wk_app %}
+        {%- endif %}
       {%- endif %}
 
       {%- capture wk_raw %}{{ content }}{% endcapture -%}

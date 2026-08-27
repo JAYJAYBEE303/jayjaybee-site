@@ -14,6 +14,17 @@
   payload and puts the definitions in the HTML source, where the site's
   own search can see them.
 
+  An app may instead declare `shape:` — a list of {group, terms}, where
+  every term is a glossary key rather than the value half of a row. The
+  box then reads as the write-up's vocabulary, grouped, one term per
+  line, and each term carries its own definition. `shape` wins if both
+  are present; the key/value `info` path below is unchanged for apps
+  that declare it.
+
+  A `shape` term with no glossary entry renders as plain text, exactly
+  as an unmatched `info` value does — a missing definition must not
+  offer a click that opens nothing.
+
   The "click an underlined value" hint renders only if the box actually
   produced a term — an infobox with nothing clickable must not invite a
   click. wk_terms survives the loop because Liquid `assign` is not
@@ -23,6 +34,25 @@
 {%- assign wk_terms = 0 -%}
 <aside class="wk-info" aria-label="{{ include.app.title }} at a glance">
   <p class="wk-info__head mono-label">{{ include.app.title }}</p>
+  {%- if include.app.shape -%}
+  <div class="wk-info__shape">
+    {%- for grp in include.app.shape %}
+    <p class="wk-info__g mono-label">{{ grp.group }}</p>
+    <ul class="wk-info__terms">
+      {%- for t in grp.terms %}
+      {%- assign wk_tk = t | strip | downcase -%}
+      {%- assign wk_th = site.data.glossary[wk_tk] -%}
+      <li>
+        {%- if wk_th -%}
+          {%- assign wk_terms = wk_terms | plus: 1 -%}
+          {%- include wiki-term.html g=wk_th label=t -%}
+        {%- else -%}{{ t }}{%- endif -%}
+      </li>
+      {%- endfor %}
+    </ul>
+    {%- endfor %}
+  </div>
+  {%- else -%}
   <dl>
     {%- for row in include.app.info %}
     <dt class="mono-label">{{ row[0] }}</dt>
@@ -49,7 +79,8 @@
     </dd>
     {%- endfor %}
   </dl>
+  {%- endif -%}
   {%- if wk_terms > 0 %}
-  <p class="wk-info__hint mono-label">Click an underlined value</p>
+  <p class="wk-info__hint mono-label">Click an underlined {% if include.app.shape %}term{% else %}value{% endif %}</p>
   {%- endif %}
 </aside>

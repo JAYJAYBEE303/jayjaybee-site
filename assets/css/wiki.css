@@ -570,6 +570,23 @@ a.wl:hover { color: var(--link-hover); border-bottom-style: solid; }
   color: var(--fg);
 }
 
+/* The `shape` variant: groups of terms rather than key/value rows. Padding
+   matches the dl above so both variants sit identically in the box. */
+.wk-info__shape { padding: var(--space-3) var(--space-4); }
+.wk-info__g { margin: var(--space-4) 0 0; }
+.wk-info__shape > .wk-info__g:first-child { margin-top: 0; }
+.wk-info__terms {
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  line-height: var(--lh-ui);
+  color: var(--fg);
+}
+.wk-info__terms li { margin-top: var(--space-1); }
+.wk-info__terms li:first-child { margin-top: 0; }
+
 /* =========================================================================
    GLOSSARY TERMS + POPOVER
    A term is a real <button> compiled by _includes/wiki-term.html. The
