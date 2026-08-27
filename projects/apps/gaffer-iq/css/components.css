@@ -954,6 +954,11 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-1);
+  /* Children are .pgw-slot column stacks (cells + a gameweek label) and, when a
+     team has postponements, a .pgw-pending pill that has no label and is
+     therefore shorter. Aligning to the start keeps every slot's cell row on the
+     same line; the default `stretch` would distort the pill instead. */
+  align-items: flex-start;
 }
 
 .pgw-cell {
@@ -980,6 +985,97 @@
 .pgw-cell--estimated {
   border-style: var(--estimated-border-style);
   opacity: 0.7;
+}
+
+/* ─── Gameweek slots — schedule irregularities ──────────────────────────────
+   One slot per GAMEWEEK, holding zero, one or two fixture cells.
+
+   The governing rule: schedule structure is carried by GEOMETRY, fixture
+   quality by COLOUR, and the two never overlap. Colour was already fully
+   committed — the five band colours mean fixture quality in all four modules
+   (CONVENTIONS §5.2) — and so was the dashed border, which means low MODEL
+   confidence (--estimated-border-style, just above). A double against brutal
+   opposition must therefore read as red-and-grouped rather than reaching for a
+   third colour that means neither thing.
+   See FEATURE_ENGINE.md §9.1. */
+
+.pgw-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.pgw-slot__cells {
+  display: flex;
+  gap: 2px;
+}
+
+.pgw-slot__label {
+  font-size: 0.5625rem;
+  line-height: 1;
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Double: the two cells are bound into one week by an accent-tinted group.
+   --color-accent is the app's structural-emphasis colour and is NOT one of the
+   five band colours, so this can never be misread as a quality signal. */
+.pgw-slot--double .pgw-slot__cells {
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-muted);
+  outline: 1px solid color-mix(in srgb, var(--color-accent) 35%, transparent);
+}
+
+.pgw-slot--double .pgw-slot__label {
+  color: var(--color-accent);
+}
+
+/* Blank: hatched, so a known-empty week is visibly different from a failed
+   load. The bare "–" this replaces was indistinguishable from missing data. */
+.pgw-cell--blank {
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent 0 3px,
+    color-mix(in srgb, var(--band-neutral) 28%, transparent) 3px 5px
+  );
+  border: 1px solid var(--color-border);
+  color: var(--color-muted);
+}
+
+/* Kickoff TBC: a corner dot. Deliberately NOT a dashed border — that already
+   means low model confidence, and this is SCHEDULE confidence, a different
+   axis that has to stay legible alongside it rather than collide with it. */
+.pgw-cell--tbc {
+  position: relative;
+}
+
+.pgw-cell--tbc::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 4px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--band-tough);
+}
+
+/* Postponed: lives OFF the strip, because it has no gameweek to sit in. */
+.pgw-pending {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 var(--space-2);
+  margin-left: var(--space-1);
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--color-border);
+  background: color-mix(in srgb, var(--band-neutral) 6%, transparent);
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: var(--color-muted);
+  white-space: nowrap;
 }
 
 /* ─── Matchup Analyser strip: hover-expand cells ────────────────────────────
@@ -1621,7 +1717,10 @@
   display: inline-flex;
   flex-wrap: nowrap;
   gap: 2px;
-  align-items: center;
+  /* Was `center`. Children are now .pgw-slot column stacks of differing height —
+     the .pgw-pending pill carries no gameweek label — and centring them would
+     float the pill to the middle of the row instead of level with the cells. */
+  align-items: flex-start;
 }
 
 /* Compact sizing for table context — narrower than the matchup card strip.
