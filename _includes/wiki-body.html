@@ -24,6 +24,9 @@
       An unknown slug will not be matched and its trailing ]] will still
       close, producing visibly broken markup — which is the point: it
       fails loudly at build rather than silently linking nowhere.
+    * A slug may name a section OR an app. An app slug resolves to that
+      app's first section. Slugs are therefore globally unique across the
+      whole wiki, sections and apps together.
     * `]]` is reserved. It cannot appear in body copy for any other reason.
     * Links are compiled BEFORE footnotes, so a footnote may contain a
       [[link]] but a link label may not contain a ((footnote)).
@@ -31,13 +34,33 @@
 {%- endcomment -%}
 
 {%- assign wk_entries = site.pages | where_exp: "p", "p.layout == 'wiki-entry'" | sort: "order" -%}
+{%- assign wk_apps = site.pages | where_exp: "p", "p.layout == 'wiki-app'" | sort: "order" -%}
 {%- assign out = include.html -%}
 
-{%- comment -%} ---- pass 1: internal links ---- {%- endcomment -%}
+{%- comment -%}
+  ---- pass 1: internal links ----
+  Sections first, then apps. An app slug resolves to that app's FIRST
+  section, so [[gaffer-iq|Gaffer IQ]] keeps working and lands the reader
+  on prose rather than on a redirect. Sections are matched first because
+  a section slug is the more specific target; the two spaces do not
+  overlap, so the order is a statement of intent rather than a
+  tie-breaker.
+{%- endcomment -%}
 {%- for e in wk_entries -%}
+  {%- assign wk_pa = wk_apps | where: "slug", e.parent | first -%}
+  {%- assign wk_lk_kind = e.kind | default: wk_pa.kind -%}
   {%- capture wk_needle -%}[[{{ e.slug }}|{%- endcapture -%}
-  {%- capture wk_tag -%}<a class="wl" href="{{ e.url }}" data-peek-kind="{{ e.kind | escape }}" data-peek-title="{{ e.title | escape }}" data-peek-lede="{{ e.lede | escape }}">{%- endcapture -%}
+  {%- capture wk_tag -%}<a class="wl" href="{{ e.url }}" data-peek-kind="{{ wk_lk_kind | escape }}" data-peek-title="{{ e.title | escape }}" data-peek-lede="{{ e.lede | escape }}">{%- endcapture -%}
   {%- assign out = out | replace: wk_needle, wk_tag -%}
+{%- endfor -%}
+{%- for a in wk_apps -%}
+  {%- assign wk_as = wk_entries | where: "parent", a.slug -%}
+  {%- assign wk_af = wk_as | first -%}
+  {%- if wk_af -%}
+    {%- capture wk_needle -%}[[{{ a.slug }}|{%- endcapture -%}
+    {%- capture wk_tag -%}<a class="wl" href="{{ wk_af.url }}" data-peek-kind="{{ a.kind | escape }}" data-peek-title="{{ a.title | escape }}" data-peek-lede="{{ a.lede | escape }}">{%- endcapture -%}
+    {%- assign out = out | replace: wk_needle, wk_tag -%}
+  {%- endif -%}
 {%- endfor -%}
 {%- assign out = out | replace: "]]", "</a>" -%}
 
