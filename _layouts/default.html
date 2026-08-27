@@ -7,16 +7,30 @@
      the entire site.
 
      Per-page front matter variables this template reads:
-       title       — used for <title>. Falls back to site.title.
+       title       — used for <title>. Falls back to site.title. A
+                     layout may also declare `title_suffix` in its OWN
+                     front matter (not the page's) to qualify every page
+                     that uses it in one place — see _layouts/wiki-entry.html.
        description — used for <meta description>. Falls back to
-                     site.description (defined in _config.yml).
+                     page.lede, then to site.description (defined in
+                     _config.yml). The lede fallback exists because the
+                     wiki's 18 section pages carry a lede but no
+                     description of their own. Only the lede branch is
+                     escaped here — at least one lede in the wild
+                     contains literal double quotes, which would
+                     otherwise break out of the attribute. page.description
+                     and site.description are left exactly as they were
+                     (unescaped) so existing pages render byte-identical.
      ============================================================= -->
 <html lang="en" data-theme="auto" class="no-js">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>{{ page.title | default: site.title }}</title>
-  <meta name="description" content="{{ page.description | default: site.description }}" />
+  <title>{%- if layout.title_suffix -%}{{ page.title }} — {{ layout.title_suffix }}{%- else -%}{{ page.title | default: site.title }}{%- endif -%}</title>
+  {%- assign page_desc = page.description -%}
+  {%- unless page_desc -%}{%- assign page_desc = page.lede | escape -%}{%- endunless -%}
+  {%- unless page_desc -%}{%- assign page_desc = site.description -%}{%- endunless -%}
+  <meta name="description" content="{{ page_desc }}" />
 
   <!-- Pre-paint setup: theme preference + JS detection + scroll-gate.
        Must run before first paint to avoid a flash of unstyled content

@@ -1,5 +1,6 @@
 ---
 layout: default
+title_suffix: Wiki — Josh Bailey
 ---
 {%- comment -%}
 =============================================================================
@@ -9,6 +10,13 @@ layout: default
   Nests inside _layouts/default.html, so the header, nav, search, footer,
   theme toggle, paper grain, type scale and reveal animations all come
   from the main site with nothing restated here.
+
+  `title_suffix` above is THIS LAYOUT's own front matter, not a
+  section's — Jekyll exposes it to the parent layout as `layout.*`, so
+  default.html's <title> can read it once here instead of every section
+  page restating `Wiki — Josh Bailey` in its own front matter. Matches
+  the qualified form _layouts/wiki-app.html builds directly for the app
+  page's <title>.
 
   Front matter a section page declares:
       layout:   wiki-entry          (required)
