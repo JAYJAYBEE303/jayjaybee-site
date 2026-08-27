@@ -8,10 +8,13 @@
    with JavaScript off the page still reads and navigates correctly. All
    that is lost is the on-this-page rail and the hover preview.
 
-   Two jobs:
-     1. Build the "On this page" list from the article's own h2/h3, and
-        keep the current section marked as the reader scrolls.
-     2. Show a small preview card when the reader hovers an internal wiki
+   Five jobs:
+     1. Build the "On this page" list from the section's own h2/h3, and
+        keep the current heading marked as the reader scrolls.
+     2. Inject and run the rail filter.
+     3. Keep the Recently read list, in this browser only.
+     4. Open a definition when an infobox term is clicked.
+     5. Show a small preview card when the reader hovers an internal wiki
         link. The card's content comes from data-peek-* attributes the
         build already wrote onto each link — no manifest, no fetch.
    ========================================================================= */
@@ -94,7 +97,247 @@
   }, { passive: true });
 
   /* =======================================================================
-     2. Hover preview
+     2. Rail filter
+
+     Injected rather than authored into the rail, so with JS off there is
+     no dead control. Filtering is over data attributes the build already
+     wrote onto each row — no index, no fetch.
+
+     Row numbers are NOT rewritten when the rail narrows: 07 identifies
+     the section, not its position in a filtered list.
+     ======================================================================= */
+
+  var filterMount = document.getElementById('wk-rail-filter');
+
+  function buildFilter () {
+    if (!filterMount) return;
+
+    var items  = Array.prototype.slice.call(document.querySelectorAll('[data-rail-item]'));
+    var groups = Array.prototype.slice.call(document.querySelectorAll('[data-rail-group]'));
+    if (items.length < 2) return;
+
+    var wrap = document.createElement('div');
+    wrap.className = 'wk-filter';
+
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.id = 'wk-filter-input';
+    input.placeholder = 'Filter entries';
+    input.autocomplete = 'off';
+    input.setAttribute('aria-label', 'Filter sections');
+
+    var empty = document.createElement('p');
+    empty.className = 'wk-rail__empty';
+    empty.textContent = 'No section matches.';
+    empty.hidden = true;
+
+    wrap.appendChild(input);
+    filterMount.appendChild(wrap);
+    filterMount.appendChild(empty);
+
+    function apply () {
+      var q = input.value.trim().toLowerCase();
+      var total = 0;
+
+      groups.forEach(function (g) {
+        var rows = Array.prototype.slice.call(g.querySelectorAll('[data-rail-item]'));
+        var shown = 0;
+
+        rows.forEach(function (a) {
+          var hit = !q ||
+                    (a.getAttribute('data-title') || '').indexOf(q) > -1 ||
+                    (a.getAttribute('data-lede')  || '').indexOf(q) > -1;
+          a.hidden = !hit;
+          if (hit) shown++;
+        });
+
+        g.hidden = shown === 0;
+        total += shown;
+
+        var count = g.querySelector('[data-rail-count]');
+        if (count) count.textContent = shown < 10 ? '0' + shown : String(shown);
+      });
+
+      empty.hidden = total !== 0;
+    }
+
+    input.addEventListener('input', apply);
+    // Escape clears rather than closes — there is nothing to close.
+    input.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape' && input.value) {
+        ev.preventDefault();
+        input.value = '';
+        apply();
+      }
+    });
+  }
+
+  /* =======================================================================
+     3. Recently read
+
+     Five most recent sections, newest first, in this browser only. Every
+     access is wrapped because localStorage throws outright in some
+     privacy modes rather than returning null.
+
+     Titles are stored alongside slugs so a row can be drawn without a
+     manifest of every section in the wiki.
+     ======================================================================= */
+
+  var RECENT_KEY = 'wk-recent-v1';
+  var RECENT_MAX = 5;
+
+  function readRecent () {
+    try {
+      var raw = window.localStorage.getItem(RECENT_KEY);
+      var list = raw ? JSON.parse(raw) : [];
+      return Object.prototype.toString.call(list) === '[object Array]' ? list : [];
+    } catch (e) { return []; }
+  }
+
+  function writeRecent (list) {
+    try { window.localStorage.setItem(RECENT_KEY, JSON.stringify(list)); } catch (e) {}
+  }
+
+  function buildRecent () {
+    var mount = document.getElementById('wk-recent');
+    var block = document.getElementById('wk-recent-block');
+    var title = document.getElementById('wk-title');
+    if (!mount || !block || !title) return;
+
+    var here = { url: window.location.pathname, title: title.textContent };
+
+    var list = readRecent().filter(function (r) {
+      return r && r.url && r.title && r.url !== here.url;
+    });
+    list.unshift(here);
+    list = list.slice(0, RECENT_MAX);
+    writeRecent(list);
+
+    mount.innerHTML = '';
+    list.forEach(function (r) {
+      var a = document.createElement('a');
+      a.href = r.url;
+      a.textContent = r.title;
+      if (r.url === here.url) a.setAttribute('aria-current', 'page');
+      mount.appendChild(a);
+    });
+
+    block.classList.add('is-built');
+  }
+
+  /* =======================================================================
+     4. Glossary popover
+
+     One element appended to <body>, same reason as the hover peek: its
+     absolute coordinates are then page coordinates whatever the
+     article's layout is doing.
+
+     Content comes from data attributes the build wrote onto the button,
+     so the glossary itself is never shipped as JavaScript.
+     ======================================================================= */
+
+  var pop = null;
+  var openTerm = null;
+
+  function ensurePop () {
+    if (pop) return pop;
+    pop = document.createElement('div');
+    pop.className = 'wk-pop';
+    pop.setAttribute('role', 'dialog');
+    pop.setAttribute('aria-label', 'Term detail');
+    document.body.appendChild(pop);
+    return pop;
+  }
+
+  function closePop () {
+    if (openTerm) openTerm.setAttribute('aria-expanded', 'false');
+    openTerm = null;
+    if (pop) pop.classList.remove('is-on');
+  }
+
+  function openPop (btn) {
+    var el = ensurePop();
+    el.innerHTML = '';
+
+    var kind = document.createElement('p');
+    kind.className = 'wk-pop__kind mono-label';
+    var kindText = document.createElement('span');
+    kindText.textContent = btn.getAttribute('data-term-kind') || 'Term';
+    var x = document.createElement('button');
+    x.type = 'button';
+    x.className = 'wk-pop__x';
+    x.setAttribute('data-pop-close', '');
+    x.setAttribute('aria-label', 'Close');
+    x.textContent = '✕';
+    kind.appendChild(kindText);
+    kind.appendChild(x);
+    el.appendChild(kind);
+
+    var term = document.createElement('p');
+    term.className = 'wk-pop__term';
+    term.textContent = btn.textContent.trim();
+    el.appendChild(term);
+
+    var body = document.createElement('p');
+    body.className = 'wk-pop__body';
+    body.textContent = btn.getAttribute('data-term-text') || '';
+    el.appendChild(body);
+
+    var href = btn.getAttribute('data-term-href');
+    if (href) {
+      var ref = document.createElement('a');
+      ref.className = 'wk-pop__ref mono-label';
+      ref.href = href;
+      ref.textContent = 'Full entry: ' + (btn.getAttribute('data-term-ref') || '') + ' →';
+      el.appendChild(ref);
+    }
+
+    // Measure while shown but invisible, then place: below the term if it
+    // fits, above if it does not, and never past the right edge.
+    el.style.visibility = 'hidden';
+    el.classList.add('is-on');
+    var r = btn.getBoundingClientRect();
+    var h = el.offsetHeight;
+    var w = el.offsetWidth;
+    var top = r.bottom + window.scrollY + 8;
+    if (r.bottom + h + 16 > window.innerHeight && r.top - h - 8 > 0) {
+      top = r.top + window.scrollY - h - 8;
+    }
+    var left = r.left + window.scrollX + (r.width / 2) - (w / 2);
+    left = Math.min(left, window.scrollX + document.documentElement.clientWidth - w - 16);
+    el.style.top  = Math.max(window.scrollY + 8, top) + 'px';
+    el.style.left = Math.max(8, left) + 'px';
+    el.style.visibility = 'visible';
+
+    btn.setAttribute('aria-expanded', 'true');
+    openTerm = btn;
+  }
+
+  function bindPop () {
+    document.addEventListener('click', function (ev) {
+      var btn = ev.target.closest ? ev.target.closest('button.wk-term') : null;
+      if (btn) {
+        ev.preventDefault();
+        // A second click on the open term closes it.
+        if (btn === openTerm) { closePop(); return; }
+        closePop();
+        openPop(btn);
+        return;
+      }
+      if (ev.target.closest && ev.target.closest('[data-pop-close]')) { closePop(); return; }
+      if (ev.target.closest && ev.target.closest('.wk-pop')) return;
+      closePop();
+    });
+
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape' && openTerm) { ev.preventDefault(); closePop(); }
+    });
+
+    window.addEventListener('resize', closePop);
+  }
+
+  /* =======================================================================
+     5. Hover preview
      ======================================================================= */
 
   var peek = null;
@@ -177,4 +420,7 @@
   }
 
   buildToc();
+  buildFilter();
+  buildRecent();
+  bindPop();
 })();
