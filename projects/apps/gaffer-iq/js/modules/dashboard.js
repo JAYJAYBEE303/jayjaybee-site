@@ -23,6 +23,7 @@
 import { store }       from '../store.js';
 import { HORIZONS, BANDS } from '../config.js';
 import { buildScoreContext, scorePlayer, rankPlayers, attachRankTiers } from '../engine/composite.js';
+import { groupPerGwSlots }              from '../engine/fixtures.js';
 import { fetchLivePoints }               from '../api.js';
 import { fetchAndMapSquad, loadSavedTeamId, saveTeamId, resolveImportGw } from '../squadImport.js';
 
@@ -186,14 +187,26 @@ const BREAKDOWN_LABELS = { form: 'Form', fixture: 'Fixture', counter: 'Counter' 
 
 /**
  * Build the "which fixture is this" context line for a breakdown panel.
- * Dashboard is GW1-locked, so score.perGw has exactly one entry (or two for
- * a double GW, or none if the team has no ctx entry) — use the first.
+ *
+ * Dashboard is GW1-locked, so score.perGw covers exactly one gameweek — but
+ * that gameweek may hold TWO fixtures. This previously read perGw[0] and
+ * discarded the second, which is precisely the information a user opens this
+ * line to check on a double: it is the sanity check on the captaincy pick, and
+ * it was telling half the truth.
+ *
+ * @param {object} score  a scorePlayer result
+ * @returns {string}
  */
-function buildFixtureContextLabel(score) {
-  const gw = score?.perGw?.[0];
-  if (!gw) return HORIZON.label;
-  if (gw.isBlank) return `GW${gw.gw} — Blank`;
-  return `GW${gw.gw} vs ${gw.opponent ?? '?'} (${gw.venue ?? '?'})`;
+export function buildFixtureContextLabel(score) {
+  const slot = groupPerGwSlots(score?.perGw ?? [])[0];
+  if (!slot) return HORIZON.label;
+  if (slot.isBlank) return `GW${slot.gw} — Blank`;
+
+  const fixtures = slot.fixtures
+    .map(f => `${f.opponent ?? '?'} (${f.venue ?? '?'})`)
+    .join(', ');
+  const marker = slot.isDouble ? ' (double)' : '';
+  return `GW${slot.gw}${marker} vs ${fixtures}`;
 }
 
 /**
