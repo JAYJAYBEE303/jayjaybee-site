@@ -1477,7 +1477,7 @@
    If you retune these, the invariant to keep is that they still sum to 100 --
    table-layout:fixed will happily distribute a shortfall for you and quietly
    undo the budgeting. */
-.ranker-table__th[data-sort="name"]              { width: 13.60%; }
+.ranker-table__th[data-sort="name"]              { width: 11.60%; }
 .ranker-table__th[data-sort="team"]              { width: 5.60%; }
 .ranker-table__th[data-col="pos"]                { width: 4.00%; }
 .ranker-table__th[data-sort="price"]             { width: 5.60%; }
@@ -1490,7 +1490,7 @@
 .ranker-table__th[data-sort="transfersOutEvent"] { width: 6.00%; }
 .ranker-table__th[data-sort="value"]             { width: 5.20%; }
 .ranker-table__th[data-sort="nextFixtureScore"]  { width: 7.00%; }
-.ranker-table__th[data-col="fixtures"]           { width: 11.00%; }
+.ranker-table__th[data-col="fixtures"]           { width: 13.00%; }
 .ranker-table__th[data-sort="playtime"]          { width: 7.20%; }
 
 /* Header cells */

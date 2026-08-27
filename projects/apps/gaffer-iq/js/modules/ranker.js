@@ -30,6 +30,7 @@ import {
 import { fetchPlayerSummary } from '../api.js';
 import { normalisePlayerSummary } from '../engine/normalise.js';
 import { calcSeasonPriceChange } from '../engine/prices.js';
+import { groupPerGwSlots, pendingFixturesForTeam } from '../engine/fixtures.js';
 import { playtimeBand } from '../engine/form.js';
 
 // ─── Playtime display ────────────────────────────────────────────────────────
@@ -473,25 +474,57 @@ function buildLastSeasonLookup(rows, ctx) {
 // ─── Build: HTML fragments ────────────────────────────────────────────────────
 
 /**
- * Per-GW fixture strip for one player row. Reuses .pgw-cell + .pgw-cell--<band>
- * modifier classes from components.css so band colours are consistent across
- * all modules. Blank GWs show '–'; DGWs produce two adjacent cells.
- * See CONVENTIONS.md §5.2.
+ * Per-GW fixture strip for one player row, rendered as one slot per GAMEWEEK.
+ *
+ * Each slot holds zero (blank), one, or two (double) fixture cells, so a 6-GW
+ * horizon always shows six slots — it previously showed one cell per FIXTURE,
+ * which meant a horizon containing a double rendered seven cells with nothing
+ * tying two of them to the same week. Postponed fixtures have no gameweek at
+ * all, so they trail the strip as a pill rather than sitting inside it.
+ *
+ * Reuses .pgw-cell + .pgw-cell--<band> from components.css so band colours stay
+ * consistent across all modules (CONVENTIONS.md §5.2); schedule structure is
+ * carried by the slot geometry instead. See FEATURE_ENGINE.md §9.1.
+ *
+ * @param {Array} perGw   from scoreOverHorizon
+ * @param {Array} pending from pendingFixturesForTeam — postponed, no gameweek
  */
-function buildFixtureStrip(perGw) {
-  if (!perGw || perGw.length === 0) {
+function buildFixtureStrip(perGw, pending = []) {
+  const slots = groupPerGwSlots(perGw);
+  if (slots.length === 0) {
     return '<span class="ranker-no-fixtures">—</span>';
   }
-  const cells = perGw.map(entry => {
-    const band    = entry.isBlank ? 'neutral' : entry.band;
-    const tooltip = entry.isBlank
-      ? `GW${entry.gw} (blank)`
-      : `GW${entry.gw} ${entry.opponent ?? ''} (${entry.venue ?? ''}) — ${Math.round(entry.value)}${entry.provisional ? ' ~est' : ''}`;
-    const label      = entry.isBlank ? '–' : (entry.opponent ?? '?');
-    const estClass   = (!entry.isBlank && entry.provisional) ? ' pgw-cell--estimated' : '';
-    return `<span class="pgw-cell pgw-cell--${esc(band)}${estClass}" title="${esc(tooltip)}">${esc(label)}</span>`;
+
+  const slotHtml = slots.map(slot => {
+    const cells = slot.fixtures.map(entry => {
+      const band    = entry.isBlank ? 'neutral' : entry.band;
+      const tooltip = entry.isBlank
+        ? `GW${entry.gw} — blank (no fixture)`
+        : `GW${entry.gw} ${entry.opponent ?? ''} (${entry.venue ?? ''}) — ${Math.round(entry.value)}`
+          + `${entry.provisional ? ' ~est' : ''}`
+          + `${entry.provisionalKickoff ? ' — kickoff TBC' : ''}`;
+      // '∅' rather than the old '–': a dash is what missing data looks like,
+      // and a blank gameweek is a known fact, not an absence of one.
+      const label    = entry.isBlank ? '∅' : (entry.opponent ?? '?');
+      const estClass = (!entry.isBlank && entry.provisional) ? ' pgw-cell--estimated' : '';
+      const blkClass = entry.isBlank ? ' pgw-cell--blank' : '';
+      const tbcClass = entry.provisionalKickoff ? ' pgw-cell--tbc' : '';
+      return `<span class="pgw-cell pgw-cell--${esc(band)}${estClass}${blkClass}${tbcClass}" title="${esc(tooltip)}">${esc(label)}</span>`;
+    }).join('');
+
+    const dblClass = slot.isDouble ? ' pgw-slot--double' : '';
+    const dblMark  = slot.isDouble ? ' ··' : '';
+    return `<span class="pgw-slot${dblClass}">`
+      + `<span class="pgw-slot__cells">${cells}</span>`
+      + `<span class="pgw-slot__label">${esc(String(slot.gw))}${dblMark}</span>`
+      + `</span>`;
   }).join('');
-  return `<span class="ranker-fixtures">${cells}</span>`;
+
+  const pendingHtml = pending.length > 0
+    ? `<span class="pgw-pending" title="${pending.length} postponed fixture${pending.length > 1 ? 's' : ''} awaiting a rearranged date">+${pending.length} TBD</span>`
+    : '';
+
+  return `<span class="ranker-fixtures">${slotHtml}${pendingHtml}</span>`;
 }
 
 /**
@@ -508,7 +541,12 @@ function buildFixtureStrip(perGw) {
  *   the toggle is explicit, so the displayed figures must match its label
  *   exactly, not silently fall back to current-season numbers.
  */
-function buildRow({ player, team, score, rankTier }, nextFixtureRankById, lastSeasonByPlayerId) {
+/**
+ * @param {object} pendingCtx  the Season, read for pendingFixturesByTeam only.
+ *   Passed down rather than rebuilt per row: buildCtx() is far too expensive to
+ *   call ~700 times per render, and the pending index is identical for every row.
+ */
+function buildRow({ player, team, score, rankTier }, nextFixtureRankById, lastSeasonByPlayerId, pendingCtx) {
   const statusMark = player.status !== 'available'
     ? `<span class="ranker-status-badge" title="${esc(player.statusNote || player.status)}">!</span>`
     : '';
@@ -611,7 +649,7 @@ function buildRow({ player, team, score, rankTier }, nextFixtureRankById, lastSe
         ${nfRank ? `<span class="ranker-rank-tag">#${nfRank}</span>` : ''}
       </td>
       <td class="ranker-table__td ranker-table__td--fixtures">
-        ${buildFixtureStrip(score.perGw)}
+        ${buildFixtureStrip(score.perGw, pendingFixturesForTeam(player.teamId, pendingCtx))}
       </td>
       <td class="ranker-table__td ranker-table__td--min">
         <span class="ranker-min-badge ranker-min-badge--${esc(pt.band)}${pt.estimated ? ' ranker-min-badge--estimated' : ''}"
@@ -759,7 +797,13 @@ function renderTable() {
 
   const sorted = applySort(filtered, lastSeasonByPlayerId);
 
-  _tbody.innerHTML = sorted.map(row => buildRow(row, nextFixtureRankById, lastSeasonByPlayerId)).join('');
+  // Read once per render, not once per row — the pending-fixture index is the
+  // same for all ~700 rows.
+  const pendingCtx = store.getSeason();
+
+  _tbody.innerHTML = sorted
+    .map(row => buildRow(row, nextFixtureRankById, lastSeasonByPlayerId, pendingCtx))
+    .join('');
 }
 
 // ─── Lazy loading ─────────────────────────────────────────────────────────────
