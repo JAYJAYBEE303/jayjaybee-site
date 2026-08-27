@@ -53,7 +53,15 @@
    needs no JS and is worth keeping at every width. */
 @media (max-width: 74rem) {
   .wk-layout { grid-template-columns: var(--wk-rail-w) minmax(0, 1fr); }
-  .wk-rail--right {
+  /* Doubled class is deliberate, not a typo: the base .wk-rail rule
+     (position: sticky) is declared later in this file, further down in
+     the LEFT RAIL section, and both selectors are single classes tying
+     on specificity — so on source order alone the later base rule would
+     win and this override's `position: static` would never apply.
+     `.wk-rail.wk-rail--right` raises this to (0,2,0), which beats the
+     base rule regardless of where either sits in the file. Do not
+     simplify this back to `.wk-rail--right`. */
+  .wk-rail.wk-rail--right {
     grid-column: 1 / -1;
     grid-row: 1;
     position: static;
