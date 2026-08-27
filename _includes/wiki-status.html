@@ -1,0 +1,30 @@
+{%- comment -%}
+=============================================================================
+  wiki-status.html — the right rail's Entry status block.
+
+  Usage, from _layouts/wiki-entry.html:
+      {% include wiki-status.html revised=wk_revised backs=wk_backs_count %}
+
+  Every number here is computed at build time, so the block is complete
+  with JavaScript off — unlike the two blocks above it in the rail.
+
+  Notes counts the ((…)) footnote markers in the source, which is the
+  same convention _includes/wiki-body.html compiles. Splitting on the
+  opening delimiter and subtracting one counts openings, so an unclosed
+  note would be counted; that would already be visibly broken in the
+  prose.
+
+  The design sheet's "Locally edited" row is deliberately absent. It
+  reports on an in-browser edit mode this site does not have.
+=============================================================================
+{%- endcomment -%}
+{%- assign wk_note_count = page.content | split: "((" | size | minus: 1 -%}
+<div class="wk-rail__block">
+  <p class="wk-rail__h"><span class="mono-label">Entry status</span></p>
+  <div class="wk-stats mono">
+    <span>Words<b>{{ page.content | strip_html | number_of_words }}</b></span>
+    <span>Notes<b>{{ wk_note_count }}</b></span>
+    <span>Inbound links<b>{{ include.backs }}</b></span>
+    <span>Revised<b>{{ include.revised }}</b></span>
+  </div>
+</div>
