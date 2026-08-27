@@ -46,15 +46,25 @@
    only caller. The modifier lives here rather than in layout.css because
    the wiki is the only thing that needs it, and .page's own width stays
    the value every other page was designed around.
+
+   The top padding is reduced for the same reason. .page's own value is
+   tuned for a page that opens with a display-size heading, where a deep
+   gap reads as composition. A wiki entry opens with a mono breadcrumb at
+   --fs-mono, so the same gap reads as a void — 87px of nothing between
+   the nav rule and an 11px line of text. The rails start at the same
+   line, so there is nothing at the top of the page to fill it either.
    ========================================================================= */
 
-.page--wide { max-width: var(--wk-container); }
+.page--wide {
+  max-width: var(--wk-container);
+  padding-top: clamp(var(--space-6), 3vw, var(--space-8));
+}
 
 /* =========================================================================
    PAGE SHELL
-   Sits inside <main class="page page--wide">, which supplies the gutters
-   and — via the modifier declared above — the widened container. Nothing
-   here re-declares padding.
+   Sits inside <main class="page page--wide">, which supplies the side
+   gutters and — via the modifier declared above — the widened container
+   and the tightened top. Nothing here re-declares either.
    ========================================================================= */
 
 .wk-layout {
