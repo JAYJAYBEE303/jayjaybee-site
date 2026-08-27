@@ -384,6 +384,17 @@ a.wk-launch:focus-visible {
   a.wk-launch:active { transform: none; }
 }
 
+/* In the rail it is the first thing in the column, so it drops the
+   top margin the in-article version needs and spans the rail's full
+   width — a button narrower than the rail would read as a stray chip
+   rather than as the column's heading action. */
+a.wk-launch--rail {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin-top: 0;
+}
+
 /* =========================================================================
    BODY PROSE
    Serif at --fs-body over --wk-measure. Distinct from .prose, which is

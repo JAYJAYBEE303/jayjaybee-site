@@ -170,25 +170,16 @@ page_wide: true
       {%- endif %}
 
       {%- comment -%}
-        The infobox and the launch button belong to the APP, not to a
-        section, so they render on the app's first section only. Repeating
-        an eight-row infobox on twelve pages would bury the prose.
+        The infobox belongs to the APP, not to a section, so it renders on
+        the app's first section only — repeating an eight-row infobox on
+        twelve pages would bury the prose.
 
-        This is also the single, deliberate coupling between a wiki entry
-        and its app; nothing else on this page knows /projects/apps/
-        exists.
+        The launch button is app-level too, but it is a destination rather
+        than reference material, so it lives in the right rail instead and
+        is present on every section. See the rail below.
       {%- endcomment -%}
-      {%- if wk_idx == 0 %}
-        {%- if wk_app.app_url %}
-        <p>
-          <a class="wk-launch mono-label" href="{{ wk_app.app_url }}">
-            Launch app <span aria-hidden="true">&#8599;</span>
-          </a>
-        </p>
-        {%- endif %}
-        {%- if wk_app.info %}
-          {% include wiki-infobox.html app=wk_app %}
-        {%- endif %}
+      {%- if wk_idx == 0 and wk_app.info %}
+        {% include wiki-infobox.html app=wk_app %}
       {%- endif %}
 
       {%- capture wk_raw %}{{ content }}{% endcapture -%}
@@ -223,6 +214,23 @@ page_wide: true
          compiled here and needs no JS at all.
          =================================================================== -->
     <aside class="wk-rail wk-rail--right" aria-label="About this section">
+
+      {%- comment -%}
+        The one deliberate coupling between a wiki entry and its app.
+        Nothing else on this page knows /projects/apps/ exists.
+
+        It sits at the head of the rail rather than in the article so it
+        is reachable from every section of the write-up, not only the
+        first — a reader who lands on Calculations from a search result
+        should not have to walk back to the front door to open the app.
+      {%- endcomment -%}
+      {%- if wk_app.app_url %}
+      <div class="wk-rail__block wk-rail__block--launch">
+        <a class="wk-launch wk-launch--rail mono-label" href="{{ wk_app.app_url }}">
+          Launch app <span aria-hidden="true">&#8599;</span>
+        </a>
+      </div>
+      {%- endif %}
 
       <div class="wk-rail__block wk-rail__block--toc" id="wk-toc-block">
         <p class="wk-rail__h"><span class="mono-label">On this page</span></p>
