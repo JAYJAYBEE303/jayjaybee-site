@@ -21,6 +21,7 @@ import { buildScoreContext, scoreFixture, scoreOverHorizon } from '../engine/com
 import {
   calcIndividualDuels, calcCounterMatchupMirrored, duelsForPairing,
 } from '../engine/counter.js';
+import { groupPerGwSlots, pendingFixturesForTeam } from '../engine/fixtures.js';
 import { invert, clamp } from '../util.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -644,30 +645,56 @@ function findFixtureId(team, entry) {
  *   each entry's fixture id via findFixtureId().
  * @param {Array} perGw
  */
-function buildPerGwStrip(team, perGw) {
-  if (!perGw || perGw.length === 0) return '';
-  const cells = perGw.map(entry => {
-    const bandClass  = entry.isBlank ? 'neutral' : entry.band;
-    const estClass   = (!entry.isBlank && entry.provisional) ? ' pgw-cell--estimated' : '';
-    const fixtureId  = findFixtureId(team, entry);
-    const clickClass = fixtureId !== null ? '' : ' pgw-cell--static';
-    const idAttr      = fixtureId !== null ? ` data-fixture-id="${fixtureId}"` : '';
-    const tabAttr     = fixtureId !== null ? ' tabindex="0"' : '';
-    const label = entry.isBlank
-      ? `GW${entry.gw} (blank)`
-      : `GW${entry.gw} ${entry.opponent ?? ''} (${entry.venue ?? ''}) — ${Math.round(entry.value)}${entry.provisional ? ' (low confidence)' : ''}`;
-    const display  = entry.isBlank ? '–' : Math.round(entry.value);
-    const oppText  = entry.isBlank ? '–' : esc(String(entry.opponent ?? '').toUpperCase());
-    const venText  = entry.isBlank ? '' : esc(entry.venue ?? '');
-    return `<div class="pgw-cell pgw-cell--${esc(bandClass)}${estClass}${clickClass}"${idAttr}${tabAttr} title="${esc(label)}">`
-      + `<span class="pgw-cell__score">${esc(String(display))}</span>`
-      + `<div class="pgw-cell__extra"><div class="pgw-cell__extra-inner">`
-      + `<span class="pgw-cell__opponent">${oppText}</span>`
-      + `<span class="pgw-cell__venue">${venText}</span>`
-      + `</div></div>`
+function buildPerGwStrip(team, perGw, pending = []) {
+  const slots = groupPerGwSlots(perGw);
+  if (slots.length === 0) return '';
+
+  const slotHtml = slots.map(slot => {
+    const cells = slot.fixtures.map(entry => {
+      const bandClass  = entry.isBlank ? 'neutral' : entry.band;
+      const estClass   = (!entry.isBlank && entry.provisional) ? ' pgw-cell--estimated' : '';
+      const blkClass   = entry.isBlank ? ' pgw-cell--blank' : '';
+      const tbcClass   = entry.provisionalKickoff ? ' pgw-cell--tbc' : '';
+      const fixtureId  = findFixtureId(team, entry);
+      const clickClass = fixtureId !== null ? '' : ' pgw-cell--static';
+      const idAttr      = fixtureId !== null ? ` data-fixture-id="${fixtureId}"` : '';
+      const tabAttr     = fixtureId !== null ? ' tabindex="0"' : '';
+      const label = entry.isBlank
+        ? `GW${entry.gw} — blank (no fixture)`
+        : `GW${entry.gw} ${entry.opponent ?? ''} (${entry.venue ?? ''}) — ${Math.round(entry.value)}`
+          + `${entry.provisional ? ' (low confidence)' : ''}`
+          + `${entry.provisionalKickoff ? ' — kickoff TBC' : ''}`;
+      // '∅' rather than '–' — a dash reads as missing data, and a blank
+      // gameweek is a known fact. Matches the Ranker's strip.
+      const display  = entry.isBlank ? '∅' : Math.round(entry.value);
+      const oppText  = entry.isBlank ? '–' : esc(String(entry.opponent ?? '').toUpperCase());
+      const venText  = entry.isBlank ? '' : esc(entry.venue ?? '');
+      return `<div class="pgw-cell pgw-cell--${esc(bandClass)}${estClass}${blkClass}${tbcClass}${clickClass}"${idAttr}${tabAttr} title="${esc(label)}">`
+        + `<span class="pgw-cell__score">${esc(String(display))}</span>`
+        + `<div class="pgw-cell__extra"><div class="pgw-cell__extra-inner">`
+        + `<span class="pgw-cell__opponent">${oppText}</span>`
+        + `<span class="pgw-cell__venue">${venText}</span>`
+        + `</div></div>`
+        + `</div>`;
+    }).join('');
+
+    const dblClass = slot.isDouble ? ' pgw-slot--double' : '';
+    const dblMark  = slot.isDouble ? ' ··' : '';
+    return `<div class="pgw-slot${dblClass}">`
+      + `<div class="pgw-slot__cells">${cells}</div>`
+      + `<div class="pgw-slot__label">${esc(String(slot.gw))}${dblMark}</div>`
       + `</div>`;
   }).join('');
-  return `<div class="pgw-strip">${cells}</div>`;
+
+  const pendingHtml = pending.length > 0
+    ? `<div class="pgw-pending" title="${pending.length} postponed fixture${pending.length > 1 ? 's' : ''} awaiting a rearranged date">+${pending.length} TBD</div>`
+    : '';
+
+  // The .pgw-strip wrapper stays: components.css lays the strip out through it.
+  // The slot wrappers do not break the delegated click handler — it matches on
+  // closest('.pgw-cell[data-fixture-id]'), and the cells still carry both the
+  // class and the attribute, so the extra nesting is transparent to it.
+  return `<div class="pgw-strip">${slotHtml}${pendingHtml}</div>`;
 }
 
 // ─── Build: matchup card ──────────────────────────────────────────────────────
@@ -714,7 +741,7 @@ function buildCard(team, venue, score, fdr, horizonScore, horizon, duels, defend
         <span class="score-chip score-chip--${esc(horizonBand)} horizon-summary__score">${horizonValue}</span>
         <span class="horizon-summary__label">${esc(horizonBand)}</span>
       </div>
-      ${buildPerGwStrip(team, horizonScore.perGw)}
+      ${buildPerGwStrip(team, horizonScore.perGw, pendingFixturesForTeam(team.id, store.getSeason()))}
     </div>
     `
     : '';
