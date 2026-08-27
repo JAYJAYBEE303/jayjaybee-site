@@ -1,0 +1,45 @@
+{%- comment -%}
+=============================================================================
+  wiki-rail.html — the left rail: one app's sections, grouped and numbered.
+
+  Usage, from _layouts/wiki-entry.html:
+      {% include wiki-rail.html app=wk_app sections=wk_sections %}
+
+  Group order is first-appearance in `order`, so the numbers on the
+  section pages are the single control over the rail. There is no list of
+  groups anywhere to keep in sync with them.
+
+  Numbering is continuous across groups — 01 … 12 — and identifies the
+  section rather than its position in a filtered list, which is why
+  wiki.js never renumbers when the filter narrows the rail.
+
+  The filter input itself is NOT rendered here. wiki.js injects it into
+  the mount below, so with JavaScript off there is no dead control in the
+  rail.
+=============================================================================
+{%- endcomment -%}
+{%- assign wk_groups = include.sections | map: "group" | uniq -%}
+
+<div class="wk-rail__block wk-rail__block--filter" id="wk-rail-filter"></div>
+
+{%- for g in wk_groups -%}
+{%- assign wk_gitems = include.sections | where: "group", g -%}
+<div class="wk-rail__block wk-rail__group" data-rail-group>
+  <p class="wk-rail__h">
+    <span class="mono-label">{{ g }}</span>
+    <span class="mono-label" data-rail-count>{{ wk_gitems.size | prepend: '0' | slice: -2, 2 }}</span>
+  </p>
+  <nav class="wk-nav">
+    {%- for e in wk_gitems -%}
+    {%- assign wk_n = 0 -%}
+    {%- for s in include.sections -%}
+      {%- if s.url == e.url -%}{%- assign wk_n = forloop.index -%}{%- endif -%}
+    {%- endfor -%}
+    <a href="{{ e.url }}"{% if e.url == page.url %} aria-current="page"{% endif %} data-rail-item data-title="{{ e.title | downcase | escape }}" data-lede="{{ e.lede | downcase | escape }}">
+      <span class="wk-nav__n">{{ wk_n | prepend: '0' | slice: -2, 2 }}</span>
+      <span class="wk-nav__t">{{ e.title }}</span>
+    </a>
+    {%- endfor -%}
+  </nav>
+</div>
+{%- endfor -%}
