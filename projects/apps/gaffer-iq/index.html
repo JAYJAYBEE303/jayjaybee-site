@@ -46,6 +46,12 @@
 
     </header>
 
+    <!-- Schedule context bar. Sits outside .app-main so it shows on every view,
+         including the three tabs that render no fixture strip. Stays hidden
+         unless the next six gameweeks contain a double or a blank — see
+         js/modules/scheduleBar.js. -->
+    <div class="schedule-bar" id="schedule-bar" hidden></div>
+
     <main class="app-main">
 
       <div id="app-error-banner" class="app-error-banner" hidden>

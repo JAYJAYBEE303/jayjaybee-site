@@ -36,6 +36,7 @@ import { initFixtures }     from './modules/fixtures.js';
 import { initRanker }       from './modules/ranker.js';
 import { initDashboard }    from './modules/dashboard.js';
 import { initPlanner }      from './modules/planner.js';
+import { initScheduleBar }  from './modules/scheduleBar.js';
 import { initCalibration }  from './calibration.js';
 
 // ─── Data loading ─────────────────────────────────────────────────────────────
@@ -359,6 +360,8 @@ initFixtures();
 initRanker();
 initDashboard();
 initPlanner();
+// Outside .app-main: one bar shared by every view, hidden on ordinary weeks.
+initScheduleBar();
 initCalibration();
 
 // ─── Lazy player-summary loader ───────────────────────────────────────────────
