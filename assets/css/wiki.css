@@ -27,7 +27,7 @@
    ========================================================================= */
 
 :root {
-  --wk-container: 84rem; /* three-column shell — wider than --container     */
+  --wk-container: 88rem; /* three-column shell — wider than --container     */
   --wk-rail-w: 14rem;   /* left index column                                */
   --wk-rail-r-w: 14rem; /* right rail column                                */
   --wk-info-w: 17rem;   /* floated infobox                                  */
