@@ -265,8 +265,12 @@
   </header>
 
   <!-- Page-specific body. Each page's front matter + content is rendered
-       in here. The .page wrapper handles outer container + gutters. -->
-  <main id="main" class="page">
+       in here. The .page wrapper handles outer container + gutters.
+
+       A layout may declare `page_wide` in its OWN front matter to widen
+       that container — see _layouts/wiki-entry.html, whose three-column
+       shell does not fit the prose-width default. -->
+  <main id="main" class="page{% if layout.page_wide %} page--wide{% endif %}">
     {{ content }}
   </main>
 

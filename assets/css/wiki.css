@@ -21,12 +21,13 @@
      * The wiki INDEX page (/projects/wiki/) uses the site's own .work-*
        components verbatim and needs nothing from this file at all.
 
-   The four --wk-* properties below are the only new values in the file.
+   The five --wk-* properties below are the only new values in the file.
    Each is a structural measure with no site-wide counterpart, and none
    restates an existing token.
    ========================================================================= */
 
 :root {
+  --wk-container: 84rem; /* three-column shell — wider than --container     */
   --wk-rail-w: 14rem;   /* left index column                                */
   --wk-rail-r-w: 14rem; /* right rail column                                */
   --wk-info-w: 17rem;   /* floated infobox                                  */
@@ -34,9 +35,26 @@
 }
 
 /* =========================================================================
+   CONTAINER
+   The site's --container (72rem) is sized for one column of prose. This
+   page puts a 14rem rail either side of that column, so inside 72rem the
+   prose is left at roughly 28rem — unreadably narrow, and not what the
+   design system's wiki sheet specifies.
+
+   .page--wide is applied by _layouts/default.html when a layout declares
+   `page_wide` in its own front matter; _layouts/wiki-entry.html is the
+   only caller. The modifier lives here rather than in layout.css because
+   the wiki is the only thing that needs it, and .page's own width stays
+   the value every other page was designed around.
+   ========================================================================= */
+
+.page--wide { max-width: var(--wk-container); }
+
+/* =========================================================================
    PAGE SHELL
-   Sits inside <main class="page">, which already supplies --container and
-   the page gutters. Nothing here re-declares width or padding.
+   Sits inside <main class="page page--wide">, which supplies the gutters
+   and — via the modifier declared above — the widened container. Nothing
+   here re-declares padding.
    ========================================================================= */
 
 .wk-layout {

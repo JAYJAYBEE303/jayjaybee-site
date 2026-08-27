@@ -1,6 +1,7 @@
 ---
 layout: default
 title_suffix: Wiki — Josh Bailey
+page_wide: true
 ---
 {%- comment -%}
 =============================================================================
@@ -17,6 +18,12 @@ title_suffix: Wiki — Josh Bailey
   page restating `Wiki — Josh Bailey` in its own front matter. Matches
   the qualified form _layouts/wiki-app.html builds directly for the app
   page's <title>.
+
+  `page_wide` works the same way. The site's default container is sized
+  for a single column of prose; this layout puts two rails either side of
+  that column, which leaves the prose far too narrow inside it. The flag
+  widens the container for wiki entries only — every other page keeps the
+  prose width it was designed around.
 
   Front matter a section page declares:
       layout:   wiki-entry          (required)
