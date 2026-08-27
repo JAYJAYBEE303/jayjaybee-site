@@ -22,7 +22,16 @@
                      and site.description are left exactly as they were
                      (unescaped) so existing pages render byte-identical.
      ============================================================= -->
-<html lang="en" data-theme="auto" class="no-js">
+{%- comment -%}
+  `is-home` marks the front page for CSS alone. The header's fade-in is
+  an arrival — it belongs to the first page a reader lands on, not to
+  every navigation after it, where re-animating a nav that was already
+  on screen reads as slowness rather than polish. See the header opt-out
+  in components.css. Written into the class attribute rather than set by
+  the pre-paint script below so the header is never hidden for a frame
+  on a sub-page.
+{%- endcomment -%}
+<html lang="en" data-theme="auto" class="no-js{% if page.url == '/' %} is-home{% endif %}">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -110,7 +119,7 @@
     })();
   </script>
 
-  <link rel="stylesheet" href="/assets/css/global.css?v=49" />
+  <link rel="stylesheet" href="/assets/css/global.css?v=50" />
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>

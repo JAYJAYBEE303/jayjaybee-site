@@ -34,9 +34,14 @@ page_wide: true
       title:    Calculations
       lede:     one italic sentence (optional)
 
-  kind, revised, steward and status are NOT declared per section. They
-  are read from the parent app, so twelve pages do not restate the same
+  revised, author and status are NOT declared per section. They are
+  read from the parent app, so twelve pages do not restate the same
   three values. A section may still override any of them.
+
+  `kind` is still inherited the same way, but this layout no longer
+  shows it: every section of an app carries the same one, so the meta
+  strip repeated `Application` on all twelve pages and said nothing.
+  /projects/wiki/ still lists it, where the apps differ from each other.
 
   Everything derived below — the rail, numbering, backlinks, pager,
   Entry status — is read from the section pages themselves at build time.
@@ -56,9 +61,8 @@ page_wide: true
 {%- assign wk_first = wk_sections | first -%}
 
 {%- comment -%} ---- metadata, inherited from the app unless overridden ---- {%- endcomment -%}
-{%- assign wk_kind = page.kind | default: wk_app.kind -%}
 {%- assign wk_revised = page.revised | default: wk_app.revised -%}
-{%- assign wk_steward = page.steward | default: wk_app.steward -%}
+{%- assign wk_author = page.author | default: wk_app.author -%}
 {%- assign wk_status = page.status | default: wk_app.status -%}
 
 {%- comment -%} Position within the app, for the meta strip. {%- endcomment -%}
@@ -154,9 +158,8 @@ page_wide: true
 
       <div class="wk-art__meta mono">
         <span><b>Entry</b>{{ wk_idx | plus: 1 | prepend: '0' | slice: -2, 2 }} / {{ wk_sections.size | prepend: '0' | slice: -2, 2 }}</span>
-        <span><b>Kind</b>{{ wk_kind }}</span>
         <span><b>Revised</b>{{ wk_revised }}</span>
-        <span><b>Steward</b>{{ wk_steward }}</span>
+        <span><b>Author</b>{{ wk_author }}</span>
         <span><b>Words</b>{{ page.content | strip_html | number_of_words }}</span>
       </div>
 

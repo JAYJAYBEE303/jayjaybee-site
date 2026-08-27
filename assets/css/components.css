@@ -163,6 +163,30 @@
   will-change: auto;
 }
 
+/* Header opt-out — every page but the front one.
+   The four header elements above are an arrival animation: they earn
+   their fade on the page a reader lands on, and on a sub-page they only
+   replay motion the reader has already watched. `is-home` is written
+   onto <html> by _layouts/default.html, so this holds from the first
+   paint and the header never flashes hidden. The observer in
+   animations.js still runs and still adds .is-visible — it sets these
+   same two values, so it lands on an element already at rest and no
+   transition has anything to interpolate. Deliberately NOT `transition:
+   none`: this selector outranks the hover rules further down the file,
+   and zeroing transitions here would take the wordmark, nav and search
+   hover states with it. Specificity beats the .js block above by the
+   element selector. */
+html:not(.is-home) :is(
+  .site-wordmark,
+  .site-nav__list > li,
+  .site-header__row > .search,
+  .site-header__top > .theme-toggle
+) {
+  opacity: 1;
+  transform: none;
+  will-change: auto;
+}
+
 /* =========================================================================
    HOVER / STATE TRANSITIONS
    Every transition uses --ease so motion reads as one piece —
