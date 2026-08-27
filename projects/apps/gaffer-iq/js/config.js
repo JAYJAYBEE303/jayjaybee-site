@@ -787,6 +787,26 @@ export const W_MIN  = 0.25;
 // MODEL: a blank is mildly bad (zero return), not neutral — so not 50.
 export const BLANK_GW_VALUE = 40;
 
+// Uplift applied to a gameweek's value for each fixture beyond the first.
+//
+// MODEL: a double gameweek is two chances at a return, not one week that
+// counts twice. The distinction matters because the old aggregation did the
+// latter: it pushed one entry per FIXTURE into a weighted mean, so a double
+// doubled that gameweek's weight without adding any return, and a double
+// against two hard opponents scored LOWER than a single hard fixture. Two
+// chances must never be worth less than one.
+//
+// The uplift is a fraction of the REMAINING headroom to 100, so it is
+// asymptotic — a double can never overflow the 0–100 band scale, and a great
+// fixture (already near the ceiling) gains proportionally less than a poor one,
+// which is right: a double is worth most to the player you would otherwise have
+// benched. At 0.35 a double at 30 lands on 54.5 — clearly better than a single
+// 30, clearly worse than a single 55.
+//
+// REASONED, NOT FITTED. Retuning this against historical double gameweeks is a
+// deferred item; treat 0.35 as a starting position, not a measured constant.
+export const DGW_UPLIFT = 0.35;
+
 // ─── §10  Player projection ───────────────────────────────────────────────────
 
 // Weights for the four components of the player projection score (must sum to 1).

@@ -10,7 +10,7 @@
 import {
   WEIGHTS, BANDS, CONFIDENCE_FLOOR, LEAGUE_AVG_STRENGTH,
   STACK_PIVOT, STACK_CURVE, STACK_MAX_PENALTY, RELATIVE_EDGE_SENSITIVITY,
-  HORIZON_DECAY, AGG_METHOD, W_MEAN, W_MIN, BLANK_GW_VALUE,
+  HORIZON_DECAY, AGG_METHOD, W_MEAN, W_MIN, BLANK_GW_VALUE, DGW_UPLIFT,
   PROJ_FORM, PROJ_FIXTURE, PROJ_COUNTER, PROJ_MINUTES, EXPECTED_PTS_FIXTURE_SWING,
   RANK_ELITE_COUNT_BY_POS, RANK_STRONG_COUNT_BY_POS, RANK_TOP_PERCENTILE, RANK_BOTTOM_PERCENTILE,
   SEASON_GWS,
@@ -769,6 +769,27 @@ function calcPlayerCounterEdge(player, gwWindow, teamFixturesByGw, ctx) {
  *     DGWs produce two entries for the same gw, blanks one with isBlank: true.
  *   See FEATURE_ENGINE.md §9.
  */
+/**
+ * Lift a gameweek's value for each fixture beyond the first.
+ *
+ * MODEL: FEATURE_ENGINE.md §9. Applied to a per-GW value AFTER that gameweek's
+ * fixtures have been collapsed to a mean — never to an individual fixture
+ * score, and never more than once per gameweek. Asymptotic toward 100 so the
+ * band scale cannot overflow.
+ *
+ * @param {number} gwValue      the gameweek's collapsed 0–100 value
+ * @param {number} fixtureCount how many fixtures the team plays that gameweek
+ * @returns {number}
+ */
+export function applyDgwUplift(gwValue, fixtureCount) {
+  // 0 fixtures means the caller has already substituted BLANK_GW_VALUE, and 1
+  // is the ordinary case. Guarding both here rather than at the call site keeps
+  // the function total: a negative (n − 1) would otherwise DEDUCT from a blank,
+  // which is not the model — a blank is already priced by BLANK_GW_VALUE.
+  if (fixtureCount <= 1) return gwValue;
+  return gwValue + (100 - gwValue) * DGW_UPLIFT * (fixtureCount - 1);
+}
+
 export function scoreOverHorizon(team, horizon, ctx) {
   if (!team || !horizon || !ctx || !ctx.teamsById) {
     throw new TypeError('scoreOverHorizon: team, horizon, and ctx are required');
