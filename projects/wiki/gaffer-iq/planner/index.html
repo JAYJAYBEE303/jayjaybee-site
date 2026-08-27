@@ -1,0 +1,21 @@
+---
+layout: wiki-entry
+parent: gaffer-iq
+slug: planner
+order: 120
+group: Pages
+title: Planner
+lede: "The most horizon-aware view: every candidate transfer evaluated for its change in projected score, with the four-point hit modelled rather than ignored."
+---
+
+<p>The most horizon-aware view, and the one furthest down the dependency
+chain: it depends on the Ranker and, through it, on the whole engine.</p>
+
+<p>It takes the current squad, the Ranker's projections across the
+horizon, and the budget and free-transfer constraints, then evaluates
+every candidate out-and-in swap for its change in projected horizon
+score. Moves are ranked by gain per cost, with the four-point hit for
+an extra transfer modelled rather than ignored — the question being
+whether a move pays for its own hit across the horizon, not just in the
+week it is made. Triple Captain candidates are picked on the same
+expected-points basis the Dashboard uses for captaincy.</p>

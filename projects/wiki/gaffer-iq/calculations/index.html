@@ -1,0 +1,98 @@
+---
+layout: wiki-entry
+parent: gaffer-iq
+slug: calculations
+order: 80
+group: Matchups
+title: Calculations
+lede: Five weighted sub-metrics, each with its own maturity curve, combined into one CompositeScore and mapped to five colour bands.
+---
+
+<p>Five weighted sub-metrics result in the overall score, known as the
+<code>CompositeScore</code>, as one number:</p>
+
+<ul>
+  <li><strong>Base difficulty</strong> — the difficulty metric from FPL
+  directly, to use as a base. A fetch from <code>api/fpl.js</code>
+  reaches <a href="https://fantasy.premierleague.com/api/fixtures"
+  target="_blank"
+  rel="noopener">fantasy.premierleague.com/api/fixtures</a> through
+  Vercel, and harvests the <code>team_h_difficulty</code> and
+  <code>team_a_difficulty</code>. This is then converted to a 10 if 1,
+  30 if 2, 50 if 3, 70 if 4, and 90 if 5.</li>
+  <li><strong>Counter-matchup</strong> — this is the heaviest
+  calculation. What this does, rather than defining a team's strength,
+  it instead calculates where a team is strongest and weakest. For
+  example, if a team who concedes mostly set pieces plays against a team
+  that scores mostly from set pieces, the counter-matchup score will
+  swing strongly one way, but if two teams' strengths and weaknesses
+  don't counter each other, then this will remain balanced. The relevant
+  data is fetched from understat.com's <code>getTeamData</code>
+  endpoint. It will fetch shots, goals, situation, and total predicted
+  goals from those shots, and calculate the average predicted goals for
+  that situation, known as shared xG — otherwise where the biggest
+  threat comes from for that team. It will then do this for all
+  situations such as transition play (fast play) and box occupation
+  (close up slow play) as well as set pieces, both for attacking and
+  conceding, calculate a score out of 100 based on how good or bad the
+  counter is, and then calculate the average of all the counters,
+  resulting in Counter-matchup. This also has a maturity value of 10
+  fixtures, elevating to a max 0.25 weight towards the total
+  CompositeScore in a linear ascent, to weaken the contribution of wild
+  early-season data.</li>
+  <li><strong>Team form</strong> — recent trajectory,
+  opponent-adjusted. It exists to correct base difficulty's
+  preseason-seeded priors in-season. It's simply fetched from
+  <a href="https://fantasy.premierleague.com/api" target="_blank"
+  rel="noopener">fantasy.premierleague.com/api</a> through Vercel, pulls
+  the <code>bootstrap-static/</code> endpoint, and harvests the
+  <code>strength_overall_home</code> and
+  <code>strength_overall_away</code> values. It then runs <code>oppAdj =
+  oppStrength / leagueAvgStrength</code> in order to swing form one way
+  or the other based on whether the form is against stronger teams or
+  weaker teams. This also has a maturity, but of 5 fixtures, to reach a
+  max weight of 0.2 — to account for teams that appear in perfect form
+  after only 1 or 2 games.</li>
+  <li><strong>Head-to-head</strong> — real cross-season meetings from
+  the Understat history window. Kept deliberately small, as testing
+  revealed that this weakens prediction accuracy if this holds more than
+  a weight of 0.1. The last 10 meetings (or last 5 seasons) are fetched
+  from <a href="https://understat.com" target="_blank"
+  rel="noopener">understat.com</a> through their
+  <code>getLeagueData/EPL/{season}</code> endpoint, looping until 5
+  seasons are fetched. The head-to-head score is then calculated by
+  <code>100 × (TotalPointsWon / TotalPossiblePoints)</code>, to account
+  for the validity of all wins, losses, and draws.</li>
+  <li><strong>Home and away</strong> — home advantage strength compares
+  how many points a team wins per game at home versus away, then
+  measures how big that gap is compared to every other team in the
+  league. A bigger gap means venue matters more for that team. Both
+  teams' gaps get averaged and turned into a boost for the home side and
+  an equal penalty for the away side, centred around a neutral 50.</li>
+</ul>
+
+<p>A <strong>stacking penalty</strong> then applies across the
+sub-metrics. It and the base-difficulty weight are a matched pair — a
+weight that large would otherwise make a strong favourite's score
+nearly immovable, and the penalty is what lets <em>several</em> poor
+secondary signals tip a fixture without letting any single one do it
+alone. Neither should be tuned without re-checking the other.</p>
+
+<p>The result maps to five bands, symmetric around a neutral midpoint,
+which drive colour everywhere in the app: <strong>great</strong>
+75–100, <strong>good</strong> 60–74, <strong>neutral</strong> 41–59,
+<strong>tough</strong> 26–40, <strong>brutal</strong> 0–25. Thresholds
+are config rather than literals, so the palette can be recalibrated
+after a season's distribution has actually been observed.</p>
+
+<p>There used to be a sixth signal, style clash, and removing it is the
+most instructive decision in the model. It substantially restated the
+counter-matchup — two of its three rules described the same interaction,
+read from the same source data, at half the weight — and two correlated
+weak predictors are worse than one, because the shared noise gets
+counted twice while the dependable metrics are diluted. It also assumed
+season-average pressing is a stable team property, which it is not: a
+side presses a promoted team and sits off against a title contender.
+And its observed spread was narrow enough that it could move the
+composite by roughly half a point — too small to change a decision,
+large enough to add noise whenever it read a fixture wrong.</p>

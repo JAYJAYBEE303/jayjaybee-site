@@ -1,0 +1,60 @@
+---
+---
+{%- comment -%}
+=============================================================================
+  wiki-app.html — the app page at /projects/wiki/<app>/.
+
+  An app page holds no prose. It carries the app-level front matter that
+  /projects/wiki/ lists and that every one of its section pages inherits
+  from, and it sends the reader straight on to the app's first section.
+
+  Front matter an app page declares:
+      layout:   wiki-app            (required)
+      slug:     gaffer-iq           (must match the folder name)
+      order:    10                  (sort position across the wiki)
+      group:    Tools               (the wiki-wide category, shown on
+                                     /projects/wiki/ — NOT a rail heading;
+                                     a section's `group` is that, and the
+                                     two are never read by one template)
+      title:    Gaffer IQ
+      kind:     Application
+      revised:  2026-08-25
+      steward:  Josh Bailey
+      lede:     one italic sentence
+      summary:  the paragraph /projects/wiki/ shows
+      status:   draft               (optional)
+      app_url:  /projects/apps/gaffer-iq/    (optional)
+      info:     mapping of key/value rows for the infobox (optional)
+
+  Deliberately NOT nested in default.html. Three redirect mechanisms are
+  emitted because they fail in different situations: the refresh meta for
+  no-JS, location.replace so the history entry is not poisoned when JS is
+  on, and a real link for anything that honours neither.
+=============================================================================
+{%- endcomment -%}
+{%- assign wk_sections = site.pages | where_exp: "p", "p.layout == 'wiki-entry'" | where: "parent", page.slug | sort: "order" -%}
+{%- assign wk_first = wk_sections | first -%}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ page.title }} — Wiki — Josh Bailey</title>
+{%- if page.description %}
+<meta name="description" content="{{ page.description | escape }}">
+{%- endif %}
+{%- if wk_first %}
+<link rel="canonical" href="{{ wk_first.url | absolute_url }}">
+<meta http-equiv="refresh" content="0; url={{ wk_first.url }}">
+<meta name="robots" content="noindex, follow">
+<script>location.replace({{ wk_first.url | jsonify }});</script>
+{%- endif %}
+</head>
+<body>
+{%- if wk_first %}
+<p>Redirecting to <a href="{{ wk_first.url }}">{{ wk_first.title }}</a>.</p>
+{%- else %}
+<p>{{ page.title }} has no sections yet.</p>
+{%- endif %}
+</body>
+</html>

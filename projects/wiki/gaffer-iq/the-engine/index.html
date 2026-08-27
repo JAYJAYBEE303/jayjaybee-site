@@ -1,0 +1,28 @@
+---
+layout: wiki-entry
+parent: gaffer-iq
+slug: the-engine
+order: 40
+group: Design Philosophy
+title: The engine
+lede: All the number-crunching in one place, the settings that control it in another, and a confidence level attached to every output.
+---
+
+<p>To be able to predict how strong a player or fixture is, all the
+number-crunching lives in one place — <code>engine/</code>, containing
+js files. If a view needs a new number, it gets added to the engine
+properly, not bolted on as a shortcut. That's what keeps every screen
+showing the same story.</p>
+
+<p>The settings that control the model (how much recent form matters,
+how much a tough opponent counts) live in one config file, separate
+from the formulas. Changing the model means adjusting a setting, never
+rewriting a formula.</p>
+
+<p>Every calculation has to clearly state which way it points, as well
+as an acknowledged confidence level in each output according to max
+weight contribution to the overall player or fixture score. There are
+automated tests to catch it, and the current weightings are an honest
+best guess, written down so they can be challenged — not treated as
+fact — until enough data is available after enough fixtures that can
+prove them right.</p>
