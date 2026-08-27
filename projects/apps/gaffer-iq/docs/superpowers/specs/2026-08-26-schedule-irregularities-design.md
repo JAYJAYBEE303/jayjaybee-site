@@ -3,7 +3,7 @@
 **Status:** approved for planning, 2026-08-26
 **Implements:** the standing UI requirement in FEATURE_ENGINE §9 ("The UI must label DGW teams")
 and the invariant in ARCHITECTURE §9 ("Do not assume one-fixture-per-GW anywhere")
-**Plan:** _not yet written_
+**Plan:** `docs/superpowers/plans/2026-08-26-schedule-irregularities.md`
 
 ---
 
