@@ -377,7 +377,11 @@ function scoreFutureLane(swap) {
   return {
     value: qualifies ? swing : 0,
     components: { swing, farXiDelta: swap.farXiDelta, nearXiDelta: swap.nearXiDelta },
-    estimated: Boolean(swap.inFarScore?.expectedPoints?.estimated),
+    // True if EITHER the aggregated after-XI far estimate is estimated (see
+    // swap.farEstimated, exposed by enumerateSwaps for exactly this) OR the
+    // incoming player's own far-window expected points are — mirrors the Now
+    // lane's pattern above so this lane cannot understate estimated inputs.
+    estimated: Boolean(swap.farEstimated || swap.inFarScore?.expectedPoints?.estimated),
     reasoning: qualifies
       ? `${swap.inPlayer.name}'s fixtures improve later: worth `
         + `${swap.farXiDelta.toFixed(1)} points over the deferred window versus `
@@ -435,20 +439,30 @@ function scoreCeilingLane(swap, ctx) {
   const score   = swap.inScore;
   const summary = ctx?.playerSummariesById?.[swap.inId] ?? null;
 
+  // A blank slot is scored BLANK_GW_VALUE by groupPerGwSlots/fixtures.js, which
+  // is high enough to beat a genuinely hard fixture in a naive max() — the
+  // team does not play that week, so it can never be the "peak" week. Blanks
+  // are excluded before taking the max; if every slot in the window is blank
+  // there is no week to peak in at all, and the lane reports 0 while flagging
+  // itself estimated rather than a confident zero.
   const slots = groupPerGwSlots(score?.perGw ?? []);
+  const playableSlots = slots.filter(slot => !slot.isBlank);
+  const allBlank = playableSlots.length === 0;
   let peakGwValue = 0;
-  for (const slot of slots) {
+  for (const slot of playableSlots) {
     const raw = slot.fixtures.reduce((s, f) => s + (f.value ?? 0), 0)
               / Math.max(1, slot.fixtures.length);
     peakGwValue = Math.max(peakGwValue, applyDgwUplift(raw, slot.fixtures.length));
   }
 
-  const peak = calcExpectedPoints(
-    score?.avgPointsPerGw ?? { value: 0, estimated: true },
-    { value: peakGwValue },
-    score?.breakdown?.minutes ?? { value: 50, estimated: true },
-    1,
-  );
+  const peak = allBlank
+    ? { value: 0, estimated: true }
+    : calcExpectedPoints(
+        score?.avgPointsPerGw ?? { value: 0, estimated: true },
+        { value: peakGwValue },
+        score?.breakdown?.minutes ?? { value: 50, estimated: true },
+        1,
+      );
 
   const history = summary?.history ?? [];
   const played  = history.filter(h => (h.minutes ?? 0) > 0);
@@ -461,11 +475,14 @@ function scoreCeilingLane(swap, ctx) {
     value,
     components: { peak: peak.value, haulRate, hauls: hauls.length, played: played.length },
     estimated: played.length === 0 || peak.estimated,
-    reasoning: played.length === 0
-      ? `${swap.inPlayer.name}'s peak week projects at ${peak.value.toFixed(1)} points, `
-        + 'but no gameweek history has loaded yet — treat this as a rough estimate.'
-      : `${swap.inPlayer.name} has hauled in ${hauls.length} of ${played.length} `
-        + `appearances, with a peak week projecting ${peak.value.toFixed(1)} points.`,
+    reasoning: allBlank
+      ? `${swap.inPlayer.name} has no fixture in this window, so no ceiling can `
+        + 'be projected.'
+      : played.length === 0
+        ? `${swap.inPlayer.name}'s peak week projects at ${peak.value.toFixed(1)} points, `
+          + 'but no gameweek history has loaded yet — treat this as a rough estimate.'
+        : `${swap.inPlayer.name} has hauled in ${hauls.length} of ${played.length} `
+          + `appearances, with a peak week projecting ${peak.value.toFixed(1)} points.`,
   };
 }
 
@@ -489,12 +506,17 @@ function scoreStructureLane(swap) {
   }
 
   const unavailable = swap.outPlayer.status !== 'available';
+  // composite.js's no-team fallback branch omits `breakdown.playtime` entirely
+  // (see scorePlayer). The `?? 1` below keeps this function total rather than
+  // throwing, but that fallback must not be silent — playtimeMissing feeds
+  // into `estimated` below in both return branches.
+  const playtimeMissing = !swap.outScore?.breakdown?.playtime;
   const playtime    = swap.outScore?.breakdown?.playtime?.value ?? 1;
   const lowPlaytime = playtime < STRUCTURE_PLAYTIME_FLOOR;
 
   if (!unavailable && !lowPlaytime) {
     return {
-      value: 0, components: { playtime }, estimated: false,
+      value: 0, components: { playtime }, estimated: playtimeMissing,
       reasoning: `${swap.outPlayer.name} is fit and starting — nothing to repair.`,
     };
   }
@@ -506,7 +528,7 @@ function scoreStructureLane(swap) {
   return {
     value: Math.max(0, swap.nearXiDelta),
     components: { playtime, unavailable },
-    estimated: Boolean(swap.outScore?.breakdown?.playtime?.estimated),
+    estimated: Boolean(swap.outScore?.breakdown?.playtime?.estimated) || playtimeMissing,
     reasoning: `${cause}. Replacing him with ${swap.inPlayer.name} restores `
              + `${Math.max(0, swap.nearXiDelta).toFixed(1)} points to your XI.`,
   };
