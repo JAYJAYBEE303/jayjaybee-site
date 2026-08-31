@@ -5857,3 +5857,171 @@ img.fx-crest {
 
 .fx-pending__team { font-weight: 700; color: var(--color-text); }
 .fx-pending__v    { color: var(--color-muted); }
+
+/* ─── Transfer Planner: verdict banner ─────────────────────────────────────── */
+
+.planner-verdict {
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--band-neutral);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  margin-bottom: var(--space-3);
+}
+
+.planner-verdict--dominant { border-left-color: var(--band-great); }
+.planner-verdict--clear    { border-left-color: var(--band-good); }
+.planner-verdict--close    { border-left-color: var(--band-neutral); }
+.planner-verdict--estimated { border-left-style: dashed; }
+
+/* A hard trigger jumped this lane ahead of the arithmetic leader — flag it
+   with a distinct border colour so it never reads as an ordinary win. Comes
+   after the confidence modifiers so it wins the cascade regardless of which
+   confidence class also applied. */
+.planner-verdict--promoted { border-left-color: var(--band-orange); }
+
+.planner-verdict__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+}
+
+.planner-verdict__lane {
+  font-weight: 600;
+  text-transform: capitalize;
+  font-size: var(--font-size-lg);
+}
+
+.planner-verdict__confidence {
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-muted);
+}
+
+.planner-verdict__promoted-mark {
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--band-orange);
+  border: 1px solid var(--band-orange);
+  border-radius: var(--radius-sm);
+  padding: 0 var(--space-1);
+}
+
+.planner-verdict__score { margin-left: auto; font-variant-numeric: tabular-nums; }
+.planner-verdict__margin { font-size: var(--font-size-xs); color: var(--color-muted); }
+.planner-verdict__headline { margin: 0; line-height: 1.5; }
+.planner-verdict__alts { margin: var(--space-1) 0 0; font-size: var(--font-size-sm); color: var(--color-muted); }
+.planner-verdict__triggers { list-style: none; margin: var(--space-2) 0 0; padding: 0; }
+
+.planner-verdict__trigger {
+  display: flex;
+  gap: var(--space-1);
+  font-size: var(--font-size-sm);
+  padding: var(--space-1) 0;
+}
+
+.planner-verdict__trigger-mark { color: var(--band-brutal); font-weight: 700; }
+
+/* The trigger that promoted the winning lane — called out from the rest of
+   the trigger list, which stays neutral. */
+.planner-verdict__trigger--promoted { color: var(--band-orange); }
+
+/* ─── Transfer Planner: lens boards ────────────────────────────────────────── */
+
+.planner-board-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  gap: var(--space-3);
+}
+
+.planner-board {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  padding: var(--space-2);
+  min-width: 0;
+}
+
+.planner-board__hd {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+}
+
+.planner-board__title { margin: 0; font-size: var(--font-size-sm); font-weight: 600; }
+.planner-board__unit  { font-size: var(--font-size-xs); color: var(--color-muted); }
+.planner-board__rows  { list-style: none; margin: 0; padding: 0; }
+.planner-board__empty { margin: 0; font-size: var(--font-size-sm); color: var(--color-muted); }
+
+.planner-board__more {
+  margin-top: var(--space-2);
+  background: none;
+  border: none;
+  color: var(--color-accent);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  padding: 0;
+}
+
+/* ─── Transfer Planner: compact swap row ───────────────────────────────────── */
+
+.planner-swap-row { border-top: 1px solid var(--color-border); padding: var(--space-1) 0; }
+.planner-swap-row:first-child { border-top: none; }
+
+.planner-swap-row__line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-size-sm);
+  min-width: 0;
+}
+
+.planner-swap-row__names { display: flex; gap: var(--space-1); min-width: 0; flex: 1; }
+.planner-swap-row__out,
+.planner-swap-row__in { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.planner-swap-row__out { color: var(--color-muted); }
+.planner-swap-row__arrow { color: var(--color-muted); flex: none; }
+.planner-swap-row__value { font-variant-numeric: tabular-nums; font-weight: 600; flex: none; }
+.planner-swap-row__price { font-variant-numeric: tabular-nums; font-size: var(--font-size-xs);
+                           color: var(--color-muted); flex: none; }
+
+.planner-swap-row__badge {
+  flex: none;
+  font-size: var(--font-size-xs);
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+}
+
+.planner-swap-row__badge--urgent    { color: var(--band-brutal); font-weight: 700; }
+.planner-swap-row__badge--xi        { color: var(--band-good); }
+.planner-swap-row__badge--estimated { color: var(--color-muted); }
+
+.planner-swap-row__why {
+  flex: none;
+  background: none;
+  border: none;
+  color: var(--color-accent);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  padding: 0 var(--space-1);
+}
+
+/* ─── Transfer Planner: why disclosure ─────────────────────────────────────── */
+
+.planner-why {
+  padding: var(--space-2) 0 var(--space-1);
+  font-size: var(--font-size-xs);
+}
+
+.planner-why__reasoning { margin: 0 0 var(--space-1); line-height: 1.5; }
+.planner-why__components { margin: 0; display: grid;
+                           grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+                           gap: var(--space-1); }
+.planner-why__row { display: flex; justify-content: space-between; gap: var(--space-1); }
+.planner-why__key { color: var(--color-muted); }
+.planner-why__val { font-variant-numeric: tabular-nums; margin: 0; }
