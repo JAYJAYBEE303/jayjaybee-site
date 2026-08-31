@@ -25,6 +25,9 @@ import {
   scoreBenchBoostTiming, scoreTripleCaptainTiming,
 } from '../engine/chips.js';
 import { fetchAndMapSquad, loadSavedTeamId, saveTeamId, resolveImportGw } from '../squadImport.js';
+import { enumerateSwaps, calcSquadFlexibility } from '../engine/transfers.js';
+import { buildVerdict } from '../engine/strategy.js';
+import { renderVerdictBanner, renderBoardGrid } from './planner-boards.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -44,9 +47,6 @@ const CHIP_LABELS = {
 };
 
 
-
-/** Max single-transfer recommendations to render. */
-const TOP_N = 8;
 
 /** Max pool size fed into the O(n²) 2-transfer combo search. */
 const COMBO_POOL = 60;
@@ -96,6 +96,32 @@ let _rankTierByPlayerId = null;
 
 /** Set<chipId> of chips the user has marked as already used this season. */
 let _chipsUsed = new Set();
+
+/** Swap keys whose why-panel is open. Survives re-render so a disclosure the
+ *  user opened is not slammed shut by a budget keystroke. */
+let _openRows = new Set();
+
+/** Board ids currently showing BOARD_EXPANDED_N rows instead of BOARD_TOP_N. */
+let _expandedBoards = new Set();
+
+/** Cached candidate scores, keyed by window. Cleared on data/horizon change. */
+let _scoreCaches = { near: new Map(), far: new Map() };
+
+/** Last enumeration, reused when only budget or free transfers changed. */
+let _swaps = [];
+
+/** DOM refs added by this feature. */
+let _verdictSlot = null;
+let _boardsSlot  = null;
+
+/**
+ * Chip timing recommendations, cached by renderChipsPanel() so buildVerdict()
+ * can read them without recomputing chip timing itself. See renderBoards()'s
+ * call to renderChipsPanel() before its own first read of _chipRecs — without
+ * that ordering the very first verdict would silently lose its chipWindow
+ * trigger, because this starts empty until the chips panel has rendered once.
+ */
+let _chipRecs = {};
 
 /** Active position set for the search dropdown filter. */
 let _searchPosSet = new Set(['GKP', 'DEF', 'MID', 'FWD']);
@@ -290,71 +316,19 @@ function ensureRankTiers(ctx, horizon) {
 // ─── Transfer computation ─────────────────────────────────────────────────────
 
 /**
- * Compute all valid single-transfer swaps within the current budget.
- * Single transfers always use one free transfer — no hit applies.
- * @param {object} ctx  score context from buildCtx()
- * @returns {Array<SwapObj>}  sorted by delta descending
- */
-function computeSingleSwaps(ctx) {
-  if (!ctx || store.getSquad().length < SQUAD_TOTAL) return [];
-
-  const horizon    = getHorizon();
-  const allPlayers = store.getPlayers();
-  const swaps      = [];
-
-  for (const outId of store.getSquad()) {
-    const outPlayer = store.getPlayer(outId);
-    const outScore  = _scores.get(outId);
-    if (!outPlayer || !outScore) continue;
-
-    // Candidates: same position, not currently in squad.
-    const candidates = allPlayers.filter(p =>
-      p.position === outPlayer.position && !isInSquad(p.id)
-    );
-
-    for (const inPlayer of candidates) {
-      const priceDiff = (inPlayer.price ?? 0) - (outPlayer.price ?? 0);
-      // Budget constraint: net spend must not exceed available budget.
-      if (priceDiff > _budget) continue;
-
-      let inScore;
-      try {
-        inScore = scorePlayer(inPlayer, horizon, ctx);
-      } catch {
-        continue;
-      }
-
-      swaps.push({
-        outId,
-        inId:      inPlayer.id,
-        outPlayer,
-        inPlayer,
-        outScore,
-        inScore,
-        // Raw delta — hit penalty not applied here; single transfers are free.
-        delta:     inScore.value - outScore.value,
-        priceDiff,
-        isHit:     false,
-      });
-    }
-  }
-
-  swaps.sort((a, b) => b.delta - a.delta);
-  return swaps;
-}
-
-/**
- * Find the best 2-transfer combination from the top-COMBO_POOL singles.
+ * Find the best 2-transfer combination from the top-COMBO_POOL swaps, ranked
+ * on the Now lane.
  *
  * When freeTransfers === 1, the second transfer costs a hit (HIT_PENALTY
  * deducted from combinedDelta). When freeTransfers === 2, both are free.
  * Only called when _allowExtraHit is true or freeTransfers === 2.
  *
- * @param {Array<SwapObj>} singles  output of computeSingleSwaps(), sorted desc
+ * @param {Array<Swap>} swaps  output of enumerateSwaps()
  * @returns {{ swap1, swap2, combinedDelta, isHit } | null}
  */
-function computeBestTwoSwap(singles) {
+function computeBestTwoSwap(swaps) {
   if (!_allowExtraHit && _freeTransfers < 2) return null;
+  const singles = [...swaps].sort((a, b) => b.lanes.now.value - a.lanes.now.value);
   if (singles.length < 2) return null;
 
   const pool    = singles.slice(0, COMBO_POOL);
@@ -379,7 +353,7 @@ function computeBestTwoSwap(singles) {
       // Combined budget: net of both priceDiffs must not exceed budget.
       if (s1.priceDiff + s2.priceDiff > _budget) continue;
 
-      const combinedDelta = s1.delta + s2.delta - hitCost;
+      const combinedDelta = s1.lanes.now.value + s2.lanes.now.value - hitCost;
       if (combinedDelta > bestDelta) {
         bestDelta = combinedDelta;
         best = { swap1: s1, swap2: s2, combinedDelta, isHit: hitCost > 0 };
@@ -506,42 +480,6 @@ function buildPriceChangeWarning(player, score) {
 }
 
 /**
- * Render a single transfer recommendation card.
- * @param {SwapObj} swap
- * @returns {string}  HTML string
- */
-function renderTransferCard(swap) {
-  const { outPlayer, inPlayer, outScore, inScore, delta, priceDiff, isHit } = swap;
-  const outTeam    = store.getTeam(outPlayer.teamId);
-  const inTeam     = store.getTeam(inPlayer.teamId);
-  const dSign      = delta >= 0 ? '+' : '';
-  const cSign      = priceDiff >= 0 ? '+' : '';
-  const remaining  = (_budget - priceDiff).toFixed(1);
-  const deltaEst   = isScoreEstimated(inScore) || isScoreEstimated(outScore) ? ' planner-delta--estimated' : '';
-  const hitBadge   = isHit
-    ? `<span class="planner-hit-badge">HIT −${HIT_PENALTY}pts</span>`
-    : '';
-  const priceWarning = buildPriceChangeWarning(inPlayer, inScore);
-
-  return `
-    <div class="planner-transfer-card">
-      <div class="planner-transfer-card__header">
-        <span class="planner-delta planner-delta--${delta >= 0 ? 'gain' : 'loss'}${deltaEst}">${dSign}${delta.toFixed(1)}</span>
-        <span class="planner-cost-diff">${cSign}£${Math.abs(priceDiff).toFixed(1)}m</span>
-        <span class="planner-budget-remaining">£${remaining}m left</span>
-        ${hitBadge}
-      </div>
-      <div class="planner-transfer-card__body">
-        ${renderPlayerProjection(outPlayer, outScore, outTeam, 'out')}
-        <div class="planner-transfer-card__arrow" aria-hidden="true">→</div>
-        ${renderPlayerProjection(inPlayer, inScore, inTeam, 'in')}
-      </div>
-      ${priceWarning ? `<div class="planner-transfer-card__price-footer">${priceWarning}</div>` : ''}
-    </div>
-  `.trim();
-}
-
-/**
  * Render the best 2-transfer combination card.
  * Shows a summary header plus both swaps, each with full player projections.
  * @param {{ swap1, swap2, combinedDelta, isHit }} twoSwap
@@ -579,8 +517,8 @@ function renderTwoSwapCard(twoSwap) {
           ${renderPlayerProjection(swap1.inPlayer, swap1.inScore, store.getTeam(swap1.inPlayer.teamId), 'in')}
         </div>
         <div class="planner-transfer-card__swap-meta">
-          <span class="planner-delta planner-delta--${swap1.delta >= 0 ? 'gain' : 'loss'} planner-delta--sm${s1Est}">
-            ${swap1.delta >= 0 ? '+' : ''}${swap1.delta.toFixed(1)}
+          <span class="planner-delta planner-delta--${swap1.lanes.now.value >= 0 ? 'gain' : 'loss'} planner-delta--sm${s1Est}">
+            ${swap1.lanes.now.value >= 0 ? '+' : ''}${swap1.lanes.now.value.toFixed(1)}
           </span>
           <span class="planner-cost-diff planner-cost-diff--sm">
             ${swap1.priceDiff >= 0 ? '+' : ''}£${Math.abs(swap1.priceDiff).toFixed(1)}m
@@ -594,8 +532,8 @@ function renderTwoSwapCard(twoSwap) {
           ${renderPlayerProjection(swap2.inPlayer, swap2.inScore, store.getTeam(swap2.inPlayer.teamId), 'in')}
         </div>
         <div class="planner-transfer-card__swap-meta">
-          <span class="planner-delta planner-delta--${swap2.delta >= 0 ? 'gain' : 'loss'} planner-delta--sm${s2Est}">
-            ${swap2.delta >= 0 ? '+' : ''}${swap2.delta.toFixed(1)}
+          <span class="planner-delta planner-delta--${swap2.lanes.now.value >= 0 ? 'gain' : 'loss'} planner-delta--sm${s2Est}">
+            ${swap2.lanes.now.value >= 0 ? '+' : ''}${swap2.lanes.now.value.toFixed(1)}
           </span>
           <span class="planner-cost-diff planner-cost-diff--sm">
             ${swap2.priceDiff >= 0 ? '+' : ''}£${Math.abs(swap2.priceDiff).toFixed(1)}m
@@ -717,7 +655,64 @@ function renderSquadPanel() {
   }).join('');
 }
 
-// ─── Render: transfer recommendations ────────────────────────────────────────
+// ─── Render: verdict banner + lens boards ────────────────────────────────────
+
+/**
+ * Re-enumerate swaps and render the verdict and boards.
+ * @param {boolean} rescore  false when only budget/free-transfers changed, in
+ *                           which case the cached candidate scores are reused
+ *                           — that is what keeps typing in the budget box fast.
+ */
+function renderBoards(rescore = true) {
+  if (!_boardsSlot || !_verdictSlot) return;
+
+  if (store.getSquad().length < SQUAD_TOTAL) {
+    const remaining = SQUAD_TOTAL - store.getSquad().length;
+    _verdictSlot.innerHTML = renderVerdictBanner(null);
+    _boardsSlot.innerHTML = `<p class="planner-hint">
+      Add ${remaining} more player${remaining === 1 ? '' : 's'} to see recommendations.
+    </p>`;
+    return;
+  }
+
+  const ctx = buildCtx();
+  if (!ctx) {
+    _boardsSlot.innerHTML = `<p class="planner-hint">No data available yet.</p>`;
+    return;
+  }
+
+  if (rescore) _scoreCaches = { near: new Map(), far: new Map() };
+
+  try {
+    _swaps = enumerateSwaps(store.getSquad(), store.getPlayers(), ctx, {
+      horizon:       getHorizon(),
+      budget:        _budget,
+      freeTransfers: _freeTransfers,
+      allowExtraHit: _allowExtraHit,
+      caches:        _scoreCaches,
+    });
+  } catch (err) {
+    console.warn('[planner] enumerateSwaps failed:', err?.message ?? err);
+    _swaps = [];
+  }
+
+  const squadPlayers = store.getSquad().map(id => store.getPlayer(id)).filter(Boolean);
+  const verdict = buildVerdict(_swaps, {
+    flexibility:   calcSquadFlexibility(squadPlayers, _scores),
+    xiEntries:     [],
+    freeTransfers: _freeTransfers,
+    chipRecs:      _chipRecs,
+  }, ctx);
+
+  _verdictSlot.innerHTML = renderVerdictBanner(verdict);
+  _boardsSlot.innerHTML  = renderBoardGrid(_swaps, {
+    expandedBoards:     _expandedBoards,
+    openRows:           _openRows,
+    rankTierByPlayerId: _rankTierByPlayerId,
+  });
+}
+
+// ─── Render: transfer recommendations (Best 2-Transfer Combo) ───────────────
 
 function renderRecommendations() {
   if (!_recommendations) return;
@@ -743,30 +738,8 @@ function renderRecommendations() {
     return;
   }
 
-  const horizon    = getHorizon();
-  const singles    = computeSingleSwaps(ctx);
-  const twoSwap    = computeBestTwoSwap(singles);
-  const topSingles = singles.slice(0, TOP_N);
-
-  const parts = [];
-
-  // ── Single transfers ──────────────────────────────────────────────────────
-  const singlesMeta = topSingles.length > 0
-    ? `Top ${topSingles.length} of ${singles.length} · ${esc(horizon.label)}`
-    : `None found · ${esc(horizon.label)}`;
-
-  parts.push(`
-    <div class="planner-section">
-      <div class="planner-section__hd">
-        <span class="planner-section__title">Single Transfers</span>
-        <span class="planner-section__meta">${singlesMeta}</span>
-      </div>
-      ${topSingles.length === 0
-        ? `<p class="planner-hint">No single-transfer options within budget £${_budget.toFixed(1)}m.</p>`
-        : topSingles.map(s => renderTransferCard(s)).join('')
-      }
-    </div>
-  `.trim());
+  const twoSwap = computeBestTwoSwap(_swaps);
+  const parts   = [];
 
   // ── Best 2-transfer combo ─────────────────────────────────────────────────
   const showCombo  = _freeTransfers === 2 || _allowExtraHit;
@@ -934,6 +907,10 @@ function renderChipsPanel() {
     triplecaptain: tcRec ?? fallback.triplecaptain,
   };
 
+  // Kept so buildVerdict can fire its chipWindow trigger without recomputing
+  // chip timing — the same recommendations the panel below is showing.
+  _chipRecs = recs;
+
   const cards = CHIP_IDS.map(id => renderChipCard(id, recs[id])).join('');
 
   _chipsPanel.innerHTML = `
@@ -961,8 +938,14 @@ function onChipsClick(e) {
 function afterSquadChange() {
   scoreSquad();
   renderSquadPanel();
-  renderRecommendations();
+  // renderChipsPanel() runs before renderBoards(): it populates _chipRecs,
+  // which buildVerdict() (inside renderBoards) reads to fire its chipWindow
+  // trigger. Running them in the other order would leave the very first
+  // verdict computed from a stale, empty _chipRecs. See the module-state
+  // comment on _chipRecs.
   renderChipsPanel();
+  renderBoards(true);
+  renderRecommendations();
   if (_searchInput) _searchInput.value = '';
   hideResults();
 }
@@ -1000,6 +983,9 @@ function onSquadSlotsClick(e) {
 function onBudgetChange() {
   const val = parseFloat(_budgetInput?.value ?? '0');
   _budget = isNaN(val) || val < 0 ? 0 : val;
+  // No re-score: budget only changes which already-scored candidates are
+  // affordable, so the cached candidate scores are reused (see renderBoards).
+  renderBoards(false);
   renderRecommendations();
 }
 
@@ -1013,6 +999,7 @@ function onFtClick(e) {
   _root?.querySelectorAll('.planner-ft-btn').forEach(b => {
     b.classList.toggle('is-active', Number(b.dataset.ft) === ft);
   });
+  renderBoards(false);
   renderRecommendations();
 }
 
@@ -1023,7 +1010,27 @@ function onHitToggle() {
     _hitToggle.textContent = _allowExtraHit ? 'On' : 'Off';
     _hitToggle.classList.toggle('is-active', _allowExtraHit);
   }
+  renderBoards(false);
   renderRecommendations();
+}
+
+/** `why` toggles one row's disclosure; the open set survives re-render. */
+function onBoardsClick(e) {
+  const whyBtn = e.target.closest('[data-why-key]');
+  if (whyBtn) {
+    const key = whyBtn.dataset.whyKey;
+    if (_openRows.has(key)) _openRows.delete(key);
+    else                    _openRows.add(key);
+    renderBoards(false);
+    return;
+  }
+  const moreBtn = e.target.closest('[data-board-more]');
+  if (moreBtn) {
+    const id = moreBtn.dataset.boardMore;
+    if (_expandedBoards.has(id)) _expandedBoards.delete(id);
+    else                         _expandedBoards.add(id);
+    renderBoards(false);
+  }
 }
 
 // ─── Squad import helpers (Phase 4-1) ────────────────────────────────────────
@@ -1159,6 +1166,8 @@ function wireDom() {
   _hitToggle       = document.getElementById('planner-hit-toggle');
   _recommendations = document.getElementById('planner-recommendations');
   _chipsPanel      = document.getElementById('planner-chips');
+  _verdictSlot     = document.getElementById('planner-verdict');
+  _boardsSlot      = document.getElementById('planner-boards');
 
   if (!_root) {
     console.warn('[planner] data-module="planner" section not found in DOM');
@@ -1207,6 +1216,9 @@ function wireDom() {
   // ── Chip-used toggles (Phase 4-3) — delegated click ──────────────────────
   _chipsPanel?.addEventListener('click', onChipsClick);
   loadChipsUsed();
+
+  // ── Board rows — delegated click for why-panels and more/less ────────────
+  _boardsSlot?.addEventListener('click', onBoardsClick);
 
   // ── Squad import (Phase 4-1) ─────────────────────────────────────────────
   _importBtn     = document.getElementById('planner-import-btn');
@@ -1264,8 +1276,12 @@ function onDataReady() {
 
   scoreSquad();
   renderSquadPanel();
-  renderRecommendations();
+  // renderChipsPanel() before renderBoards(): see the comment in
+  // afterSquadChange() — buildVerdict() needs a fresh _chipRecs, not the
+  // empty one this module starts with.
   renderChipsPanel();
+  renderBoards(true);
+  renderRecommendations();
 }
 
 /** Flush a render deferred while off screen, once the Planner is shown. */
@@ -1274,8 +1290,9 @@ function onRouteChanged(module) {
   _pendingRender = false;
   scoreSquad();
   renderSquadPanel();
-  renderRecommendations();
   renderChipsPanel();
+  renderBoards(true);
+  renderRecommendations();
 }
 
 function onHorizonChanged() {
@@ -1287,8 +1304,9 @@ function onHorizonChanged() {
   // recommendations + chip timing (chips depend on the same fixture data).
   scoreSquad();
   renderSquadPanel();
-  renderRecommendations();
   renderChipsPanel();
+  renderBoards(true);
+  renderRecommendations();
 }
 
 // ─── Public init ─────────────────────────────────────────────────────────────

@@ -506,25 +506,28 @@
 
         </div>
 
-        <!-- Two-column shell: squad panel (left) + recommendations (right) -->
+        <!-- Verdict banner: the week's call, above everything else -->
+        <div class="planner-verdict-slot" id="planner-verdict"></div>
+
+        <!-- Rail (squad) + five lens boards -->
         <div class="planner-shell">
 
-          <aside class="dash-squad-panel" aria-label="My squad">
+          <aside class="dash-squad-panel dash-squad-panel--rail" aria-label="My squad">
             <div id="planner-squad-slots"></div>
           </aside>
 
           <div class="planner-right-col">
+            <div id="planner-boards" aria-label="Transfer recommendations"></div>
+
+            <section class="planner-recommendations" id="planner-recommendations"
+                     aria-label="Two-transfer combination">
+              <p class="planner-hint">Add 15 players to see transfer recommendations.</p>
+            </section>
 
             <section class="planner-chips" id="planner-chips"
                      aria-label="Chip timing recommendations">
               <p class="planner-hint">Computing chip timing recommendations…</p>
             </section>
-
-            <section class="planner-recommendations" id="planner-recommendations"
-                     aria-label="Transfer recommendations">
-              <p class="planner-hint">Add 15 players to see transfer recommendations.</p>
-            </section>
-
           </div>
 
         </div>
