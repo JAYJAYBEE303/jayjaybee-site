@@ -1165,3 +1165,116 @@ export const SEASON_BOUNDARY_MONTH = 6;
 // season. A pairing with fewer has genuinely not met more often in this
 // division, and the view says so rather than quietly showing less.
 export const H2H_MEETING_WINDOW = 10;
+
+// ─── §14  Transfer lanes and strategy ────────────────────────────────────────
+//
+// Constants for the Transfer Planner's five recommendation lanes and the
+// weekly verdict. See
+// docs/superpowers/specs/2026-08-30-planner-multi-lens-transfers-design.md
+
+// Squad shape. Promoted here from modules/planner.js and modules/dashboard.js,
+// which each carried their own copy — engine/lineup.js and engine/transfers.js
+// both need them and engine code may not read module state (CONVENTIONS §3.3).
+export const SQUAD_LIMITS = { GKP: 2, DEF: 5, MID: 5, FWD: 3 };
+export const SQUAD_TOTAL  = 15;
+export const BENCH_SIZE   = 4;
+export const XI_SIZE      = 11;
+
+// Minimum players per position in a legal starting XI (FPL rules).
+export const XI_FORMATION_MIN = { GKP: 1, DEF: 3, MID: 2, FWD: 1 };
+
+// Points deducted per transfer beyond the free allocation.
+export const HIT_PENALTY = 4;
+
+// How much a bench player contributes to the squad's expected-points total.
+//
+// MODEL: a benched player is not worth zero. Autosubs mean a bench player whose
+// XI counterpart blanks does score. The weight is deliberately small so that
+// improving the bench registers as a faint positive rather than as nothing,
+// while never rivalling a genuine XI upgrade — which is precisely the failure
+// this whole change exists to fix.
+export const BENCH_CONTRIBUTION_WEIGHT = 0.15;
+
+// The deferred "future" window: starts FUTURE_WINDOW_START gameweeks after the
+// current one and runs for FUTURE_WINDOW_GWS gameweeks. Default GW+2..GW+6.
+export const FUTURE_WINDOW_START = 2;
+export const FUTURE_WINDOW_GWS   = 5;
+
+// Minimum far-window XI gain (in points) before a swing qualifies for the
+// Future Prep board. Stops the board filling with players who are merely
+// less-bad later rather than actually good later.
+export const FUTURE_MIN_FAR_GAIN = 0.5;
+
+// Candidates scored per position, taken by composite rank. Bounds the O(n²)
+// enumeration: 15 squad slots × this many candidates × 2 windows.
+export const CANDIDATE_POOL_PER_POS = 40;
+
+// ── Squad flexibility (Funds & Flexibility lane) ─────────────────────────────
+//
+// MODEL: "flexibility" is carried as two weighted components because the
+// problem it describes has two readings and live use has not yet settled which
+// one matters. SPREAD measures price clumping — six players inside one narrow
+// band cannot be upgraded without selling two of them. HEADROOM measures how
+// much cash could be raised toward a premium without touching the XI core.
+// Resolving this is a weight change, not a rewrite. See spec §7.1.
+export const FLEX_W_SPREAD   = 0.6;
+export const FLEX_W_HEADROOM = 0.4;
+
+// Price window (£m) within which two squad players count as clumped together.
+export const FLEX_CLUMP_BAND = 0.6;
+
+// Squad value (£m) raisable from the four most disposable outfield players that
+// scores a full 100 on the headroom component.
+export const FLEX_HEADROOM_TARGET = 20.0;
+
+// Flexibility below this (0–100) fires the cashCrunch verdict trigger.
+export const FLEX_FLOOR = 35;
+
+// ── Ceiling lane ─────────────────────────────────────────────────────────────
+//
+// MODEL: FPL exposes no variance data, so "ceiling" blends the best SINGLE
+// gameweek in the window with how often the player has actually hauled. The
+// haul term is backward-looking and thin for players with few starts, and
+// player summaries load lazily, so this lane flags itself estimated whenever a
+// summary is missing. It is the least trustworthy of the five lanes.
+export const CEILING_W_PEAK = 0.65;
+export const CEILING_W_HAUL = 0.35;
+
+// FPL points in a single gameweek at or above which a return counts as a haul.
+export const HAUL_POINTS_THRESHOLD = 10;
+
+// ── Structure Fix lane ───────────────────────────────────────────────────────
+
+// Playtime security (0–1, from calcPlaytimeSecurity) below which a player
+// already in the projected XI counts as structurally broken.
+export const STRUCTURE_PLAYTIME_FLOOR = 0.45;
+
+// ── Lane normalisation ───────────────────────────────────────────────────────
+//
+// MODEL: each lane's natural unit is mapped onto a shared 0–100 scale by
+// dividing by the value below and capping. This is the most arbitrary step in
+// the design and the verdict's margin language is only as meaningful as these
+// numbers are. They are calibration targets, not truths — the first thing to
+// tune against realised results per ROADMAP.md Phase 3B.
+export const LANE_SCALE_NOW       = 6;    // XI expected points gained
+export const LANE_SCALE_FUTURE    = 8;    // swing in XI expected points
+export const LANE_SCALE_FUNDS     = 25;   // flexibility points gained
+export const LANE_SCALE_CEILING   = 12;   // peak-blend points
+export const LANE_SCALE_STRUCTURE = 5;    // XI expected points restored
+
+// ── Verdict ──────────────────────────────────────────────────────────────────
+
+// Below this lane score (0–100) no move is worth making and the verdict rolls.
+export const VERDICT_ACT_THRESHOLD = 35;
+
+// Margin (0–100 lane-score points) over the runner-up at which the verdict
+// reads "clear", and at which it reads "in a different league".
+export const VERDICT_MARGIN_CLEAR    = 12;
+export const VERDICT_MARGIN_DOMINANT = 30;
+
+// How near a chip's recommended gameweek must be to fire the chipWindow trigger.
+export const CHIP_WINDOW_GWS = 3;
+
+// ── Board rendering ──────────────────────────────────────────────────────────
+export const BOARD_TOP_N      = 3;
+export const BOARD_EXPANDED_N = 8;

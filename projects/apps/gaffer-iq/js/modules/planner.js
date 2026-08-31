@@ -13,7 +13,10 @@
  */
 
 import { store } from '../store.js';
-import { HORIZONS, PRICE_BUY_NOW_CONFIDENCE, PRICE_BUY_NOW_SCORE_MIN } from '../config.js';
+import {
+  HORIZONS, PRICE_BUY_NOW_CONFIDENCE, PRICE_BUY_NOW_SCORE_MIN,
+  SQUAD_LIMITS, SQUAD_TOTAL, BENCH_SIZE, HIT_PENALTY,
+} from '../config.js';
 import { buildScoreContext, scorePlayer, rankPlayers, attachRankTiers } from '../engine/composite.js';
 import { calcPriceChangeRisk } from '../engine/prices.js';
 import { groupPerGwSlots } from '../engine/fixtures.js';
@@ -40,19 +43,7 @@ const CHIP_LABELS = {
   triplecaptain: 'Triple Captain',
 };
 
-/** Number of squad players treated as bench for Bench Boost analysis.
- *  MODEL: 4 = 1 GK + 3 outfield bench in FPL. The planner picks the four
- *  lowest-projected squad members as a heuristic (no XI selection in scope). */
-const BENCH_SIZE = 4;
 
-/** Maximum players per position in a valid 15-man squad. */
-const SQUAD_LIMITS = { GKP: 2, DEF: 5, MID: 5, FWD: 3 };
-
-/** Total squad size: 2 + 5 + 5 + 3 = 15. */
-const SQUAD_TOTAL = Object.values(SQUAD_LIMITS).reduce((s, n) => s + n, 0);
-
-/** Points deducted per hit transfer. */
-const HIT_PENALTY = 4;
 
 /** Max single-transfer recommendations to render. */
 const TOP_N = 8;
