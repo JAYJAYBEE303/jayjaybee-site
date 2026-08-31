@@ -1257,13 +1257,18 @@ export const STRUCTURE_PLAYTIME_FLOOR = 0.45;
 // MODEL: each lane's natural unit is mapped onto a shared 0–100 scale by
 // dividing by the value below and capping. This is the most arbitrary step in
 // the design and the verdict's margin language is only as meaningful as these
-// numbers are. They are calibration targets, not truths — the first thing to
-// tune against realised results per ROADMAP.md Phase 3B.
-export const LANE_SCALE_NOW       = 6;    // XI expected points gained
-export const LANE_SCALE_FUTURE    = 8;    // swing in XI expected points
-export const LANE_SCALE_FUNDS     = 25;   // flexibility points gained
-export const LANE_SCALE_CEILING   = 12;   // peak-blend points
-export const LANE_SCALE_STRUCTURE = 5;    // XI expected points restored
+// numbers are. They were calibrated against measured raw/p90/normalised-max
+// distributions on live data at GW2 of the season (15-man squad, GW3 horizon,
+// £2.0m budget, 581 enumerated swaps), so that each lane's best real-world
+// move lands at roughly 90–100 rather than being arithmetically incapable of
+// clearing VERDICT_ACT_THRESHOLD. They are still calibration targets, not
+// truths — the first thing to tune against realised results per ROADMAP.md
+// Phase 3B.
+export const LANE_SCALE_NOW       = 10;   // XI expected points gained
+export const LANE_SCALE_FUTURE    = 0.7;  // swing in XI expected points
+export const LANE_SCALE_FUNDS     = 5;    // flexibility points gained
+export const LANE_SCALE_CEILING   = 8;    // peak-blend points
+export const LANE_SCALE_STRUCTURE = 10;   // XI expected points restored
 
 // ── Verdict ──────────────────────────────────────────────────────────────────
 
