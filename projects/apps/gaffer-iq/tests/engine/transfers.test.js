@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { enumerateSwaps } from '../../js/engine/transfers.js';
+import { enumerateSwaps, calcSquadFlexibility } from '../../js/engine/transfers.js';
 
 /**
  * A stub scoring context. enumerateSwaps calls scorePlayer, which needs a real
@@ -126,4 +126,69 @@ test('enumerateSwaps returns an empty array for an incomplete squad', () => {
     allowExtraHit: false, scorePlayerFn: stubScorer,
   });
   assert.deepEqual(swaps, []);
+});
+
+test('calcSquadFlexibility scores a price-clumped squad below a spread one', () => {
+  const clumped = Array.from({ length: 15 }, (_, i) => player(i + 1, 'MID', 7.0));
+  const spread  = Array.from({ length: 15 }, (_, i) => player(i + 1, 'MID', 4.0 + i * 0.7));
+  const scores  = new Map(clumped.map(p => [p.id, stubScorer(p)]));
+  const clumpedScore = calcSquadFlexibility(clumped, scores).value;
+  const spreadScore  = calcSquadFlexibility(spread,  scores).value;
+  assert.ok(spreadScore > clumpedScore,
+    `spread ${spreadScore} should beat clumped ${clumpedScore}`);
+});
+
+test('calcSquadFlexibility stays within 0-100', () => {
+  const squad  = squadOf15();
+  const scores = new Map(squad.map(p => [p.id, stubScorer(p)]));
+  const result = calcSquadFlexibility(squad, scores);
+  assert.ok(result.value >= 0 && result.value <= 100, `got ${result.value}`);
+});
+
+test('the Future lane ranks by swing, not by raw far-window value', () => {
+  // Two candidates with identical far-window value; only their NEAR value
+  // differs. The one that is worse now — and therefore swings harder — must
+  // score higher on the Future lane.
+  const squad = squadOf15();
+  const steady = player(30, 'MID', 7.0, 6.0);
+  const riser  = player(31, 'MID', 7.0, 1.0);
+  const scorer = (p, horizon) => {
+    const isFar = horizon.label === 'Future';
+    if (p.id === 30) return { ...stubScorer(p), expectedPoints: { value: 6, estimated: false } };
+    if (p.id === 31) return {
+      ...stubScorer(p),
+      expectedPoints: { value: isFar ? 6 : 1, estimated: false },
+    };
+    return stubScorer(p);
+  };
+  const swaps = enumerateSwaps(squad.map(p => p.id), [...squad, steady, riser], stubCtx(), {
+    horizon: { label: 'test', gws: 3 }, budget: 5, freeTransfers: 1,
+    allowExtraHit: false, scorePlayerFn: scorer,
+  });
+  const steadySwap = swaps.find(s => s.inId === 30 && s.outId === 8);
+  const riserSwap  = swaps.find(s => s.inId === 31 && s.outId === 8);
+  assert.ok(riserSwap.lanes.future.value > steadySwap.lanes.future.value,
+    'the player who improves later must win the Future lane');
+});
+
+test('the Structure lane stays silent when the outgoing player is fine', () => {
+  const squad = squadOf15();
+  const swaps = enumerateSwaps(squad.map(p => p.id), [...squad, player(40, 'MID', 6.0, 7.5)], stubCtx(), {
+    horizon: { label: 'test', gws: 3 }, budget: 5, freeTransfers: 1,
+    allowExtraHit: false, scorePlayerFn: stubScorer,
+  });
+  // Every stub player is available with playtime 0.9 — nothing is broken.
+  assert.ok(swaps.every(s => s.lanes.structure.value === 0),
+    'a healthy squad produces no Structure Fix candidates');
+});
+
+test('the Structure lane fires for an unavailable XI player', () => {
+  const squad = squadOf15();
+  squad[11].status = 'injured';                      // player 12, a certain starter
+  const swaps = enumerateSwaps(squad.map(p => p.id), [...squad, player(40, 'MID', 12.0, 8.0)], stubCtx(), {
+    horizon: { label: 'test', gws: 3 }, budget: 5, freeTransfers: 1,
+    allowExtraHit: false, scorePlayerFn: stubScorer,
+  });
+  const fix = swaps.find(s => s.outId === 12 && s.inId === 40);
+  assert.ok(fix.lanes.structure.value > 0, 'an injured starter is a structure problem');
 });

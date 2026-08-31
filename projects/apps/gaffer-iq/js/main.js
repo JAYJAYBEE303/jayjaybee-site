@@ -27,7 +27,7 @@ import { calcTeamForm, calcPlayerForm, calcPlayingLikelihood } from './engine/fo
 import { calcStyleProfile, calcStyleClash } from './engine/style.js';
 import { buildUnderstatSlugsByTeamId } from './engine/channel.js';
 import { pickStartingXI, calcXiExpectedPoints } from './engine/lineup.js';
-import { enumerateSwaps } from './engine/transfers.js';
+import { enumerateSwaps, calcSquadFlexibility } from './engine/transfers.js';
 import {
   calcCounterMatchup, calcIndividualDuels, duelsForPairing,
 } from './engine/counter.js';
@@ -428,6 +428,7 @@ window.__engine = {
   pickStartingXI,
   calcXiExpectedPoints,
   enumerateSwaps,
+  calcSquadFlexibility,
 };
 
 /**
