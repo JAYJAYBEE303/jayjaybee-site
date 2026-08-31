@@ -45,9 +45,11 @@ test('buildVerdict names the winning lane when one move is strong', () => {
 });
 
 test('buildVerdict reports close when the top two lanes are near-tied', () => {
-  // Now and Future both land at roughly the same normalised score.
+  // Now 6.0 normalises to 60 (6.0 / LANE_SCALE_NOW=10 * 100) and Future 0.42 also
+  // normalises to 60 (0.42 / LANE_SCALE_FUTURE=0.7 * 100), so the margin is 0 and
+  // the verdict must read close.
   const verdict = buildVerdict(
-    [swapWith({ now: 6.0 }), swapWith({ future: 8.0 })],
+    [swapWith({ now: 6.0 }), swapWith({ future: 0.42 })],
     squadState(), { currentGw: 10 });
   assert.equal(verdict.confidence, 'close');
   assert.ok(verdict.alternatives.length >= 1, 'a close call names its rival');
