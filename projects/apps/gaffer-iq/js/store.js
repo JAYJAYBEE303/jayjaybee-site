@@ -143,7 +143,9 @@ function getSquadPicks()              { return state.squadPicks; }
  */
 function getSavedXi() {
   return state.squadPicks
-    .filter(p => typeof p.slot === 'number' && p.slot >= 1 && p.slot <= 11)
+    .filter(p => p && typeof p === 'object'
+      && typeof p.playerId === 'number'
+      && typeof p.slot === 'number' && p.slot >= 1 && p.slot <= 11)
     .sort((a, b) => a.slot - b.slot)
     .map(p => p.playerId);
 }
@@ -317,11 +319,12 @@ function clearCache() {
 (function hydrate() {
   try {
     const raw = sessionStorage.getItem(SS_KEY_SEASON);
-    if (!raw) return;
-    const parsed = JSON.parse(raw);
-    if (parsed && parsed.data) {
-      state.season = parsed.data;
-      state.lastRefreshAt = parsed.at ?? null;
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.data) {
+        state.season = parsed.data;
+        state.lastRefreshAt = parsed.at ?? null;
+      }
     }
   } catch { /* corrupt or absent — ignore and re-fetch */ }
 
