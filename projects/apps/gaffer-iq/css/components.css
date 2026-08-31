@@ -5998,35 +5998,38 @@ img.fx-crest {
   min-width: 0;
 }
 
-/* flex-start, not baseline: the left column is now a title stacked over a
-   two-line blurb, and baseline alignment would drag the unit label down to the
-   blurb's first line instead of sitting level with the title. */
+/* Two stacked rows, not two side-by-side columns: title and unit share the top
+   row, and the blurb gets the card's FULL width beneath them. Sitting the
+   blurb beside the unit boxed it into roughly half the card and wrapped a
+   two-line sentence over four. */
 .planner-board__hd {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-2);
   margin-bottom: var(--space-2);
 }
 
-.planner-board__titles { min-width: 0; }
+.planner-board__hd-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
 
 .planner-board__title { margin: 0; font-size: var(--font-size-sm); font-weight: 600; }
 
 /* What strategy this board actually represents. Deliberately quiet — it is
    read once and then ignored, so it must not compete with the rows. */
 .planner-board__blurb {
-  margin: 2px 0 0;
+  margin: var(--space-1) 0 0;
   font-size: var(--font-size-xs);
   color: var(--color-muted);
   line-height: 1.45;
 }
 
-/* The unit of the middle column. Right-aligned and capped so a longer label
-   ("proj. XI pts over horizon") wraps rather than crushing the title. */
+/* The unit of the middle column. Shares the title's row, so it only has to
+   yield when the two together outrun the card: the title is short and fixed,
+   and this is the half that may wrap. */
 .planner-board__unit {
-  flex: none;
-  max-width: 8.5rem;
+  flex: 0 1 auto;
+  min-width: 0;
   text-align: right;
   font-size: var(--font-size-xs);
   color: var(--color-muted);

@@ -37,31 +37,31 @@ export const LANE_BOARDS = [
   { id: 'now',       title: 'Now',
     blurb: 'The biggest immediate upgrade to your starting XI over the current '
          + 'horizon. Says nothing about what happens after it.',
-    unit: 'proj. XI pts over horizon',
+    unit: 'projected XI points over the horizon',
     format: v => `${v >= 0 ? '+' : ''}${v.toFixed(1)}` },
 
   { id: 'future',    title: 'Future Prep',
     blurb: 'Buying before the fixtures turn. Ranks by how much MORE a player is '
          + 'worth in the deferred window than he is right now.',
-    unit: 'XI pts, later minus now',
+    unit: 'projected XI points, later minus now',
     format: v => `${v >= 0 ? '+' : ''}${v.toFixed(1)}` },
 
   { id: 'funds',     title: 'Funds & Flexibility',
     blurb: 'Cash and room to manoeuvre. Frees money and unclumps your price '
          + 'bands for the smallest sacrifice in projected points.',
-    unit: 'flex pts per pt given up',
+    unit: 'flexibility points per point given up',
     format: v => v.toFixed(1) },
 
   { id: 'ceiling',   title: 'Ceiling',
     blurb: 'Chasing one big week rather than a steady one. This is where '
          + 'captaincy and Triple Captain points come from.',
-    unit: 'proj. peak-week pts',
+    unit: 'projected peak-week points',
     format: v => v.toFixed(1) },
 
   { id: 'structure', title: 'Structure Fix',
     blurb: 'Repairing a broken XI slot: a starter who is flagged, barely '
          + 'playing, or rating in the bottom band of the whole pool.',
-    unit: 'XI pts restored',
+    unit: 'projected XI points restored',
     format: v => `${v >= 0 ? '+' : ''}${v.toFixed(1)}` },
 ];
 
@@ -114,6 +114,19 @@ const LANE_DIRECTIONS = {
 };
 
 /**
+ * Small counts spelled out, so prose never collides with the gameweek numbers
+ * sitting next to it — "1 GW2 match" reads as one number run into another.
+ * A gameweek holds at most ten fixtures, so the table covers every real case
+ * and anything past it falls back to a digit rather than inventing words.
+ */
+const NUMBER_WORDS = ['zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six',
+                      'Seven', 'Eight', 'Nine', 'Ten'];
+
+function numberWord(n) {
+  return NUMBER_WORDS[n] ?? String(n);
+}
+
+/**
  * The gameweek this plan is FOR, and why it may not be the gameweek showing on
  * the scoreboard. A round that has kicked off cannot be changed, so once
  * GW n is under way the planner is planning GW n+1 and must say so — otherwise
@@ -126,28 +139,23 @@ function timingNote(timing) {
   if (!timing || !timing.planningGw) return '';
   const { phase, currentGw, planningGw, unplayed } = timing;
 
-  if (phase === 'pre-deadline') {
-    return `Planning GW${planningGw} — the deadline has not passed, so every `
-         + 'move below is still live for this round.';
-  }
-  if (phase === 'off-season' || currentGw == null) {
-    return `Planning GW${planningGw}.`;
-  }
+  // The same short sentence in every phase. WHY the planning gameweek is not
+  // the live one is a detail the user does not need spelled out on every
+  // render — which round is being planned is the only part that changes what
+  // they actually do.
+  const lead = `This plan is for GW${planningGw}.`;
 
-  const lead = phase === 'finished'
-    ? `GW${currentGw} is complete, so this plan is for GW${planningGw}.`
-    : `GW${currentGw} has already kicked off and can no longer be changed, so `
-      + `this plan is for GW${planningGw}.`;
+  if (phase !== 'live' || currentGw == null || unplayed <= 0) return lead;
 
   // The caution only makes sense while results are still outstanding: those
   // results move every number on this page, so committing a transfer now is
   // committing on information that is not in yet.
-  const caution = unplayed > 0
-    ? ` ${unplayed} GW${currentGw} ${unplayed === 1 ? 'match is' : 'matches are'} `
-      + 'still to play, and those results will move these numbers — deciding now '
-      + 'means deciding on incomplete information, so there is rarely anything to '
-      + 'gain by rushing it.'
-    : '';
+  const caution = unplayed === 1
+    ? ` One GW${currentGw} match is still to play, and its result will move `
+      + 'these numbers — deciding now means deciding on incomplete information.'
+    : ` ${numberWord(unplayed)} GW${currentGw} matches are still to play, and `
+      + 'those results will move these numbers — deciding now means deciding on '
+      + 'incomplete information.';
 
   return lead + caution;
 }
@@ -362,11 +370,11 @@ function renderBoard(board, swaps, opts) {
   return `
     <section class="planner-board planner-board--${esc(board.id)}" aria-label="${esc(board.title)}">
       <header class="planner-board__hd">
-        <div class="planner-board__titles">
+        <div class="planner-board__hd-row">
           <h3 class="planner-board__title">${esc(board.title)}</h3>
-          <p class="planner-board__blurb">${esc(board.blurb)}</p>
+          <span class="planner-board__unit" title="What the number on each row measures">${esc(board.unit)}</span>
         </div>
-        <span class="planner-board__unit" title="What the number on each row measures">${esc(board.unit)}</span>
+        <p class="planner-board__blurb">${esc(board.blurb)}</p>
       </header>
       ${body}
       ${more}
