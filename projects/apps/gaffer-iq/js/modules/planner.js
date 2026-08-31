@@ -27,6 +27,7 @@ import {
 import { fetchAndMapSquad, loadSavedTeamId, saveTeamId, resolveImportGw } from '../squadImport.js';
 import { enumerateSwaps, calcSquadFlexibility } from '../engine/transfers.js';
 import { buildVerdict } from '../engine/strategy.js';
+import { pickStartingXI } from '../engine/lineup.js';
 import { renderVerdictBanner, renderBoardGrid } from './planner-boards.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -600,12 +601,58 @@ function renderSearchResults() {
 
 // ─── Render: squad slots ──────────────────────────────────────────────────────
 
+/**
+ * Where the team the user actually SET differs from the team the model would
+ * pick. Returns empty sets when no import has happened — a hand-built squad has
+ * no saved order to disagree with, and inventing one would be a lie.
+ *
+ * A saved-XI player id that is no longer in the squad (replaceSquad() can drop
+ * an imported player that exceeds SQUAD_LIMITS while the picks are stored
+ * unconditionally) simply never matches a rendered slot: it still lands in
+ * `started` by set arithmetic, but renderSquadPanel() only ever tests
+ * diff.started.has(player.id) against players it is actually rendering — i.e.
+ * players still in the squad — so a phantom id produces no marker, no crash,
+ * and does not double-count against a real player.
+ *
+ * @returns {{ benched: Set<number>, started: Set<number>, captainId: number|null,
+ *             modelCaptainId: number|null }}
+ *   benched: model starts them, the user has them on the bench
+ *   started: the user starts them, the model would bench them
+ */
+function calcSavedXiDiff() {
+  const savedXi = store.getSavedXi();
+  if (savedXi.length === 0) {
+    return { benched: new Set(), started: new Set(), captainId: null, modelCaptainId: null };
+  }
+
+  const scoredSquad = store.getSquad()
+    .map(id => ({ player: store.getPlayer(id), score: _scores.get(id) }))
+    .filter(e => e.player && e.score);
+  const projectedIds = new Set(pickStartingXI(scoredSquad).xi.map(e => e.player.id));
+  const savedSet = new Set(savedXi);
+
+  const benched = new Set([...projectedIds].filter(id => !savedSet.has(id)));
+  const started = new Set([...savedSet].filter(id => !projectedIds.has(id)));
+
+  const captainId = store.getSquadPicks().find(p => p.isCaptain)?.playerId ?? null;
+  let modelCaptainId = null;
+  let bestEp = -Infinity;
+  for (const id of projectedIds) {
+    const ep = _scores.get(id)?.expectedPoints?.value ?? -Infinity;
+    if (ep > bestEp) { bestEp = ep; modelCaptainId = id; }
+  }
+
+  return { benched, started, captainId, modelCaptainId };
+}
+
 function renderSquadPanel() {
   const squad = store.getSquad();
   if (_tally) {
     _tally.textContent = `${squad.length} / ${SQUAD_TOTAL} players selected`;
   }
   if (!_squadSlots) return;
+
+  const diff = calcSavedXiDiff();
 
   _squadSlots.innerHTML = Object.entries(SQUAD_LIMITS).map(([pos, max]) => {
     const playersInPos = squad
@@ -624,6 +671,15 @@ function renderSquadPanel() {
             <span class="dash-squad-slot__name">${esc(player.name)}</span>
             <span class="dash-squad-slot__team">${team ? esc(team.shortName) : '—'}</span>
             ${chip}
+            ${diff.benched.has(player.id)
+              ? '<span class="dash-squad-slot__diff dash-squad-slot__diff--benched" title="The model would start him — you have him on your bench">bench</span>'
+              : ''}
+            ${diff.started.has(player.id)
+              ? '<span class="dash-squad-slot__diff dash-squad-slot__diff--started" title="You are starting him — the model would bench him">start</span>'
+              : ''}
+            ${diff.captainId === player.id && diff.modelCaptainId !== player.id
+              ? '<span class="dash-squad-slot__diff dash-squad-slot__diff--armband" title="Your armband is here; the model prefers another player">C</span>'
+              : ''}
             <button class="dash-squad-slot__remove"
                     data-remove-id="${player.id}"
                     type="button"

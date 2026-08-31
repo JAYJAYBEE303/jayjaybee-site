@@ -6021,3 +6021,15 @@ img.fx-crest {
 .planner-why__row { display: flex; justify-content: space-between; gap: var(--space-1); }
 .planner-why__key { color: var(--color-muted); }
 .planner-why__val { font-variant-numeric: tabular-nums; margin: 0; }
+
+/* Saved-XI diff markers: where the team you set differs from the model's pick. */
+.dash-squad-slot__diff {
+  font-size: var(--font-size-xs);
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+}
+
+.dash-squad-slot__diff--benched { color: var(--band-good); }
+.dash-squad-slot__diff--started { color: var(--band-tough); }
+.dash-squad-slot__diff--armband { color: var(--band-orange); font-weight: 700; }
