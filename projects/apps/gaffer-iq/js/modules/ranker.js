@@ -263,6 +263,39 @@ function getNextFixtureForTeam(teamId) {
     ?? null;
 }
 
+/**
+ * A tbody of placeholder rows, shown while the pool cannot yet be ranked.
+ *
+ * WHY THE WHOLE TABLE AND NOT JUST THE SCORE CELLS. This table is SORTED by
+ * the number that is still settling. Skeletoning the two score columns alone
+ * would leave every other column readable but in an order that reshuffles
+ * itself the moment the last Understat payload lands — a row the reader was
+ * about to click moves out from under them. Withholding the ordering as well
+ * as the values is the honest version of the same state.
+ *
+ * @param {number} rowCount  roughly a screenful — enough to read as a table,
+ *   not so many that the placeholder costs more to build than it saves.
+ * @returns {string} tbody HTML
+ */
+function buildSkeletonRows(rowCount = 12) {
+  // ONE placeholder per row, spanning every column, rather than one per cell.
+  // Per-cell would read marginally more like a table, but this table is 15
+  // columns wide, so a screenful of them is ~180 simultaneously animating
+  // elements — and the shimmer animates background-position, which the
+  // compositor cannot take off the main thread. Trading that for 12 bars costs
+  // nothing legible: the state being communicated is "the whole table is
+  // still coming", which does not need per-column resolution.
+  //
+  // The colspan keeps the <thead>'s column widths, so the table does not
+  // reflow when the real rows replace these.
+  return Array.from(
+    { length: rowCount },
+    () => `<tr class="ranker-table__row ranker-table__row--skeleton" aria-hidden="true">`
+      + `<td class="ranker-table__td" colspan="${colCount()}">`
+      + `<span class="skeleton skeleton--text"></span></td></tr>`,
+  ).join('');
+}
+
 // ─── Build: scored rows ───────────────────────────────────────────────────────
 
 /**
@@ -277,6 +310,30 @@ function getNextFixtureForTeam(teamId) {
  */
 async function rebuildRowsChunked() {
   const computeId = ++_computeId;
+
+  // Every score in this table blends counter-matchup, which needs the whole
+  // league's Understat payloads — the pool spans all 20 teams, so unlike the
+  // Matchup Analyser there is no smaller set to wait on. Until the prefetch
+  // settles, rank nothing and show placeholders.
+  //
+  // This is also the cheaper path, not just the more honest one: data:ready
+  // fires several times through the prefetch, and each full-pool rank costs
+  // ~920ms of blocking work whose result was going to be superseded anyway.
+  // The last settle schedules one more data:ready (main.js), which is what
+  // brings us back here to do the single ranking run that counts.
+  if (!store.isTeamXgSettled()) {
+    _rows = [];
+    renderThead();
+    _tbody.innerHTML = buildSkeletonRows();
+    _tbody.setAttribute('aria-busy', 'true');
+    // The banner reads "Computing rankings…", which is not what is happening
+    // here — nothing is being computed, the inputs have not all arrived. The
+    // skeleton rows already say "still coming"; a banner claiming work is in
+    // progress would be a second, wrong account of the same state.
+    if (_loading) _loading.classList.remove('is-visible');
+    return;
+  }
+  _tbody.removeAttribute('aria-busy');
 
   // Show the progress banner and yield one macrotask tick before snapshotting
   // ctx. This matches the single-tick deferral the old synchronous rebuildRows
@@ -774,6 +831,16 @@ function renderTable() {
   renderThead();
 
   if (_rows.length === 0) {
+    // Two different empty states wearing the same shape. "No player data" is a
+    // verdict; an unsettled prefetch is a wait, and saying the former during
+    // the latter tells the reader the data failed when it is simply late.
+    // Reached through the filter/sort handlers, which re-render off the cached
+    // _rows without going back through rebuildRowsChunked.
+    if (!store.isTeamXgSettled()) {
+      _tbody.innerHTML = buildSkeletonRows();
+      _tbody.setAttribute('aria-busy', 'true');
+      return;
+    }
     _tbody.innerHTML = `<tr><td class="ranker-table__empty" colspan="${colCount()}">No player data loaded.</td></tr>`;
     return;
   }
@@ -804,6 +871,7 @@ function renderTable() {
   _tbody.innerHTML = sorted
     .map(row => buildRow(row, nextFixtureRankById, lastSeasonByPlayerId, pendingCtx))
     .join('');
+  _tbody.removeAttribute('aria-busy');
 }
 
 // ─── Lazy loading ─────────────────────────────────────────────────────────────

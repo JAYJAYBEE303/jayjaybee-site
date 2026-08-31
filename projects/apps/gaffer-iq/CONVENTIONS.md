@@ -115,7 +115,32 @@ e.g. `<span class="score-pill score-pill--good">`. The band string in `Composite
 - No inline styles in HTML and no `style.foo =` in JS except for genuinely dynamic values (e.g. a computed bar width). Toggle classes, don't write style strings.
 - `--band-…` also covers colours that aren't one of the original five score bands: `--band-light-green` for rank-relative player colouring (see `FEATURE_ENGINE.md` §13), and `--band-deep-blue` / `--band-orange` for the league table's Champions and Europa zones. Same naming convention, same `:root` location. Extend this block for any future colour need before reaching for a raw hex — or a new prefix — anywhere else.
 
-### 5.4 Layout
+### 5.4 Skeletons (values that have not settled)
+
+A value that is still being computed renders as a **skeleton**, never as a number that will silently change. The trigger is narrow and specific: `counterMatchup` feeds every `CompositeScore`, and its Understat payloads arrive after `data:ready`, so anything downstream of it is provisional until the store says otherwise (`ARCHITECTURE.md` §6, "Enrichment and the settling problem").
+
+**Compose, don't replace.** Put `skeleton` on the element that would have carried the value, alongside its normal structural class, and **omit the band modifier**:
+
+```html
+<span class="score-chip skeleton">00</span>          <!-- yes -->
+<span class="skeleton skeleton--chip">00</span>      <!-- no: invents a second set of sizes -->
+<span class="score-chip score-chip--good skeleton">  <!-- no: band and fill are the same
+                                                          specificity; source order decides -->
+```
+
+The structural class keeps the settled value's exact footprint, so the number drops in with no layout shift. The placeholder text (`00`, `settling`) is a **sizing device** — `.skeleton` renders it transparent — which is why skeletons are not empty elements.
+
+Three further rules:
+
+- **Skeleton the value, not the affordance.** A per-gameweek strip cell links to that fixture's card whether or not its score has settled; keep it clickable. The exception is an element whose affordance is a *promise about the value* — a Ranker row opens "that player" in the Matchup Analyser, and while the table is skeletoned there is no player behind it.
+- **Withhold orderings, not just numbers.** Where a view *ranks* by a settling score — the Ranker's table, the Planner's boards, the Dashboard's captain and XI — skeletoning the score cells alone is not enough: the order still reshuffles under the reader. Skeleton the whole list.
+- **Say what is pending, where you can.** The Matchup card skeletons only the `counterMatchup` breakdown row, because every other metric there really is final. Naming the one input the score is waiting on beats going blank as a whole.
+
+Skeletons carry no information: mark them `aria-hidden="true"` and put `aria-busy="true"` on the region that owns them. Where the skeleton *is* the whole message (a loading pane), use `role="status"` with an `aria-label` instead — a shimmer says nothing to a screen reader.
+
+The `.skeleton` block lives at the **bottom** of `components.css` and must stay there; see the note above it for why.
+
+### 5.5 Layout
 - Flexbox/Grid only. No float layouts. No CSS frameworks (no Tailwind, no Bootstrap). Hand-written CSS, organised by the three files in `ARCHITECTURE.md` §3.
 - Mobile is not a Phase 1 target (personal desktop tool), but do not actively prevent it — use relative units and avoid fixed pixel widths on containers.
 

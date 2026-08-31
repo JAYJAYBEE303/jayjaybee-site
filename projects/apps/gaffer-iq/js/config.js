@@ -1005,6 +1005,25 @@ export const BB_MIN_DOUBLES = 2;
 // single emit cheap in the first place.
 export const TEAM_XG_COALESCE_MS = 400;
 
+// How long the app waits for the boot-time team-xG prefetch before it stops
+// treating the outstanding payloads as "still coming".
+//
+// WHY THIS EXISTS: the score a fixture card shows is skeleton-loaded until both
+// its teams' Understat payloads have settled, precisely so the CompositeScore
+// stops silently changing under the reader once the counter-matchup upgrade
+// lands. `fetch` has no timeout of its own, so a single request left hanging by
+// the proxy would strand those skeletons on screen for the rest of the session.
+// At this deadline main.js force-settles whatever is still outstanding: the
+// scores render on whatever tier the data supports, exactly as they did before
+// the skeletons existed. A payload that arrives afterwards is still stored and
+// still upgrades the score in place — the deadline only ends the WAIT, it never
+// cancels a request or discards a result.
+//
+// Set well above the coalesce window and comfortably above a slow-but-healthy
+// round trip, so it is a genuine failure backstop rather than a second timer
+// racing the normal path.
+export const TEAM_XG_SETTLE_TIMEOUT_MS = 20000;
+
 // ─── §11.1  Player Ranker performance ────────────────────────────────────────
 
 // Number of players scored per setTimeout(fn, 0) chunk in the async ranker.

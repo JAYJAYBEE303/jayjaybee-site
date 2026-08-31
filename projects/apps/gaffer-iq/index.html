@@ -174,7 +174,29 @@
         <div class="matchup-shell">
           <aside class="gw-nav" aria-label="Gameweek navigator"></aside>
           <div class="matchup-grid">
-            <div class="app-status">Loading FPL data…</div>
+            <!-- Two placeholder cards, replaced wholesale by renderMatchup().
+                 They are here rather than left to the module so the first paint
+                 already has the shape of the answer: the module graph is large
+                 enough that the browser paints before main.js runs, and a bare
+                 line of text was what filled that gap. Kept deliberately dumb —
+                 no score row, no breakdown — since the module owns every state
+                 after this one. -->
+            <article class="matchup-card matchup-card--neutral" aria-busy="true">
+              <div class="skeleton-lines" role="status" aria-label="Loading FPL data">
+                <span class="skeleton skeleton--text"></span>
+                <span class="skeleton skeleton--text"></span>
+                <span class="skeleton skeleton--text"></span>
+                <span class="skeleton skeleton--text"></span>
+              </div>
+            </article>
+            <article class="matchup-card matchup-card--neutral" aria-hidden="true">
+              <div class="skeleton-lines">
+                <span class="skeleton skeleton--text"></span>
+                <span class="skeleton skeleton--text"></span>
+                <span class="skeleton skeleton--text"></span>
+                <span class="skeleton skeleton--text"></span>
+              </div>
+            </article>
           </div>
           <aside class="team-nav" aria-label="Team fixture navigator"></aside>
         </div>
@@ -314,7 +336,10 @@
                 <thead id="ranker-thead"></thead>
                 <tbody id="ranker-tbody">
                   <!-- colspan must track ranker.js's colCount() (15). -->
-                  <tr><td class="ranker-table__empty" colspan="15">Loading FPL data…</td></tr>
+                  <tr><td class="ranker-table__empty" colspan="15">
+                    <span class="skeleton skeleton--text"
+                          role="status" aria-label="Loading FPL data"></span>
+                  </td></tr>
                 </tbody>
               </table>
             </div>

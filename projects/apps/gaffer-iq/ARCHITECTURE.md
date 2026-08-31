@@ -304,6 +304,24 @@ The general rule for any future enrichment fetch: **the cost of a payload landin
 
 One coupling to remember: `store.clearCache()` wipes `state.teamXg`, so anything guarding those fetches against duplication must be reset alongside it (`resetTeamXgPrefetch` in `main.js`). Letting the guard outlive the cache it guards silently strands the app on the role tier — no error, just quietly worse scores.
 
+### Enrichment and the settling problem
+
+Batching the re-renders made the upgrade cheap; it did not make it honest. `counterMatchup` is a weighted component of every `CompositeScore`, so a score computed before its teams' Understat payloads land is **provisional and will rewrite itself** a second or two later. The reader had no way to tell that from a settled number — the Matchup Analyser's headline score simply changed, unprompted, after the card had already been read.
+
+The store answers this directly. `markTeamXgRequested` / `settleTeamXg` track which slugs are still outstanding, and two predicates read that state:
+
+| Predicate | Question | Used by |
+|---|---|---|
+| `store.isTeamScoreSettled(teamId)` | can this one team's contribution still move? | Matchup Analyser — a fixture card waits on exactly its two teams |
+| `store.isTeamXgSettled()` | has the whole prefetch finished? | Ranker, Dashboard, Planner — their scores rank a pool that spans all 20 teams, so there is no smaller set to wait on |
+
+Anything a predicate reports unsettled renders as a **skeleton** (`CONVENTIONS.md` §5.4) rather than as a number. Two rules follow from this and both are load-bearing:
+
+- **Dispatch before you announce.** `prefetchAllTeamXg()` must run *before* `store.markDataReady()`. "Outstanding" is only distinguishable from "never asked for" once the prefetch has registered what it is waiting on; announce first and every module renders against a store reporting nothing pending. Worse, when there is genuinely nothing to fetch, no later emit arrives to correct it and the skeletons never clear.
+- **Settle on failure too.** A rejected fetch is as final an answer to "is more coming?" as a fulfilled one. `TEAM_XG_SETTLE_TIMEOUT_MS` (`config.js`) is the backstop for the third case — `fetch` has no timeout, so a request the proxy never answers would otherwise hold skeletons on screen for the whole session.
+
+There is a payoff beyond honesty. The Ranker, Dashboard and Planner now skip their expensive work entirely while unsettled — a full-pool rank or swap enumeration whose result was going to be superseded is pure waste — so the gate removes rescoring passes rather than adding them.
+
 ### Processing
 - All transformation from raw JSON to the internal model happens in `engine/normalise.js` and **nowhere else**. Modules and other engine files only ever see the clean model, never raw FPL field names like `element_type` or `team_h_difficulty`. This insulates the whole codebase from the FPL API's quirky naming and from upstream schema changes — if the API renames a field, you fix it in one function.
 

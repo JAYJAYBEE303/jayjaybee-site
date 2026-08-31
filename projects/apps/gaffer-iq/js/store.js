@@ -7,6 +7,15 @@
  * See ARCHITECTURE.md §6 (caching) and CONVENTIONS.md §8 (event naming).
  */
 
+// The ONE engine import this file makes. buildUnderstatSlugsByTeamId is a pure
+// lookup builder over payloads the store already holds, and isTeamScoreSettled
+// (below) needs the same team-id → Understat-slug mapping the engine uses to
+// decide which payload feeds which team. Re-deriving that mapping in every
+// module that wants to ask "is this team's score final yet?" is how the two
+// would drift apart, so the question is answered here, once, against the same
+// function the scoring path uses.
+import { buildUnderstatSlugsByTeamId } from './engine/channel.js';
+
 // Bump the version suffix when the normalised model shape changes — old
 // cached payloads will then be ignored rather than feeding stale data through.
 const SS_KEY_SEASON = 'gaffer-iq:season:v3';
@@ -44,6 +53,24 @@ const state = {
   // failed to fetch are simply absent, never null.
   leagueXgHistory: [],
   teamXg: {},
+  // Understat team-xG PREFETCH BOOKKEEPING (not data — see teamXg above for
+  // that). Every team's payload feeds the counter-matchup metric, which is a
+  // weighted component of CompositeScore, so a score computed before its
+  // team's payload lands is provisional and WILL change when it does. The UI
+  // skeleton-loads such scores rather than printing a number that silently
+  // moves a second later, and these two fields are what it asks.
+  //
+  // teamXgPending holds the Understat slugs whose fetch is still outstanding;
+  // main.js adds them when it dispatches the prefetch and removes each one as
+  // it settles — on FAILURE as well as success, because a failed fetch is just
+  // as final an answer as a successful one for "is more data still coming?".
+  //
+  // teamXgDispatched separates "nothing outstanding because everything has
+  // landed" from "nothing outstanding because nothing has been asked for yet".
+  // Without it an empty pending set at boot reads as complete, and every score
+  // renders as final a beat before the prefetch even starts.
+  teamXgPending: new Set(),
+  teamXgDispatched: false,
   // Fixtures tab — raw `event/{gw}/live/` payloads keyed by GW. This is the
   // ONLY source of per-fixture match events (scorers, assists, cards) and of
   // who actually featured; bootstrap/fixtures carry neither. Memory-only and
@@ -194,6 +221,130 @@ function setTeamXg(teamSlug, data) {
   state.teamXg[teamSlug] = data;
 }
 
+// ─── Team-xG prefetch readiness ──────────────────────────────────────────────
+// Answers one question for the UI: "can this score still change on its own?"
+// Consumers skeleton-load anything whose answer is yes, so a CompositeScore is
+// either a settled number or visibly not a number yet — never a settled-looking
+// number that quietly rewrites itself when the next payload lands.
+
+/**
+ * Record that the boot-time team-xG prefetch has been dispatched, and which
+ * slugs it is waiting on.
+ *
+ * Additive, and safe to call repeatedly: main.js skips slugs it has already
+ * requested, so a second call passes only the newly dispatched ones. The
+ * dispatched flag latches true on the first call and is cleared only by
+ * clearCache(), alongside the payloads it describes.
+ *
+ * @param {string[]} slugs  Understat slugs whose fetch has just been started.
+ */
+function markTeamXgRequested(slugs) {
+  state.teamXgDispatched = true;
+  for (const slug of slugs) state.teamXgPending.add(slug);
+}
+
+/**
+ * Record that one slug's fetch has finished — fulfilled OR rejected. Both are
+ * final answers to "is more data coming for this team?", which is the only
+ * thing the pending set tracks; whether the payload is any good is
+ * `getTeamXg`'s business, and the engine already degrades gracefully when it
+ * is absent.
+ *
+ * Deliberately emits NOTHING. Views drop their skeletons on the next coalesced
+ * data:ready, which main.js schedules from the same settle — introducing a
+ * second render path here would let one arrival repaint a view twice, and
+ * un-batch precisely what TEAM_XG_COALESCE_MS exists to batch. This function
+ * updates the answer; markDataReady is still the only thing that asks views to
+ * re-read it.
+ * @param {string} teamSlug
+ */
+function settleTeamXg(teamSlug) {
+  state.teamXgPending.delete(teamSlug);
+}
+
+/**
+ * Stop waiting on every slug still outstanding.
+ *
+ * The failure backstop behind TEAM_XG_SETTLE_TIMEOUT_MS (config.js): `fetch`
+ * has no timeout, so one hung request would otherwise strand skeletons on
+ * screen for the rest of the session. This ends the WAIT only — the requests
+ * are not cancelled, and a payload arriving afterwards still lands in
+ * `teamXg` and still upgrades scores in place through the normal path.
+ *
+ * Silent, like settleTeamXg — main.js schedules the render that follows, and
+ * uses the return value to skip that render when the deadline fired on a
+ * prefetch that had already finished. A no-op force-settle must not cost a
+ * full application-wide rescore.
+ *
+ * @returns {number} how many slugs were still outstanding.
+ */
+function settleAllTeamXg() {
+  const stranded = state.teamXgPending.size;
+  state.teamXgPending.clear();
+  return stranded;
+}
+
+// Cached team-id → Understat-slug map, plus the leagueXg payload it was built
+// from. buildUnderstatSlugsByTeamId walks the whole league payload, and
+// isTeamScoreSettled is called once per rendered score chip — several hundred
+// times per Ranker render — so rebuilding it per call is not viable. Keyed by
+// payload IDENTITY rather than a dirty flag: leagueXg and season are each
+// written exactly once per load, so a reference check is both sufficient and
+// impossible to forget to invalidate.
+let _slugCacheKey = null;
+let _slugCacheSeason = null;
+let _slugCacheValue = {};
+
+function slugsByTeamId() {
+  const leagueXg = state.leagueXg;
+  const season   = state.season;
+  if (leagueXg !== _slugCacheKey || season !== _slugCacheSeason) {
+    _slugCacheKey = leagueXg;
+    _slugCacheSeason = season;
+    _slugCacheValue = season
+      ? buildUnderstatSlugsByTeamId(leagueXg, season.teamsById)
+      : {};
+  }
+  return _slugCacheValue;
+}
+
+/**
+ * Is this team's contribution to a CompositeScore final, or can it still move?
+ *
+ * True once the team's Understat payload has settled — or once it is known
+ * that no payload is coming for it at all, which is the case for any team the
+ * slug mapping cannot resolve (buildUnderstatSlugsByTeamId does not always
+ * map all 20 — see the Coventry note in config.js's club-name aliases). A
+ * team with no slug is at its final tier already, so treating it as unsettled
+ * would leave its scores skeletoned for ever.
+ *
+ * False before the prefetch is dispatched: at that point nothing is
+ * outstanding purely because nothing has been asked for, and every score on
+ * screen is about to change.
+ *
+ * @param {number} teamId  FPL team id
+ * @returns {boolean}
+ */
+function isTeamScoreSettled(teamId) {
+  if (!state.teamXgDispatched) return false;
+  const slug = slugsByTeamId()[teamId];
+  if (!slug) return true;
+  return !state.teamXgPending.has(slug);
+}
+
+/**
+ * Has the whole prefetch finished?
+ *
+ * The gate for any score that reads BEYOND the two teams in front of the
+ * reader — the Ranker's full-pool ranking, the Dashboard's and Planner's
+ * squad scores, the horizon aggregates. Those depend on opponents the view
+ * never names, so there is no smaller set of teams to wait on.
+ * @returns {boolean}
+ */
+function isTeamXgSettled() {
+  return state.teamXgDispatched && state.teamXgPending.size === 0;
+}
+
 /**
  * Cache one gameweek's raw live payload. Emits so any open view re-renders
  * the moment it lands, the same contract as the other async enrichments.
@@ -316,6 +467,12 @@ function clearCache() {
   state.leagueXgPrev = null;
   state.leagueXgHistory = [];
   state.teamXg = {};
+  // Must reset alongside the payloads they describe: a stale dispatched flag
+  // with an empty pending set would report every score as settled through the
+  // whole of the next prefetch, which is exactly the window the skeletons
+  // exist to cover.
+  state.teamXgPending = new Set();
+  state.teamXgDispatched = false;
   state.live = {};
   state.matchDetail = {};
   state.lastRefreshAt = null;
@@ -367,10 +524,12 @@ export const store = {
   getFixtures, getFixture, getPositions, getEvents,
   getCurrentGw, getNextGw, getPlayerSummary, getAllPlayerSummaries,
   getLeagueXg, getLeagueXgPrev, getLeagueXgHistory, getTeamXg, getAllTeamXg,
+  isTeamScoreSettled, isTeamXgSettled,
   getLive, getMatchDetail,
   getActiveHorizon, getActiveModule, getSquad, getSquadPicks, getSavedXi,
   getError, getLastRefreshAt, isFresh,
   setSeason, setPlayerSummary, setLeagueXg, setLeagueXgPrev, setLeagueXgHistory, setTeamXg,
+  markTeamXgRequested, settleTeamXg, settleAllTeamXg,
   setLive, setMatchDetail,
   setActiveHorizon, setActiveModule, setSquad, setSquadPicks, setError, markDataReady,
   clearCache,

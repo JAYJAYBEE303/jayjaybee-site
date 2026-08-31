@@ -302,6 +302,31 @@ function emptyState(message) {
 }
 
 /**
+ * A "still arriving" block — the same slot emptyState fills, but for a wait
+ * rather than a verdict.
+ *
+ * These two states used to look identical: both rendered a line of muted text,
+ * so "No meeting between these teams" and "Loading match data" read as the
+ * same kind of statement, and only the wording separated a settled answer from
+ * a pending one. A skeleton reads as pending at a glance and, unlike the text,
+ * stops reading as pending the moment it is replaced.
+ *
+ * The message is kept as the block's accessible label rather than dropped: a
+ * shimmer conveys nothing to a screen reader.
+ *
+ * @param {string} message  what is being waited for, e.g. 'Loading match data'
+ * @param {number} lines    how tall the placeholder should read
+ */
+function loadingState(message, lines = 2) {
+  const rows = Array.from(
+    { length: lines },
+    () => '<span class="skeleton skeleton--text"></span>',
+  ).join('');
+  return `<div class="skeleton-lines" role="status" aria-busy="true"
+               aria-label="${esc(message)}" title="${esc(message)}">${rows}</div>`;
+}
+
+/**
  * The context object engine/h2h.js reads. Assembled here rather than held in
  * the store because it is a plain view over state the store already owns —
  * the same shape composite.js's buildScoreContext passes that engine.
@@ -694,7 +719,7 @@ function matchReportHtml(fixture, home, away) {
 
   const live = store.getLive(fixture.gw);
   if (!live) {
-    return emptyState('Loading match data…');
+    return loadingState('Loading match data…');
   }
 
   const { events, featured } = indexFixtureLive(live, fixture);
@@ -709,7 +734,7 @@ function matchReportHtml(fixture, home, away) {
   const eventsBlock = timeline ?? (pending ? `
       <section class="fx-detail__block">
         <h4 class="fx-detail__title">Match events</h4>
-        ${emptyState('Loading the minute-by-minute feed\u2026')}
+        ${loadingState('Loading the minute-by-minute feed\u2026', 3)}
       </section>` : `
       <section class="fx-detail__block">
         <h4 class="fx-detail__title">Match events</h4>
@@ -732,7 +757,7 @@ function matchReportHtml(fixture, home, away) {
       ${lineupsHtml(fixture, home, away) ?? (pending ? `
       <section class="fx-detail__block">
         <h4 class="fx-detail__title">Lineups</h4>
-        ${emptyState('Loading the teamsheets\u2026')}
+        ${loadingState('Loading the teamsheets\u2026', 3)}
       </section>` : `
       <section class="fx-detail__block">
         <h4 class="fx-detail__title">Who featured</h4>
@@ -816,7 +841,7 @@ function renderGameweekPane() {
   if (!_panes.gameweek) return;
 
   if (!store.getSeason()) {
-    _panes.gameweek.innerHTML = emptyState('Loading FPL data…');
+    _panes.gameweek.innerHTML = loadingState('Loading FPL data…', 3);
     return;
   }
 
@@ -1119,7 +1144,7 @@ function renderTablePane() {
 
   const season = store.getSeason();
   if (!season) {
-    _panes.table.innerHTML = emptyState('Loading FPL data…');
+    _panes.table.innerHTML = loadingState('Loading FPL data…', 3);
     return;
   }
 
@@ -1265,7 +1290,7 @@ function renderTeamPane() {
   if (!_panes.team) return;
 
   if (!store.getSeason()) {
-    _panes.team.innerHTML = emptyState('Loading FPL data…');
+    _panes.team.innerHTML = loadingState('Loading FPL data…', 3);
     return;
   }
 
@@ -1440,7 +1465,7 @@ function renderH2hPane() {
   if (!_panes.h2h) return;
 
   if (!store.getSeason()) {
-    _panes.h2h.innerHTML = emptyState('Loading FPL data…');
+    _panes.h2h.innerHTML = loadingState('Loading FPL data…', 3);
     return;
   }
 

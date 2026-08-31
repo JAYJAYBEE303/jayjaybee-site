@@ -50,8 +50,15 @@
    TEAM NAVIGATOR (.team-nav) mirrors it on the opposite side of the shell —
    same panel chrome, header, and .gw-nav__* row markup, just one team's full
    season instead of one GW's fixtures (see buildTeamNavPanel in matchup.js).
-   Deliberately NOT capped/scrolled to match height — a team's full fixture
-   list runs longer than one GW's, so this panel is taller by design.
+
+   The team navigator now lists EVERY remaining gameweek, not a 12-GW window,
+   and is capped to the viewport with the list scrolling inside it. Both halves
+   of that matter and neither works alone. Uncapped, 38 rows made the panel
+   several screens tall, which defeats the sticky positioning the panel exists
+   to have. Capped without scrolling — the previous arrangement — the rows past
+   the cap were simply absent, with nothing on screen to distinguish "this
+   team's season ends here" from "the list stopped here". A scrollbar says
+   there is more; a silent slice says nothing.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 .gw-nav,
@@ -62,7 +69,20 @@
   padding: var(--space-4);
   /* Stays in view while the (much taller) breakdown cards scroll past it. */
   position: sticky;
-  top: calc(52px + var(--space-6));
+  top: calc(var(--app-header-height) + var(--space-6));
+}
+
+/* The team navigator is a column whose header is fixed and whose list takes
+   whatever height is left, so the panel as a whole never outgrows the viewport
+   it is pinned inside. The GW navigator is deliberately excluded: it holds one
+   gameweek's fixtures — ten rows at most — and would never reach the cap, so
+   giving it a scroll container only risks one appearing at an awkward zoom. */
+.team-nav {
+  display: flex;
+  flex-direction: column;
+  /* Viewport, less the sticky nav above it and the same gap on both sides, so
+     the panel's bottom edge lands where its top offset implies it should. */
+  max-height: calc(100vh - var(--app-header-height) - (var(--space-6) * 2));
 }
 
 .gw-nav__header {
@@ -127,6 +147,45 @@
   flex-direction: column;
   gap: 2px;
   list-style: none;
+}
+
+/* The team navigator's full-season list. Only this variant scrolls — see the
+   .team-nav note above for why the GW navigator does not. */
+.gw-nav__list--scroll {
+  overflow-y: auto;
+  /* A flex child's default min-height:auto refuses to shrink below its content,
+     which would push the panel past its max-height and never produce a
+     scrollbar at all. This is what actually makes the cap take effect. */
+  min-height: 0;
+  /* Reaching the end of the list must not start scrolling the page underneath
+     it — the panel is sticky, so a chained scroll moves content the reader was
+     not pointing at. */
+  overscroll-behavior: contain;
+  /* Row height plus the list's gap, so a row activated by keyboard is never
+     left half-clipped against either edge. */
+  scroll-padding: var(--space-4) 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+  /* Breathing room for the scrollbar so it does not sit on top of the rows'
+     trailing GW label. */
+  padding-right: var(--space-1);
+}
+
+.gw-nav__list--scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.gw-nav__list--scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.gw-nav__list--scroll::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: var(--radius-pill);
+}
+
+.gw-nav__list--scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--color-muted);
 }
 
 /* Score chip / home / dash / away / score chip as an auto 1fr auto 1fr auto
@@ -3483,6 +3542,18 @@
     position: static;
   }
 
+  /* With the panel no longer pinned, a viewport-height cap would trap the
+     season list in a small inner scroller in the middle of a page that already
+     scrolls — two scrollbars for one list. Let it run at full length here and
+     scroll with the page, which is the natural gesture on a narrow screen. */
+  .team-nav {
+    max-height: none;
+  }
+
+  .gw-nav__list--scroll {
+    overflow-y: visible;
+  }
+
   /* ─── Player Ranker — table → card list ──────────────────────────────────
      Each <tr> becomes a flex card. Specific <td> columns are hidden or
      repositioned to show only the key stats: pos · name · price · value ·
@@ -6129,3 +6200,132 @@ img.fx-crest {
 .dash-squad-slot__diff--benched { color: var(--band-good); }
 .dash-squad-slot__diff--started { color: var(--band-tough); }
 .dash-squad-slot__diff--armband { color: var(--band-orange); font-weight: 700; }
+
+/* WHERE THIS LIVES, AND WHY IT IS LAST IN THE FILE.
+   A skeleton is composed onto the real component's class
+   (`class="breakdown-row__bar skeleton"`), and several of those components set
+   `background` at the same specificity this block does — .breakdown-row__bar
+   paints itself --color-muted, for one. Equal specificity means source order
+   decides, so the skeleton fill only reliably wins from the bottom of the
+   file. Keep this block last; moving it up silently returns those skeletons to
+   whatever colour their component paints, with no error anywhere to say so. */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SKELETON — placeholder for a value that is still settling
+   ---------------------------------------------------------------------------
+   WHAT IT IS FOR. A CompositeScore is a weighted blend, and one of its
+   components (counter-matchup) cannot be computed until that team's Understat
+   payload lands during the boot-time prefetch. Before this existed the score
+   rendered anyway and then silently rewrote itself a second or two later — a
+   number that looks final and is not. A skeleton says "not yet" for exactly as
+   long as that is true, and is replaced by the settled number.
+
+   HOW TO USE IT. Compose, don't replace: put `skeleton` ON the element that
+   would have carried the value, alongside its normal structural class, and
+   OMIT the band modifier.
+
+       <span class="score-chip skeleton">…</span>     not  <span class="skeleton">
+       <div class="score-pill skeleton">…</div>
+       <div class="pgw-cell skeleton"></div>
+
+   The structural class keeps the element's exact footprint — padding, min-width,
+   line-height — so the settled value drops in with no layout shift, and there
+   is no second set of sizes here to keep in step with the real components.
+   Skeletons keep their placeholder text (rendered transparent) for the same
+   reason: it is what gives a text-sized box its height.
+
+   The band modifier is what must be left off. Band backgrounds and the
+   skeleton fill are the same specificity, so emitting both would leave the
+   winner decided by source order — an unsettled score would read as a real
+   band-coloured chip. Omitting it makes that unrepresentable rather than
+   merely discouraged.
+
+   Skeletons are decorative and carry no information, so mark them
+   `aria-hidden="true"` and put `aria-busy="true"` on the region that owns them.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.skeleton {
+  /* Transparent text, not empty markup: the placeholder characters size the
+     box to the same line height the real value will occupy. */
+  color: transparent;
+  /* The placeholder text is a sizing device, not content — never let it be
+     selected or copied as if it were a real value. */
+  user-select: none;
+  /* Deliberately NOT pointer-events:none. Some skeletons sit on elements that
+     are navigation as well as value — a per-gameweek strip cell is a link to
+     that fixture's card whether or not its score has settled — and disabling
+     the element wholesale would take the navigation away for the few seconds
+     the number is still arriving. Withhold the VALUE, not the affordance. */
+  /* Deliberately no border rule: each composed element keeps its own, so a
+     skeleton score pill still shows the pill's outline and a skeleton chip
+     still has none. The one thing a skeleton must always win is the FILL. */
+  background-color: var(--color-skeleton);
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--color-skeleton-highlight) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: skeleton-sweep var(--skeleton-shimmer-duration) linear infinite;
+}
+
+/* Any nested text (a score pill's value/band spans) inherits the transparency
+   rather than punching through with its own band colour. */
+.skeleton * {
+  color: transparent;
+}
+
+@keyframes skeleton-sweep {
+  from { background-position: 100% 0; }
+  to   { background-position: 0 0; }
+}
+
+/* The shimmer is the only thing that distinguishes a skeleton from an empty
+   box, so when motion is unwelcome it becomes a flat tone that still reads as
+   a filled placeholder — not simply an animation switched off. */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    background-image: none;
+    background-color: var(--color-skeleton-highlight);
+  }
+}
+
+/* A standalone placeholder line, for regions with no existing element to
+   compose onto — a loading pane, a recommendation panel, a table row. Fills
+   its container's width, so the container chooses how wide a line reads. */
+.skeleton--text {
+  display: block;
+  width: 100%;
+  height: 1.1rem;
+  border-radius: var(--radius-sm);
+}
+
+/* Placeholder Ranker rows. The real row is a button (it opens that player in
+   the Matchup Analyser), so the skeleton has to give up the affordances that
+   promise — there is no player behind it to open. This is the exception to the
+   "withhold the value, not the affordance" rule above: elsewhere the element
+   still leads somewhere real. */
+.ranker-table__row--skeleton {
+  cursor: default;
+}
+
+.ranker-table__row--skeleton:hover {
+  background: transparent;
+}
+
+/* Stack of placeholder lines with the rhythm of body copy. */
+.skeleton-lines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+}
+
+/* Successive lines shorten, so the block reads as a paragraph rather than a
+   grey rectangle. */
+.skeleton-lines .skeleton--text:last-child {
+  width: 60%;
+}

@@ -111,6 +111,16 @@
      re-typing it. */
   --radius-pill: 999px;
 
+  /* --- Layout metrics ---------------------------------------------------- */
+  /* Height of the sticky app nav. Was a 52px literal in three places — the nav
+     itself, its items, and the offset the matchup navigators stick below it.
+     Named because a fourth consumer now needs it as an arithmetic input: the
+     team navigator's list is capped at the viewport height MINUS this, so the
+     whole panel stays on screen and the list scrolls inside it. Three literals
+     that must agree is a convention; four, one of which is doing sums with the
+     other three, is a bug waiting to happen. */
+  --app-header-height: 52px;
+
   /* --- Elevation --------------------------------------------------------- */
   /* First --shadow-* tokens in the system. Two raw drop-shadow recipes
      already exist inline (.dash-search-results, .squad-import-panel); those
@@ -125,6 +135,17 @@
   /* Used everywhere a score's confidence is below CONFIDENCE_FLOOR.          */
   --color-estimated:        #7a8390;   /* muted, slightly desaturated neutral */
   --estimated-border-style: dashed;    /* applied as border-style for estimated indicators */
+
+  /* --- Skeleton placeholders --------------------------------------------- */
+  /* Shown in place of any value that is still being computed — most of all a
+     CompositeScore whose counter-matchup component is waiting on an Understat
+     team payload. Deliberately DARKER than --color-surface-raised: a skeleton
+     has to read as an absence, so it recedes rather than competing with the
+     real chips and pills beside it. The highlight is the shimmer's crest and
+     the only part that rises above the surrounding surface. */
+  --color-skeleton:           #1b2027;
+  --color-skeleton-highlight: #2b323b;
+  --skeleton-shimmer-duration: 1500ms;
 
   /* --- Position badge colours (ranker, dashboard, planner) --------------- */
   --pos-gkp: #f0c040;   /* golden yellow */

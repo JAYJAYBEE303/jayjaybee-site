@@ -191,6 +191,42 @@ function isScoreEstimated(score) {
   return Boolean(score?.breakdown?.form?.estimated || score?.breakdown?.counter?.estimated);
 }
 
+/**
+ * The chip a player's score gets while the league-wide Understat prefetch is
+ * still running, or '' when everything is in.
+ *
+ * A player score is scored over the HORIZON, so it reads every opponent in the
+ * window — there is no two-team subset to wait on, and the gate is the whole
+ * prefetch. Returning '' rather than a boolean keeps the decision in one place
+ * for both chip sites below.
+ * @returns {string} skeleton chip HTML, or '' when the score is final
+ */
+function pendingScoreChip() {
+  if (store.isTeamXgSettled()) return '';
+  return `<span class="score-chip skeleton" aria-hidden="true"
+                title="Still calculating — waiting on league-wide counter-matchup data">00</span>`;
+}
+
+/**
+ * A block of placeholder lines standing in for a recommendation the module
+ * cannot honestly produce yet.
+ *
+ * Every recommendation here is a RANKING — which swap is best, which combo,
+ * which chip week — over scores that are still settling, so the answer would
+ * change under the reader rather than merely gain precision. There is no
+ * partial version of "your best transfer" worth showing.
+ *
+ * @param {number} lines  how tall the placeholder should read
+ */
+function skeletonPanel(lines = 3) {
+  const rows = Array.from(
+    { length: lines },
+    () => '<span class="skeleton skeleton--text"></span>',
+  ).join('');
+  return `<div class="skeleton-lines" aria-busy="true"
+               title="Still calculating — waiting on league-wide counter-matchup data">${rows}</div>`;
+}
+
 /** rankTier (composite.js → calcRankTier) → the .score-chip--rank-* modifier
  *  suffix, or '' when the player isn't in any standout tier (keeps their
  *  existing band colour). Mirrors the identical helper in modules/ranker.js.
@@ -533,7 +569,7 @@ function renderPlayerProjection(player, score, team, direction) {
           </div>
         </div>
       </div>
-      <span class="score-chip score-chip--${esc(score?.band ?? 'neutral')}${isScoreEstimated(score) ? ' score-chip--estimated' : ''}${rankTierClass(_rankTierByPlayerId?.get(player.id))}">${Math.round(score?.value ?? 0)}</span>
+      ${pendingScoreChip() || `<span class="score-chip score-chip--${esc(score?.band ?? 'neutral')}${isScoreEstimated(score) ? ' score-chip--estimated' : ''}${rankTierClass(_rankTierByPlayerId?.get(player.id))}">${Math.round(score?.value ?? 0)}</span>`}
     </div>
   `.trim();
 }
@@ -763,9 +799,9 @@ function renderSquadPanel() {
       ...playersInPos.map(player => {
         const score = _scores.get(player.id);
         const team  = store.getTeam(player.teamId);
-        const chip  = score
+        const chip  = pendingScoreChip() || (score
           ? `<span class="score-chip score-chip--${esc(score.band)}${rankTierClass(_rankTierByPlayerId?.get(player.id))}">${Math.round(score.value)}</span>`
-          : '';
+          : '');
         return `
           <div class="dash-squad-slot dash-squad-slot--filled">
             <span class="dash-squad-slot__name">${esc(player.name)}</span>
@@ -821,6 +857,18 @@ function renderBoards(rescore = true) {
     _boardsSlot.innerHTML = `<p class="planner-hint">
       Add ${remaining} more player${remaining === 1 ? '' : 's'} to see recommendations.
     </p>`;
+    return;
+  }
+
+  // Before enumerateSwaps, deliberately. Every swap is scored against the
+  // counter-matchup metric, so running the enumeration now would produce a
+  // ranked board that reorders itself when the Understat prefetch finishes —
+  // and the enumeration is the most expensive thing this module does, so the
+  // work would be thrown away as well as misleading. Placeholders until then;
+  // the data:ready that follows the last settle brings us back here.
+  if (!store.isTeamXgSettled()) {
+    _verdictSlot.innerHTML = renderVerdictBanner(null);
+    _boardsSlot.innerHTML  = skeletonPanel(4);
     return;
   }
 
@@ -922,6 +970,13 @@ function renderRecommendations() {
     return;
   }
 
+  // Same reasoning as renderBoards: the best combo is a ranking over scores
+  // that have not finished arriving, and _swaps is empty while that is true.
+  if (!store.isTeamXgSettled()) {
+    _recommendations.innerHTML = skeletonPanel(2);
+    return;
+  }
+
   const ctx = buildCtx();
   if (!ctx) {
     _recommendations.innerHTML = `<p class="planner-hint">No data available yet.</p>`;
@@ -1000,22 +1055,41 @@ function pickTcCandidate() {
  * Render a single chip card. The "Already used" toggle stays operable even on
  * used chips so the user can mark/unmark; the recommendation strikethroughs
  * and the card greys out via the --used modifier.
+ *
+ * @param {string} chipId
+ * @param {object|null} rec  the timing recommendation, or null when there is
+ *   none to give
+ * @param {boolean} pending  true while the Understat prefetch is settling, in
+ *   which case no recommendation has been COMPUTED yet — distinct from a null
+ *   `rec`, which is a computed "no week to recommend"
  */
-function renderChipCard(chipId, rec) {
+function renderChipCard(chipId, rec, pending = false) {
   const used    = _chipsUsed.has(chipId);
   const label   = CHIP_LABELS[chipId];
   const recText = rec?.gw != null ? `GW${rec.gw}` : '—';
   const why     = rec?.reasoning ?? 'Not enough data to recommend a GW yet.';
   const toggleLabel = used ? 'Used' : 'Mark used';
+  // `pending` is passed in rather than inferred from a null `rec`: wildcard
+  // and freehit are legitimately null when their timing engine throws or finds
+  // no candidate week, and that is a settled answer ("—"), not a wait. The two
+  // states look identical from inside this function, so the caller — which
+  // knows which one it is in — has to say.
+  //
+  // The chip's NAME and its "Mark used" state are the user's own and stay live
+  // either way; only the week being recommended and the reasoning are withheld.
 
   return `
     <div class="planner-chip-card${used ? ' planner-chip-card--used' : ''}"
-         data-chip-id="${esc(chipId)}">
+         data-chip-id="${esc(chipId)}"${pending ? ' aria-busy="true"' : ''}>
       <div class="planner-chip-card__head">
         <span class="planner-chip-card__name">${esc(label)}</span>
-        <span class="planner-chip-card__rec">${esc(recText)}</span>
+        ${pending
+          ? '<span class="planner-chip-card__rec skeleton" aria-hidden="true">GW00</span>'
+          : `<span class="planner-chip-card__rec">${esc(recText)}</span>`}
       </div>
-      <p class="planner-chip-card__why">${esc(why)}</p>
+      ${pending
+        ? '<p class="planner-chip-card__why skeleton" aria-hidden="true">Waiting on counter-matchup data before recommending a week.</p>'
+        : `<p class="planner-chip-card__why">${esc(why)}</p>`}
       <div class="planner-chip-card__foot">
         <button class="planner-chip-card__used-toggle"
                 type="button"
@@ -1048,6 +1122,32 @@ function renderChipsPanel() {
   }
 
   const horizon = getHorizon();
+
+  // Every chip recommendation names a GAMEWEEK chosen by comparing scores
+  // across the horizon, so all four would name one week now and a different
+  // one when the prefetch finished. The four timing engines are also among the
+  // heavier things this module runs, so skipping them here is the same saving
+  // the Ranker and the boards make. renderChipCard renders a null rec as a
+  // placeholder; the "Mark used" toggles stay live because that state is the
+  // user's, not the model's.
+  //
+  // _chipRecs is deliberately left EMPTY rather than filled with placeholders:
+  // buildVerdict reads it to fire its chipWindow trigger, and a placeholder
+  // would be a recommendation it could act on. renderBoards is gated on the
+  // same condition, so no verdict is built from this empty map either way.
+  if (!store.isTeamXgSettled()) {
+    _chipRecs = {};
+    _chipsPanel.innerHTML = `
+      <div class="planner-chips__hd">
+        <span class="planner-chips__title">Chips</span>
+        <span class="planner-chips__meta">advisory · ${esc(horizon.label)}</span>
+      </div>
+      <div class="planner-chips__grid">${
+        CHIP_IDS.map(id => renderChipCard(id, null, true)).join('')
+      }</div>
+    `;
+    return;
+  }
 
   // Wildcard and Free Hit are league-wide, evaluated regardless of squad.
   let wcBest = null;

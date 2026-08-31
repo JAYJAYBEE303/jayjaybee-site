@@ -252,6 +252,18 @@ function buildScoreBreakdownRows(breakdown) {
  */
 function buildBreakdownDetails(player, score, rankTier = null) {
   if (!score) return '';
+
+  // A player's score is scored over the HORIZON, so it reads every opponent in
+  // that window rather than one fixture — there is no two-team subset to wait
+  // on the way the Matchup Analyser has. The gate is therefore the whole
+  // Understat prefetch: until it settles, this chip is a number that will move
+  // on its own, so show that it is still arriving instead. The disclosure
+  // stays closed-but-present; its breakdown is real once opened.
+  if (!store.isTeamXgSettled()) {
+    return `<span class="score-chip skeleton" aria-hidden="true"
+                  title="Still calculating — waiting on league-wide counter-matchup data">00</span>`;
+  }
+
   const estClass = isScoreEstimated(score) ? ' score-chip--estimated' : '';
   const chip     = `<span class="score-chip score-chip--${esc(score.band)}${estClass}${rankTierClass(rankTier)}">${Math.round(score.value)}</span>`;
   const context  = buildFixtureContextLabel(score);
@@ -714,6 +726,25 @@ function renderDecisions() {
 
   if (!_dataReady) {
     _decisions.innerHTML = `<p class="dash-decisions__hint">Loading player data…</p>`;
+    return;
+  }
+
+  // The captain, the XI and the bench are all a RANKING of the squad by a
+  // score that is still settling — pickStartingXI and the captaincy reduce
+  // below both choose by it. Rendering now would name a captain and then
+  // silently name a different one when the last Understat payload landed,
+  // which is the one thing a recommendation panel must not do. The GW badge
+  // stays: it is a fact about the gameweek, not a product of any score.
+  if (!store.isTeamXgSettled()) {
+    _decisions.innerHTML = [
+      badgeHtml,
+      `<div class="skeleton-lines" aria-busy="true"
+            title="Still calculating — waiting on league-wide counter-matchup data">
+        <span class="skeleton skeleton--text"></span>
+        <span class="skeleton skeleton--text"></span>
+        <span class="skeleton skeleton--text"></span>
+      </div>`,
+    ].join('');
     return;
   }
 

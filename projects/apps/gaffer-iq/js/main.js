@@ -15,6 +15,7 @@ import { store } from './store.js';
 import {
   UNDERSTAT_SEASON, UNDERSTAT_PREV_SEASON, UNDERSTAT_HISTORY_SEASONS,
   TEAM_XG_COALESCE_MS,
+  TEAM_XG_SETTLE_TIMEOUT_MS,
 } from './config.js';
 import {
   fetchBootstrap, fetchFixtures, fetchPlayerSummary,
@@ -48,6 +49,24 @@ import { initCalibration }  from './calibration.js';
 // re-render mid-flight can't fire a duplicate request.
 const _teamXgRequested = new Set();
 
+// Deadline handle for the prefetch as a whole (armTeamXgDeadline, below);
+// null when none is armed. Declared beside the Set it is cleared alongside,
+// since resetTeamXgPrefetch has to clear both together or the next prefetch
+// inherits the previous one's deadline.
+let _teamXgTimeoutHandle = null;
+
+// Bumped by resetTeamXgPrefetch, and captured by each in-flight request.
+//
+// A manual refresh clears the cache and re-dispatches the same slugs, so the
+// PREVIOUS run's requests are still outstanding against a pending set that has
+// since been rebuilt. Without this, one of those stragglers settling would
+// remove a slug the NEW run is still waiting on, and the app would report
+// scores as final while a fresher payload was still inbound — the precise
+// thing the pending set exists to prevent. A stale request still stores its
+// payload (it is real data, just from the previous run); it simply no longer
+// gets to say the wait is over.
+let _teamXgRunId = 0;
+
 /**
  * Forget which team-xG fetches have been started, so the next
  * prefetchAllTeamXg() re-requests all of them.
@@ -64,6 +83,11 @@ const _teamXgRequested = new Set();
  */
 function resetTeamXgPrefetch() {
   _teamXgRequested.clear();
+  _teamXgRunId += 1;
+  if (_teamXgTimeoutHandle !== null) {
+    clearTimeout(_teamXgTimeoutHandle);
+    _teamXgTimeoutHandle = null;
+  }
 }
 
 /**
@@ -91,10 +115,20 @@ async function loadInitialData({ force = false } = {}) {
   const xgFresh      = !force && store.getLeagueXg() !== null;
 
   if (seasonFresh && xgFresh) {
-    store.markDataReady();
+    // ORDER MATTERS. The prefetch must be DISPATCHED before ready is announced,
+    // not after. Modules skeleton any score whose Understat payloads are still
+    // outstanding, and "outstanding" is only distinguishable from "never asked
+    // for" once the prefetch has registered what it is waiting on (see
+    // store.markTeamXgRequested). Announcing first means every module renders
+    // against a store that reports nothing pending — and in the case where
+    // there is genuinely nothing to fetch, no later emit ever arrives to
+    // correct it, leaving skeletons on screen for the rest of the session.
+    // Dispatching first costs nothing: it starts network calls and returns.
+    //
     // Fire-and-forget; every module upgrades to the channel tier in place as
     // each team's statistics land. Not gated on any tab being open.
     prefetchAllTeamXg();
+    store.markDataReady();
     return;
   }
 
@@ -174,10 +208,10 @@ async function loadInitialData({ force = false } = {}) {
       store.setLeagueXgHistory(loaded);
     }
 
-    store.markDataReady();
-    // Fire-and-forget; every module upgrades to the channel tier in place as
-    // each team's statistics land. Not gated on any tab being open.
+    // Prefetch first, then announce — see the note on the early-return path
+    // above. Same reason, same ordering requirement.
     prefetchAllTeamXg();
+    store.markDataReady();
   } catch (err) {
     // store.setError() clears season state before emitting — the store is left
     // cleanly empty, not partially populated (CONVENTIONS.md §9, store.js §setError).
@@ -245,24 +279,82 @@ function scheduleDataReady() {
   }, TEAM_XG_COALESCE_MS);
 }
 
+/**
+ * Arm the TEAM_XG_SETTLE_TIMEOUT_MS backstop, once per prefetch.
+ *
+ * `fetch` carries no timeout, so a request the proxy never answers stays
+ * pending for the life of the page — and with it every skeleton waiting on
+ * that team's score. At the deadline the store stops waiting and the affected
+ * scores render on whatever tier the data supports, which is exactly the
+ * behaviour that predates the skeletons. Nothing is cancelled or discarded: a
+ * late payload still lands in the store and still upgrades scores in place.
+ */
+function armTeamXgDeadline() {
+  if (_teamXgTimeoutHandle !== null) return;
+  const runId = _teamXgRunId;
+  _teamXgTimeoutHandle = setTimeout(() => {
+    _teamXgTimeoutHandle = null;
+    // resetTeamXgPrefetch clears this timer, so a stale firing should not be
+    // possible — the guard is here because "should not be possible" is exactly
+    // what a force-settle must not rely on.
+    if (runId !== _teamXgRunId) return;
+    const stranded = store.settleAllTeamXg();
+    if (stranded === 0) return;
+    console.warn(`[Gaffer IQ] ${stranded} team-xG request(s) did not answer within `
+      + `${TEAM_XG_SETTLE_TIMEOUT_MS}ms — scoring on the data in hand.`);
+    // Views that were skeletoned need a render to replace those skeletons with
+    // the scores they can compute now; nothing else has changed in the store,
+    // so this goes through the same coalesced path every other arrival uses.
+    scheduleDataReady();
+  }, TEAM_XG_SETTLE_TIMEOUT_MS);
+}
+
 function prefetchAllTeamXg() {
   const season = store.getSeason();
   if (!season) return;
 
   const slugs = buildUnderstatSlugsByTeamId(store.getLeagueXg(), season.teamsById);
+  const dispatched = [];
   for (const slug of new Set(Object.values(slugs))) {
     if (_teamXgRequested.has(slug) || store.getTeamXg(slug)) continue;
-
     _teamXgRequested.add(slug);
+    dispatched.push(slug);
+  }
+
+  // Announced BEFORE the first fetch is started, and unconditionally — even
+  // when `dispatched` is empty, which is what latches the store's dispatched
+  // flag and lets every score read as settled when there was never anything
+  // to wait for (no Understat league payload, so no slugs to resolve). Do this
+  // after the loop rather than inside it so the pending set is never
+  // momentarily one-slug-deep, which a synchronously-resolving fetch could
+  // otherwise read as "prefetch complete".
+  store.markTeamXgRequested(dispatched);
+  if (dispatched.length > 0) armTeamXgDeadline();
+
+  const runId = _teamXgRunId;
+  for (const slug of dispatched) {
     fetchTeamXg(slug)
       .then((data) => {
         store.setTeamXg(slug, data);
-        // Whatever tab is active upgrades in place as each payload lands —
-        // but batched, not once per payload. See scheduleDataReady.
-        scheduleDataReady();
       })
       .catch((err) => {
         console.warn(`[Gaffer IQ] team xG unavailable for ${slug}: ${err.message}`);
+      })
+      .finally(() => {
+        // A straggler from a superseded run has already had its payload
+        // stored above; what it must not do is close out a wait belonging to
+        // the run that replaced it. See _teamXgRunId.
+        if (runId !== _teamXgRunId) return;
+        // Settled means ANSWERED, not succeeded: a rejected fetch is just as
+        // final for "is more data coming?" as a fulfilled one, and a view
+        // still skeletoning a team whose payload will never arrive is stuck.
+        // Hence .finally rather than a settle inside .then only.
+        store.settleTeamXg(slug);
+        // Whatever tab is active upgrades in place as each payload lands —
+        // but batched, not once per payload. See scheduleDataReady. Also on
+        // the failure path, so the last outstanding slug failing still
+        // produces the render that clears the remaining skeletons.
+        scheduleDataReady();
       });
   }
 }
