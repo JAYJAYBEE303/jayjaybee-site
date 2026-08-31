@@ -41,16 +41,45 @@ function memoScore(cache, player, horizon, ctx, scoreFn) {
 }
 
 /**
- * The top CANDIDATE_POOL_PER_POS players per position, by near-window score,
- * excluding anyone already in the squad.
+ * Cheap, no-scoring proxy used only to SELECT which players are worth a full
+ * composite score, never to rank them against each other for real. Season
+ * points per elapsed gameweek — the same rate `calcAvgPointsPerGw` uses, just
+ * computed inline here so this module needs no extra import for it.
  *
- * Scores every eligible player through the caller's memoised `scoreNear`
- * closure rather than calling rankPlayers separately — rankPlayers would score
- * the same ~626 players a second time under a cache the enumeration loop below
- * can't see, doubling the near-window scoring cost for no benefit. Routing
- * through the shared cache means every player is scored at most once, and the
- * cache is warm by the time the enumeration loop asks for these same
- * candidates again.
+ * MODEL: candidate SELECTION uses this cheap historical proxy; candidate
+ * RANKING within every lane still runs the full composite via `scoreNear` /
+ * `scoreFar`. A mis-ranked pre-filter therefore costs breadth (a good player
+ * with a slow start might be excluded from the pool) rather than correctness
+ * (nothing that DOES make the pool is ever ordered by this proxy).
+ *
+ * @param {Player} player
+ * @param {object} ctx  from buildScoreContext(); reads ctx.elapsedGws
+ * @returns {number}  points-per-gw scale, higher = better; falls back to raw
+ *   season points (not a rate) when ctx.elapsedGws is unavailable
+ */
+function candidateProxyScore(player, ctx) {
+  const points = player?.totals?.points ?? 0;
+  const elapsedGws = ctx?.elapsedGws;
+  if (typeof elapsedGws === 'number' && elapsedGws > 0) {
+    return points / Math.max(1, elapsedGws);
+  }
+  // Fallback: elapsedGws not on this ctx (e.g. a stub in tests). Raw season
+  // points is not a rate, but it is still a defensible relative ordering and
+  // keeps the pre-filter functioning rather than throwing.
+  return points;
+}
+
+/**
+ * The top CANDIDATE_POOL_PER_POS players per position, excluding anyone
+ * already in the squad.
+ *
+ * Selection is two-staged to stay affordable: first a cheap proxy
+ * (`candidateProxyScore`, season points per elapsed gameweek — no
+ * `scorePlayer` call) narrows ~626 players down to CANDIDATE_POOL_PER_POS per
+ * position, THEN only that narrowed set is scored through the caller's
+ * memoised `scoreNear` closure. Scoring the full pool first (as an earlier
+ * version of this function did, via rankPlayers) was exactly the cost
+ * CANDIDATE_POOL_PER_POS exists to avoid — see spec rationale below.
  *
  * MODEL: bounding the pool by rank rather than scoring all ~700 players is what
  * keeps the enumeration affordable. A transfer target outside the top 40 of its
@@ -59,27 +88,41 @@ function memoScore(cache, player, horizon, ctx, scoreFn) {
  *
  * @param {Player[]} allPlayers   the full player pool
  * @param {number[]} squadIds     the user's 15 player ids, excluded from pools
+ * @param {object}   ctx          from buildScoreContext(); read for elapsedGws
  * @param {(player: Player) => (object|null)} scoreNear  memoised near-window
  *   scorer; returns null (and the player is skipped) if scoring fails
  * @returns {Object<string, Player[]>}  keyed by position, each sorted by
  *   score.value descending
  */
-function buildCandidatePools(allPlayers, squadIds, scoreNear) {
+function buildCandidatePools(allPlayers, squadIds, ctx, scoreNear) {
   const squadSet = new Set(squadIds);
   const pools = { GKP: [], DEF: [], MID: [], FWD: [] };
-  const scored = { GKP: [], DEF: [], MID: [], FWD: [] };
+  const shortlisted = { GKP: [], DEF: [], MID: [], FWD: [] };
 
   for (const player of allPlayers) {
-    const bucket = scored[player?.position];
+    const bucket = shortlisted[player?.position];
     if (!bucket || squadSet.has(player.id)) continue;
-    const score = scoreNear(player);
-    if (!score) continue;
-    bucket.push({ player, score });
+    bucket.push(player);
   }
 
-  for (const pos of Object.keys(scored)) {
-    scored[pos].sort((a, b) => b.score.value - a.score.value);
-    pools[pos] = scored[pos].slice(0, CANDIDATE_POOL_PER_POS).map(row => row.player);
+  for (const pos of Object.keys(shortlisted)) {
+    // Cheap proxy narrows the field first; price-descending breaks ties (a
+    // pricier player at the same points rate is the stronger transfer target).
+    shortlisted[pos].sort((a, b) => {
+      const proxyDiff = candidateProxyScore(b, ctx) - candidateProxyScore(a, ctx);
+      if (proxyDiff !== 0) return proxyDiff;
+      return (b.price ?? 0) - (a.price ?? 0);
+    });
+    const shortlist = shortlisted[pos].slice(0, CANDIDATE_POOL_PER_POS);
+
+    const scored = [];
+    for (const player of shortlist) {
+      const score = scoreNear(player);
+      if (!score) continue;
+      scored.push({ player, score });
+    }
+    scored.sort((a, b) => b.score.value - a.score.value);
+    pools[pos] = scored.map(row => row.player);
   }
   return pools;
 }
@@ -139,7 +182,7 @@ export function enumerateSwaps(squadIds, allPlayers, ctx, opts = {}) {
   const baseFar  = calcXiExpectedPoints(farEntries);
   const baseXiIds = new Set(pickStartingXI(nearEntries).xi.map(e => e.player.id));
 
-  const pools = buildCandidatePools(allPlayers, squadIds, scoreNear);
+  const pools = buildCandidatePools(allPlayers, squadIds, ctx, scoreNear);
   // A single transfer is free whenever at least one FT is available. The hit
   // only ever applies to a SECOND move, which computeBestTwoSwap models — so a
   // single swap carries a cost of 0 in every normal state of this page.
