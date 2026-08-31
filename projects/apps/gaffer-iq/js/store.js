@@ -17,6 +17,11 @@ const SS_KEY_SEASON = 'gaffer-iq:season:v3';
 // key is now unused and simply ages out of sessionStorage.
 const SS_KEY_SQUAD = 'gafferiq_squad';
 
+// Saved FPL pick order from the last import: which players the user actually
+// has on the pitch and on the bench, plus the armband. Cleared by any manual
+// squad edit — see setSquad.
+const SS_KEY_PICKS = 'gafferiq_squad_picks';
+
 const state = {
   season: null,         // see engine/normalise.js → normaliseSeason output
   playerSummaries: {},  // playerId → normalised PlayerSummary
@@ -74,6 +79,9 @@ const state = {
   // kept its own private copy with its own sessionStorage key — this is now
   // the single source of truth. See CONVENTIONS.md §8.
   squad: [],
+  // Array<{playerId, slot, isCaptain, isViceCaptain}> from the last import, or
+  // [] when the squad was built by hand.
+  squadPicks: [],
   lastError: null,
   lastRefreshAt: null,
 };
@@ -127,6 +135,19 @@ function getAllTeamXg()               { return { ...state.teamXg }; }
 function getActiveHorizon()           { return state.activeHorizon; }
 function getActiveModule()            { return state.activeModule; }
 function getSquad()                   { return state.squad; }
+function getSquadPicks()              { return state.squadPicks; }
+
+/**
+ * The player ids the user actually has in their saved starting XI (slots 1–11).
+ * @returns {number[]}  empty when no import has happened or picks were cleared
+ */
+function getSavedXi() {
+  return state.squadPicks
+    .filter(p => typeof p.slot === 'number' && p.slot >= 1 && p.slot <= 11)
+    .sort((a, b) => a.slot - b.slot)
+    .map(p => p.playerId);
+}
+
 function getError()                   { return state.lastError; }
 function getLastRefreshAt()           { return state.lastRefreshAt; }
 function isFresh()                    { return state.season !== null; }
@@ -231,6 +252,26 @@ function setSquad(playerIds) {
   try {
     sessionStorage.setItem(SS_KEY_SQUAD, JSON.stringify(state.squad));
   } catch { /* quota exceeded or disabled — non-fatal */ }
+  // A hand-edited squad invalidates the imported pick order — those slots
+  // describe a team that no longer exists, and presenting them as current
+  // would be a lie. Import calls setSquadPicks() straight after setSquad().
+  state.squadPicks = [];
+  try { sessionStorage.removeItem(SS_KEY_PICKS); } catch { /* non-fatal */ }
+  emit('squad:updated', state.squad);
+}
+
+/**
+ * Store the imported FPL pick order (slot + armband) for the current squad.
+ * Called immediately after setSquad() on import — see the note in setSquad
+ * about why order matters here.
+ * @param {Array<{playerId: number, slot: number|null, isCaptain: boolean,
+ *   isViceCaptain: boolean}>} picks
+ */
+function setSquadPicks(picks) {
+  state.squadPicks = Array.isArray(picks) ? picks.slice() : [];
+  try {
+    sessionStorage.setItem(SS_KEY_PICKS, JSON.stringify(state.squadPicks));
+  } catch { /* quota exceeded — non-fatal */ }
   emit('squad:updated', state.squad);
 }
 
@@ -289,12 +330,21 @@ function clearCache() {
   // when the season cache above is stale/absent.
   try {
     const rawSquad = sessionStorage.getItem(SS_KEY_SQUAD);
-    if (!rawSquad) return;
-    const parsedSquad = JSON.parse(rawSquad);
-    if (Array.isArray(parsedSquad)) {
-      state.squad = parsedSquad.filter(id => typeof id === 'number');
+    if (rawSquad) {
+      const parsedSquad = JSON.parse(rawSquad);
+      if (Array.isArray(parsedSquad)) {
+        state.squad = parsedSquad.filter(id => typeof id === 'number');
+      }
     }
   } catch { /* corrupt or absent — ignore and start fresh */ }
+
+  try {
+    const rawPicks = sessionStorage.getItem(SS_KEY_PICKS);
+    if (rawPicks) {
+      const parsed = JSON.parse(rawPicks);
+      if (Array.isArray(parsed)) state.squadPicks = parsed;
+    }
+  } catch { /* corrupt — start with no saved picks */ }
 })();
 
 export const store = {
@@ -304,9 +354,10 @@ export const store = {
   getCurrentGw, getNextGw, getPlayerSummary, getAllPlayerSummaries,
   getLeagueXg, getLeagueXgPrev, getLeagueXgHistory, getTeamXg, getAllTeamXg,
   getLive, getMatchDetail,
-  getActiveHorizon, getActiveModule, getSquad, getError, getLastRefreshAt, isFresh,
+  getActiveHorizon, getActiveModule, getSquad, getSquadPicks, getSavedXi,
+  getError, getLastRefreshAt, isFresh,
   setSeason, setPlayerSummary, setLeagueXg, setLeagueXgPrev, setLeagueXgHistory, setTeamXg,
   setLive, setMatchDetail,
-  setActiveHorizon, setActiveModule, setSquad, setError, markDataReady,
+  setActiveHorizon, setActiveModule, setSquad, setSquadPicks, setError, markDataReady,
   clearCache,
 };

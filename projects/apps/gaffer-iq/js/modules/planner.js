@@ -1113,7 +1113,7 @@ async function handleImport() {
   showImportStatus(`Importing GW${gw} squad…`, 'loading');
 
   try {
-    const { playerIds, entryInfo, missingCount } = await fetchAndMapSquad(teamId, gw);
+    const { playerIds, picks, entryInfo, missingCount } = await fetchAndMapSquad(teamId, gw);
 
     if (playerIds.length === 0) {
       showImportStatus('No recognised players found — check the Team ID and try again.', 'error');
@@ -1125,6 +1125,8 @@ async function handleImport() {
     _importedEntryInfo = entryInfo;
 
     replaceSquad(playerIds);
+    // Order matters: setSquad clears any previous picks, so this must follow it.
+    store.setSquadPicks(picks);
     renderImportInfo(entryInfo);
 
     const warn = missingCount > 0 ? ` (${missingCount} player${missingCount === 1 ? '' : 's'} not recognised)` : '';

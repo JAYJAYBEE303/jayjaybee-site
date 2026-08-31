@@ -69,6 +69,9 @@ export function resolveImportGw() {
 /**
  * @typedef {object} ImportResult
  * @property {number[]}     playerIds    Ordered FPL player IDs from the picks (15 entries).
+ * @property {Array<{playerId: number, slot: number|null, isCaptain: boolean,
+ *   isViceCaptain: boolean}>} picks      Pick order, slot (1-11 XI, 12-15 bench)
+ *   and armband, in the order FPL sent them.
  * @property {object|null}  entryInfo    Raw FPL entry object (name, team name, rank) or null.
  * @property {number}       missingCount Players in picks not found in the local store.
  */
@@ -111,6 +114,7 @@ export async function fetchAndMapSquad(teamId, gw) {
   // Map each pick's element (FPL player ID) to a local store player.
   // Picks already arrive sorted by position; preserve that order.
   const playerIds = [];
+  const picks     = [];
   let missingCount = 0;
 
   for (const pick of rawPicks) {
@@ -122,7 +126,20 @@ export async function fetchAndMapSquad(teamId, gw) {
       continue;
     }
     playerIds.push(id);
+    // Slot 1–11 is the XI, 12–15 the bench in priority order. Kept because the
+    // Planner compares the team you actually set against the one the model
+    // would pick — a difference the app was previously blind to.
+    // Note: pick.position, pick.is_captain and pick.is_vice_captain are raw
+    // FPL field names. CONVENTIONS.md §3.1 confines those to normalise.js —
+    // this is the one read, converted to internal names (slot, isCaptain,
+    // isViceCaptain) on the same line, which is the spirit of the rule.
+    picks.push({
+      playerId:       id,
+      slot:           pick.position ?? null,
+      isCaptain:      Boolean(pick.is_captain),
+      isViceCaptain:  Boolean(pick.is_vice_captain),
+    });
   }
 
-  return { playerIds, entryInfo, missingCount };
+  return { playerIds, picks, entryInfo, missingCount };
 }
