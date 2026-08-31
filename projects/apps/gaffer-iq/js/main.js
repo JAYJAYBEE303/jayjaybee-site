@@ -26,6 +26,7 @@ import { calcBaseDifficulty, calcHomeAwaySplit, calcVenueEffect, calcFixtureHist
 import { calcTeamForm, calcPlayerForm, calcPlayingLikelihood } from './engine/form.js';
 import { calcStyleProfile, calcStyleClash } from './engine/style.js';
 import { buildUnderstatSlugsByTeamId } from './engine/channel.js';
+import { pickStartingXI, calcXiExpectedPoints } from './engine/lineup.js';
 import {
   calcCounterMatchup, calcIndividualDuels, duelsForPairing,
 } from './engine/counter.js';
@@ -423,6 +424,8 @@ window.__engine = {
   calcStyleProfile, calcStyleClash,
   calcCounterMatchup,
   calcIndividualDuels, duelsForPairing,
+  pickStartingXI,
+  calcXiExpectedPoints,
 };
 
 /**

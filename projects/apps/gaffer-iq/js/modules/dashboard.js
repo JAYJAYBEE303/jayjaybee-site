@@ -24,6 +24,7 @@ import { store }       from '../store.js';
 import { HORIZONS, BANDS, SQUAD_LIMITS } from '../config.js';
 import { buildScoreContext, scorePlayer, rankPlayers, attachRankTiers } from '../engine/composite.js';
 import { groupPerGwSlots }              from '../engine/fixtures.js';
+import { pickStartingXI }               from '../engine/lineup.js';
 import { fetchLivePoints }               from '../api.js';
 import { fetchAndMapSquad, loadSavedTeamId, saveTeamId, resolveImportGw } from '../squadImport.js';
 
@@ -465,58 +466,6 @@ function ensureRankTiers(ctx) {
     console.warn('[dashboard] full-pool rank computation failed', err?.message ?? err);
     _rankTierByPlayerId = new Map();
   }
-}
-
-// ─── Starting XI picker ───────────────────────────────────────────────────────
-
-/**
- * Select the optimal valid starting XI from the scored squad.
- * Formation rules (ROADMAP.md Phase 2C):
- *   • Exactly  1 GKP
- *   • Minimum  3 DEF
- *   • Minimum  2 MID
- *   • Minimum  1 FWD
- *   • Exactly 11 players total
- *
- * Algorithm: fill minimums by score descending, then fill the remaining
- * 4 outfield slots from the leftover pool (sorted by score descending).
- * Bench is ordered: outfield-by-score-desc, bench GKP always last.
- *
- * @param {Array<{player: Player, score: object}>} scoredSquad  15 entries
- * @returns {{ xi: Array<{player,score}>, bench: Array<{player,score}> }}
- */
-function pickStartingXI(scoredSquad) {
-  const byPos = { GKP: [], DEF: [], MID: [], FWD: [] };
-  for (const entry of scoredSquad) {
-    const pos = entry.player.position;
-    if (byPos[pos]) byPos[pos].push(entry);
-  }
-  for (const pos of Object.keys(byPos)) {
-    byPos[pos].sort((a, b) => b.score.value - a.score.value);
-  }
-
-  const xi = [];
-
-  xi.push(byPos.GKP[0]);
-  const benchGkp = byPos.GKP[1] ?? null;
-
-  const defMin = byPos.DEF.slice(0, 3);
-  const midMin = byPos.MID.slice(0, 2);
-  const fwdMin = byPos.FWD.slice(0, 1);
-  xi.push(...defMin, ...midMin, ...fwdMin);
-
-  const pool = [
-    ...byPos.DEF.slice(3),
-    ...byPos.MID.slice(2),
-    ...byPos.FWD.slice(1),
-  ].sort((a, b) => b.score.value - a.score.value);
-
-  xi.push(...pool.slice(0, 4));
-
-  const benchOutfield = pool.slice(4);
-  const bench = benchGkp ? [...benchOutfield, benchGkp] : benchOutfield;
-
-  return { xi, bench };
 }
 
 // ─── Risk flags ───────────────────────────────────────────────────────────────
