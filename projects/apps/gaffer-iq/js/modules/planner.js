@@ -734,11 +734,12 @@ function renderBoards(rescore = true) {
 
   try {
     _swaps = enumerateSwaps(store.getSquad(), store.getPlayers(), ctx, {
-      horizon:       getHorizon(),
-      budget:        _budget,
-      freeTransfers: _freeTransfers,
-      allowExtraHit: _allowExtraHit,
-      caches:        _scoreCaches,
+      horizon:            getHorizon(),
+      budget:             _budget,
+      freeTransfers:      _freeTransfers,
+      allowExtraHit:      _allowExtraHit,
+      caches:             _scoreCaches,
+      rankTierByPlayerId: _rankTierByPlayerId,
     });
   } catch (err) {
     console.warn('[planner] enumerateSwaps failed:', err?.message ?? err);

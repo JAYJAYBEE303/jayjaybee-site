@@ -149,13 +149,22 @@ function withSwap(entries, outId, inEntry) {
  * @param {Player[]} allPlayers      the full player pool
  * @param {object}   ctx             from buildScoreContext()
  * @param {object}   opts            { horizon, budget, freeTransfers,
- *                                     allowExtraHit, scorePlayerFn?, caches? }
+ *                                     allowExtraHit, scorePlayerFn?, caches?,
+ *                                     rankTierByPlayerId? }
+ * @param {Map<number, string|null>} [opts.rankTierByPlayerId]  playerId ->
+ *   rank tier ('positionElite'|'positionStrong'|'topPercentile'|
+ *   'midPercentile'|'bottomPercentile'|null), from
+ *   attachRankTiers(rankPlayers(...)) over the FULL player pool. Computed by
+ *   the caller (modules/planner.js caches it) because ranking the whole pool
+ *   is expensive and this function must not recompute it. Optional — when
+ *   absent, the Structure lane's bottomPercentile condition simply never
+ *   fires; nothing throws.
  * @returns {Array<Swap>}  unsorted; callers sort by whichever lane they render
  */
 export function enumerateSwaps(squadIds, allPlayers, ctx, opts = {}) {
   const {
     horizon, budget = 0, freeTransfers = 1, allowExtraHit = false,
-    scorePlayerFn = defaultScorePlayer, caches = null,
+    scorePlayerFn = defaultScorePlayer, caches = null, rankTierByPlayerId = null,
   } = opts;
 
   if (!Array.isArray(squadIds) || squadIds.length < SQUAD_TOTAL) return [];
@@ -276,7 +285,7 @@ export function enumerateSwaps(squadIds, allPlayers, ctx, opts = {}) {
       swap.lanes.future    = scoreFutureLane(swap);
       swap.lanes.funds     = scoreFundsLane(swap, flexBefore, flexAfter, priceRisk);
       swap.lanes.ceiling   = scoreCeilingLane(swap, ctx);
-      swap.lanes.structure = scoreStructureLane(swap);
+      swap.lanes.structure = scoreStructureLane(swap, rankTierByPlayerId);
       swaps.push(swap);
     }
   }
@@ -498,12 +507,30 @@ function scoreCeilingLane(swap, ctx) {
  * a swap involving a healthy bench player is not a structure problem, and the
  * board says "nothing broken" rather than padding itself.
  *
+ * Spec §7.1 defines three independent conditions that mark the OUT player as
+ * structurally broken (any one is sufficient):
+ *   (a) status !== 'available'
+ *   (b) breakdown.playtime.value below STRUCTURE_PLAYTIME_FLOOR
+ *   (c) rank tier 'bottomPercentile'
+ *
+ * MODEL: (c) exists because a player can be fit and nailed — (a) and (b) both
+ * stay silent — while his underlying output has collapsed relative to the
+ * WHOLE player pool: a nailed starter quietly posting bottom-decile numbers
+ * is still costing the user every week, and this is the only one of the
+ * three conditions that would ever catch him. Rank tier is intentionally not
+ * computed in here — it depends on a full-pool ranking the caller has
+ * already paid for (see rankTierByPlayerId in enumerateSwaps' JSDoc) — so
+ * this condition degrades to "never fires" rather than recomputing it.
+ *
  * @param {object} swap
+ * @param {Map<number, string|null>|null} [rankTierByPlayerId]  playerId ->
+ *   rank tier, from the caller's cached attachRankTiers(rankPlayers(...))
+ *   pass. Optional; when absent condition (c) never fires.
  * @returns {{ value: number, components: object, estimated: boolean,
  *             reasoning: string }}  value on the same points scale as
  *   nearXiDelta, 0 when there is nothing to repair, higher = more urgent fix
  */
-function scoreStructureLane(swap) {
+function scoreStructureLane(swap, rankTierByPlayerId = null) {
   if (!swap.flags.outInXi) {
     return {
       value: 0, components: {}, estimated: false,
@@ -520,21 +547,26 @@ function scoreStructureLane(swap) {
   const playtimeMissing = !swap.outScore?.breakdown?.playtime;
   const playtime    = swap.outScore?.breakdown?.playtime?.value ?? 1;
   const lowPlaytime = playtime < STRUCTURE_PLAYTIME_FLOOR;
+  const rankTier    = rankTierByPlayerId?.get(swap.outId) ?? null;
+  const bottomTier  = rankTier === 'bottomPercentile';
 
-  if (!unavailable && !lowPlaytime) {
+  if (!unavailable && !lowPlaytime && !bottomTier) {
     return {
-      value: 0, components: { playtime }, estimated: playtimeMissing,
+      value: 0, components: { playtime, rankTier }, estimated: playtimeMissing,
       reasoning: `${swap.outPlayer.name} is fit and starting — nothing to repair.`,
     };
   }
 
   const cause = unavailable
     ? `${swap.outPlayer.name} is flagged ${swap.outPlayer.status}`
-    : `${swap.outPlayer.name} is barely starting (playtime ${(playtime * 100).toFixed(0)}%)`;
+    : lowPlaytime
+      ? `${swap.outPlayer.name} is barely starting (playtime ${(playtime * 100).toFixed(0)}%)`
+      : `${swap.outPlayer.name} is fit and starting but now rates in the bottom `
+        + 'band of the whole player pool';
 
   return {
     value: Math.max(0, swap.nearXiDelta),
-    components: { playtime, unavailable },
+    components: { playtime, unavailable, rankTier },
     estimated: Boolean(swap.outScore?.breakdown?.playtime?.estimated) || playtimeMissing,
     reasoning: `${cause}. Replacing him with ${swap.inPlayer.name} restores `
              + `${Math.max(0, swap.nearXiDelta).toFixed(1)} points to your XI.`,
