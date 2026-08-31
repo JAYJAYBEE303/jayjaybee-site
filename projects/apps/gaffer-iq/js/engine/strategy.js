@@ -118,6 +118,11 @@ function detectTriggers(swaps, squadState, ctx) {
   // the genuinely sharp signals the other triggers carry. At most one chip
   // trigger fires: the chip whose recommended GW is nearest, ties broken by
   // CHIP_TRIGGER_PRIORITY (the sharper, more time-critical chips win a tie).
+  // ctx.currentGw is the gameweek being PLANNED, which is not necessarily the
+  // one on the scoreboard: once a round has kicked off its deadline has gone
+  // and modules/planner.js advances the context to the next one. Distances
+  // below are therefore measured from the first gameweek the user can still
+  // act in — the only frame in which "plan transfers around it" means anything.
   const currentGw = ctx?.currentGw ?? 0;
   let nearestChip = null;
   for (const [chipId, rec] of Object.entries(squadState?.chipRecs ?? {})) {
@@ -134,7 +139,10 @@ function detectTriggers(swaps, squadState, ctx) {
   }
   if (nearestChip) {
     const { chipId, gw, distance } = nearestChip;
-    const distancePhrase = distance === 0 ? 'this gameweek'
+    // "this gameweek" would be a lie whenever the live round has already
+    // started — the nearest actionable gameweek is the one being planned, not
+    // the one being played.
+    const distancePhrase = distance === 0 ? 'the gameweek you are planning'
       : `${distance} ${distance === 1 ? 'gameweek' : 'gameweeks'} away`;
     triggers.push({
       id: 'chipWindow',
@@ -197,7 +205,9 @@ function detectTriggers(swaps, squadState, ctx) {
  * @param {{ flexibility: { value: number, components: object, estimated: boolean },
  *           freeTransfers: number,
  *           chipRecs: Object<string, { gw: number, reasoning: string }> }} squadState
- * @param {{ currentGw: number }} ctx   from buildScoreContext()
+ * @param {{ currentGw: number }} ctx   from buildScoreContext(). `currentGw` is
+ *   the gameweek being PLANNED — see modules/planner.js getPlanningTiming(),
+ *   which advances it past a round that has already kicked off.
  * @returns {{
  *   lane: 'now'|'future'|'funds'|'ceiling'|'structure'|'roll',
  *   laneScore: number,        // 0–100, the winning lane's normalised score (0 if rolled)

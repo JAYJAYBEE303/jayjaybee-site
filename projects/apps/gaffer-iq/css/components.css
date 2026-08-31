@@ -5916,6 +5916,63 @@ img.fx-crest {
 .planner-verdict__alts { margin: var(--space-1) 0 0; font-size: var(--font-size-sm); color: var(--color-muted); }
 .planner-verdict__triggers { list-style: none; margin: var(--space-2) 0 0; padding: 0; }
 
+/* Which gameweek this plan is FOR. Sits above the headline because it changes
+   how everything below it should be read — a plan for the round after the one
+   on the scoreboard is a different claim. */
+.planner-verdict__timing {
+  margin: 0 0 var(--space-1);
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+  line-height: 1.5;
+}
+
+/* What acting on the winning lane commits you to. */
+.planner-verdict__direction {
+  margin: var(--space-2) 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+  line-height: 1.5;
+}
+
+/* Dismiss. Default margin-left:auto right-aligns it on a 'roll' verdict, which
+   renders no score; when a score IS present that element takes the auto margin
+   instead and this one only needs a gap, or the free space would be split
+   between the two and strand the score mid-row. */
+.planner-verdict__close {
+  flex: none;
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--color-muted);
+  font-size: var(--font-size-lg);
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 var(--space-1);
+}
+
+.planner-verdict__score ~ .planner-verdict__close { margin-left: var(--space-2); }
+.planner-verdict__close:hover { color: var(--color-text); }
+
+/* Dismissed: one line, still naming the call and offering a way back. */
+.planner-verdict--collapsed {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+}
+
+.planner-verdict__gw { font-size: var(--font-size-xs); color: var(--color-muted); }
+
+.planner-verdict__reopen {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--color-accent);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  padding: 0;
+}
+
 .planner-verdict__trigger {
   display: flex;
   gap: var(--space-1);
@@ -5941,15 +5998,41 @@ img.fx-crest {
   min-width: 0;
 }
 
+/* flex-start, not baseline: the left column is now a title stacked over a
+   two-line blurb, and baseline alignment would drag the unit label down to the
+   blurb's first line instead of sitting level with the title. */
 .planner-board__hd {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: var(--space-2);
   margin-bottom: var(--space-2);
 }
 
+.planner-board__titles { min-width: 0; }
+
 .planner-board__title { margin: 0; font-size: var(--font-size-sm); font-weight: 600; }
-.planner-board__unit  { font-size: var(--font-size-xs); color: var(--color-muted); }
+
+/* What strategy this board actually represents. Deliberately quiet — it is
+   read once and then ignored, so it must not compete with the rows. */
+.planner-board__blurb {
+  margin: 2px 0 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  line-height: 1.45;
+}
+
+/* The unit of the middle column. Right-aligned and capped so a longer label
+   ("proj. XI pts over horizon") wraps rather than crushing the title. */
+.planner-board__unit {
+  flex: none;
+  max-width: 8.5rem;
+  text-align: right;
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  line-height: 1.3;
+}
+
 .planner-board__rows  { list-style: none; margin: 0; padding: 0; }
 .planner-board__empty { margin: 0; font-size: var(--font-size-sm); color: var(--color-muted); }
 
@@ -5982,6 +6065,15 @@ img.fx-crest {
 .planner-swap-row__out { color: var(--color-muted); }
 .planner-swap-row__arrow { color: var(--color-muted); flex: none; }
 .planner-swap-row__value { font-variant-numeric: tabular-nums; font-weight: 600; flex: none; }
+
+/* Estimated inputs. Carried on the number itself rather than by a separate
+   "~" column, which cost every row horizontal space to annotate a few of them.
+   Same border-style treatment as .score-pill--estimated — the house
+   convention. See ARCHITECTURE.md §11, FEATURE_ENGINE.md §8.3. */
+.planner-swap-row__value--estimated {
+  border-bottom: 1px var(--estimated-border-style) var(--color-muted);
+  opacity: 0.82;
+}
 .planner-swap-row__price { font-variant-numeric: tabular-nums; font-size: var(--font-size-xs);
                            color: var(--color-muted); flex: none; }
 
@@ -5995,7 +6087,8 @@ img.fx-crest {
 
 .planner-swap-row__badge--urgent    { color: var(--band-brutal); font-weight: 700; }
 .planner-swap-row__badge--xi        { color: var(--band-good); }
-.planner-swap-row__badge--estimated { color: var(--color-muted); }
+/* --estimated removed: the estimated signal now sits on the value itself
+   (.planner-swap-row__value--estimated) rather than in its own column. */
 
 .planner-swap-row__why {
   flex: none;

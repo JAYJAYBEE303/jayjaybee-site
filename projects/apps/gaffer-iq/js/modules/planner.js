@@ -29,13 +29,26 @@ import { fetchAndMapSquad, loadSavedTeamId, saveTeamId, resolveImportGw } from '
 import { enumerateSwaps, calcSquadFlexibility } from '../engine/transfers.js';
 import { buildVerdict } from '../engine/strategy.js';
 import { pickStartingXI } from '../engine/lineup.js';
-import { renderVerdictBanner, renderBoardGrid } from './planner-boards.js';
+import { renderVerdictBanner, renderBoardGrid, verdictSignature } from './planner-boards.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 /** localStorage key for chip-usage tracking (Phase 4-3). Persists across sessions
  *  because chip usage is a season-long decision the user makes once per chip. */
 const CHIPS_USED_KEY = 'gafferiq_chips_used';
+
+/**
+ * localStorage key holding the signature of the verdict the user last
+ * dismissed. localStorage, not sessionStorage or a module variable: a banner
+ * you have read and closed must stay closed across a refresh and across tab
+ * switches, which is exactly what the two cheaper options fail to do.
+ *
+ * A SIGNATURE rather than a boolean, so the dismissal expires on its own when
+ * the advice changes — see verdictSignature() in planner-boards.js. Budget
+ * keystrokes and score jitter keep it hidden; a new planning gameweek or a
+ * different strategic call brings it back.
+ */
+const VERDICT_DISMISSED_KEY = 'gafferiq_verdict_dismissed';
 
 // CHIP_IDS and CHIP_LABELS now live in config.js — shared with
 // engine/strategy.js's chipWindow trigger message, so a raw id never
@@ -96,6 +109,15 @@ let _openRows = new Set();
 
 /** Board ids currently showing BOARD_EXPANDED_N rows instead of BOARD_TOP_N. */
 let _expandedBoards = new Set();
+
+/** Signature of the verdict the user dismissed, or ''. Mirrors
+ *  VERDICT_DISMISSED_KEY in localStorage; loaded once on init. */
+let _dismissedVerdict = '';
+
+/** Signature of the verdict currently on screen, or ''. Written by
+ *  renderBoards() and read by the dismiss/show buttons, which have no other
+ *  way to name the thing they are hiding. */
+let _currentVerdictSignature = '';
 
 /** Cached candidate scores, keyed by window. Cleared on data/horizon change. */
 let _scoreCaches = { near: new Map(), far: new Map() };
@@ -182,6 +204,65 @@ function rankTierClass(rankTier) {
   return '';
 }
 
+/**
+ * Which gameweek this page is planning FOR, and how the round on the
+ * scoreboard relates to it.
+ *
+ * MODEL: `season.currentGw` is FPL's `is_current`, which stays pointing at a
+ * round from its deadline until the next one opens — so for most of a
+ * weekend it names a gameweek whose deadline has GONE. A planner is a tool
+ * for spending transfers, and transfers cannot be spent into a round that has
+ * kicked off, so planning against currentGw once it is live produced advice
+ * about a deadline the user could no longer meet ("Triple Captain looks
+ * strongest in GW2, this gameweek" while GW2 was being played). Once the
+ * current round has started, the planning gameweek is the NEXT one.
+ *
+ * Deliberately local to this module: the Dashboard and Matchup are reporting
+ * on the live round and must keep using currentGw. Only the planner plans.
+ *
+ * @returns {{ currentGw: number|null, planningGw: number|null,
+ *             phase: 'live'|'pre-deadline'|'finished'|'off-season',
+ *             unplayed: number }}
+ */
+function getPlanningTiming() {
+  const currentGw = store.getCurrentGw();
+  const nextGw    = store.getNextGw();
+  const ev        = currentGw == null
+    ? null
+    : store.getEvents().find(e => e.id === currentGw) ?? null;
+
+  if (!ev) {
+    return {
+      currentGw, planningGw: nextGw ?? currentGw ?? 1,
+      phase: 'off-season', unplayed: 0,
+    };
+  }
+
+  // `dataChecked` is FPL's data_checked — true once at least one fixture in the
+  // round has been processed. Kept alongside the deadline comparison because
+  // the deadline alone is a clock read, and a wrong client clock would
+  // otherwise silently skip a gameweek. Either signal is enough.
+  const deadlinePassed = ev.deadline ? Date.parse(ev.deadline) <= Date.now() : false;
+  const started = Boolean(ev.finished || ev.dataChecked || deadlinePassed);
+
+  const phase = ev.finished ? 'finished' : started ? 'live' : 'pre-deadline';
+
+  // Only meaningful while the round is under way: how many of its matches have
+  // yet to be played, because each one still to come can move every number on
+  // this page. Postponed fixtures carry gw === null and are excluded by the
+  // equality check, which is correct — they are not pending results for THIS
+  // round.
+  const unplayed = phase === 'live'
+    ? store.getFixtures().filter(f => f.gw === currentGw && !f.played).length
+    : 0;
+
+  const planningGw = started
+    ? (nextGw ?? currentGw + 1)
+    : currentGw;
+
+  return { currentGw, planningGw, phase, unplayed };
+}
+
 /** Build the engine scoring context from the current store state. */
 function buildCtx() {
   const season = store.getSeason();
@@ -192,7 +273,10 @@ function buildCtx() {
     leagueXgPrev: store.getLeagueXgPrev(),
     leagueXgHistory: store.getLeagueXgHistory(),
     teamXgBySlug: store.getAllTeamXg(),
-    currentGw: store.getCurrentGw() ?? store.getNextGw() ?? 1,
+    // The planning gameweek, NOT the live one — this is what moves every
+    // fixture window on the page (and therefore the chip timings below) off a
+    // round the user can no longer act on. See getPlanningTiming.
+    currentGw: getPlanningTiming().planningGw ?? store.getNextGw() ?? 1,
   });
 }
 
@@ -223,6 +307,23 @@ function saveChipsUsed() {
   try {
     localStorage.setItem(CHIPS_USED_KEY, JSON.stringify([..._chipsUsed]));
   } catch { /* quota exceeded — non-fatal */ }
+}
+
+// ─── Verdict dismissal persistence ───────────────────────────────────────────
+
+function loadDismissedVerdict() {
+  try {
+    _dismissedVerdict = localStorage.getItem(VERDICT_DISMISSED_KEY) ?? '';
+  } catch { _dismissedVerdict = ''; /* storage blocked — banner just stays open */ }
+}
+
+/** @param {string} signature  '' to clear the dismissal (re-show the banner). */
+function saveDismissedVerdict(signature) {
+  _dismissedVerdict = signature;
+  try {
+    if (signature) localStorage.setItem(VERDICT_DISMISSED_KEY, signature);
+    else           localStorage.removeItem(VERDICT_DISMISSED_KEY);
+  } catch { /* quota exceeded or blocked — the in-memory state still holds */ }
 }
 
 // ─── Squad management ─────────────────────────────────────────────────────────
@@ -785,7 +886,16 @@ function renderBoards(rescore = true) {
     chipRecs:      _chipRecs,
   }, ctx);
 
-  _verdictSlot.innerHTML = renderVerdictBanner(verdict);
+  const timing = getPlanningTiming();
+  _currentVerdictSignature = verdictSignature(verdict, timing);
+
+  _verdictSlot.innerHTML = renderVerdictBanner(verdict, {
+    timing,
+    // The dismissal is keyed to what the verdict SAYS, so a call that has
+    // since changed re-opens itself rather than staying silently hidden.
+    dismissed: Boolean(_currentVerdictSignature)
+            && _currentVerdictSignature === _dismissedVerdict,
+  });
   _boardsSlot.innerHTML  = renderBoardGrid(_swaps, {
     expandedBoards: _expandedBoards,
     openRows:       _openRows,
@@ -1110,6 +1220,24 @@ function onHitToggle() {
 }
 
 /** `why` toggles one row's disclosure; the open set survives re-render. */
+/**
+ * Dismiss / re-show the verdict banner. Delegated off the slot rather than
+ * bound to the button, because renderBoards() replaces the slot's innerHTML on
+ * every squad, budget and horizon change — a direct binding would be discarded
+ * on the first re-render.
+ */
+function onVerdictClick(e) {
+  if (e.target.closest('[data-verdict-dismiss]')) {
+    saveDismissedVerdict(_currentVerdictSignature);
+    renderBoards(false);
+    return;
+  }
+  if (e.target.closest('[data-verdict-show]')) {
+    saveDismissedVerdict('');
+    renderBoards(false);
+  }
+}
+
 function onBoardsClick(e) {
   const whyBtn = e.target.closest('[data-why-key]');
   if (whyBtn) {
@@ -1314,6 +1442,10 @@ function wireDom() {
 
   // ── Board rows — delegated click for why-panels and more/less ────────────
   _boardsSlot?.addEventListener('click', onBoardsClick);
+
+  // ── Verdict banner — delegated click for dismiss/show ────────────────────
+  _verdictSlot?.addEventListener('click', onVerdictClick);
+  loadDismissedVerdict();
 
   // ── Squad import (Phase 4-1) ─────────────────────────────────────────────
   _importBtn     = document.getElementById('planner-import-btn');
