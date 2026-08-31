@@ -266,6 +266,17 @@ function setSquad(playerIds) {
  * Store the imported FPL pick order (slot + armband) for the current squad.
  * Called immediately after setSquad() on import — see the note in setSquad
  * about why order matters here.
+ *
+ * Emits its OWN 'squadPicks:updated' event rather than 'squad:updated'. The
+ * squad ARRAY does not change here — only which slots/armband apply to it —
+ * and every board/score a 'squad:updated' subscriber recomputes (Planner's
+ * full lens-board re-enumeration, Dashboard's re-score) depends only on
+ * squad MEMBERSHIP, never on pick order. Reusing 'squad:updated' would make
+ * setSquad()'s own emit, immediately followed by this one on import, pay for
+ * that expensive work twice for a single logical "import a squad" action.
+ * Only the saved-XI diff markers (store.getSavedXi(), read by the Planner's
+ * squad rail) depend on pick order, so that is the only listener this event
+ * needs to reach.
  * @param {Array<{playerId: number, slot: number|null, isCaptain: boolean,
  *   isViceCaptain: boolean}>} picks
  */
@@ -274,7 +285,7 @@ function setSquadPicks(picks) {
   try {
     sessionStorage.setItem(SS_KEY_PICKS, JSON.stringify(state.squadPicks));
   } catch { /* quota exceeded — non-fatal */ }
-  emit('squad:updated', state.squad);
+  emit('squadPicks:updated', state.squadPicks);
 }
 
 function setError(err) {

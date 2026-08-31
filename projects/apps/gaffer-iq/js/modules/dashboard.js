@@ -21,7 +21,7 @@
  */
 
 import { store }       from '../store.js';
-import { HORIZONS, BANDS, SQUAD_LIMITS } from '../config.js';
+import { HORIZONS, BANDS, SQUAD_LIMITS, SQUAD_TOTAL } from '../config.js';
 import { buildScoreContext, scorePlayer, rankPlayers, attachRankTiers } from '../engine/composite.js';
 import { groupPerGwSlots }              from '../engine/fixtures.js';
 import { pickStartingXI }               from '../engine/lineup.js';
@@ -32,10 +32,6 @@ import { fetchAndMapSquad, loadSavedTeamId, saveTeamId, resolveImportGw } from '
 
 /** Dashboard is horizon-locked to GW1 — ignores the global horizon switcher. */
 const HORIZON = HORIZONS.GW1;
-
-
-/** Total squad size: 2 + 5 + 5 + 3 = 15. */
-const SQUAD_TOTAL = Object.values(SQUAD_LIMITS).reduce((s, n) => s + n, 0);
 
 /**
  * minutesSecurity below this threshold → "Rotation Risk" flag.

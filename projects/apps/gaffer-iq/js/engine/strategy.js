@@ -134,12 +134,13 @@ function detectTriggers(swaps, squadState, ctx) {
   }
   if (nearestChip) {
     const { chipId, gw, distance } = nearestChip;
-    const gwUnit = distance === 1 ? 'gameweek' : 'gameweeks';
+    const distancePhrase = distance === 0 ? 'this gameweek'
+      : `${distance} ${distance === 1 ? 'gameweek' : 'gameweeks'} away`;
     triggers.push({
       id: 'chipWindow',
       laneId: chipId === 'triplecaptain' ? 'ceiling' : 'future',
       message: `${CHIP_LABELS[chipId] ?? chipId} looks strongest in GW${gw}, `
-             + `${distance} ${gwUnit} away — plan transfers around it.`,
+             + `${distancePhrase} — plan transfers around it.`,
     });
   }
 
@@ -194,7 +195,7 @@ function detectTriggers(swaps, squadState, ctx) {
  *   `{ value: number, components: object, estimated: boolean, reasoning: string }`,
  *   plus `flags.{outInXi, inEntersXi, outUnavailable}`, `outPlayer`, `inPlayer`.
  * @param {{ flexibility: { value: number, components: object, estimated: boolean },
- *           xiEntries: Array, freeTransfers: number,
+ *           freeTransfers: number,
  *           chipRecs: Object<string, { gw: number, reasoning: string }> }} squadState
  * @param {{ currentGw: number }} ctx   from buildScoreContext()
  * @returns {{
@@ -291,11 +292,22 @@ export function buildVerdict(swaps, squadState, ctx) {
              + `${leaderLabel} (${leader.score.toFixed(0)} points), which would `
              + 'otherwise have topped the board this week.';
   } else {
+    // `confidence` can read 'close' with an EMPTY `alternatives` list: the
+    // estimated-data downgrade above can drop 'clear'/'dominant' to 'close'
+    // on a margin that was already ≥ VERDICT_MARGIN_CLEAR, but `alternatives`
+    // is filtered on that same margin and was computed before the downgrade
+    // — it has nothing within range to name. That disagreement is intentional
+    // (the downgrade is about honesty re: estimated data, not about how far
+    // apart the lanes actually are), so only the SENTENCE falls back here;
+    // `confidence` itself is left as 'close' for the banner's badge/CSS.
+    const canNameAlternatives = confidence === 'close' && alternatives.length > 0;
+    const altNames = alternatives.map(a => a.label).join(' and ');
     headline =
         confidence === 'dominant' ? `${winnerLabel} is in a different league this week.`
-      : confidence === 'clear'    ? `${winnerLabel}, clearly.`
-      : `Close call — ${winnerLabel}, but ${alternatives.map(a => a.label).join(' and ')} `
-        + `${alternatives.length === 1 ? 'is' : 'are'} within ${VERDICT_MARGIN_CLEAR} points.`;
+      : canNameAlternatives
+        ? `Close call — ${winnerLabel}, but ${altNames} `
+          + `${alternatives.length === 1 ? 'is' : 'are'} within ${VERDICT_MARGIN_CLEAR} points.`
+        : `${winnerLabel}, clearly.`;
   }
 
   const estimatedNote = estimated

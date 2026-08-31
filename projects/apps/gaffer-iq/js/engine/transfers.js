@@ -40,7 +40,16 @@ function memoScore(cache, player, horizon, ctx, scoreFn) {
   let score;
   try {
     score = scoreFn(player, horizon, ctx);
-  } catch {
+  } catch (err) {
+    // Not re-thrown: one unscoreable player must not fail the whole
+    // enumeration (CONVENTIONS.md §9 requires this catch do SOMETHING,
+    // not swallow silently — logging is that something). The caller-side
+    // consequence is real, though: if this is a SQUAD member, nearEntries
+    // falls below SQUAD_TOTAL and enumerateSwaps returns [], which
+    // upstream must not present as "no legal transfers" — see
+    // modules/planner.js's renderBoards, which distinguishes that case
+    // from a genuine empty enumeration using this warning as its signal.
+    console.warn('[engine/transfers] scoreFn failed for player', player?.id, err?.message ?? err);
     return null;
   }
   cache.set(player.id, score);
@@ -149,7 +158,7 @@ function withSwap(entries, outId, inEntry) {
  * @param {Player[]} allPlayers      the full player pool
  * @param {object}   ctx             from buildScoreContext()
  * @param {object}   opts            { horizon, budget, freeTransfers,
- *                                     allowExtraHit, scorePlayerFn?, caches?,
+ *                                     scorePlayerFn?, caches?,
  *                                     rankTierByPlayerId? }
  * @param {Map<number, string|null>} [opts.rankTierByPlayerId]  playerId ->
  *   rank tier ('positionElite'|'positionStrong'|'topPercentile'|
@@ -163,7 +172,7 @@ function withSwap(entries, outId, inEntry) {
  */
 export function enumerateSwaps(squadIds, allPlayers, ctx, opts = {}) {
   const {
-    horizon, budget = 0, freeTransfers = 1, allowExtraHit = false,
+    horizon, budget = 0, freeTransfers = 1,
     scorePlayerFn = defaultScorePlayer, caches = null, rankTierByPlayerId = null,
   } = opts;
 

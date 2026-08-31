@@ -1267,11 +1267,12 @@ Haul rate is the share of played gameweeks scoring ≥ `HAUL_POINTS_THRESHOLD` (
 **Structure Fix** (`LANE_SCALE_STRUCTURE = 10`) — fires only when the OUT player is in the *projected* starting XI **and** is broken by at least one of:
 
 - `status !== 'available'` (injured, suspended, doubtful), or
-- `breakdown.playtime.value` below `STRUCTURE_PLAYTIME_FLOOR` (0.45).
+- `breakdown.playtime.value` below `STRUCTURE_PLAYTIME_FLOOR` (0.45), or
+- rank tier `bottomPercentile` against the full player pool (a nailed, fit starter whose underlying output has still collapsed relative to the whole pool — the only one of the three conditions that catches this case).
 
 Scored by how much of the XI total the repair restores (`max(0, nearXiDelta)`). Legitimately empty most weeks — the board renders an explicit "Nothing broken — no starter is flagged or short of minutes" state rather than padding itself with the next-best generic swap. Verified live both ways: empty on a squad of fifteen `status: 'available'` players, populated (naming the injured starter and the points restored) on a squad carrying one flagged player.
 
-> **Scope note — a shipped gap, not a ruling:** spec §7.1 also lists a rank-tier condition (`bottomPercentile`) as a third way a starter can count as "broken". The shipped `scoreStructureLane` checks only `status` and `playtime` — no rank-tier signal reaches it, and `enumerateSwaps` never receives a `rankTierByPlayerId` map to check it against. This was not logged as a deliberate controller ruling anywhere in the build ledger; it appears to have been dropped rather than decided. Flagged here rather than silently documented as shipped — see the Task 10 report's Concerns.
+The rank-tier condition depends on `rankTierByPlayerId` — a `playerId → tier` map built from a full-pool `attachRankTiers(rankPlayers(...))` pass, computed once by the caller (`modules/planner.js`) and threaded through `enumerateSwaps`'s `opts.rankTierByPlayerId` to `scoreStructureLane` (`engine/transfers.js:550-551`; wired at `modules/planner.js:742`). Added by commit `0e76814`, after this section was first written describing only the first two conditions — see CONVENTIONS.md §10.
 
 ### 14.4 Lane normalisation and why it is the first thing to calibrate
 

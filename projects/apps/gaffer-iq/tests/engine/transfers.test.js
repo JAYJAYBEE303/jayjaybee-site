@@ -185,7 +185,11 @@ test('the Structure lane stays silent when the outgoing player is fine', () => {
 test('the Structure lane fires for an unavailable XI player', () => {
   const squad = squadOf15();
   squad[11].status = 'injured';                      // player 12, a certain starter
-  const swaps = enumerateSwaps(squad.map(p => p.id), [...squad, player(40, 'MID', 12.0, 8.0)], stubCtx(), {
+  // stubScorer ignores `status`, so player 12 still projects its declared ep
+  // (9.0) despite being injured — the repair only reads as a genuine gain if
+  // the incoming player's ep (9.5) is HIGHER than that, giving a positive
+  // nearXiDelta for scoreStructureLane's max(0, nearXiDelta) to report.
+  const swaps = enumerateSwaps(squad.map(p => p.id), [...squad, player(40, 'MID', 12.0, 9.5)], stubCtx(), {
     horizon: { label: 'test', gws: 3 }, budget: 5, freeTransfers: 1,
     allowExtraHit: false, scorePlayerFn: stubScorer,
   });

@@ -10,7 +10,7 @@
  * See docs/superpowers/specs/2026-08-30-planner-multi-lens-transfers-design.md §9.
  */
 
-import { BOARD_TOP_N, BOARD_EXPANDED_N } from '../config.js';
+import { BOARD_TOP_N, BOARD_EXPANDED_N, STRUCTURE_PLAYTIME_FLOOR } from '../config.js';
 
 /** Safe HTML escape for any dynamic string placed inside innerHTML. */
 function esc(str) {
@@ -95,7 +95,8 @@ export function renderVerdictBanner(verdict) {
           : ''}
         ${verdict.lane === 'roll' ? '' :
           `<span class="planner-verdict__score">${verdict.laneScore.toFixed(0)}
-            <span class="planner-verdict__margin">+${verdict.margin.toFixed(0)} clear</span>
+            ${verdict.promotedBy ? '' :
+              `<span class="planner-verdict__margin">+${verdict.margin.toFixed(0)} clear</span>`}
           </span>`}
       </div>
       <p class="planner-verdict__headline">${esc(verdict.reasoning)}</p>
@@ -173,12 +174,17 @@ function renderBoard(board, swaps, opts) {
   // An empty board says so plainly. Padding it with the next-best generic swap
   // would be exactly the tunnel vision this feature exists to remove.
   const body = rows.length === 0
-    ? `<p class="planner-board__empty">${esc(emptyMessage(board.id))}</p>`
+    ? `<p class="planner-board__empty">${esc(emptyMessage(board.id, swaps))}</p>`
     : `<ul class="planner-board__rows">
          ${rows.map(s => renderSwapRow(s, board, openRows.has(swapKey(s)))).join('')}
        </ul>`;
 
-  const more = ranked.length > rows.length
+  // `|| isExpanded` matters when a board has, say, 6 qualifying swaps: once
+  // expanded (limit = BOARD_EXPANDED_N) ranked.length === rows.length and the
+  // plain `ranked.length > rows.length` check would drop the button entirely,
+  // leaving no way back to the collapsed view — _expandedBoards persists
+  // across renders, so that board would be stuck expanded for the session.
+  const more = (ranked.length > rows.length || isExpanded)
     ? `<button class="planner-board__more" type="button" data-board-more="${esc(board.id)}">
          ${isExpanded ? 'less' : `more (${ranked.length - rows.length})`}
        </button>`
@@ -196,10 +202,38 @@ function renderBoard(board, swaps, opts) {
   `.trim();
 }
 
-/** What a board says when it has nothing to recommend. */
-function emptyMessage(boardId) {
+/**
+ * Whether SOME candidate out-player is structurally broken, independent of
+ * whether any candidate swap for them turned out profitable (the Structure
+ * lane always scores `max(0, nearXiDelta)`, so a broken starter with no
+ * affordable improvement scores exactly 0 — same as "nothing is broken").
+ * Mirrors the three OUT-side conditions `scoreStructureLane` checks
+ * (engine/transfers.js), read back off data the swaps already carry rather
+ * than recomputed here — this stays a DOM module, no engine logic.
+ * @param {Array<Swap>} swaps  the full unfiltered enumeration
+ * @returns {boolean}
+ */
+function hasBrokenStarter(swaps) {
+  return (swaps ?? []).some(s => s.flags?.outInXi && (
+    s.flags?.outUnavailable
+    || (s.lanes?.structure?.components?.playtime ?? 1) < STRUCTURE_PLAYTIME_FLOOR
+    || s.lanes?.structure?.components?.rankTier === 'bottomPercentile'
+  ));
+}
+
+/** What a board says when it has nothing to recommend.
+ *  @param {string} boardId
+ *  @param {Array<Swap>} [swaps]  only read by 'structure', to tell "nothing
+ *    broken" apart from "broken, but nothing affordable fixes it" — the two
+ *    are very different claims and the verdict banner above may already be
+ *    naming the broken player, so silently reusing one empty string for both
+ *    would contradict it. */
+function emptyMessage(boardId, swaps) {
   switch (boardId) {
-    case 'structure': return 'Nothing broken — no starter is flagged or short of minutes.';
+    case 'structure': return hasBrokenStarter(swaps)
+      ? 'A starter is flagged, low on minutes, or rating poorly — but no '
+        + 'affordable replacement actually gains points in your XI.'
+      : 'Nothing broken — no starter is flagged or short of minutes.';
     case 'future':    return 'No fixture swings worth pre-empting within your budget.';
     case 'funds':     return 'No move improves your flexibility without costing too much.';
     case 'ceiling':   return 'No higher-ceiling option within budget.';
@@ -210,8 +244,7 @@ function emptyMessage(boardId) {
 /**
  * The full grid of five boards.
  * @param {Array<Swap>} swaps
- * @param {{expandedBoards: Set<string>, openRows: Set<string>,
- *          rankTierByPlayerId: Map<number,string>}} opts
+ * @param {{expandedBoards: Set<string>, openRows: Set<string>}} opts
  * @returns {string}  HTML
  */
 export function renderBoardGrid(swaps, opts) {

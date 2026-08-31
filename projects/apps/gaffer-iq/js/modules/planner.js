@@ -6,7 +6,8 @@
  * No analytical logic lives here — see FEATURE_ENGINE.md §10 and §11.
  * See ROADMAP.md Phase 2D, ARCHITECTURE.md §10.
  *
- * Subscriptions: data:ready, horizon:changed, route:changed, squad:updated
+ * Subscriptions: data:ready, horizon:changed, route:changed, squad:updated,
+ *   squadPicks:updated
  * Renders only while on screen: data:ready does the cheap bookkeeping
  * unconditionally, then defers the expensive work to route:changed when
  * this module is hidden. See CONVENTIONS.md §8.
@@ -39,8 +40,6 @@ const CHIPS_USED_KEY = 'gafferiq_chips_used';
 // CHIP_IDS and CHIP_LABELS now live in config.js — shared with
 // engine/strategy.js's chipWindow trigger message, so a raw id never
 // leaks into rendered text on either surface.
-
-
 
 /** Max pool size fed into the O(n²) 2-transfer combo search. */
 const COMBO_POOL = 60;
@@ -726,6 +725,10 @@ function renderBoards(rescore = true) {
 
   const ctx = buildCtx();
   if (!ctx) {
+    // M4: this path used to leave whatever verdict banner was already
+    // rendered on screen — stale, and describing a squad/budget state the
+    // boards below no longer match. Clear both slots together.
+    _verdictSlot.innerHTML = renderVerdictBanner(null);
     _boardsSlot.innerHTML = `<p class="planner-hint">No data available yet.</p>`;
     return;
   }
@@ -737,7 +740,6 @@ function renderBoards(rescore = true) {
       horizon:            getHorizon(),
       budget:             _budget,
       freeTransfers:      _freeTransfers,
-      allowExtraHit:      _allowExtraHit,
       caches:             _scoreCaches,
       rankTierByPlayerId: _rankTierByPlayerId,
     });
@@ -746,19 +748,47 @@ function renderBoards(rescore = true) {
     _swaps = [];
   }
 
+  // FIX 6: an empty enumeration is ambiguous on its own — it is the correct,
+  // honest result of "no legal transfer beats your budget", but it is ALSO
+  // what a squad member failing to score produces (enumerateSwaps requires
+  // every squad member to score before it enumerates anything; see its
+  // `nearEntries.length < SQUAD_TOTAL` guard). buildVerdict([]) can't tell
+  // these apart and always renders the "no legal transfers" roll verdict,
+  // which would be a confident, wrong statement in the second case. _scores
+  // is populated by this module's own per-player scoreSquad() over the same
+  // squad/horizon/ctx just before this runs, so a squad member missing from
+  // it is the simplest available signal that a scoring failure — not a
+  // legitimately empty budget search — is why _swaps is empty. Reusing that
+  // existing signal (already console.warn'd by scoreSquad and, for a failure
+  // inside enumerateSwaps itself, by memoScore) avoids inventing a new engine
+  // return shape just to carry this one bit.
+  const squadScored = store.getSquad().every(id => _scores.has(id));
+  if (_swaps.length === 0 && !squadScored) {
+    _verdictSlot.innerHTML = `
+      <div class="planner-verdict planner-verdict--empty">
+        <p class="planner-verdict__headline">Some of your squad could not be
+          scored this week, so no honest verdict can be built — this is not
+          the same as "no legal transfers". Check the console for which
+          player failed and try again once data has finished loading.</p>
+      </div>
+    `.trim();
+    _boardsSlot.innerHTML = `<p class="planner-hint">
+      No boards — see the note above.
+    </p>`;
+    return;
+  }
+
   const squadPlayers = store.getSquad().map(id => store.getPlayer(id)).filter(Boolean);
   const verdict = buildVerdict(_swaps, {
     flexibility:   calcSquadFlexibility(squadPlayers, _scores),
-    xiEntries:     [],
     freeTransfers: _freeTransfers,
     chipRecs:      _chipRecs,
   }, ctx);
 
   _verdictSlot.innerHTML = renderVerdictBanner(verdict);
   _boardsSlot.innerHTML  = renderBoardGrid(_swaps, {
-    expandedBoards:     _expandedBoards,
-    openRows:           _openRows,
-    rankTierByPlayerId: _rankTierByPlayerId,
+    expandedBoards: _expandedBoards,
+    openRows:       _openRows,
   });
 }
 
@@ -1360,6 +1390,19 @@ function onRouteChanged(module) {
   renderRecommendations();
 }
 
+/**
+ * 'squadPicks:updated' fires when the pick order (slot + armband) changes
+ * without the squad's MEMBERSHIP changing — the only thing that depends on
+ * it is the squad rail's saved-XI diff markers (calcSavedXiDiff, inside
+ * renderSquadPanel). Deliberately does NOT run the rest of afterSquadChange:
+ * re-scoring and re-enumerating swaps here would be the exact double cold
+ * pass this event was split out of 'squad:updated' to avoid — see the
+ * comment on store.js's setSquadPicks.
+ */
+function onSquadPicksChanged() {
+  renderSquadPanel();
+}
+
 function onHorizonChanged() {
   if (!_dataReady) return;
   // Rank tiers depend on horizon (a player's score, and therefore rank,
@@ -1388,10 +1431,11 @@ function onHorizonChanged() {
  * renderRecommendations' null DOM-ref guards if this module hasn't wired yet.
  */
 export function initPlanner() {
-  store.subscribe('data:ready',      onDataReady);
-  store.subscribe('horizon:changed', onHorizonChanged);
-  store.subscribe('route:changed',   onRouteChanged);
-  store.subscribe('squad:updated',   afterSquadChange);
+  store.subscribe('data:ready',        onDataReady);
+  store.subscribe('horizon:changed',   onHorizonChanged);
+  store.subscribe('route:changed',     onRouteChanged);
+  store.subscribe('squad:updated',     afterSquadChange);
+  store.subscribe('squadPicks:updated', onSquadPicksChanged);
 
   // If the store is already hydrated (sessionStorage), wire up immediately.
   if (store.isFresh()) {
