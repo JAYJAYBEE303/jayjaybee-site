@@ -14,7 +14,7 @@
  * See docs/superpowers/specs/2026-08-30-planner-multi-lens-transfers-design.md.
  */
 
-import { scorePlayer as defaultScorePlayer, rankPlayers } from './composite.js';
+import { scorePlayer as defaultScorePlayer } from './composite.js';
 import { pickStartingXI, calcXiExpectedPoints } from './lineup.js';
 import {
   SQUAD_TOTAL, HIT_PENALTY, CANDIDATE_POOL_PER_POS,
@@ -41,35 +41,45 @@ function memoScore(cache, player, horizon, ctx, scoreFn) {
 }
 
 /**
- * The top CANDIDATE_POOL_PER_POS players per position, by composite rank,
+ * The top CANDIDATE_POOL_PER_POS players per position, by near-window score,
  * excluding anyone already in the squad.
+ *
+ * Scores every eligible player through the caller's memoised `scoreNear`
+ * closure rather than calling rankPlayers separately — rankPlayers would score
+ * the same ~626 players a second time under a cache the enumeration loop below
+ * can't see, doubling the near-window scoring cost for no benefit. Routing
+ * through the shared cache means every player is scored at most once, and the
+ * cache is warm by the time the enumeration loop asks for these same
+ * candidates again.
  *
  * MODEL: bounding the pool by rank rather than scoring all ~700 players is what
  * keeps the enumeration affordable. A transfer target outside the top 40 of its
  * position is not a recommendation this tool would ever make, so nothing of
  * value is lost — but the bound is config, not a hard-coded assumption.
  *
- * @returns {Object<string, Player[]>}  keyed by position
+ * @param {Player[]} allPlayers   the full player pool
+ * @param {number[]} squadIds     the user's 15 player ids, excluded from pools
+ * @param {(player: Player) => (object|null)} scoreNear  memoised near-window
+ *   scorer; returns null (and the player is skipped) if scoring fails
+ * @returns {Object<string, Player[]>}  keyed by position, each sorted by
+ *   score.value descending
  */
-function buildCandidatePools(allPlayers, squadIds, horizon, ctx, scoreFn) {
+function buildCandidatePools(allPlayers, squadIds, scoreNear) {
   const squadSet = new Set(squadIds);
   const pools = { GKP: [], DEF: [], MID: [], FWD: [] };
+  const scored = { GKP: [], DEF: [], MID: [], FWD: [] };
 
-  let ranked;
-  try {
-    ranked = rankPlayers(allPlayers, horizon, ctx);
-  } catch {
-    // Fall back to unranked order rather than returning nothing — a degraded
-    // candidate list is still a usable planner (CONVENTIONS §9).
-    ranked = allPlayers.map(player => ({ player }));
+  for (const player of allPlayers) {
+    const bucket = scored[player?.position];
+    if (!bucket || squadSet.has(player.id)) continue;
+    const score = scoreNear(player);
+    if (!score) continue;
+    bucket.push({ player, score });
   }
 
-  for (const row of ranked) {
-    const player = row.player;
-    const pool = pools[player?.position];
-    if (!pool || squadSet.has(player.id)) continue;
-    if (pool.length >= CANDIDATE_POOL_PER_POS) continue;
-    pool.push(player);
+  for (const pos of Object.keys(scored)) {
+    scored[pos].sort((a, b) => b.score.value - a.score.value);
+    pools[pos] = scored[pos].slice(0, CANDIDATE_POOL_PER_POS).map(row => row.player);
   }
   return pools;
 }
@@ -129,7 +139,7 @@ export function enumerateSwaps(squadIds, allPlayers, ctx, opts = {}) {
   const baseFar  = calcXiExpectedPoints(farEntries);
   const baseXiIds = new Set(pickStartingXI(nearEntries).xi.map(e => e.player.id));
 
-  const pools = buildCandidatePools(allPlayers, squadIds, horizon, ctx, scorePlayerFn);
+  const pools = buildCandidatePools(allPlayers, squadIds, scoreNear);
   // A single transfer is free whenever at least one FT is available. The hit
   // only ever applies to a SECOND move, which computeBestTwoSwap models — so a
   // single swap carries a cost of 0 in every normal state of this page.
