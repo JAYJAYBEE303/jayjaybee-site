@@ -18,7 +18,7 @@ import {
   LANE_SCALE_NOW, LANE_SCALE_FUTURE, LANE_SCALE_FUNDS,
   LANE_SCALE_CEILING, LANE_SCALE_STRUCTURE,
   VERDICT_ACT_THRESHOLD, VERDICT_MARGIN_CLEAR, VERDICT_MARGIN_DOMINANT,
-  CHIP_WINDOW_GWS, FLEX_FLOOR,
+  CHIP_WINDOW_GWS, FLEX_FLOOR, PRICE_BUY_NOW_CONFIDENCE,
 } from '../config.js';
 
 /** Lane id → the config divisor that maps its natural unit onto 0–100. */
@@ -56,7 +56,7 @@ function normaliseLaneValue(laneId, value) {
   return clamp(0, 100, (value / scale) * 100);
 }
 
-/** The best swap on each lane, with its normalised score. */
+/** The best swap on each lane, with its normalised score, ranked highest first. */
 function rankLanes(swaps) {
   const rows = [];
   for (const laneId of Object.keys(LANE_SCALES)) {
@@ -67,12 +67,10 @@ function rankLanes(swaps) {
       if (!best || lane.value > best.lanes[laneId].value) best = swap;
     }
     if (!best) continue;
-    const raw = best.lanes[laneId].value;
     rows.push({
       laneId,
       swap: best,
-      raw,
-      score: normaliseLaneValue(laneId, raw),
+      score: normaliseLaneValue(laneId, best.lanes[laneId].value),
       estimated: Boolean(best.lanes[laneId].estimated),
     });
   }
@@ -81,8 +79,8 @@ function rankLanes(swaps) {
 
 /**
  * Hard conditions that may promote a lane past the arithmetic. Each carries its
- * own headline reason and is always reported — a trigger never silently
- * reorders anything.
+ * own headline reason and is always reported — detecting a trigger never by
+ * itself reorders anything; buildVerdict decides whether it actually promotes.
  *
  * @returns {Array<{id: string, laneId: string, message: string}>}
  */
@@ -122,8 +120,15 @@ function detectTriggers(swaps, squadState, ctx) {
     });
   }
 
+  // Gated on confidence, not just direction: calcPriceChangeRisk (engine/prices.js)
+  // reports direction:'rise' for any net-positive transfer flow above its activity
+  // floor, including thin, noisy signals. PRICE_BUY_NOW_CONFIDENCE is the same bar
+  // the planner's own "Buy now" badge uses — reusing it keeps this trigger no more
+  // trigger-happy than that UI already is.
   const risingTarget = swaps.find(s =>
-    s.lanes?.funds?.components?.priceRisk === 'rise' && s.lanes?.now?.value > 0);
+    s.lanes?.funds?.components?.priceRisk === 'rise'
+    && (s.lanes?.funds?.components?.priceRiskConfidence ?? 0) >= PRICE_BUY_NOW_CONFIDENCE
+    && s.lanes?.now?.value > 0);
   if (risingTarget) {
     triggers.push({
       id: 'priceDeadline',
@@ -137,63 +142,136 @@ function detectTriggers(swaps, squadState, ctx) {
 }
 
 /**
- * Build the week's verdict.
+ * Build the week's verdict: which lane to act on (or whether to roll), how
+ * confident that call is, and what — if anything — overrode the arithmetic.
  *
- * @param {Array<Swap>} swaps       from enumerateSwaps()
- * @param {object} squadState       { flexibility, xiEntries, freeTransfers, chipRecs }
- * @param {object} ctx              from buildScoreContext()
- * @returns {{ lane, laneScore, margin, confidence, bestSwap, alternatives,
- *             triggers, reasoning, estimated }}
+ * Selection has two stages. First, the five lanes are ranked by their best
+ * swap's normalised score (0–100, see normaliseLaneValue); the top-ranked lane
+ * is the "arithmetic leader" and only wins outright if its score clears
+ * VERDICT_ACT_THRESHOLD — otherwise the verdict rolls. Second, any lane with a
+ * fired trigger (see detectTriggers) that ALSO clears VERDICT_ACT_THRESHOLD is a
+ * promotion candidate; the highest-scoring such lane, if it differs from the
+ * arithmetic leader, is promoted to be the verdict's lane instead — even when
+ * the arithmetic leader itself didn't clear the threshold. A promotion always
+ * reports confidence 'clear' (a hard condition is not a close call) before the
+ * estimated-data downgrade below is applied. This is spec §8.3's "hard triggers
+ * can jump the queue and say so".
+ *
+ * `margin` always means the arithmetic leader's normalised score minus the
+ * runner-up's (never negative) — it describes how the lanes actually compare
+ * and keeps that meaning whether or not a promotion changed which lane won.
+ *
+ * Honesty rule (spec §8.4): a winning lane whose swap is itself flagged
+ * `estimated` never reports the same confidence a measured winner would —
+ * 'dominant' is downgraded to 'clear', and 'clear' (including a fresh
+ * promotion) is downgraded to 'close'.
+ *
+ * @param {Array<object>} swaps        Swap[] from enumerateSwaps() — each with
+ *   `lanes.{now,future,funds,ceiling,structure}` as
+ *   `{ value: number, components: object, estimated: boolean, reasoning: string }`,
+ *   plus `flags.{outInXi, inEntersXi, outUnavailable}`, `outPlayer`, `inPlayer`.
+ * @param {{ flexibility: { value: number, components: object, estimated: boolean },
+ *           xiEntries: Array, freeTransfers: number,
+ *           chipRecs: Object<string, { gw: number, reasoning: string }> }} squadState
+ * @param {{ currentGw: number }} ctx   from buildScoreContext()
+ * @returns {{
+ *   lane: 'now'|'future'|'funds'|'ceiling'|'structure'|'roll',
+ *   laneScore: number,        // 0–100, the winning lane's normalised score (0 if rolled)
+ *   margin: number,           // 0–100, arithmetic leader's score minus the runner-up's
+ *   confidence: 'dominant'|'clear'|'close',
+ *   bestSwap: object|null,    // the winning lane's Swap, or null when rolled
+ *   alternatives: Array<{ lane: string, label: string, score: number }>,
+ *   triggers: Array<{ id: string, laneId: string, message: string }>,
+ *   promotedBy: string|null,  // the trigger id that promoted this lane, or null
+ *   estimated: boolean,       // true if the winning lane's swap is itself estimated
+ *   reasoning: string,
+ * }}
  */
 export function buildVerdict(swaps, squadState, ctx) {
   const triggers = detectTriggers(swaps ?? [], squadState ?? {}, ctx ?? {});
   const ranked   = rankLanes(swaps ?? []);
   const leader   = ranked[0] ?? null;
+  const runnerUp = ranked[1] ?? null;
+  const margin   = leader ? (runnerUp ? leader.score - runnerUp.score : leader.score) : 0;
 
-  if (!leader || leader.score < VERDICT_ACT_THRESHOLD) {
+  // Promotion: the highest-scoring triggered lane that clears the threshold, if
+  // it differs from the arithmetic leader. ranked is sorted descending, so the
+  // first qualifying row is the highest-scoring one.
+  const triggeredLaneIds = new Set(triggers.map(t => t.laneId));
+  let promoted = ranked.find(row =>
+    triggeredLaneIds.has(row.laneId) && row.score >= VERDICT_ACT_THRESHOLD) ?? null;
+  if (promoted && leader && promoted.laneId === leader.laneId) promoted = null;
+  const promotedBy = promoted
+    ? (triggers.find(t => t.laneId === promoted.laneId)?.id ?? null)
+    : null;
+
+  const winner = promoted ?? leader;
+
+  if (!promoted && (!winner || winner.score < VERDICT_ACT_THRESHOLD)) {
+    const triggerNote = triggers.length > 0 ? ` ${triggers.map(t => t.message).join(' ')}` : '';
+    const estimatedNote = winner?.estimated
+      ? ' Some of the inputs behind this are estimated, so treat it as a lean rather '
+        + 'than a certainty.'
+      : '';
+    const headline = winner
+      ? `${LANE_LABELS.roll} — the best move, ${LANE_LABELS[winner.laneId]}, scores `
+        + `${winner.score.toFixed(0)} against a threshold of ${VERDICT_ACT_THRESHOLD}.`
+      : `${LANE_LABELS.roll} — no legal transfers are available within your budget.`;
     return {
       lane: 'roll',
-      laneScore: leader?.score ?? 0,
-      margin: 0,
+      laneScore: winner?.score ?? 0,
+      margin,
       confidence: 'clear',
       bestSwap: null,
       alternatives: [],
       triggers,
-      estimated: Boolean(leader?.estimated),
-      reasoning: leader
-        ? `Nothing on the board is worth a transfer this week — the best move, `
-          + `${LANE_LABELS[leader.laneId]}, scores ${leader.score.toFixed(0)} against a `
-          + `threshold of ${VERDICT_ACT_THRESHOLD}. Roll it and bank the transfer.`
-        : 'No legal transfers are available within your budget. Roll it.',
+      promotedBy: null,
+      estimated: Boolean(winner?.estimated),
+      reasoning: `${headline}${triggerNote}${estimatedNote}`,
     };
   }
 
-  const runnerUp = ranked[1] ?? null;
-  const margin   = runnerUp ? leader.score - runnerUp.score : leader.score;
-
-  let confidence = 'close';
-  if (margin >= VERDICT_MARGIN_DOMINANT)   confidence = 'dominant';
-  else if (margin >= VERDICT_MARGIN_CLEAR) confidence = 'clear';
+  let confidence;
+  if (promoted) {
+    confidence = 'clear';
+  } else {
+    confidence = 'close';
+    if (margin >= VERDICT_MARGIN_DOMINANT)   confidence = 'dominant';
+    else if (margin >= VERDICT_MARGIN_CLEAR) confidence = 'clear';
+  }
 
   // Honesty rule: an estimated winner never speaks with the same certainty as a
   // measured one. See spec §8.4.
-  const estimated = leader.estimated;
+  const estimated = winner.estimated;
   if (estimated && confidence === 'dominant') confidence = 'clear';
   else if (estimated && confidence === 'clear') confidence = 'close';
 
-  const alternatives = ranked.slice(1)
-    .filter(row => leader.score - row.score < VERDICT_MARGIN_CLEAR)
+  const alternatives = ranked
+    .filter(row => row.laneId !== winner.laneId && winner.score - row.score < VERDICT_MARGIN_CLEAR)
     .map(row => ({ lane: row.laneId, label: LANE_LABELS[row.laneId], score: row.score }));
 
-  const laneLabel = LANE_LABELS[leader.laneId];
-  const headline =
-      confidence === 'dominant' ? `${laneLabel} is in a different league this week.`
-    : confidence === 'clear'    ? `${laneLabel}, clearly.`
-    : `Close call — ${laneLabel}, but ${alternatives.map(a => a.label).join(' and ')} `
-      + `${alternatives.length === 1 ? 'is' : 'are'} within ${VERDICT_MARGIN_CLEAR} points.`;
+  const winnerLabel = LANE_LABELS[winner.laneId];
+  let headline;
+  let triggersForNote = triggers;
 
-  const triggerNote = triggers.length > 0
-    ? ` ${triggers.map(t => t.message).join(' ')}`
+  if (promoted) {
+    const leadTrigger = triggers.find(t => t.id === promotedBy);
+    const leaderLabel = LANE_LABELS[leader.laneId];
+    headline = `${leadTrigger.message} This promotes ${winnerLabel} ahead of `
+             + `${leaderLabel} (${leader.score.toFixed(0)} points), which would `
+             + 'otherwise have topped the board this week.';
+    // The promoting trigger is already stated as the headline — don't repeat it.
+    triggersForNote = triggers.filter(t => t.id !== promotedBy);
+  } else {
+    headline =
+        confidence === 'dominant' ? `${winnerLabel} is in a different league this week.`
+      : confidence === 'clear'    ? `${winnerLabel}, clearly.`
+      : `Close call — ${winnerLabel}, but ${alternatives.map(a => a.label).join(' and ')} `
+        + `${alternatives.length === 1 ? 'is' : 'are'} within ${VERDICT_MARGIN_CLEAR} points.`;
+  }
+
+  const triggerNote = triggersForNote.length > 0
+    ? ` ${triggersForNote.map(t => t.message).join(' ')}`
     : '';
   const estimatedNote = estimated
     ? ' Some of the inputs behind this are estimated, so treat it as a lean rather '
@@ -201,15 +279,16 @@ export function buildVerdict(swaps, squadState, ctx) {
     : '';
 
   return {
-    lane: leader.laneId,
-    laneScore: leader.score,
+    lane: winner.laneId,
+    laneScore: winner.score,
     margin,
     confidence,
-    bestSwap: leader.swap,
+    bestSwap: winner.swap,
     alternatives,
     triggers,
+    promotedBy,
     estimated,
-    reasoning: `${headline} ${leader.swap.lanes[leader.laneId].reasoning}`
+    reasoning: `${headline} ${winner.swap.lanes[winner.laneId].reasoning}`
              + `${triggerNote}${estimatedNote}`,
   };
 }

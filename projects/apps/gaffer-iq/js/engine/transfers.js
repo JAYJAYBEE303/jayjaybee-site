@@ -411,7 +411,14 @@ function scoreFundsLane(swap, flexBefore, flexAfter, priceRisk) {
   const value = flexGain / (pointsGiven + 1);
   return {
     value,
-    components: { flexGain, cashFreed, pointsGiven, priceRisk: priceRisk?.direction ?? 'stable' },
+    components: {
+      flexGain, cashFreed, pointsGiven,
+      priceRisk: priceRisk?.direction ?? 'stable',
+      // Exposed alongside the direction so consumers (engine/strategy.js's
+      // priceDeadline trigger) can gate on how confident the signal is rather
+      // than firing on any net-positive transfer flow, however thin.
+      priceRiskConfidence: priceRisk?.confidence ?? 0,
+    },
     estimated: flexBefore.estimated || flexAfter.estimated,
     reasoning: `Frees £${cashFreed.toFixed(1)}m and moves squad flexibility by `
              + `${flexGain.toFixed(0)} points, at a cost of ${pointsGiven.toFixed(1)} `
