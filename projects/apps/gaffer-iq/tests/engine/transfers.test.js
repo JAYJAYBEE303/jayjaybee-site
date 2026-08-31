@@ -60,7 +60,7 @@ test('enumerateSwaps only proposes same-position swaps', () => {
   const candidates = [player(100, 'MID', 7.0, 6.0), player(101, 'FWD', 7.0, 6.0)];
   const swaps = enumerateSwaps(squad.map(p => p.id), [...squad, ...candidates], stubCtx(), {
     horizon: { label: 'test', gws: 3 }, budget: 5, freeTransfers: 1,
-    allowExtraHit: false, scorePlayerFn: stubScorer,
+    scorePlayerFn: stubScorer,
   });
   for (const swap of swaps) {
     assert.equal(swap.outPlayer.position, swap.inPlayer.position);
@@ -73,7 +73,7 @@ test('enumerateSwaps excludes candidates that break the budget', () => {
   const candidates = [player(102, 'MID', 20.0, 9.0)];
   const swaps = enumerateSwaps(squad.map(p => p.id), [...squad, ...candidates], stubCtx(), {
     horizon: { label: 'test', gws: 3 }, budget: 1.0, freeTransfers: 1,
-    allowExtraHit: false, scorePlayerFn: stubScorer,
+    scorePlayerFn: stubScorer,
   });
   assert.equal(swaps.some(s => s.inId === 102), false);
 });
@@ -85,7 +85,7 @@ test('a bench-for-bench swap scores near zero on the Now lane', () => {
   const candidates = [player(20, 'MID', 5.0, 1.5)];
   const swaps = enumerateSwaps(squad.map(p => p.id), [...squad, ...candidates], stubCtx(), {
     horizon: { label: 'test', gws: 3 }, budget: 5, freeTransfers: 1,
-    allowExtraHit: false, scorePlayerFn: stubScorer,
+    scorePlayerFn: stubScorer,
   });
   const benchSwap = swaps.find(s => s.outId === 8 && s.inId === 20);
   assert.ok(benchSwap, 'the bench swap is enumerated');
@@ -98,7 +98,7 @@ test('a swap that promotes a player into the XI beats bench churn', () => {
   const candidates = [player(20, 'MID', 5.0, 1.5), player(40, 'MID', 6.0, 7.5)];
   const swaps = enumerateSwaps(squad.map(p => p.id), [...squad, ...candidates], stubCtx(), {
     horizon: { label: 'test', gws: 3 }, budget: 5, freeTransfers: 1,
-    allowExtraHit: false, scorePlayerFn: stubScorer,
+    scorePlayerFn: stubScorer,
   });
   const churn   = swaps.find(s => s.outId === 8 && s.inId === 20);
   const upgrade = swaps.find(s => s.outId === 8 && s.inId === 40);
@@ -111,7 +111,7 @@ test('enumerateSwaps flags whether the outgoing player was in the XI', () => {
   const candidates = [player(20, 'MID', 5.0, 1.5)];
   const swaps = enumerateSwaps(squad.map(p => p.id), [...squad, ...candidates], stubCtx(), {
     horizon: { label: 'test', gws: 3 }, budget: 5, freeTransfers: 1,
-    allowExtraHit: false, scorePlayerFn: stubScorer,
+    scorePlayerFn: stubScorer,
   });
   const fromBench = swaps.find(s => s.outId === 8);
   const fromXi    = swaps.find(s => s.outId === 12);
@@ -123,7 +123,7 @@ test('enumerateSwaps returns an empty array for an incomplete squad', () => {
   const squad = squadOf15().slice(0, 10);
   const swaps = enumerateSwaps(squad.map(p => p.id), squad, stubCtx(), {
     horizon: { label: 'test', gws: 3 }, budget: 5, freeTransfers: 1,
-    allowExtraHit: false, scorePlayerFn: stubScorer,
+    scorePlayerFn: stubScorer,
   });
   assert.deepEqual(swaps, []);
 });
@@ -163,7 +163,7 @@ test('the Future lane ranks by swing, not by raw far-window value', () => {
   };
   const swaps = enumerateSwaps(squad.map(p => p.id), [...squad, steady, riser], stubCtx(), {
     horizon: { label: 'test', gws: 3 }, budget: 5, freeTransfers: 1,
-    allowExtraHit: false, scorePlayerFn: scorer,
+    scorePlayerFn: scorer,
   });
   const steadySwap = swaps.find(s => s.inId === 30 && s.outId === 8);
   const riserSwap  = swaps.find(s => s.inId === 31 && s.outId === 8);
@@ -175,7 +175,7 @@ test('the Structure lane stays silent when the outgoing player is fine', () => {
   const squad = squadOf15();
   const swaps = enumerateSwaps(squad.map(p => p.id), [...squad, player(40, 'MID', 6.0, 7.5)], stubCtx(), {
     horizon: { label: 'test', gws: 3 }, budget: 5, freeTransfers: 1,
-    allowExtraHit: false, scorePlayerFn: stubScorer,
+    scorePlayerFn: stubScorer,
   });
   // Every stub player is available with playtime 0.9 — nothing is broken.
   assert.ok(swaps.every(s => s.lanes.structure.value === 0),
@@ -191,7 +191,7 @@ test('the Structure lane fires for an unavailable XI player', () => {
   // nearXiDelta for scoreStructureLane's max(0, nearXiDelta) to report.
   const swaps = enumerateSwaps(squad.map(p => p.id), [...squad, player(40, 'MID', 12.0, 9.5)], stubCtx(), {
     horizon: { label: 'test', gws: 3 }, budget: 5, freeTransfers: 1,
-    allowExtraHit: false, scorePlayerFn: stubScorer,
+    scorePlayerFn: stubScorer,
   });
   const fix = swaps.find(s => s.outId === 12 && s.inId === 40);
   assert.ok(fix.lanes.structure.value > 0, 'an injured starter is a structure problem');

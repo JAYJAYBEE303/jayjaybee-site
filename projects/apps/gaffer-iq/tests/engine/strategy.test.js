@@ -26,7 +26,6 @@ function swapWith(lanes) {
 function squadState(overrides = {}) {
   return {
     flexibility: { value: 70, components: {}, estimated: false },
-    xiEntries: [],
     freeTransfers: 1,
     chipRecs: {},
     ...overrides,

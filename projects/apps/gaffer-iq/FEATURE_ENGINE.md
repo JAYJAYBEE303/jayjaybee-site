@@ -1215,7 +1215,7 @@ This is the fix in one line. A swap between two bench players moves the total by
 enumerateSwaps(squadIds, allPlayers, ctx, opts) → Swap[]
 ```
 
-`opts` carries `{ horizon, budget, freeTransfers, allowExtraHit, caches }`. Every candidate is scored in **two windows**, memoised per `(playerId, windowKey)` so a re-render never re-scores a player it has already seen this session:
+`opts` carries `{ horizon, budget, freeTransfers, scorePlayerFn, caches, rankTierByPlayerId }`. Every candidate is scored in **two windows**, memoised per `(playerId, windowKey)` so a re-render never re-scores a player it has already seen this session:
 
 - **Near** — the active horizon, as selected in the UI.
 - **Far** — `FUTURE_WINDOW_START` gameweeks out (default `+2`), running `FUTURE_WINDOW_GWS` gameweeks (default `5`). Only the fixture window shifts; form terms stay measured from today, because future form is not knowable.
