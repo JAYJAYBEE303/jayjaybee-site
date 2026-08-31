@@ -1205,8 +1205,11 @@ export const FUTURE_WINDOW_GWS   = 5;
 // less-bad later rather than actually good later.
 export const FUTURE_MIN_FAR_GAIN = 0.5;
 
-// Candidates scored per position, taken by composite rank. Bounds the O(n²)
-// enumeration: 15 squad slots × this many candidates × 2 windows.
+// Candidates selected per position by a cheap pre-filter proxy (season points
+// per elapsed gameweek — see candidateProxyScore in engine/transfers.js), then
+// fully composite-scored. Composite rank orders WITHIN this pool; it does not
+// choose the pool. Bounds the O(n²) enumeration: 15 squad slots × this many
+// candidates × 2 windows.
 export const CANDIDATE_POOL_PER_POS = 40;
 
 // ── Squad flexibility (Funds & Flexibility lane) ─────────────────────────────

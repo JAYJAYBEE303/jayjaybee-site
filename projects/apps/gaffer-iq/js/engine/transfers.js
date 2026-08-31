@@ -42,9 +42,12 @@ function memoScore(cache, player, horizon, ctx, scoreFn) {
 
 /**
  * Cheap, no-scoring proxy used only to SELECT which players are worth a full
- * composite score, never to rank them against each other for real. Season
- * points per elapsed gameweek — the same rate `calcAvgPointsPerGw` uses, just
- * computed inline here so this module needs no extra import for it.
+ * composite score, never to rank them against each other for real. A rough
+ * season-points-per-gameweek approximation — NOT the same computation as
+ * `calcAvgPointsPerGw`, which prefers real per-GW summary history when it is
+ * loaded and otherwise divides by `ctx.playedFixtures`, not `ctx.elapsedGws`.
+ * This proxy is deliberately cruder: it exists purely to avoid a `scorePlayer`
+ * call before the pool is narrowed, not to match the real average.
  *
  * MODEL: candidate SELECTION uses this cheap historical proxy; candidate
  * RANKING within every lane still runs the full composite via `scoreNear` /
@@ -202,8 +205,14 @@ export function enumerateSwaps(squadIds, allPlayers, ctx, opts = {}) {
       const nearAfter = withSwap(nearEntries, outPlayer.id, { player: inPlayer, score: inNear });
       const farAfter  = withSwap(farEntries,  outPlayer.id, { player: inPlayer, score: inFar });
 
-      const nearXiDelta = calcXiExpectedPoints(nearAfter).value - baseNear.value;
-      const farXiDelta  = calcXiExpectedPoints(farAfter).value  - baseFar.value;
+      // Keep the full { value, estimated } shape rather than just .value — the
+      // aggregate already accounts for every XI/bench member's own estimated
+      // flag, and throwing it away under-reports how much of the swap's score
+      // rests on estimated data (see lanes.now.estimated below).
+      const nearAfterXi = calcXiExpectedPoints(nearAfter);
+      const farAfterXi  = calcXiExpectedPoints(farAfter);
+      const nearXiDelta = nearAfterXi.value - baseNear.value;
+      const farXiDelta  = farAfterXi.value  - baseFar.value;
 
       const afterXiIds = new Set(pickStartingXI(nearAfter).xi.map(e => e.player.id));
 
@@ -219,11 +228,19 @@ export function enumerateSwaps(squadIds, allPlayers, ctx, opts = {}) {
         priceDiff,
         nearXiDelta,
         farXiDelta,
+        // Aggregated far-window estimated flag, exposed for Task 4's Future
+        // lane to consume without re-running calcXiExpectedPoints(farAfter).
+        farEstimated: Boolean(farAfterXi.estimated || inFar.expectedPoints?.estimated),
         lanes: {
           now: {
             value: nearXiDelta - hitCost,
             components: { nearXiDelta, hitCost },
-            estimated: Boolean(inNear.expectedPoints?.estimated),
+            // True if EITHER the aggregated after-XI estimate is estimated
+            // (any XI/bench member, not just the incoming player) OR the
+            // incoming player's own expected points are — under-reporting
+            // this bit would let the weekly verdict (Task 5) overstate its
+            // confidence when the win rests on estimated data.
+            estimated: Boolean(nearAfterXi.estimated || inNear.expectedPoints?.estimated),
             reasoning: buildNowReasoning(outPlayer, inPlayer, nearXiDelta, hitCost),
           },
           future:    null,   // Task 4
