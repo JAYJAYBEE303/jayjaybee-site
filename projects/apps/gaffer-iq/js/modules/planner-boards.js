@@ -54,9 +54,10 @@ export function swapKey(swap) {
  * The verdict banner: the week's call, its confidence, and any triggers.
  *
  * When `verdict.promotedBy` is set, a hard trigger jumped this lane ahead of
- * the arithmetically better one — the reasoning string already explains that
- * in prose, so here we only add a visual cue: a `--promoted` modifier on the
- * banner root, and a matching modifier on the trigger that did the promoting.
+ * the arithmetically better one — its message already leads the reasoning
+ * prose (see engine/strategy.js), so it is skipped here to avoid stating it
+ * twice. Every other trigger still renders as a bullet. The banner root still
+ * gets a `--promoted` modifier as the visual cue.
  * @param {object|null} verdict  from buildVerdict()
  * @returns {string}  HTML
  */
@@ -67,10 +68,11 @@ export function renderVerdictBanner(verdict) {
     </div>`;
   }
 
-  const triggers = verdict.triggers.length === 0 ? '' : `
+  const listedTriggers = verdict.triggers.filter(t => t.id !== verdict.promotedBy);
+  const triggers = listedTriggers.length === 0 ? '' : `
     <ul class="planner-verdict__triggers">
-      ${verdict.triggers.map(t => `
-        <li class="planner-verdict__trigger${t.id === verdict.promotedBy ? ' planner-verdict__trigger--promoted' : ''}" data-trigger="${esc(t.id)}">
+      ${listedTriggers.map(t => `
+        <li class="planner-verdict__trigger" data-trigger="${esc(t.id)}">
           <span class="planner-verdict__trigger-mark" aria-hidden="true">!</span>
           ${esc(t.message)}
         </li>`).join('')}

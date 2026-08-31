@@ -5925,10 +5925,6 @@ img.fx-crest {
 
 .planner-verdict__trigger-mark { color: var(--band-brutal); font-weight: 700; }
 
-/* The trigger that promoted the winning lane — called out from the rest of
-   the trigger list, which stays neutral. */
-.planner-verdict__trigger--promoted { color: var(--band-orange); }
-
 /* ─── Transfer Planner: lens boards ────────────────────────────────────────── */
 
 .planner-board-grid {

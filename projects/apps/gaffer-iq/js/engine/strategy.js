@@ -134,11 +134,12 @@ function detectTriggers(swaps, squadState, ctx) {
   }
   if (nearestChip) {
     const { chipId, gw, distance } = nearestChip;
+    const gwUnit = distance === 1 ? 'gameweek' : 'gameweeks';
     triggers.push({
       id: 'chipWindow',
       laneId: chipId === 'triplecaptain' ? 'ceiling' : 'future',
       message: `${CHIP_LABELS[chipId] ?? chipId} looks strongest in GW${gw}, `
-             + `${distance} gameweek(s) away — plan transfers around it.`,
+             + `${distance} ${gwUnit} away — plan transfers around it.`,
     });
   }
 
