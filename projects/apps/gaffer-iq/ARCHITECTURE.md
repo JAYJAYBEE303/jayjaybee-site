@@ -153,7 +153,11 @@ gaffer-iq/                          (= projects/gaffer-iq/ in the repo)
     │   ├── form.js             # Team form & player form calculations.
     │   ├── style.js            # Team xG profiles (styleClash itself is unwired — FEATURE_ENGINE §8.1).
     │   ├── counter.js          # Position-based counter-matchup scoring.
-    │   └── composite.js        # Combines all metrics → composite matchup score.
+    │   ├── composite.js        # Combines all metrics → composite matchup score.
+    │   ├── lineup.js           # Starting XI/bench selection + XI expected points.
+    │   │                       #   Shared by dashboard.js and transfers.js — see note below.
+    │   ├── transfers.js        # Enumerates squad swaps; scores each on 5 lanes (FEATURE_ENGINE §14).
+    │   └── strategy.js         # Normalises the 5 lanes into one weekly verdict (FEATURE_ENGINE §14).
     │
     └── modules/                # The feature views. These OWN the DOM; engine never does.
         ├── landing.js          # Landing page — the front page at the bare URL.
@@ -163,8 +167,11 @@ gaffer-iq/                          (= projects/gaffer-iq/ in the repo)
         ├── fixtures.js         # Fixtures: GW grid, league table, team schedule, H2H.
         ├── ranker.js           # Player Ranker.
         ├── dashboard.js        # GW Decision Dashboard.
-        └── planner.js          # Transfer Planner.
+        ├── planner.js          # Transfer Planner: state, wiring, squad rail, import panel.
+        └── planner-boards.js   # Transfer Planner: verdict banner + lens board HTML (no state).
 ```
+
+**`pickStartingXI` (`engine/lineup.js`) is shared between the Dashboard and the Planner** — it used to be defined only inside `modules/dashboard.js` and was lifted out so both modules agree on what "your starting XI" means. The Planner's five transfer lanes are measured as the *change* in this selection's total expected points, so a disagreement between the two on XI selection would silently corrupt every lane. See `FEATURE_ENGINE.md` §14.1.
 
 ### Hard rules about this structure
 1. **Only `api.js` is allowed to call `fetch()`.** Modules and engine never fetch directly. This keeps the network surface in one place and makes caching and the proxy boundary trivial to reason about.
@@ -473,14 +480,14 @@ All four modules consume the **same** engine output (composite scores + breakdow
 │ Matchup       │  │ Player Ranker │ │ GW Dashboard │ │ Transfer       │
 │ Analyser      │  │               │ │              │ │ Planner        │
 ├───────────────┤  ├───────────────┤ ├──────────────┤ ├────────────────┤
-│ Deep-dive on  │  │ Ranks players │ │ Decision view│ │ Models in/out  │
-│ ONE fixture:  │  │ by projected  │ │ for the      │ │ moves over a   │
-│ shows full    │  │ value over the│ │ active GW:   │ │ horizon: which │
-│ breakdown,    │  │ horizon, using│ │ captaincy,   │ │ transfers most │
-│ both sides,   │  │ player form × │ │ start/bench, │ │ improve total  │
-│ style clash,  │  │ fixture       │ │ flags risky  │ │ projected score│
-│ counter-      │  │ composite.    │ │ picks.       │ │ given budget & │
-│ matchups.     │  │               │ │              │ │ free transfers.│
+│ Deep-dive on  │  │ Ranks players │ │ Decision view│ │ Scores swaps on│
+│ ONE fixture:  │  │ by projected  │ │ for the      │ │ five lanes by  │
+│ shows full    │  │ value over the│ │ active GW:   │ │ projected-XI   │
+│ breakdown,    │  │ horizon, using│ │ captaincy,   │ │ points change; │
+│ both sides,   │  │ player form × │ │ start/bench, │ │ issues a weekly│
+│ style clash,  │  │ fixture       │ │ flags risky  │ │ verdict, or    │
+│ counter-      │  │ composite.    │ │ picks.       │ │ rolls.         │
+│ matchups.     │  │               │ │              │ │                │
 └───────────────┘  └───────────────┘ └──────────────┘ └────────────────┘
         │                  │               │                  │
         └── drill-down ────┴───────────────┴── feeds picks ───┘
@@ -493,7 +500,7 @@ Relationships, concretely:
 - **Fixtures** is the schedule-level companion to the Matchup Analyser: the GW grid (kickoff times, results, per-fixture events and lineups), the league table with its European/relegation zones, one team's results/upcoming split, and the full H2H history for a pairing. It carries no scoring of its own — it is the "what and when" view that the Matchup Analyser then explains. All four views run on live data, and they cross-link: a club name in the Table or in a fixture row opens By team on that club, and an opponent in By team — or the head-to-head block inside any fixture, played or upcoming — opens Head-to-head on that pairing.
 - **Player Ranker** = player form × that player's fixture composite over the horizon → a ranked projected-value list. It is the bridge between team-level fixture scores and player-level decisions.
 - **GW Dashboard** is horizon-locked to `GW1` by design (it's about *this* week's decisions: captaincy, starting XI, bench order, risk flags). It consumes the ranker's projections and the live endpoint.
-- **Transfer Planner** is the most horizon-aware module: it takes your current squad (entered manually in Phase 1; possibly imported in a later phase), the ranker's projections over the chosen horizon, and budget/free-transfer constraints, and proposes the moves that most raise projected total. It depends on the ranker and, through it, the whole engine.
+- **Transfer Planner** is the most horizon-aware module: it takes your current squad (entered manually or imported via the FPL picks endpoint), the ranker's projections over the chosen horizon, and budget/free-transfer constraints, and enumerates every legal swap (`engine/transfers.js`). Each swap is scored not by the ranker's within-position composite but by the change it makes to `pickStartingXI`'s total expected points (`engine/lineup.js`) — the same axis fix `expectedPoints` already gave captaincy (§10.2 above) — on five independent lanes (Now, Future Prep, Funds & Flexibility, Ceiling, Structure Fix). `engine/strategy.js` normalises the five and issues one weekly verdict: act on the strongest lane, or roll the transfer. See `FEATURE_ENGINE.md` §14 for the full model.
 
 Dependency direction is strictly: `modules → engine → normalise → store → api → proxy → FPL`. Nothing points back up the chain.
 

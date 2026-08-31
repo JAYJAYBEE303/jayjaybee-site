@@ -1182,3 +1182,144 @@ Tiers are checked **most-specific first**: `positionElite` before `positionStron
 **Cost, and why it's cached, not recomputed per edit.** A full-pool ranking scores every loaded player — the same cost the Ranker already accepts as normal (it does this on every load/horizon change via chunked async scoring). The ranking depends only on `(ctx, horizon)`, **not** on squad membership, so Dashboard and Planner compute it **once** per data load (and, for Planner, once per horizon change — its horizon can change via the global switcher; Dashboard is locked to GW1 so only data-load invalidates it) and reuse the cached lookup across every subsequent squad add/remove. Recomputing on every edit would re-score ~700 players per click for no reason.
 
 **Where it's shown:** the single headline "Value" score chip in each module (Ranker's Value column; Dashboard's captain/XI/bench/squad-slot chips; Planner's squad-slot and transfer in/out candidate chips) — the number that represents overall player quality. Deliberately **not** applied to the Ranker's Next Fixture chip, the per-GW fixture strip, or the minutes-security badge: those are different, narrower metrics (fixture favourability, per-GW difficulty, playing time) with their own meaning, and colouring them by overall-value rank would misrepresent what they show.
+
+---
+
+## 14. Transfer Planner: the five lanes and the weekly verdict (`engine/lineup.js`, `engine/transfers.js`, `engine/strategy.js`)
+
+Full design: `docs/superpowers/specs/2026-08-30-planner-multi-lens-transfers-design.md`.
+
+### 14.1 The XI-expected-points spine, and why the composite was the wrong axis
+
+**Problem this fixes:** the Planner used to rank a candidate transfer by the change in `score.value` — the same 0–100 within-position composite the Ranker uses. That composite has no relationship to whether a player is actually **in the starting XI**, so swapping a 0-point bench substitute for a marginally-better 2-point bench substitute could out-score a genuine upgrade to a starter. Ranking transfers by a number that ignores selection is the bug this whole feature exists to fix.
+
+**The fix:** `pickStartingXI` (`engine/lineup.js`, lifted from `modules/dashboard.js` and now shared by both — see `ARCHITECTURE.md` §10) orders candidates for the XI and bench by `score.expectedPoints.value` — the real points-scale projection (§10.2) — not `score.value`. `calcXiExpectedPoints(scoredSquad)` then sums the XI's expected points plus the bench at `BENCH_CONTRIBUTION_WEIGHT`:
+
+```
+calcXiExpectedPoints(squad) = Σ expectedPoints(xi) + BENCH_CONTRIBUTION_WEIGHT × Σ expectedPoints(bench)
+```
+
+> **MODEL:** a benched player is not worth zero — autosubs mean a bench player whose XI counterpart blanks does score. `BENCH_CONTRIBUTION_WEIGHT = 0.15` is deliberately small, so improving the bench registers as a faint positive rather than nothing, without ever rivalling a genuine XI upgrade.
+
+A candidate swap's worth (`nearXiDelta` / `farXiDelta`) is the **difference** in this total before and after the swap, with `pickStartingXI` re-run on the changed squad:
+
+```
+xiDelta = calcXiExpectedPoints(after) − calcXiExpectedPoints(before)
+```
+
+This is the fix in one line. A swap between two bench players moves the total by roughly nothing, whatever their composite gap. A swap that promotes someone into the XI is credited for the promotion **and** for the knock-on demotion of whoever they displace, because both fall out of re-picking the XI. Verified live on a synthetic 15-man squad (626-player pool, GW6 horizon, 508 enumerated swaps): bench-to-bench swaps averaged **0.02** points on the Now lane (max 0.20 in either direction) against **2.74** average (peak 9.26) for swaps that reach the starting XI — roughly two orders of magnitude apart, which is the intended shape.
+
+### 14.2 Candidate enumeration: a two-window swap search (`engine/transfers.js`)
+
+```
+enumerateSwaps(squadIds, allPlayers, ctx, opts) → Swap[]
+```
+
+`opts` carries `{ horizon, budget, freeTransfers, allowExtraHit, caches }`. Every candidate is scored in **two windows**, memoised per `(playerId, windowKey)` so a re-render never re-scores a player it has already seen this session:
+
+- **Near** — the active horizon, as selected in the UI.
+- **Far** — `FUTURE_WINDOW_START` gameweeks out (default `+2`), running `FUTURE_WINDOW_GWS` gameweeks (default `5`). Only the fixture window shifts; form terms stay measured from today, because future form is not knowable.
+
+**Candidate SELECTION uses a cheap proxy; candidate RANKING does not — this is a deliberate change from the design plan.** The plan's original enumeration scored the entire ~626-player pool with the full composite (`rankPlayers`) just to find each position's top `CANDIDATE_POOL_PER_POS`, then re-scored the shortlist through the memoised path — duplicating the most expensive step. `candidateProxyScore(player, ctx)` now narrows the field first, at zero `scorePlayer` cost: season points divided by elapsed gameweeks, ties broken by price. Only the resulting shortlist (`CANDIDATE_POOL_PER_POS = 40` per position) is ever scored through the full composite, and it is that full composite — not the proxy — which orders candidates within every lane.
+
+> **MODEL:** the proxy decides who is *considered*, never who *wins*. A genuinely strong player with a rough season-points history (a new signing, a player returning from injury) could be excluded from the pool; a player who makes the pool is never ranked by the proxy. This trade only costs breadth, never correctness of the ordering shown. Confirmed live: Haaland, Palmer, Bruno Fernandes and João Pedro all survive the pre-filter.
+
+**Performance is deliberately split into a cold and a warm path**, and the gap between them is load-bearing, not an oversight:
+- **Cold** (first enumeration, or a horizon change): ~3.5–6s on the ~626-player pool. This runs only while the Planner tab is off-screen or first activates (`route:changed` deferral), never while the user is typing.
+- **Warm** (budget field, free-transfer count, hit toggle): re-filters and re-ranks the already-scored candidates **without re-scoring**, ~50ms. This is spec §11's actual requirement — the interactive controls must never re-score — and is the path a keystroke exercises. Measured live: 59.80ms for a budget-field keystroke.
+
+### 14.3 The five lanes (`config.js` §14)
+
+Each lane returns `{ value, components, estimated, reasoning }` on its own natural unit; normalisation to a shared 0–100 scale happens in `strategy.js` (§14.4 below), so the raw, explainable number stays available for display.
+
+**Now** (`LANE_SCALE_NOW = 10`) — `nearXiDelta`, less `HIT_PENALTY` (4 points) when the move requires a hit. Nothing else: expected points added to your starting XI over the active horizon.
+
+**Future Prep** (`LANE_SCALE_FUTURE = 0.7`) — ranked by *swing*, not raw far-window projection:
+
+```
+swing = farXiDelta − nearXiDelta,  gated on farXiDelta > FUTURE_MIN_FAR_GAIN (0.5)
+```
+
+> **MODEL:** ranking the far window by raw projection would mostly re-list the Now board — a genuinely good player is good in both windows. Swing isolates the move that is *specifically* about the future: rough fixtures now, green fixtures later — the buy-before-the-price-rises decision this board exists to serve.
+
+**Funds & Flexibility** (`LANE_SCALE_FUNDS = 5`) — flexibility gained per expected point sacrificed: `flexGain / (pointsGiven + 1)`. Flexibility (`calcSquadFlexibility`) blends two weighted components:
+
+- *Spread* (`FLEX_W_SPREAD = 0.6`) — how much of the squad sits clumped inside a `FLEX_CLUMP_BAND`-wide price band (six players at 7.0–7.6m cannot upgrade one without selling two).
+- *Headroom* (`FLEX_W_HEADROOM = 0.4`) — how much cash the four most disposable outfield players (lowest `expectedPoints`) would raise, as a fraction of `FLEX_HEADROOM_TARGET`.
+
+> **ASSUMPTION (unresolved):** the user described the problem as price clumping making up-value moves hard when capped — *spread*. *Headroom* is the adjacent reading of the same complaint. Both are carried as weighted components so that resolving this is a config change in `config.js`, not a rewrite. Revisit after a few weeks of live use.
+
+Cash freed (`−priceDiff`) and `calcPriceChangeRisk()` (`engine/prices.js`) fold into this lane's `components`, including a `priceRiskConfidence` figure the verdict's `priceDeadline` trigger reads (§14.7).
+
+**Ceiling** (`LANE_SCALE_CEILING = 8`) — peak rather than mean:
+
+```
+ceiling = CEILING_W_PEAK (0.65) × best playable-GW expectedPoints in the near window
+        + CEILING_W_HAUL (0.35) × haul rate × that same peak
+```
+
+Haul rate is the share of played gameweeks scoring ≥ `HAUL_POINTS_THRESHOLD` (10), from `summary.history[].points`.
+
+**Ceiling excludes blank gameweeks from its peak — a deliberate fix, not the original design.** `groupPerGwSlots` scores an empty slot at `BLANK_GW_VALUE` (40), which is high enough to beat a genuinely hard fixture in a naive `Math.max`; a blank week — the team does not play at all — could therefore present as the player's "peak" week. The lane now filters `slot.isBlank` out before taking the max; if every slot in the window is blank there is no week to peak in, so the lane reports `0` and flags itself `estimated` rather than a confident zero.
+
+> **KNOWN WEAKNESS:** FPL exposes no variance data, so haul rate is a backward-looking proxy, thin for players with few starts, and player summaries load lazily — many candidates will have none loaded at all. This lane sets `estimated: true` whenever the summary is missing or the peak itself is estimated, and the verdict downgrades its own confidence accordingly (§14.6). It is the least trustworthy of the five and must never present as equally solid.
+
+**Structure Fix** (`LANE_SCALE_STRUCTURE = 10`) — fires only when the OUT player is in the *projected* starting XI **and** is broken by at least one of:
+
+- `status !== 'available'` (injured, suspended, doubtful), or
+- `breakdown.playtime.value` below `STRUCTURE_PLAYTIME_FLOOR` (0.45).
+
+Scored by how much of the XI total the repair restores (`max(0, nearXiDelta)`). Legitimately empty most weeks — the board renders an explicit "Nothing broken — no starter is flagged or short of minutes" state rather than padding itself with the next-best generic swap. Verified live both ways: empty on a squad of fifteen `status: 'available'` players, populated (naming the injured starter and the points restored) on a squad carrying one flagged player.
+
+> **Scope note — a shipped gap, not a ruling:** spec §7.1 also lists a rank-tier condition (`bottomPercentile`) as a third way a starter can count as "broken". The shipped `scoreStructureLane` checks only `status` and `playtime` — no rank-tier signal reaches it, and `enumerateSwaps` never receives a `rankTierByPlayerId` map to check it against. This was not logged as a deliberate controller ruling anywhere in the build ledger; it appears to have been dropped rather than decided. Flagged here rather than silently documented as shipped — see the Task 10 report's Concerns.
+
+### 14.4 Lane normalisation and why it is the first thing to calibrate
+
+`buildVerdict` (`engine/strategy.js`) maps each lane's best swap onto 0–100 by dividing by a per-lane config threshold and capping:
+
+```
+normaliseLaneValue(laneId, value) = clamp(0, 100, (value / LANE_SCALE_<LANE>) × 100)
+```
+
+> **MODEL:** this is the load-bearing and most arbitrary step in the whole design. Without a shared scale, "a swing of +6" and "frees £0.5m" have no common language, and the margin the verdict reports would be meaningless. The `LANE_SCALE_*` thresholds are calibration targets, not truths.
+
+**The shipped values are a recalibration, not the plan's original numbers.** The design plan proposed `NOW=6, FUTURE=8, FUNDS=25, CEILING=12, STRUCTURE=5`. Measured against a live synthetic squad (GW3 horizon, £2.0m budget, 581 swaps), those values made Future Prep (normalised max 8) and Funds & Flexibility (normalised max 18) **arithmetically incapable of ever clearing `VERDICT_ACT_THRESHOLD` (35)** — two of the five lanes the feature exists to surface could never win the verdict, however good the underlying swap. The thresholds were recalibrated against the same measured distributions to `LANE_SCALE_NOW = 10`, `LANE_SCALE_FUTURE = 0.7`, `LANE_SCALE_FUNDS = 5`, `LANE_SCALE_CEILING = 8`, `LANE_SCALE_STRUCTURE = 10`, so each lane's best real-world move lands at roughly 90–100 rather than being structurally shut out. They remain calibration targets, not truths — the first thing to tune against realised results per `ROADMAP.md` Phase 3B.
+
+**Caveat carried forward, not resolved:** Now, Future and Structure are *deltas*; Funds is a *ratio*; Ceiling is an *absolute* (every swap scores positive — 532 of 581 in the calibration run). Normalisation makes the five comparable **by convention**, not by shared units. Spec §7.1 chose that; it is not being re-architected here.
+
+### 14.5 The roll lane
+
+Doing nothing is scored as a lane, not treated as a fallback — a planner that always recommends something is the failure this design exists to prevent. If no acting lane clears `VERDICT_ACT_THRESHOLD`, the verdict is **roll it**, and its reasoning either banks the transfer toward the Future Prep board's already-identified target, or — with an empty swap set — states plainly that no legal transfer exists within budget. Verified directly: `buildVerdict([], ...)` returns `{ lane: 'roll', laneScore: 0, confidence: 'clear', reasoning: 'Roll the transfer — no legal transfers are available within your budget.' }`.
+
+### 14.6 Verdict confidence bands
+
+```
+margin = arithmetic leader's normalised score − runner-up's (never negative)
+
+margin ≥ VERDICT_MARGIN_DOMINANT (30) → 'dominant'  ("in a different league")
+margin ≥ VERDICT_MARGIN_CLEAR    (12) → 'clear'
+otherwise                             → 'close', and `alternatives` names every
+                                         lane within VERDICT_MARGIN_CLEAR points
+```
+
+**Honesty rule 1 — estimated inputs downgrade confidence.** A winning lane whose swap is itself flagged `estimated` never reports the same confidence a measured winner would: `'dominant'` downgrades to `'clear'`, and `'clear'` (including a fresh trigger promotion, §14.7) downgrades to `'close'`. `lanes.now.estimated` / `lanes.future.estimated` read the **aggregated** estimated flag `calcXiExpectedPoints` already computes across every XI/bench member, not just the incoming player — under-reporting this would let the verdict overstate certainty. Verified live: a squad whose only strong lane was Ceiling (estimated — no gameweek history loaded for the target) reported `'clear'`, not `'dominant'`, despite a raw margin of +72.
+
+### 14.7 Triggers, and how they promote a lane past the arithmetic
+
+Four hard conditions can override the ranked lanes. Each supplies its own headline reason and is always named in `verdict.triggers` — detecting a trigger never by itself reorders anything; only `buildVerdict`'s promotion step (below) does.
+
+1. `xiPlayerUnavailable` — a projected-XI player is injured, suspended or flagged. → `structure` lane.
+2. `chipWindow` — a chip's recommended GW falls within `CHIP_WINDOW_GWS` (3). → `ceiling` lane for Triple Captain, `future` otherwise.
+3. `cashCrunch` — squad flexibility below `FLEX_FLOOR` (35). → `funds` lane.
+4. `priceDeadline` — a lane-leading target trending toward a price rise. → `funds` lane.
+
+**Trigger promotion is a shipped capability the original plan under-specified.** The design's own language ("triggers override the arithmetic", "promote a lane") and the user's stated intent ("hard triggers jump the queue and say so") both called for a trigger to be able to change the winning lane. The first implementation only ever *reported* triggers in the output without using them to reorder anything — an injured XI starter could silently lose the verdict to a marginally larger points gain elsewhere. Promotion now works as follows: the highest-scoring lane with a fired trigger, if it *also* clears `VERDICT_ACT_THRESHOLD` and differs from the arithmetic leader, is promoted to be the verdict's lane. A promotion always forces `confidence: 'clear'` (before the estimated-data downgrade above) and sets `promotedBy` to the trigger's id; `reasoning` explicitly names the higher-scoring lane it jumped ahead of, so the user can see when they are being steered off the raw numbers rather than have it happen invisibly. Verified live: `xiPlayerUnavailable` promoted Structure Fix (93) ahead of an arithmetically-tied Now (93), with reasoning naming Now by name and score.
+
+**At most one `chipWindow` trigger fires — also a fix, not the original behaviour.** `engine/chips.js` always recommends a best gameweek for *every* chip; without a cap, wildcard/free hit/bench boost landing in the same nearby window (the common case, not the exception) fired three near-identical triggers at once and drowned the sharper signals. Only the nearest-GW chip fires, ties broken `triplecaptain > benchboost > freehit > wildcard` — the sharper, more time-critical chips win a tie.
+
+**`priceDeadline` is gated on `PRICE_BUY_NOW_CONFIDENCE`, not on direction alone — also a fix.** `calcPriceChangeRisk` reports `direction: 'rise'` for any net-positive transfer flow above its activity floor, including thin, noisy signals; the trigger originally fired on any rise regardless of confidence, so a 52-in/48-out signal would tell the user "buying later costs more" with no real basis. It now reuses the existing `PRICE_BUY_NOW_CONFIDENCE` constant — the same bar the Planner's own "Buy now" badge already uses — rather than introducing a second, looser threshold.
+
+### 14.8 The two honesty rules, together
+
+1. **Estimated inputs downgrade confidence** (§14.6) — a verdict never sounds more certain than its weakest load-bearing input.
+2. **Empty boards state their emptiness** — a lane with nothing to say (most often Structure Fix, §14.3; sometimes Future Prep when no swing clears `FUTURE_MIN_FAR_GAIN`) renders an explicit "nothing here" state. Per `CONVENTIONS.md` §9, a board never pads itself with a weaker suggestion to look busy — silence is the honest answer some weeks.

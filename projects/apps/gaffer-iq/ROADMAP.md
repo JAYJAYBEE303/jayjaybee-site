@@ -82,10 +82,12 @@ With the pipeline and scoring proven, go wide. Build the remaining three modules
 **Exit criterion:** enter your squad, get a captaincy pick, XI/bench order, and risk flags for the current GW; live points appear during an active GW.
 
 ### 2D. Transfer Planner
-- `modules/planner.js`: takes current squad + budget + free transfers, evaluates out→in swaps using `scoreOverHorizon`/`scorePlayer`, ranks transfers by projected gain, models the −4 point hit, respects budget.
-- Surfaces top N single transfers and the best 2-transfer combination over the active horizon.
+- `modules/planner.js` + `modules/planner-boards.js`: takes current squad + budget + free transfers, enumerates every legal out→in swap (`engine/transfers.js`), models the −4 point hit, respects budget.
+- Ranks by the change in projected **starting-XI** expected points (`engine/lineup.js`'s shared `pickStartingXI`/`calcXiExpectedPoints`), not by within-position composite — the axis that made a bench-to-bench swap able to outrank a genuine upgrade to a starter. See `FEATURE_ENGINE.md` §14.1.
+- Scores every swap on five independent lanes — Now, Future Prep, Funds & Flexibility, Ceiling, Structure Fix — and normalises them (`engine/strategy.js`) into one weekly verdict: act on the strongest lane, or roll the transfer when nothing clears the acting threshold. Four hard triggers (an unavailable XI starter, a near chip window, a cash crunch, an imminent high-confidence price rise) can promote a lane past the raw arithmetic, always naming what it jumped ahead of.
+- Surfaces top N single transfers per lane, plus the best 2-transfer combination over the active horizon.
 
-**Exit criterion:** for a given squad and budget, the planner proposes ranked transfers with quantified projected-score gains over the chosen horizon, hit-aware.
+**Exit criterion:** for a given squad and budget, the planner ranks transfers by projected starting-XI expected-points gain across five lanes and issues a weekly verdict — including "no transfer this week" — that is hit-aware and states its own confidence.
 
 ---
 

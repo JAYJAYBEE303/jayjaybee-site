@@ -264,6 +264,162 @@ window.__verify.pairingPlayers()
 
 ---
 
+## Transfer Planner verification (Task 10 checklist)
+
+The Planner's ranking model changed from a composite-score delta to projected
+starting-XI expected points, scored on five lanes with a weekly verdict
+(`FEATURE_ENGINE.md` §14). Re-run every check below after any change to
+`engine/lineup.js`, `engine/transfers.js`, `engine/strategy.js`, or the
+`LANE_SCALE_*` / `VERDICT_*` constants in `config.js` — a config change is
+exactly the kind of edit that can silently flip which lane wins.
+
+**`tests/engine/lineup.test.js`, `transfers.test.js` and `strategy.test.js` are
+written but UNRUN.** There is no Node and no CI on this machine (`npm test` runs
+`node --test`); do not claim they pass. The checklist below is the real gate
+until a runner exists.
+
+**Never enter a real FPL team ID for this.** Seed a synthetic squad from the
+console instead:
+
+```js
+const s = window.__store;
+const pick = (p, n) => s.getPlayers().filter(x => x.position === p).slice(0, n).map(x => x.id);
+s.setSquad([].concat(pick('GKP', 2), pick('DEF', 5), pick('MID', 5), pick('FWD', 3)));
+```
+
+`setSquad()`'s synchronous re-render (full-pool rescoring on both Dashboard and
+Planner) can exceed the console's own eval timeout and report "Internal error"
+— the mutation still completes; re-query `s.getSquad()` in a follow-up eval
+rather than assuming it failed. It also clears any saved picks
+(`s.getSquadPicks()`) — call `s.setSquadPicks(...)` afterwards, never before.
+
+### The headline check — the defect this whole feature exists to fix
+
+A bench-to-bench swap must score near zero on the Now board; a swap that
+reaches the starting XI must score far higher. Verify the two numbers
+directly, not by eyeballing the board:
+
+```js
+const config = await import('/js/config.js?cb=' + Date.now());
+const s = window.__store;
+const ctx = window.__engine.buildScoreContext(s.getSeason(), {
+  playerSummariesById: s.getAllPlayerSummaries(),
+  leagueXg: s.getLeagueXg(), leagueXgPrev: s.getLeagueXgPrev(),
+  leagueXgHistory: s.getLeagueXgHistory(), teamXgBySlug: s.getAllTeamXg(),
+  currentGw: s.getCurrentGw() ?? s.getNextGw() ?? 1,
+});
+const horizon = config.HORIZONS[s.getActiveHorizon()] ?? config.HORIZONS.GW6;
+const swaps = window.__engine.enumerateSwaps(s.getSquad(), s.getPlayers(), ctx, {
+  horizon, budget: 0, freeTransfers: 1, allowExtraHit: false,
+  caches: { near: new Map(), far: new Map() },
+});
+const benchToBench = swaps.filter(sw => !sw.flags.outInXi && !sw.flags.inEntersXi);
+const xiReaching   = swaps.filter(sw => sw.flags.inEntersXi);
+const avg = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : NaN;
+({
+  benchToBenchAvgNow: avg(benchToBench.map(sw => Math.abs(sw.lanes.now.value))),
+  xiReachingAvgNow:   avg(xiReaching.map(sw => sw.lanes.now.value)),
+  xiReachingMaxNow:   Math.max(...xiReaching.map(sw => sw.lanes.now.value)),
+});
+```
+
+**Expected:** `benchToBenchAvgNow` under ~0.5; `xiReachingAvgNow` at least an
+order of magnitude larger. Reference run (synthetic 15, GW6 horizon, 508
+swaps): bench-to-bench averaged **0.02** (max 0.20 either direction) against
+**2.74** average / **9.26** peak for XI-reaching swaps. A result where the two
+overlap means `pickStartingXI` or `calcXiExpectedPoints` (`engine/lineup.js`)
+has regressed back to ordering by `score.value` instead of
+`score.expectedPoints.value` — check that first.
+
+### Full Step 1 checklist
+
+- [ ] **Bench-to-bench near zero, XI-reaching far higher** — the snippet above;
+      record both numbers every time, not just a pass/fail.
+- [ ] **A promoting swap is credited for the promotion.** Seed a squad
+      containing an injured/flagged starter (the default first-N-per-position
+      seed above usually includes one). The verdict banner should show a
+      `PROMOTED` badge, name the trigger, and its `reasoning` should name the
+      lane it jumped ahead of by score. Confirm via
+      `window.__engine.buildVerdict(swaps, { flexibility: window.__engine.calcSquadFlexibility(squad, scoresById), xiEntries: [], freeTransfers: 1, chipRecs: {} }, ctx).promotedBy`
+      is non-null.
+- [ ] **Dashboard and Planner agree on the projected XI.** Score the same
+      squad both ways and compare — Dashboard is horizon-locked to `GW1`, so
+      match that before comparing sets:
+      ```js
+      const horizon = config.HORIZONS.GW1;
+      const scored = s.getSquad().map(id => {
+        const player = s.getPlayer(id);
+        return { player, score: window.__engine.scorePlayer(player, horizon, ctx) };
+      });
+      const { xi, bench } = window.__engine.pickStartingXI(scored);
+      xi.map(e => e.player.name).sort();   // compare against the Dashboard's rendered Starting XI
+      ```
+      **They will legitimately differ under the Planner's own default horizon**
+      (`GW6`, `store.js`) — that is by design, not a bug (captaincy cares about
+      next week only; transfer planning is horizon-aware). Only compare under
+      matching horizons.
+- [ ] **Saved picks are held in the store, and cleared by a manual edit.**
+      ```js
+      const picks = s.getSquad().map((id, i) => ({ playerId: id, slot: i + 1, isCaptain: i === 0, isViceCaptain: i === 1 }));
+      s.setSquadPicks(picks);
+      s.getSavedXi().length;        // 11
+      s.setSquad(s.getSquad().slice(0, 14));   // any manual edit
+      s.getSquadPicks().length;     // 0 — cleared
+      ```
+- [ ] **Structure Fix is empty when nothing is broken, populated when a squad
+      member is flagged.** Seed once with all-`status: 'available'` players
+      (empty state: "Nothing broken — no starter is flagged or short of
+      minutes") and once with a flagged starter (populated, names the player
+      and the points restored).
+- [ ] **The verdict reads "close" when the top two lanes are near-tied, and
+      rolls when nothing clears the threshold.** "Close" is visible on most
+      real squads (check the banner's confidence pill). To force "roll"
+      without depending on finding a real squad with no good moves, call the
+      engine directly with an empty swap set:
+      ```js
+      window.__engine.buildVerdict([], { flexibility: window.__engine.calcSquadFlexibility(squadPlayers, new Map()), xiEntries: [], freeTransfers: 1, chipRecs: {} }, ctx).lane;
+      // 'roll'
+      ```
+- [ ] **Budget keystrokes re-rank without a visible stall.** Time a dispatched
+      `input` event on `#planner-budget` after the boards have rendered once
+      (warm cache):
+      ```js
+      const input = document.getElementById('planner-budget');
+      const t0 = performance.now();
+      input.value = '2.0';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      performance.now() - t0;
+      ```
+      **Expected:** under ~100ms (the warm `rescore=false` path). Reference
+      run: 59.80ms. Anything multi-second means a keystroke is re-scoring the
+      candidate pool instead of re-filtering the cache — check the `rescore`
+      flag at the `renderBoards()` call site that handles the budget input.
+
+### After any `LANE_SCALE_*` or `VERDICT_*` change
+
+Re-run the lane-distribution measurement Task 4 used to catch a lane that is
+arithmetically incapable of ever winning:
+
+```js
+const laneIds = ['now', 'future', 'funds', 'ceiling', 'structure'];
+for (const id of laneIds) {
+  const values = swaps.map(sw => sw.lanes[id]?.value).filter(Number.isFinite);
+  const positive = values.filter(v => v > 0).length;
+  const sorted = [...values].sort((a, b) => a - b);
+  const p90 = sorted[Math.floor(sorted.length * 0.9)];
+  console.log(id, 'max', Math.max(...values).toFixed(2), 'p90', (p90 ?? 0).toFixed(2), 'count>0', positive);
+}
+```
+
+For each lane, `(max / LANE_SCALE_<LANE>) * 100` must land near 90–100 —
+if a lane's normalised max sits well under `VERDICT_ACT_THRESHOLD` (35), that
+lane can never win the verdict regardless of how good the underlying swap is,
+which is the exact failure Task 4 found and Task 5 fixed by recalibrating
+`LANE_SCALE_FUTURE` (8 → 0.7) and `LANE_SCALE_FUNDS` (25 → 5). See
+`FEATURE_ENGINE.md` §14.4.
+
+---
+
 ## End of Season Review
 
 After GW38, do a full retrospective:
