@@ -944,6 +944,19 @@ export const PLAYTIME_BANDS = [
 
 // ─── Phase 4-3  Chip planning ────────────────────────────────────────────────
 
+// Canonical chip identifiers. Order = render order in the Planner's chips panel.
+export const CHIP_IDS = ['wildcard', 'freehit', 'benchboost', 'triplecaptain'];
+
+// Human labels for chips, keyed by chip id. Shared by js/modules/planner.js (chip
+// cards) and js/engine/strategy.js (the chipWindow trigger message) — a single
+// definition so a raw id like "freehit" never leaks into rendered text.
+export const CHIP_LABELS = {
+  wildcard:      'Wildcard',
+  freehit:       'Free Hit',
+  benchboost:    'Bench Boost',
+  triplecaptain: 'Triple Captain',
+};
+
 // How many candidate GWs ahead of currentGw to evaluate for each chip.
 // Higher = considers timing further out, but cost is roughly O(CHIP_PLAN_HORIZON
 // × teams × WC_WINDOW) scoreFixture calls (cached per (team, fixture)).

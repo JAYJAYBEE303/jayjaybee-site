@@ -15,7 +15,7 @@
 import { store } from '../store.js';
 import {
   HORIZONS, PRICE_BUY_NOW_CONFIDENCE, PRICE_BUY_NOW_SCORE_MIN,
-  SQUAD_LIMITS, SQUAD_TOTAL, BENCH_SIZE, HIT_PENALTY,
+  SQUAD_LIMITS, SQUAD_TOTAL, BENCH_SIZE, HIT_PENALTY, CHIP_IDS, CHIP_LABELS,
 } from '../config.js';
 import { buildScoreContext, scorePlayer, rankPlayers, attachRankTiers } from '../engine/composite.js';
 import { calcPriceChangeRisk } from '../engine/prices.js';
@@ -35,16 +35,9 @@ import { renderVerdictBanner, renderBoardGrid } from './planner-boards.js';
  *  because chip usage is a season-long decision the user makes once per chip. */
 const CHIPS_USED_KEY = 'gafferiq_chips_used';
 
-/** Canonical chip identifiers. Order = render order in the chips panel. */
-const CHIP_IDS = ['wildcard', 'freehit', 'benchboost', 'triplecaptain'];
-
-/** Human labels for chips, keyed by chip id. */
-const CHIP_LABELS = {
-  wildcard:      'Wildcard',
-  freehit:       'Free Hit',
-  benchboost:    'Bench Boost',
-  triplecaptain: 'Triple Captain',
-};
+// CHIP_IDS and CHIP_LABELS now live in config.js — shared with
+// engine/strategy.js's chipWindow trigger message, so a raw id never
+// leaks into rendered text on either surface.
 
 
 
@@ -936,6 +929,23 @@ function onChipsClick(e) {
 // ─── After squad change ───────────────────────────────────────────────────────
 
 function afterSquadChange() {
+  // Cheap bookkeeping stays unconditional — both Dashboard and Planner call
+  // store.setSquad(), so this fires whichever module made the edit. Clearing
+  // the Planner's own search box/results is harmless either way.
+  if (_searchInput) _searchInput.value = '';
+  hideResults();
+
+  // Invalidate always, recompute lazily (CONVENTIONS.md §8), same split as
+  // onDataReady: a squad edit made on the Dashboard while the Planner is
+  // hidden must not pay for scoreSquad()'s rank computation or an uncached
+  // enumerateSwaps() over ~626 players just to write into DOM nobody sees.
+  // onRouteChanged flushes this once the Planner is actually shown.
+  if (store.getActiveModule() !== 'planner') {
+    _pendingRender = true;
+    return;
+  }
+  _pendingRender = false;
+
   scoreSquad();
   renderSquadPanel();
   // renderChipsPanel() runs before renderBoards(): it populates _chipRecs,
@@ -946,8 +956,6 @@ function afterSquadChange() {
   renderChipsPanel();
   renderBoards(true);
   renderRecommendations();
-  if (_searchInput) _searchInput.value = '';
-  hideResults();
 }
 
 // ─── Event handlers ───────────────────────────────────────────────────────────

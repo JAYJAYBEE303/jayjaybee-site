@@ -18,8 +18,12 @@ import {
   LANE_SCALE_NOW, LANE_SCALE_FUTURE, LANE_SCALE_FUNDS,
   LANE_SCALE_CEILING, LANE_SCALE_STRUCTURE,
   VERDICT_ACT_THRESHOLD, VERDICT_MARGIN_CLEAR, VERDICT_MARGIN_DOMINANT,
-  CHIP_WINDOW_GWS, FLEX_FLOOR, PRICE_BUY_NOW_CONFIDENCE,
+  CHIP_WINDOW_GWS, FLEX_FLOOR, PRICE_BUY_NOW_CONFIDENCE, CHIP_LABELS,
 } from '../config.js';
+
+// Tie-break priority when more than one chip's recommended GW is equally near —
+// the sharper, more time-critical chips win. See detectTriggers' MODEL note.
+const CHIP_TRIGGER_PRIORITY = ['triplecaptain', 'benchboost', 'freehit', 'wildcard'];
 
 /** Lane id → the config divisor that maps its natural unit onto 0–100. */
 const LANE_SCALES = {
@@ -107,16 +111,34 @@ function detectTriggers(swaps, squadState, ctx) {
     });
   }
 
+  // MODEL: chips.js always recommends a best gameweek for every chip — there is
+  // no "no recommendation" state — so without a cap this trigger would fire for
+  // several chips most weeks (wildcard, free hit and bench boost all landing in
+  // the same nearby window is the common case, not the exception) and drown out
+  // the genuinely sharp signals the other triggers carry. At most one chip
+  // trigger fires: the chip whose recommended GW is nearest, ties broken by
+  // CHIP_TRIGGER_PRIORITY (the sharper, more time-critical chips win a tie).
   const currentGw = ctx?.currentGw ?? 0;
+  let nearestChip = null;
   for (const [chipId, rec] of Object.entries(squadState?.chipRecs ?? {})) {
     const gw = rec?.gw;
     if (typeof gw !== 'number') continue;
     if (gw - currentGw > CHIP_WINDOW_GWS || gw < currentGw) continue;
+    const distance = gw - currentGw;
+    if (!nearestChip
+      || distance < nearestChip.distance
+      || (distance === nearestChip.distance
+          && CHIP_TRIGGER_PRIORITY.indexOf(chipId) < CHIP_TRIGGER_PRIORITY.indexOf(nearestChip.chipId))) {
+      nearestChip = { chipId, gw, distance };
+    }
+  }
+  if (nearestChip) {
+    const { chipId, gw, distance } = nearestChip;
     triggers.push({
       id: 'chipWindow',
       laneId: chipId === 'triplecaptain' ? 'ceiling' : 'future',
-      message: `${chipId} looks strongest in GW${gw}, ${gw - currentGw} gameweek(s) `
-             + 'away — plan transfers around it.',
+      message: `${CHIP_LABELS[chipId] ?? chipId} looks strongest in GW${gw}, `
+             + `${distance} gameweek(s) away — plan transfers around it.`,
     });
   }
 
@@ -208,7 +230,10 @@ export function buildVerdict(swaps, squadState, ctx) {
   const winner = promoted ?? leader;
 
   if (!promoted && (!winner || winner.score < VERDICT_ACT_THRESHOLD)) {
-    const triggerNote = triggers.length > 0 ? ` ${triggers.map(t => t.message).join(' ')}` : '';
+    // No triggerNote here: the structured `triggers` list this verdict already
+    // carries is rendered as its own bulleted list by the module (with the `!`
+    // marker) — repeating the same sentences in prose read as broken, not
+    // thorough. See spec revision in the multi-lens transfers task-8 review.
     const estimatedNote = winner?.estimated
       ? ' Some of the inputs behind this are estimated, so treat it as a lean rather '
         + 'than a certainty.'
@@ -227,7 +252,7 @@ export function buildVerdict(swaps, squadState, ctx) {
       triggers,
       promotedBy: null,
       estimated: Boolean(winner?.estimated),
-      reasoning: `${headline}${triggerNote}${estimatedNote}`,
+      reasoning: `${headline}${estimatedNote}`,
     };
   }
 
@@ -252,16 +277,18 @@ export function buildVerdict(swaps, squadState, ctx) {
 
   const winnerLabel = LANE_LABELS[winner.laneId];
   let headline;
-  let triggersForNote = triggers;
 
+  // No triggerNote appended below: the structured `triggers` list is rendered
+  // as its own bulleted list by the module, so repeating trigger messages in
+  // prose here would duplicate it. The one exception is the promotion
+  // headline just below, which must keep stating the promoting trigger's
+  // message — that sentence is what explains why a lower-scoring lane won.
   if (promoted) {
     const leadTrigger = triggers.find(t => t.id === promotedBy);
     const leaderLabel = LANE_LABELS[leader.laneId];
     headline = `${leadTrigger.message} This promotes ${winnerLabel} ahead of `
              + `${leaderLabel} (${leader.score.toFixed(0)} points), which would `
              + 'otherwise have topped the board this week.';
-    // The promoting trigger is already stated as the headline — don't repeat it.
-    triggersForNote = triggers.filter(t => t.id !== promotedBy);
   } else {
     headline =
         confidence === 'dominant' ? `${winnerLabel} is in a different league this week.`
@@ -270,9 +297,6 @@ export function buildVerdict(swaps, squadState, ctx) {
         + `${alternatives.length === 1 ? 'is' : 'are'} within ${VERDICT_MARGIN_CLEAR} points.`;
   }
 
-  const triggerNote = triggersForNote.length > 0
-    ? ` ${triggersForNote.map(t => t.message).join(' ')}`
-    : '';
   const estimatedNote = estimated
     ? ' Some of the inputs behind this are estimated, so treat it as a lean rather '
       + 'than a certainty.'
@@ -288,7 +312,6 @@ export function buildVerdict(swaps, squadState, ctx) {
     triggers,
     promotedBy,
     estimated,
-    reasoning: `${headline} ${winner.swap.lanes[winner.laneId].reasoning}`
-             + `${triggerNote}${estimatedNote}`,
+    reasoning: `${headline} ${winner.swap.lanes[winner.laneId].reasoning}${estimatedNote}`,
   };
 }
