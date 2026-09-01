@@ -304,3 +304,75 @@ export function buildChipWindows(gwStats, opts = {}) {
   }
   return out;
 }
+
+/**
+ * Plain-English note for one gameweek. The panel shows this under its rows.
+ * Postponement wording says the attribution is INFERRED, because it is — see
+ * attributePostponements.
+ */
+function gameweekNote(ppCount, isDouble, loaded) {
+  if (ppCount > 1) {
+    return `${ppCount} fixtures look postponed out of this week — only one matchup `
+         + `left to plan around. Inferred from the clubs left without a game.`;
+  }
+  if (ppCount === 1) {
+    return 'A fixture looks postponed out of this week and will be rearranged later. '
+         + 'Inferred from the clubs left without a game.';
+  }
+  if (isDouble) return 'Double gameweek. The strongest captaincy week of this stretch.';
+  if (loaded)   return 'Several heavily one-sided fixtures land together here.';
+  return 'An ordinary week — nothing worth holding a transfer for.';
+}
+
+/**
+ * The whole-season model behind the Full Season strip.
+ *
+ * Players are the expensive half and are LEFT NULL here. The module fills them
+ * in per gameweek from a chunked background pass (see modules/fullSeason.js),
+ * so the ribbon can paint from fixtures alone without waiting on ~700 form
+ * computations. `skipPlayers` is that path; it is also what the unit tests use.
+ *
+ * @param {object} ctx      from buildScoreContext
+ * @param {object} season   from normaliseSeason — read for pendingFixtures
+ * @param {{skipPlayers?: boolean}} [opts]
+ * @returns {object} SeasonModel
+ */
+export function buildSeasonModel(ctx, season, opts = {}) {
+  const pending  = season?.pendingFixtures ?? [];
+  const ppByGw   = attributePostponements(pending, ctx);
+  const currentGw = ctx.currentGw ?? 1;
+  const teamCount = Object.keys(ctx.teamsById || {}).length;
+  const formCache = opts.skipPlayers ? null : buildPlayerFormCache(ctx);
+
+  const gameweeks = [];
+  const gwStats   = [];
+  for (let gw = 1; gw <= LAST_GW; gw++) {
+    const fixtures = (ctx.fixtures || []).filter(f => f.gw === gw);
+    const live     = buildGameweekMatchups(gw, ctx, opts);
+    const pp       = ppByGw.get(gw) ?? [];
+    const matchups = fillMatchupSlots(live, pp);
+    const loaded   = isLoadedWeek(matchups);
+    const playing  = new Set();
+    for (const f of fixtures) { playing.add(f.homeTeamId); playing.add(f.awayTeamId); }
+    const blankCount = fixtures.length === 0 ? 0 : Math.max(0, teamCount - playing.size);
+    const players  = opts.skipPlayers ? null : buildGameweekPlayers(gw, ctx, formCache, opts);
+
+    gameweeks.push({
+      gw,
+      played: gw < currentGw,
+      matchups,
+      loaded,
+      blankCount,
+      players,
+      note: gameweekNote(pp.length, matchups.some(m => m.isDouble), loaded),
+    });
+    gwStats.push({
+      gw,
+      matchupTotal: matchups.reduce((a, m) => a + (m.value ?? 0), 0),
+      blankCount,
+      bestPlayerPoints: players?.[0]?.points ?? 0,
+    });
+  }
+
+  return { gameweeks, chipWindows: buildChipWindows(gwStats), currentGw };
+}

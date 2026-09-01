@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 
 import {
   buildGameweekMatchups, isLoadedWeek, attributePostponements, fillMatchupSlots,
-  buildGameweekPlayers, buildChipWindows,
+  buildGameweekPlayers, buildChipWindows, buildSeasonModel,
 } from '../../js/engine/season.js';
 
 /**
@@ -357,4 +357,54 @@ test('buildChipWindows skips a half with no gameweeks left', () => {
   const out = buildChipWindows(stats);
   assert.equal(out.some(w => w.half === 1), false);
   assert.equal(out.some(w => w.half === 2), true);
+});
+
+// ─── buildSeasonModel ───────────────────────────────────────────────────────
+
+test('buildSeasonModel returns all 38 gameweeks in order', () => {
+  const ctx = { fixtures: [], teamsById: {}, playersByTeamId: {}, currentGw: 3 };
+  const model = buildSeasonModel(ctx, { pendingFixtures: [] }, { skipPlayers: true });
+  assert.equal(model.gameweeks.length, 38);
+  assert.deepEqual(model.gameweeks.map(g => g.gw).slice(0, 3), [1, 2, 3]);
+});
+
+test('buildSeasonModel marks gameweeks before currentGw as played', () => {
+  const ctx = { fixtures: [], teamsById: {}, playersByTeamId: {}, currentGw: 4 };
+  const model = buildSeasonModel(ctx, { pendingFixtures: [] }, { skipPlayers: true });
+  assert.deepEqual(model.gameweeks.slice(0, 5).map(g => g.played),
+    [true, true, true, false, false]);
+});
+
+test('buildSeasonModel leaves players null when the pass is skipped', () => {
+  const ctx = { fixtures: [], teamsById: {}, playersByTeamId: {}, currentGw: 1 };
+  const model = buildSeasonModel(ctx, { pendingFixtures: [] }, { skipPlayers: true });
+  assert.equal(model.gameweeks[0].players, null);
+});
+
+test('buildSeasonModel counts blank clubs per gameweek', () => {
+  // Four clubs; only two play in GW5, so two are blank.
+  const ctx = {
+    fixtures: [{ id: 1, gw: 5, homeTeamId: 1, awayTeamId: 2 }],
+    teamsById: { 1: { id: 1 }, 2: { id: 2 }, 3: { id: 3 }, 4: { id: 4 } },
+    playersByTeamId: {}, currentGw: 1,
+  };
+  const model = buildSeasonModel(ctx, { pendingFixtures: [] }, { skipPlayers: true });
+  assert.equal(model.gameweeks[4].blankCount, 2);
+});
+
+test('buildSeasonModel notes a postponement in the week it was taken from', () => {
+  const ctx = {
+    fixtures: [
+      { id: 1, gw: 5, homeTeamId: 3, awayTeamId: 4 },
+      { id: 2, gw: 6, homeTeamId: 1, awayTeamId: 3 },
+      { id: 3, gw: 6, homeTeamId: 2, awayTeamId: 4 },
+    ],
+    teamsById: { 1: { id: 1 }, 2: { id: 2 }, 3: { id: 3 }, 4: { id: 4 } },
+    playersByTeamId: {}, currentGw: 1,
+  };
+  const season = { pendingFixtures: [{ id: 9, gw: null, homeTeamId: 1, awayTeamId: 2 }] };
+  const model = buildSeasonModel(ctx, season, { skipPlayers: true });
+  const gw5 = model.gameweeks[4];
+  assert.equal(gw5.matchups.some(m => m.postponed), true);
+  assert.match(gw5.note, /postponed/i);
 });
