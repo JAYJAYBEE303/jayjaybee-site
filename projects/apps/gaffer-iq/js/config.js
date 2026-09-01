@@ -760,12 +760,23 @@ export const BANDS = {
 
 // ─── §8 / ARCHITECTURE §9  Planning horizons ─────────────────────────────────
 
-// The three horizons are a first-class, cross-cutting concept.
-// The active horizon key is stored in store.js and changed by the horizon switcher.
+// The horizons are a first-class, cross-cutting concept.
+// The active horizon key is stored in store.js, fixed at GW6 since the switcher
+// was removed from the nav (see ARCHITECTURE.md §9).
+//
+// GW10 is NOT one of the switchable options — store.activeHorizon is fixed at
+// GW6 and nothing selects GW10. It exists because the Matchup Analyser's
+// Outlook strip reads a deliberately longer window than the scoring horizon
+// the rest of the app plans against: that strip is for eyeballing a team's run
+// of fixtures, where more weeks is simply more to look at, while the horizon
+// proper feeds player scores in the Ranker and Planner, where lengthening the
+// window would change every ranking. See MATCHUP_OUTLOOK_HORIZON in
+// js/modules/matchup.js.
 export const HORIZONS = {
-  GW1: { label: 'This GW',    gws: 1 },
-  GW3: { label: 'Next 3 GWs', gws: 3 },
-  GW6: { label: 'Next 6 GWs', gws: 6 },
+  GW1:  { label: 'This GW',     gws: 1 },
+  GW3:  { label: 'Next 3 GWs',  gws: 3 },
+  GW6:  { label: 'Next 6 GWs',  gws: 6 },
+  GW10: { label: 'Next 10 GWs', gws: 10 },
 };
 
 // ─── §9  Horizon aggregation ──────────────────────────────────────────────────

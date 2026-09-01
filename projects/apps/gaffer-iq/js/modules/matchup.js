@@ -7,7 +7,7 @@
  * No analytical logic lives here — all scoring delegated to engine/composite.js.
  * See ARCHITECTURE.md §10, FEATURE_ENGINE.md §11, ROADMAP.md Phase 1C.
  *
- * Subscriptions: data:ready, horizon:changed, route:changed, player:selected
+ * Subscriptions: data:ready, route:changed, player:selected
  * Renders only while on screen: data:ready does the cheap bookkeeping
  * unconditionally, then defers the expensive work to route:changed when
  * this module is hidden. See CONVENTIONS.md §8.
@@ -54,6 +54,19 @@ const METRIC_TIEBREAK = [
 const METRIC_ORDER = Object.keys(METRIC_LABELS).sort((a, b) =>
   (WEIGHTS[b] - WEIGHTS[a])
   || (METRIC_TIEBREAK.indexOf(a) - METRIC_TIEBREAK.indexOf(b)));
+
+// How many gameweeks the Outlook strip at the foot of each card covers.
+//
+// FIXED HERE rather than read from store.getActiveHorizon(), which the rest of
+// the app plans against. Those are two different questions. The active horizon
+// prices players in the Ranker and Planner, so its length is a scoring
+// decision; this strip just shows a team's run of fixtures, where a longer
+// window is only more to look at. Widening the shared horizon to reach 10
+// weeks here would silently rescore every player in two other modules.
+//
+// The strip wraps (.pgw-strip is flex-wrap), so a card too narrow for ten
+// slots on one line gets two lines rather than a clipped run.
+const MATCHUP_OUTLOOK_HORIZON = HORIZONS.GW10;
 
 // Metrics whose weight ramps up with evidence, and the matches each needs
 // before it carries its full configured weight. The breakdown shows an "n/N"
@@ -671,8 +684,9 @@ function onTeamNavKeydown(e) {
 
 /**
  * Score the selected fixture for both teams and render two side-by-side cards.
- * Each card shows the single-fixture breakdown plus the team's horizon aggregate
- * strip (perGw coloured cells) so the horizon switcher produces visible updates.
+ * Each card shows the single-fixture breakdown plus the team's Outlook strip
+ * (perGw coloured cells) over MATCHUP_OUTLOOK_HORIZON — the run of fixtures
+ * ahead of that team, independent of the horizon the rest of the app scores on.
  * All scoring delegated to engine/composite.js — no metric logic here.
  */
 function renderMatchup() {
@@ -695,8 +709,7 @@ function renderMatchup() {
     return;
   }
 
-  const horizonKey = store.getActiveHorizon();
-  const horizon    = HORIZONS[horizonKey] ?? HORIZONS.GW1;
+  const horizon = MATCHUP_OUTLOOK_HORIZON;
 
   const homeScore        = scoreFixture(homeTeam, fixture, ctx);
   const awayScore        = scoreFixture(awayTeam, fixture, ctx);
@@ -885,7 +898,8 @@ function buildPerGwStrip(team, perGw, pending = []) {
  * @param {CompositeScore} score         from scoreFixture — single fixture detail
  * @param {number}         fdr           official FPL difficulty rating 1–5
  * @param {object}         horizonScore  from scoreOverHorizon — multi-GW aggregate
- * @param {{label:string, gws:number}} horizon  active horizon config
+ * @param {{label:string, gws:number}} horizon  the Outlook window
+ *   (MATCHUP_OUTLOOK_HORIZON) — supplies both the section title and its length
  * @param {Array}          duels         from calcIndividualDuels — may be [] when
  *                                       summaries / ICT data aren't loaded
  * @param {{pairings: Object, estimated: boolean}} defending
@@ -1614,14 +1628,6 @@ function onRouteChanged(module) {
   onDataReady();
 }
 
-function onHorizonChanged() {
-  // Re-render with the new horizon: renderMatchup now calls scoreOverHorizon
-  // so the horizon aggregate score and perGw strip update on every switch.
-  if (store.isFresh() && _selectedFixtureId) {
-    renderMatchup();
-  }
-}
-
 /**
  * Handle a player:selected event emitted by the Ranker (and any future module)
  * when the user clicks a player row to drill into its matchup breakdown.
@@ -1715,7 +1721,6 @@ export function initMatchup() {
   _teamNav   = root.querySelector('.team-nav');
 
   store.subscribe('data:ready',      onDataReady);
-  store.subscribe('horizon:changed', onHorizonChanged);
   store.subscribe('route:changed',   onRouteChanged);
   store.subscribe('player:selected', onPlayerSelected);
 
