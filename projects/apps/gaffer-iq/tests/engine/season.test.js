@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildGameweekMatchups } from '../../js/engine/season.js';
+import { buildGameweekMatchups, isLoadedWeek } from '../../js/engine/season.js';
 
 /**
  * Minimal ctx double. buildGameweekMatchups only reads `fixtures` and
@@ -78,4 +78,25 @@ test('buildGameweekMatchups leaves a single-fixture week unflagged', () => {
   const ctx = ctxWith([{ id: 10, gw: 5, homeTeamId: 1, awayTeamId: 2 }]);
   const [m] = buildGameweekMatchups(5, ctx, { score: scorerFrom({}) });
   assert.equal(m.isDouble, false);
+});
+
+// ─── isLoadedWeek ───────────────────────────────────────────────────────────
+
+// A row as isLoadedWeek sees it: only `value` and `postponed` matter.
+const row = (value, postponed = false) => ({ value, postponed });
+
+test('isLoadedWeek is true once two matchups reach the great band', () => {
+  // BANDS.great is the threshold; 90 and 80 clear it, 40 does not.
+  assert.equal(isLoadedWeek([row(90), row(80), row(40)]), true);
+});
+
+test('isLoadedWeek is false when only one matchup reaches the great band', () => {
+  // One blowout is an ordinary week with a good fixture in it, not a loaded one.
+  assert.equal(isLoadedWeek([row(90), row(60), row(40)]), false);
+});
+
+test('isLoadedWeek does not count a postponed row toward the threshold', () => {
+  // A postponed row carries value: null. It must neither count nor throw on
+  // the comparison — the guard order in isLoadedWeek is what prevents both.
+  assert.equal(isLoadedWeek([row(90), row(null, true), row(null, true)]), false);
 });
