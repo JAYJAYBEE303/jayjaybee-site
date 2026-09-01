@@ -36,6 +36,7 @@ import {
 
 import { initLanding }      from './modules/landing.js';
 import { initMatchup }      from './modules/matchup.js';
+import { initFullSeason }   from './modules/fullSeason.js';
 import { initFixtures }     from './modules/fixtures.js';
 import { initRanker }       from './modules/ranker.js';
 import { initDashboard }    from './modules/dashboard.js';
@@ -451,6 +452,7 @@ routeToHash();
 // called, so they are in place when data:ready fires.
 initLanding();
 initMatchup();
+initFullSeason();
 initFixtures();
 initRanker();
 initDashboard();
