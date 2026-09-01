@@ -51,7 +51,83 @@ function columnHTML(g) {
     </div>`;
 }
 
-/** Rebuild the ribbon and rail from `_model`. */
+const CHIP_CLASS = {
+  wildcard:      'season-rail__cell--wildcard',
+  freehit:       'season-rail__cell--freehit',
+  triplecaptain: 'season-rail__cell--triplecaptain',
+};
+
+/**
+ * The chip rail: one cell per gameweek, mirroring the ribbon's widths and gap
+ * exactly, so a band's left edge IS its gameweek's left edge.
+ *
+ * Consecutive weeks of one chip are CONJOINED — bridged across the flex gap by
+ * an overlay (see .season-rail__cell--bridge::after), never by a negative
+ * margin. A negative margin consumes layout width and drifts every later cell
+ * leftward: 32px of accumulated error by GW38 when the prototype tried it.
+ *
+ * Safe to call twice (Task 11 repaints after its background player pass) —
+ * innerHTML replacement below always fully replaces the previous rail rather
+ * than appending or double-applying state.
+ */
+function renderRail() {
+  if (!_rail || !_model) return;
+  const chipAt = gw => _model.chipWindows.find(w => gw >= w.from && gw <= w.to);
+  const cells = [];
+  for (const g of _model.gameweeks) {
+    const w = chipAt(g.gw);
+    const cls = ['season-rail__cell'];
+    if (g.played) cls.push('season-rail__cell--past');
+    if (w) {
+      cls.push(CHIP_CLASS[w.chip]);
+      if (g.gw === w.from) cls.push('season-rail__cell--head');
+      // A run cannot bridge the reset: a chip window may not straddle GW19.
+      const continues = g.gw !== CHIP_RESET_AFTER_GW && chipAt(g.gw + 1) === w;
+      cls.push(continues ? 'season-rail__cell--bridge' : 'season-rail__cell--tail');
+    }
+    cells.push(`<span class="${cls.join(' ')}" data-gw="${g.gw}"></span>`);
+    if (g.gw === CHIP_RESET_AFTER_GW) cells.push('<span class="season-rail__split"></span>');
+  }
+  _rail.innerHTML = cells.join('');
+}
+
+/** Static legend. Every graphic on the strip is named here. */
+function renderKey() {
+  const key = _root?.querySelector('.season-key');
+  if (!key) return;
+  const group = (title, items) =>
+    `<div class="season-key__group"><span class="season-key__heading">${title}</span>`
+    + items.map(([cls, label]) =>
+      `<span class="season-key__item"><i class="season-key__swatch ${cls}"></i>${label}</span>`).join('')
+    + '</div>';
+  key.innerHTML = [
+    group('Matchup one-sidedness', [
+      ['season-key__swatch--great', 'Heavily favoured'],
+      ['season-key__swatch--good',  'Favoured'],
+      ['season-key__swatch--even',  'Even'],
+    ]),
+    group('Schedule', [
+      ['season-key__swatch--double',    'Double gameweek'],
+      ['season-key__swatch--postponed', 'Postponed fixture'],
+      ['season-key__swatch--split',     'Chip reset (after GW19)'],
+    ]),
+    group('Players', [
+      ['season-key__swatch--player',   "In the week's top five"],
+      ['season-key__swatch--standout', 'Standout — captaincy shout'],
+      ['season-key__swatch--favoured', 'Favoured side of a matchup'],
+    ]),
+    group('Chip windows', [
+      ['season-key__swatch--wildcard',      'Wildcard'],
+      ['season-key__swatch--triplecaptain', 'Triple Captain'],
+      ['season-key__swatch--freehit',       'Free Hit'],
+    ]),
+    group('Week strength', [
+      ['season-key__swatch--loaded', 'Loaded — several one-sided ties'],
+    ]),
+  ].join('');
+}
+
+/** Rebuild the ribbon, rail and key from `_model`. */
 function render() {
   if (!_model || !_ribbon) return;
   const cols = [];
@@ -65,6 +141,8 @@ function render() {
     }
   }
   _ribbon.innerHTML = cols.join('');
+  renderRail();
+  renderKey();
 }
 
 function rebuild() {

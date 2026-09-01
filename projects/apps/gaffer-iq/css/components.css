@@ -6624,3 +6624,147 @@ img.fx-crest {
   align-self: stretch;
   background: var(--color-border);
 }
+
+/* ─── Chip rail ───────────────────────────────────────────────────────────── */
+
+/* Sits below the ribbon (not overlapping it), so the prototype's floating
+   expand/collapse panel — Task 10 — can grow upward without covering it.
+   Mirrors .season-ribbon's flex sizing (width/gap) exactly: a chip band's
+   left edge lands on its gameweek's left edge only because both rows share
+   the same --season-col-w / --season-col-gap tokens. */
+.season-rail {
+  display: flex;
+  gap: var(--season-col-gap);
+  height: 7px;
+  margin-top: 6px;
+}
+
+.season-rail__cell { position: relative; width: var(--season-col-w); flex: none; }
+
+.season-rail__cell--past { width: var(--season-col-past); }
+
+.season-rail__cell--wildcard      { background: var(--band-deep-blue); }
+.season-rail__cell--triplecaptain { background: var(--band-orange); }
+.season-rail__cell--freehit       { background: var(--band-tough); }
+
+/* Bridges a chip window's run across the ribbon's flex gap with an overlay,
+   NOT a negative margin. A negative margin consumes layout width, which
+   drifts every later cell leftward — 32px of accumulated error by GW38 in
+   the prototype's first attempt — taking the bands off their gameweeks. */
+.season-rail__cell--bridge::after {
+  content: "";
+  position: absolute;
+  top: 0; bottom: 0; left: 100%;
+  width: var(--season-col-gap);
+  background: inherit;
+}
+
+.season-rail__cell--head { border-top-left-radius: 3px; border-bottom-left-radius: 3px; }
+.season-rail__cell--tail { border-top-right-radius: 3px; border-bottom-right-radius: 3px; }
+
+/* Lines up under .season-split — no visible mark of its own here, the divider
+   above already carries the label. */
+.season-rail__split { width: 1px; flex: none; }
+
+/* ─── Colour key ──────────────────────────────────────────────────────────── */
+
+/* Static legend beneath the strip. Every graphic used on the ribbon and rail
+   is named here (fullSeason.js renderKey()) so a first-time reader isn't
+   left guessing what a tint or a dot means. */
+.season-key {
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border-subtle);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(185px, 1fr));
+  gap: 14px 22px;
+}
+
+.season-key__group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.season-key__heading {
+  font-size: 0.625rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  font-weight: 700;
+}
+
+.season-key__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
+
+/* Base swatch is the "band tile" shape (matches .season-gw__tile's rounding);
+   modifiers below override size/shape for the dot, bar and line variants. */
+.season-key__swatch {
+  width: 15px;
+  height: 11px;
+  border-radius: var(--radius-sm);
+  flex: none;
+  display: inline-block;
+}
+
+.season-key__swatch--great { background: var(--band-great-bg);   border: 1px solid var(--band-great); }
+.season-key__swatch--good  { background: var(--band-good-bg);    border: 1px solid var(--band-good); }
+.season-key__swatch--even  { background: var(--band-neutral-bg); border: 1px solid var(--color-border); }
+
+.season-key__swatch--double {
+  background: var(--band-neutral-bg);
+  outline: 1px solid var(--color-accent);
+  outline-offset: -1px;
+}
+
+.season-key__swatch--postponed {
+  background: var(--band-brutal-bg);
+  outline: 1px solid var(--band-brutal);
+  outline-offset: -1px;
+}
+
+/* The chip-reset divider is a vertical rule, not a tile — this swatch matches
+   its shape rather than the default rectangle. */
+.season-key__swatch--split {
+  width: 2px;
+  height: 14px;
+  border-radius: 0;
+  background: var(--color-border);
+}
+
+.season-key__swatch--player {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--band-good);
+}
+
+.season-key__swatch--standout {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--band-light-green);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--band-light-green) 90%, transparent);
+}
+
+.season-key__swatch--favoured {
+  background: var(--band-light-green-bg);
+  border: 1px solid var(--band-light-green);
+}
+
+/* Chip-window colours match the rail bands above 1:1 (season-rail__cell's
+   --wildcard/--triplecaptain/--freehit), just wider than tall so the swatch
+   reads as a bar rather than a tile. */
+.season-key__swatch--wildcard      { width: 24px; height: 7px; background: var(--band-deep-blue); }
+.season-key__swatch--triplecaptain { width: 24px; height: 7px; background: var(--band-orange); }
+.season-key__swatch--freehit       { width: 24px; height: 7px; background: var(--band-tough); }
+
+.season-key__swatch--loaded {
+  border: 1px solid var(--band-good);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--band-good) 50%, transparent);
+}
