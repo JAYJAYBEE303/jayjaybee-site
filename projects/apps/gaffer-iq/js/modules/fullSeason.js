@@ -52,19 +52,38 @@ function columnHTML(g) {
 }
 
 const CHIP_CLASS = {
-  wildcard:      'season-rail__cell--wildcard',
-  freehit:       'season-rail__cell--freehit',
-  triplecaptain: 'season-rail__cell--triplecaptain',
+  wildcard:      'season-rail__bar--wildcard',
+  freehit:       'season-rail__bar--freehit',
+  triplecaptain: 'season-rail__bar--triplecaptain',
+};
+const CHIP_LABEL = {
+  wildcard:      'Wildcard',
+  freehit:       'Free Hit',
+  triplecaptain: 'Triple Captain',
 };
 
 /**
  * The chip rail: one cell per gameweek, mirroring the ribbon's widths and gap
  * exactly, so a band's left edge IS its gameweek's left edge.
  *
- * Consecutive weeks of one chip are CONJOINED — bridged across the flex gap by
- * an overlay (see .season-rail__cell--bridge::after), never by a negative
- * margin. A negative margin consumes layout width and drifts every later cell
- * leftward: 32px of accumulated error by GW38 when the prototype tried it.
+ * A gameweek CAN be covered by more than one chip window at once — the
+ * busiest week (Free Hit) and the best captain week (Triple Captain) can
+ * legitimately coincide. `chipsAt` therefore returns every matching window,
+ * and each one gets its own `.season-rail__bar` stacked inside the cell
+ * (flex-direction: column, one flex:1 bar per window) rather than `.find()`ing
+ * a single "winner" and silently dropping the rest — that was FINDING 1 from
+ * fix round 1: Triple Captain landing on the same week as Free Hit vanished
+ * from the DOM with no error.
+ *
+ * Consecutive weeks of ONE window are CONJOINED — bridged across the flex gap
+ * by an overlay on THAT window's own bar (see .season-rail__bar--bridge::
+ * after), never by a negative margin. A negative margin consumes layout width
+ * and drifts every later cell leftward: 32px of accumulated error by GW38
+ * when the prototype tried it. Head/tail/bridge are computed PER WINDOW —
+ * whether this exact window object also covers gw + 1 — not per cell, so two
+ * overlapping windows with different runs don't leak caps into each other.
+ * The cell's own width/gap are untouched by any of this — only what's drawn
+ * inside it changes, which is what keeps the rail locked to the ribbon.
  *
  * Safe to call twice (Task 11 repaints after its background player pass) —
  * innerHTML replacement below always fully replaces the previous rail rather
@@ -72,20 +91,21 @@ const CHIP_CLASS = {
  */
 function renderRail() {
   if (!_rail || !_model) return;
-  const chipAt = gw => _model.chipWindows.find(w => gw >= w.from && gw <= w.to);
+  const chipsAt = gw => _model.chipWindows.filter(w => gw >= w.from && gw <= w.to);
   const cells = [];
   for (const g of _model.gameweeks) {
-    const w = chipAt(g.gw);
-    const cls = ['season-rail__cell'];
-    if (g.played) cls.push('season-rail__cell--past');
-    if (w) {
-      cls.push(CHIP_CLASS[w.chip]);
-      if (g.gw === w.from) cls.push('season-rail__cell--head');
+    const windows = chipsAt(g.gw);
+    const cellCls = ['season-rail__cell'];
+    if (g.played) cellCls.push('season-rail__cell--past');
+    const bars = windows.map(w => {
+      const cls = ['season-rail__bar', CHIP_CLASS[w.chip]];
+      if (g.gw === w.from) cls.push('season-rail__bar--head');
       // A run cannot bridge the reset: a chip window may not straddle GW19.
-      const continues = g.gw !== CHIP_RESET_AFTER_GW && chipAt(g.gw + 1) === w;
-      cls.push(continues ? 'season-rail__cell--bridge' : 'season-rail__cell--tail');
-    }
-    cells.push(`<span class="${cls.join(' ')}" data-gw="${g.gw}"></span>`);
+      const continues = g.gw !== CHIP_RESET_AFTER_GW && chipsAt(g.gw + 1).includes(w);
+      cls.push(continues ? 'season-rail__bar--bridge' : 'season-rail__bar--tail');
+      return `<span class="${cls.join(' ')}" title="${CHIP_LABEL[w.chip]}"></span>`;
+    }).join('');
+    cells.push(`<span class="${cellCls.join(' ')}" data-gw="${g.gw}">${bars}</span>`);
     if (g.gw === CHIP_RESET_AFTER_GW) cells.push('<span class="season-rail__split"></span>');
   }
   _rail.innerHTML = cells.join('');

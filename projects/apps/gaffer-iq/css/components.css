@@ -6639,19 +6639,41 @@ img.fx-crest {
   margin-top: 6px;
 }
 
-.season-rail__cell { position: relative; width: var(--season-col-w); flex: none; }
+/* The cell itself carries no colour any more — a gameweek can be covered by
+   MORE THAN ONE chip window at once (the busiest week and the best captain
+   week can legitimately coincide), so colour lives on a .season-rail__bar
+   child instead. Cell width/gap is untouched by this — it is still what
+   locks the rail to the ribbon's columns. */
+.season-rail__cell {
+  position: relative;
+  width: var(--season-col-w);
+  flex: none;
+  display: flex;
+  flex-direction: column;
+}
 
 .season-rail__cell--past { width: var(--season-col-past); }
 
-.season-rail__cell--wildcard      { background: var(--band-deep-blue); }
-.season-rail__cell--triplecaptain { background: var(--band-orange); }
-.season-rail__cell--freehit       { background: var(--band-tough); }
+/* One bar per matched window. flex: 1 splits the cell's height evenly across
+   however many windows cover this gameweek, so two colliding chips read as a
+   two-tone bar instead of one hiding the other. */
+.season-rail__bar {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.season-rail__bar--wildcard      { background: var(--band-deep-blue); }
+.season-rail__bar--triplecaptain { background: var(--band-orange); }
+.season-rail__bar--freehit       { background: var(--band-tough); }
 
 /* Bridges a chip window's run across the ribbon's flex gap with an overlay,
    NOT a negative margin. A negative margin consumes layout width, which
    drifts every later cell leftward — 32px of accumulated error by GW38 in
-   the prototype's first attempt — taking the bands off their gameweeks. */
-.season-rail__cell--bridge::after {
+   the prototype's first attempt — taking the bands off their gameweeks.
+   Lives on the bar (not the cell) so `background: inherit` picks up THIS
+   window's own colour even when it is one of several stacked bars. */
+.season-rail__bar--bridge::after {
   content: "";
   position: absolute;
   top: 0; bottom: 0; left: 100%;
@@ -6659,8 +6681,8 @@ img.fx-crest {
   background: inherit;
 }
 
-.season-rail__cell--head { border-top-left-radius: 3px; border-bottom-left-radius: 3px; }
-.season-rail__cell--tail { border-top-right-radius: 3px; border-bottom-right-radius: 3px; }
+.season-rail__bar--head { border-top-left-radius: 3px; border-bottom-left-radius: 3px; }
+.season-rail__bar--tail { border-top-right-radius: 3px; border-bottom-right-radius: 3px; }
 
 /* Lines up under .season-split — no visible mark of its own here, the divider
    above already carries the label. */
@@ -6757,7 +6779,7 @@ img.fx-crest {
   border: 1px solid var(--band-light-green);
 }
 
-/* Chip-window colours match the rail bands above 1:1 (season-rail__cell's
+/* Chip-window colours match the rail bands above 1:1 (season-rail__bar's
    --wildcard/--triplecaptain/--freehit), just wider than tall so the swatch
    reads as a bar rather than a tile. */
 .season-key__swatch--wildcard      { width: 24px; height: 7px; background: var(--band-deep-blue); }
