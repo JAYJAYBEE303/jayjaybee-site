@@ -293,14 +293,26 @@ export function buildChipWindows(gwStats, opts = {}) {
     }
 
     // Free Hit — the single most damaged week: the one where the squad you own
-    // is least able to field an XI, so renting a different one pays.
+    // is least able to field an XI, so renting a different one pays. A flat
+    // blankCount (every row 0 — no blank is known yet) has no discriminating
+    // signal: the reduce below would then just return its own seed, rows[0],
+    // making "gameweek one" look like a confident pick when it is really an
+    // arbitrary one. A confidently-wrong recommendation is worse than none,
+    // so skip the chip for this half rather than push a false best.
     const fh = rows.reduce((best, s) => (s.blankCount > best.blankCount ? s : best), rows[0]);
-    out.push({ chip: 'freehit', from: fh.gw, to: fh.gw, half });
+    if (fh.blankCount > 0) {
+      out.push({ chip: 'freehit', from: fh.gw, to: fh.gw, half });
+    }
 
-    // Triple Captain — the single best captain week available anywhere.
+    // Triple Captain — the single best captain week available anywhere. Same
+    // guard: bestPlayerPoints is 0 for every row until the player pass has
+    // run, so a max of 0 means there is nothing to recommend yet, not that
+    // gameweek one is the best captain week.
     const tc = rows.reduce((best, s) =>
       (s.bestPlayerPoints > best.bestPlayerPoints ? s : best), rows[0]);
-    out.push({ chip: 'triplecaptain', from: tc.gw, to: tc.gw, half });
+    if (tc.bestPlayerPoints > 0) {
+      out.push({ chip: 'triplecaptain', from: tc.gw, to: tc.gw, half });
+    }
   }
   return out;
 }

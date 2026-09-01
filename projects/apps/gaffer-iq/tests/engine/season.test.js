@@ -310,8 +310,20 @@ function flatStats() {
   }));
 }
 
+// flatStats() alone has blankCount: 0 on every row, which is now a genuine
+// "nothing damaged yet" input (see the omission tests below) rather than
+// something a Free Hit window would come out of — so the two structural
+// tests below give each half one damaged week, same as the free-hit-specific
+// test further down, to keep a real signal behind every window they expect.
+function statsWithFreeHitSignal() {
+  const stats = flatStats();
+  stats[5].blankCount = 3;    // GW6, half 1
+  stats[25].blankCount = 3;   // GW26, half 2
+  return stats;
+}
+
 test('buildChipWindows picks one window per chip per half', () => {
-  const out = buildChipWindows(flatStats());
+  const out = buildChipWindows(statsWithFreeHitSignal());
   const key = w => `${w.chip}:${w.half}`;
   const keys = out.map(key).sort();
   assert.deepEqual(keys, [
@@ -322,7 +334,7 @@ test('buildChipWindows picks one window per chip per half', () => {
 });
 
 test('buildChipWindows never lets a window straddle the chip reset', () => {
-  const out = buildChipWindows(flatStats());
+  const out = buildChipWindows(statsWithFreeHitSignal());
   for (const w of out) {
     const crosses = w.from <= 19 && w.to >= 20;
     assert.equal(crosses, false, `${w.chip} ${w.from}-${w.to} straddles the reset`);
@@ -357,6 +369,25 @@ test('buildChipWindows skips a half with no gameweeks left', () => {
   const out = buildChipWindows(stats);
   assert.equal(out.some(w => w.half === 1), false);
   assert.equal(out.some(w => w.half === 2), true);
+});
+
+test('buildChipWindows omits the free hit when no week is damaged', () => {
+  // Every blankCount is 0, so there is no week a Free Hit would rescue.
+  // flatStats() seeds bestPlayerPoints to 5 (non-zero), so this isolates the
+  // free hit condition alone — triple captain still gets a window.
+  const out = buildChipWindows(flatStats());
+  assert.equal(out.some(w => w.chip === 'freehit'), false);
+  assert.equal(out.some(w => w.chip === 'triplecaptain'), true);
+});
+
+test('buildChipWindows omits the triple captain before any projections exist', () => {
+  // bestPlayerPoints is 0 for every week until the player pass has run.
+  // blankCount is given a genuine (if tied) signal here so this isolates the
+  // triple captain condition alone — free hit still gets a window.
+  const stats = flatStats().map(s => ({ ...s, blankCount: 1, bestPlayerPoints: 0 }));
+  const out = buildChipWindows(stats);
+  assert.equal(out.some(w => w.chip === 'triplecaptain'), false);
+  assert.equal(out.some(w => w.chip === 'freehit'), true);
 });
 
 // ─── buildSeasonModel ───────────────────────────────────────────────────────
