@@ -388,7 +388,7 @@ test('buildSeasonModel counts blank clubs per gameweek', () => {
     teamsById: { 1: { id: 1 }, 2: { id: 2 }, 3: { id: 3 }, 4: { id: 4 } },
     playersByTeamId: {}, currentGw: 1,
   };
-  const model = buildSeasonModel(ctx, { pendingFixtures: [] }, { skipPlayers: true });
+  const model = buildSeasonModel(ctx, { pendingFixtures: [] }, { skipPlayers: true, score: scorerFrom({}) });
   assert.equal(model.gameweeks[4].blankCount, 2);
 });
 
@@ -403,7 +403,7 @@ test('buildSeasonModel notes a postponement in the week it was taken from', () =
     playersByTeamId: {}, currentGw: 1,
   };
   const season = { pendingFixtures: [{ id: 9, gw: null, homeTeamId: 1, awayTeamId: 2 }] };
-  const model = buildSeasonModel(ctx, season, { skipPlayers: true });
+  const model = buildSeasonModel(ctx, season, { skipPlayers: true, score: scorerFrom({}) });
   const gw5 = model.gameweeks[4];
   assert.equal(gw5.matchups.some(m => m.postponed), true);
   assert.match(gw5.note, /postponed/i);
