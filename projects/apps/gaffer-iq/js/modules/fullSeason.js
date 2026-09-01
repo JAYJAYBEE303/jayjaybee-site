@@ -59,6 +59,7 @@ function render() {
     cols.push(columnHTML(g));
     if (g.gw === CHIP_RESET_AFTER_GW) {
       cols.push('<span class="season-split" role="separator"'
+        + ' aria-orientation="vertical"'
         + ' aria-label="Chips reset after Gameweek 19"'
         + ' title="FPL chips reset after Gameweek 19"></span>');
     }
@@ -69,25 +70,41 @@ function render() {
 function rebuild() {
   const season = store.getSeason();
   if (!season) return;
-  // Same options matchup.js passes (js/modules/matchup.js buildCtx), so the
-  // strip and the cards above it score from identical inputs.
+  // Exactly matchup.js's buildCtx() option set (js/modules/matchup.js), so the
+  // strip scores every fixture from the SAME inputs as the cards above it —
+  // omitting teamXgBySlug/leagueXgHistory degrades the counter-matchup and
+  // history sub-metrics, which can band (and colour) a tile differently than
+  // the card for the same fixture.
   const ctx = buildScoreContext(season, {
     playerSummariesById: store.getAllPlayerSummaries(),
     leagueXg:            store.getLeagueXg(),
     leagueXgPrev:        store.getLeagueXgPrev(),
+    leagueXgHistory:     store.getLeagueXgHistory(),
+    teamXgBySlug:        store.getAllTeamXg(),
+    currentGw:           store.getCurrentGw() ?? store.getNextGw() ?? 1,
   });
   _model = buildSeasonModel(ctx, season, { skipPlayers: true });
   render();
 }
 
+let _pendingRender = false;   // data changed while off screen — render on activation
+
 function onDataReady() {
-  if (store.getActiveModule() !== 'matchup') return;   // CONVENTIONS §8
+  // Rebuilding scores all 38 gameweeks — expensive. Defer it when hidden,
+  // same idiom as matchup.js/dashboard.js/fixtures.js/planner.js (CONVENTIONS §8).
+  if (store.getActiveModule() !== 'matchup') {
+    _pendingRender = true;
+    return;
+  }
+  _pendingRender = false;
   rebuild();
 }
 
+/** Flush a render deferred while off screen, once Matchup is shown. */
 function onRouteChanged(module) {
-  if (module !== 'matchup') return;
-  if (store.isFresh()) rebuild();
+  if (module !== 'matchup' || !_pendingRender) return;
+  _pendingRender = false;
+  rebuild();
 }
 
 /** Initialise the strip. Called once from main.js on bootstrap. */
