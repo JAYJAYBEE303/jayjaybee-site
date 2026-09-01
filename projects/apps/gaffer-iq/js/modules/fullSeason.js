@@ -437,7 +437,11 @@ async function expand(col, prev) {
   // that has to be given back before applying this column's own shift.
   pair.shift = scrollShiftFor(col, _scroller);
   const flowDelta = (prev && prev.col !== col && +prev.col.dataset.gw < gw) ? -GROW : 0;
-  const maxScroll = _scroller.scrollWidth - _scroller.clientWidth;
+  // Same +GROW as scrollShiftFor's headroom: the clamp must model the track
+  // AFTER the column widens, which is the state this scroll animates toward.
+  // Without it the clamp truncates the very shift scrollShiftFor just granted,
+  // and the last gameweek's panel overhangs because the scroll never happened.
+  const maxScroll = _scroller.scrollWidth + GROW - _scroller.clientWidth;
   const target = Math.max(0, Math.min(maxScroll, _scroller.scrollLeft + flowDelta + pair.shift));
   // NOT innerWidth: it includes the vertical scrollbar's width. The Matchup
   // page has vertical overflow, so the scrollbar is always showing and
