@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 
 import {
   buildGameweekMatchups, isLoadedWeek, attributePostponements, fillMatchupSlots,
-  buildGameweekPlayers,
+  buildGameweekPlayers, buildChipWindows,
 } from '../../js/engine/season.js';
 
 /**
@@ -299,4 +299,62 @@ test('buildGameweekPlayers caps at SEASON_TOP_PLAYERS', () => {
 test('buildGameweekPlayers returns nothing for a gameweek with no fixtures', () => {
   const ctx = playerCtx([{ id: 30, gw: 5, homeTeamId: 1, awayTeamId: 2 }]);
   assert.deepEqual(buildGameweekPlayers(9, ctx, new Map(), { project: projectFrom({}) }), []);
+});
+
+// ─── buildChipWindows ──────────────────────────────────────────────────────
+
+/** 38 flat gameweeks, then callers spike the ones they care about. */
+function flatStats() {
+  return Array.from({ length: 38 }, (_, i) => ({
+    gw: i + 1, matchupTotal: 100, blankCount: 0, bestPlayerPoints: 5,
+  }));
+}
+
+test('buildChipWindows picks one window per chip per half', () => {
+  const out = buildChipWindows(flatStats());
+  const key = w => `${w.chip}:${w.half}`;
+  const keys = out.map(key).sort();
+  assert.deepEqual(keys, [
+    'freehit:1', 'freehit:2',
+    'triplecaptain:1', 'triplecaptain:2',
+    'wildcard:1', 'wildcard:2',
+  ]);
+});
+
+test('buildChipWindows never lets a window straddle the chip reset', () => {
+  const out = buildChipWindows(flatStats());
+  for (const w of out) {
+    const crosses = w.from <= 19 && w.to >= 20;
+    assert.equal(crosses, false, `${w.chip} ${w.from}-${w.to} straddles the reset`);
+  }
+});
+
+test('buildChipWindows sends the wildcard to the best fixture run in its half', () => {
+  const stats = flatStats();
+  for (const gw of [6, 7, 8, 9, 10]) stats[gw - 1].matchupTotal = 500;
+  const wc = buildChipWindows(stats).find(w => w.chip === 'wildcard' && w.half === 1);
+  assert.equal(wc.from, 6);
+});
+
+test('buildChipWindows sends the free hit to the most damaged week', () => {
+  const stats = flatStats();
+  stats[13].blankCount = 6;             // GW14
+  const fh = buildChipWindows(stats).find(w => w.chip === 'freehit' && w.half === 1);
+  assert.equal(fh.from, 14);
+  assert.equal(fh.to, 14);
+});
+
+test('buildChipWindows sends the triple captain to the best captain week', () => {
+  const stats = flatStats();
+  stats[24].bestPlayerPoints = 19;      // GW25, second half
+  const tc = buildChipWindows(stats).find(w => w.chip === 'triplecaptain' && w.half === 2);
+  assert.equal(tc.from, 25);
+});
+
+test('buildChipWindows skips a half with no gameweeks left', () => {
+  // Late season: only GW30 onward remain, so the first half has nothing.
+  const stats = flatStats().filter(s => s.gw >= 30);
+  const out = buildChipWindows(stats);
+  assert.equal(out.some(w => w.half === 1), false);
+  assert.equal(out.some(w => w.half === 2), true);
 });

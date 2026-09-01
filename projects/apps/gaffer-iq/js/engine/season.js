@@ -7,7 +7,10 @@
  * See docs/superpowers/specs/2026-09-01-full-season-strip-design.md.
  */
 
-import { SEASON_TOP_MATCHUPS, SEASON_TOP_PLAYERS, SEASON_LOADED_MIN_GREAT, BANDS } from '../config.js';
+import {
+  SEASON_TOP_MATCHUPS, SEASON_TOP_PLAYERS, SEASON_LOADED_MIN_GREAT, BANDS,
+  CHIP_RESET_AFTER_GW, WC_WINDOW,
+} from '../config.js';
 import { scoreFixture, calcAvgPointsPerGw, calcExpectedPoints } from './composite.js';
 import { calcPlayerForm, calcPlayingLikelihood } from './form.js';
 
@@ -244,4 +247,60 @@ export function buildGameweekPlayers(gw, ctx, formCache, opts = {}) {
   }
 
   return rows.sort((a, b) => b.points - a.points).slice(0, SEASON_TOP_PLAYERS);
+}
+
+/**
+ * The best gameweek to play each chip, in each half of the season.
+ *
+ * EACH HALF IS SEARCHED SEPARATELY, which is also the mechanism that stops a
+ * window straddling the GW19 reset: a run that would cross it is simply never a
+ * candidate in either half. FPL reissues every chip after GW19, so a window
+ * spanning it would be advice you cannot take.
+ *
+ * SQUAD-AGNOSTIC. Triple Captain reads the best available captain in the league
+ * that week rather than a player you own, and Bench Boost is absent entirely —
+ * a bench you do not own carries no information. This is what lets the strip
+ * work on a first visit.
+ *
+ * @param {Array<object>} gwStats  one entry per gameweek:
+ *   { gw, matchupTotal, blankCount, bestPlayerPoints }
+ * @param {{wcWindow?: number}} [opts]
+ * @returns {Array<object>}  { chip, from, to, half }
+ */
+export function buildChipWindows(gwStats, opts = {}) {
+  const wcWindow = opts.wcWindow ?? WC_WINDOW;
+  const halves = [
+    { half: 1, rows: gwStats.filter(s => s.gw <= CHIP_RESET_AFTER_GW) },
+    { half: 2, rows: gwStats.filter(s => s.gw >  CHIP_RESET_AFTER_GW) },
+  ];
+
+  const out = [];
+  for (const { half, rows } of halves) {
+    if (rows.length === 0) continue;
+
+    // Wildcard — the best run of wcWindow consecutive weeks by fixture quality.
+    // Runs must sit wholly inside the half, so they cannot cross the reset.
+    let bestSum = -Infinity, bestStart = null;
+    for (let i = 0; i + wcWindow <= rows.length; i++) {
+      const slice = rows.slice(i, i + wcWindow);
+      // Only contiguous gameweeks form a run.
+      if (slice[slice.length - 1].gw - slice[0].gw !== wcWindow - 1) continue;
+      const sum = slice.reduce((a, s) => a + s.matchupTotal, 0);
+      if (sum > bestSum) { bestSum = sum; bestStart = slice[0].gw; }
+    }
+    if (bestStart !== null) {
+      out.push({ chip: 'wildcard', from: bestStart, to: bestStart + wcWindow - 1, half });
+    }
+
+    // Free Hit — the single most damaged week: the one where the squad you own
+    // is least able to field an XI, so renting a different one pays.
+    const fh = rows.reduce((best, s) => (s.blankCount > best.blankCount ? s : best), rows[0]);
+    out.push({ chip: 'freehit', from: fh.gw, to: fh.gw, half });
+
+    // Triple Captain — the single best captain week available anywhere.
+    const tc = rows.reduce((best, s) =>
+      (s.bestPlayerPoints > best.bestPlayerPoints ? s : best), rows[0]);
+    out.push({ chip: 'triplecaptain', from: tc.gw, to: tc.gw, half });
+  }
+  return out;
 }
