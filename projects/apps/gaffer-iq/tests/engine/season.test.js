@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildGameweekMatchups, isLoadedWeek } from '../../js/engine/season.js';
+import { buildGameweekMatchups, isLoadedWeek, attributePostponements, fillMatchupSlots } from '../../js/engine/season.js';
 
 /**
  * Minimal ctx double. buildGameweekMatchups only reads `fixtures` and
@@ -99,4 +99,82 @@ test('isLoadedWeek does not count a postponed row toward the threshold', () => {
   // A postponed row carries value: null. It must neither count nor throw on
   // the comparison — the guard order in isLoadedWeek is what prevents both.
   assert.equal(isLoadedWeek([row(90), row(null, true), row(null, true)]), false);
+});
+
+// ─── attributePostponements ────────────────────────────────────────────────────
+
+/** ctx whose scheduled fixtures pair up teams across the given gameweeks. */
+function scheduleCtx(fixtures, teamIds) {
+  const teamsById = {};
+  for (const id of teamIds) teamsById[id] = { id };
+  return { fixtures, teamsById };
+}
+
+test('attributePostponements places a pending tie in the week both clubs are blank', () => {
+  // GW5: teams 1 and 2 have no fixture, everyone else plays. The pending 1v2
+  // tie is the hole's obvious cause.
+  const ctx = scheduleCtx([
+    { id: 20, gw: 5, homeTeamId: 3, awayTeamId: 4 },
+    { id: 21, gw: 6, homeTeamId: 1, awayTeamId: 3 },
+    { id: 22, gw: 6, homeTeamId: 2, awayTeamId: 4 },
+  ], [1, 2, 3, 4]);
+  const pending = [{ id: 99, gw: null, homeTeamId: 1, awayTeamId: 2 }];
+  const map = attributePostponements(pending, ctx);
+  assert.deepEqual(map.get(5).map(f => f.id), [99]);
+});
+
+test('attributePostponements ignores a week where only one club is blank', () => {
+  // Team 1 is blank in GW5 but team 2 plays, so the 1v2 tie cannot have been
+  // removed from GW5.
+  const ctx = scheduleCtx([
+    { id: 20, gw: 5, homeTeamId: 2, awayTeamId: 3 },
+    { id: 21, gw: 6, homeTeamId: 1, awayTeamId: 2 },
+  ], [1, 2, 3]);
+  const pending = [{ id: 99, gw: null, homeTeamId: 1, awayTeamId: 2 }];
+  const map = attributePostponements(pending, ctx);
+  assert.equal(map.has(5), false);
+});
+
+test('attributePostponements picks the earliest matching week', () => {
+  // Both clubs are blank in GW5 and again in GW9. The postponement left its
+  // hole at the original date; the rearranged date is always later.
+  const ctx = scheduleCtx([
+    { id: 20, gw: 5, homeTeamId: 3, awayTeamId: 4 },
+    { id: 21, gw: 9, homeTeamId: 3, awayTeamId: 4 },
+    { id: 22, gw: 6, homeTeamId: 1, awayTeamId: 2 },
+  ], [1, 2, 3, 4]);
+  const pending = [{ id: 99, gw: null, homeTeamId: 1, awayTeamId: 2 }];
+  const map = attributePostponements(pending, ctx);
+  assert.equal(map.has(5), true);
+  assert.equal(map.has(9), false);
+});
+
+test('attributePostponements gives two ties in one week both slots', () => {
+  const ctx = scheduleCtx([
+    { id: 20, gw: 5, homeTeamId: 5, awayTeamId: 6 },
+    { id: 21, gw: 6, homeTeamId: 1, awayTeamId: 5 },
+    { id: 22, gw: 6, homeTeamId: 2, awayTeamId: 6 },
+    { id: 23, gw: 6, homeTeamId: 3, awayTeamId: 5 },
+    { id: 24, gw: 6, homeTeamId: 4, awayTeamId: 6 },
+  ], [1, 2, 3, 4, 5, 6]);
+  const pending = [
+    { id: 98, gw: null, homeTeamId: 1, awayTeamId: 2 },
+    { id: 99, gw: null, homeTeamId: 3, awayTeamId: 4 },
+  ];
+  const map = attributePostponements(pending, ctx);
+  assert.deepEqual(map.get(5).map(f => f.id).sort(), [98, 99]);
+});
+
+test('attributePostponements returns an empty map when nothing is pending', () => {
+  const ctx = scheduleCtx([{ id: 20, gw: 5, homeTeamId: 1, awayTeamId: 2 }], [1, 2]);
+  assert.equal(attributePostponements([], ctx).size, 0);
+});
+
+test('attributePostponements ignores weeks with no fixtures at all', () => {
+  // GW7 has no scheduled fixtures anywhere — an unplayed part of the season,
+  // not a hole. Every club is "blank", which must not swallow every pending tie.
+  const ctx = scheduleCtx([{ id: 20, gw: 5, homeTeamId: 1, awayTeamId: 2 }], [1, 2, 3, 4]);
+  const pending = [{ id: 99, gw: null, homeTeamId: 3, awayTeamId: 4 }];
+  const map = attributePostponements(pending, ctx);
+  assert.equal(map.has(7), false);
 });

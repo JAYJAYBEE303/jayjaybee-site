@@ -72,3 +72,52 @@ export function isLoadedWeek(matchups) {
   return matchups.filter(m => !m.postponed && m.value >= BANDS.great).length
     >= SEASON_LOADED_MIN_GREAT;
 }
+
+/**
+ * Infer which gameweek each postponed fixture was taken out of.
+ *
+ * WHY THIS IS AN INFERENCE. FPL sets `event: null` on a postponed fixture and
+ * does not retain the gameweek it was scheduled for, so the answer is not in
+ * the feed. What IS observable is the hole it left: two clubs with no fixture
+ * in a week the rest of the league plays. A pending tie between exactly those
+ * two clubs is the obvious cause.
+ *
+ * DISPLAY-ONLY. Nothing here feeds a score, and ARCHITECTURE.md §9's rule that
+ * gameweek aggregation must skip `gw === null` fixtures is untouched. The UI
+ * states that the attribution is inferred, so a wrong guess reads as a guess.
+ *
+ * Earliest match wins: a rearranged date is always later than the hole.
+ * A gameweek with NO scheduled fixtures at all is skipped — that is an unplayed
+ * stretch of the season, not a hole, and every club is trivially "blank" in it.
+ *
+ * @param {Array<object>} pending  fixtures with gw === null
+ * @param {object} ctx             from buildScoreContext
+ * @returns {Map<number, Array<object>>}  gameweek → fixtures attributed to it
+ */
+export function attributePostponements(pending, ctx) {
+  const out = new Map();
+  if (!pending || pending.length === 0) return out;
+
+  // Which clubs play in each gameweek that has any fixtures at all.
+  const playingByGw = new Map();
+  for (const f of (ctx.fixtures || [])) {
+    if (typeof f.gw !== 'number') continue;
+    let set = playingByGw.get(f.gw);
+    if (!set) playingByGw.set(f.gw, set = new Set());
+    set.add(f.homeTeamId);
+    set.add(f.awayTeamId);
+  }
+
+  const gws = [...playingByGw.keys()].sort((a, b) => a - b);
+  for (const f of pending) {
+    for (const gw of gws) {
+      const playing = playingByGw.get(gw);
+      if (playing.has(f.homeTeamId) || playing.has(f.awayTeamId)) continue;
+      let list = out.get(gw);
+      if (!list) out.set(gw, list = []);
+      list.push(f);
+      break;                       // earliest match only
+    }
+  }
+  return out;
+}
