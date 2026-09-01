@@ -728,17 +728,18 @@ export function buildGameweekPlayers(gw, ctx, formCache, opts = {}) {
   if (fixtures.length === 0) return [];
 
   // How many games each club plays this week, and its best fixture score.
+  // The fixture scores are only needed by the real projection, so they are
+  // skipped entirely when a test injects `project`.
   const counts = new Map();
   const bestFixture = new Map();
   for (const f of fixtures) {
-    for (const [teamId, oppId] of [[f.homeTeamId, f.awayTeamId], [f.awayTeamId, f.homeTeamId]]) {
+    for (const teamId of [f.homeTeamId, f.awayTeamId]) {
       counts.set(teamId, (counts.get(teamId) ?? 0) + 1);
       const team = ctx.teamsById[teamId];
-      if (!team) continue;
-      const s = opts.project ? { value: 50 } : scoreFixture(team, f, ctx);
+      if (!team || opts.project) continue;
+      const s = scoreFixture(team, f, ctx);
       const prev = bestFixture.get(teamId);
       if (!prev || s.value > prev.value) bestFixture.set(teamId, s);
-      void oppId;
     }
   }
 
@@ -1522,10 +1523,45 @@ git commit -m "feat(season): expand a gameweek into a floating panel"
 - Modify: `js/engine/season.js`
 
 **Interfaces:**
-- Consumes: `buildPlayerFormCache(ctx)` and `buildGameweekPlayers(gw, ctx, formCache)` (Task 5).
-- Produces: `runPlayerPass(ctx)` — an async generator over gameweeks that fills `_model.gameweeks[i].players` and repaints the dots.
+- Consumes: `buildPlayerFormCache(ctx)` and `buildGameweekPlayers(gw, ctx, formCache)` (Task 5); `buildChipWindows(gwStats)` (Task 6).
+- Produces: `recomputeChipWindows(model) -> Array<ChipWindow>` (new export in `js/engine/season.js`); `runPlayerPass(ctx)` in the module — an async pass over gameweeks that fills `_model.gameweeks[i].players`, repaints the dots, and refreshes the chip rail when it finishes.
 
-- [ ] **Step 1: Write the pass**
+- [ ] **Step 1: Add the chip-window recompute to the engine**
+
+`buildSeasonModel` is called with `skipPlayers: true` so the ribbon can paint
+immediately, which means `bestPlayerPoints` is `0` for every gameweek when the
+chip windows are first computed. Triple Captain's `reduce` therefore never
+beats its seed and lands on the first gameweek of each half — a visibly wrong
+band. Once the player pass has run, the windows have to be computed again from
+real numbers.
+
+Add to `js/engine/season.js` (it stays in the engine — a module may not compute
+a number, `ARCHITECTURE.md` §3 hard rule 2):
+
+```js
+/**
+ * Recompute the chip windows from a model whose players have since arrived.
+ *
+ * buildSeasonModel runs first with `skipPlayers` so the ribbon can paint from
+ * fixtures alone, and at that point every gameweek's `bestPlayerPoints` is 0 —
+ * which silently pins Triple Captain to the first gameweek of each half,
+ * because its `reduce` never finds a value greater than its seed. The module
+ * calls this once its background pass has filled `players`.
+ *
+ * @param {object} model  a SeasonModel whose gameweeks now carry `players`
+ * @returns {Array<object>}  fresh chip windows
+ */
+export function recomputeChipWindows(model) {
+  return buildChipWindows(model.gameweeks.map(g => ({
+    gw:               g.gw,
+    matchupTotal:     g.matchups.reduce((a, m) => a + (m.value ?? 0), 0),
+    blankCount:       g.blankCount,
+    bestPlayerPoints: g.players?.[0]?.points ?? 0,
+  })));
+}
+```
+
+- [ ] **Step 2: Write the pass**
 
 Add to `js/modules/fullSeason.js`:
 
@@ -1552,6 +1588,12 @@ async function runPlayerPass(ctx) {
     paintDots(g);
     await new Promise(r => setTimeout(r, 0));   // yield a frame
   }
+  // The chip windows were first computed against players that had not arrived
+  // yet, which pins Triple Captain to each half's opening gameweek. Now that
+  // every week has its five, they can be computed for real and the rail
+  // repainted — renderRail() is written to be safe to call twice.
+  _model.chipWindows = recomputeChipWindows(_model);
+  renderRail();
 }
 
 /** Repaint one column's dots once its players have arrived. */
@@ -1571,7 +1613,7 @@ Call it at the end of `rebuild()`:
   runPlayerPass(ctx);
 ```
 
-- [ ] **Step 2: Show skeletons for a week that has not arrived**
+- [ ] **Step 3: Show skeletons for a week that has not arrived**
 
 In the panel builder from Task 10, when `g.players` is `null`:
 
@@ -1587,7 +1629,7 @@ const playerRows = g.players
       '<span class="season-player"><span class="skeleton skeleton--text"></span></span>').join('');
 ```
 
-- [ ] **Step 3: Verify in the browser**
+- [ ] **Step 4: Verify in the browser**
 
 Run: reload `http://localhost:3000/#matchup` and immediately open a late gameweek.
 Expected: skeleton rows, replaced by real names within a second or two. Then check the pass completed:
@@ -1604,7 +1646,16 @@ performance.mark('a'); /* reload, wait for dots */ performance.measure('pass', '
 ```
 If the ribbon is unresponsive for more than ~2s, switch to the fallback in spec §7: compute a week's players on demand when it is opened, and drop the dots to a cheaper proxy.
 
-- [ ] **Step 4: Commit**
+Also confirm the chip rail corrects itself. Before the pass finishes, the
+Triple Captain bands sit on gameweeks 1 and 20; after it completes they should
+move. Check in the console:
+
+```js
+[...document.querySelectorAll('.season-rail__cell--triplecaptain')].map(c => c.dataset.gw)
+```
+Expected: NOT `["1","20"]` on a season with any played fixtures.
+
+- [ ] **Step 5: Commit**
 
 ```bash
 git add projects/apps/gaffer-iq/js/modules/fullSeason.js projects/apps/gaffer-iq/js/engine/season.js
