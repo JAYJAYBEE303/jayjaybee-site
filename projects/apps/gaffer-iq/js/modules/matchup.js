@@ -38,6 +38,38 @@ const METRIC_LABELS = {
   //   METRIC_ORDER derives from these keys, so dropping the label drops the row.
 };
 
+// Plain-English meaning of each breakdown metric, for the "i" popup beside its
+// row. One sentence, framed as what the number describes about an actual match
+// — deliberately NOT how it is computed. The weight, the maturity counter and
+// the row's own title= tooltip already carry the mechanical detail; what the
+// popup answers is "what am I even looking at", which is the question a reader
+// meeting the row for the first time actually has.
+//
+// homeAway is keyed by venue because the row itself is: the same metric is
+// labelled "Home Advantage" on one card and "Away Disadvantage" on the other,
+// and a single shared sentence would read as a non-sequitur under one of them.
+const METRIC_MEANINGS = {
+  baseDifficulty:
+    "How strong this opponent is as a side, the way you'd size them up from the "
+    + "league table before kick-off — before form, venue or styles come into it.",
+  counterMatchup:
+    'Whether the way this team tries to score is the same way this particular '
+    + 'opponent tends to get hurt — pace in behind against a slow back line, '
+    + 'say, or corners against a defence that keeps losing headers.',
+  teamForm:
+    "How well the team has actually been playing in its recent matches, rather "
+    + "than how good its squad is supposed to be on paper.",
+  history:
+    'Whether these two clubs have a pattern when they meet — some fixtures just '
+    + 'keep going one way regardless of where either side sits in the table.',
+  homeAway: {
+    Home: 'How much this team is lifted by playing at their own ground, in front '
+        + 'of their own crowd, with no travel in their legs.',
+    Away: 'How much this team tends to drop off on the road, where the crowd is '
+        + 'against them and the trip takes something out of the performance.',
+  },
+};
+
 // Tiebreak for metrics on equal weight (teamForm and history are both 0.15).
 // Read as "which is more worth reading first", and only ever consulted when
 // WEIGHTS cannot separate two rows.
@@ -1058,6 +1090,53 @@ function maturityTooltip(key, m, progress) {
 }
 
 /**
+ * The "i" affordance at the right edge of a breakdown row, and the popup it
+ * opens: one plain-English sentence saying what the metric describes about a
+ * real match.
+ *
+ * Built as a <details> for the same reason the counter pairings are — the open
+ * state is the browser's, so nothing here has to track it. The difference is
+ * that this panel is absolutely positioned rather than in flow: a breakdown row
+ * is a compact single line, and pushing five rows apart to reveal a sentence
+ * would move every number the reader was comparing. The pairing rows below can
+ * afford to expand because their panel IS the content; this one is a footnote.
+ *
+ * The <summary> itself carries the button styling (rather than wrapping a span,
+ * as .counter-pairing-info__btn does) so the affordance is the focusable
+ * element and the popup can be opened from the keyboard. Closing it again is
+ * wired by hand — closeMetricInfo for an outside click, onMetricInfoKeydown
+ * for Escape; <details> has neither.
+ *
+ * @param {string} key            metric key
+ * @param {'Home'|'Away'} venue   which side of the fixture this card is for
+ * @returns {string} HTML — the button and its popup, or an empty grid cell for
+ *   a metric with no explanation on file
+ */
+function buildMetricInfo(key, venue) {
+  const entry = METRIC_MEANINGS[key];
+  const text  = typeof entry === 'string' ? entry : entry?.[venue];
+  // An unexplained metric still emits the cell — .breakdown-rows is one shared
+  // grid, so a missing cell would pull every later row's columns out of phase.
+  if (!text) return '<span class="breakdown-row__info"></span>';
+
+  const label = key === 'homeAway'
+    ? (venue === 'Home' ? 'Home Advantage' : 'Away Disadvantage')
+    : METRIC_LABELS[key];
+
+  return `
+    <details class="breakdown-row__info">
+      <summary class="breakdown-row__info-btn"
+               title="What does ${esc(label)} mean?"
+               aria-label="What does ${esc(label)} mean?">i</summary>
+      <div class="breakdown-row__info-pop" role="note">
+        <span class="breakdown-row__info-title">${esc(label)}</span>
+        <p class="breakdown-row__info-text">${esc(text)}</p>
+      </div>
+    </details>
+  `.trim();
+}
+
+/**
  * @param {object} breakdown  CompositeScore.breakdown
  * @param {'Home'|'Away'} venue
  * @param {boolean} settled   false while the Understat team payloads behind
@@ -1130,6 +1209,7 @@ function buildBreakdownRows(breakdown, venue, settled = true) {
         </div>
         ${value}
         <span class="breakdown-row__weight">${pct}%</span>
+        ${buildMetricInfo(key, venue)}
       </div>
     `.trim();
   }).join('');
@@ -1581,6 +1661,39 @@ function onStripKeydown(e) {
   onStripActivate(e);
 }
 
+/**
+ * Close every open metric "i" popup except the one the click landed inside.
+ *
+ * Bound on the document rather than on _grid because the whole point is to
+ * catch clicks that land ANYWHERE else — the page header, the navigator, the
+ * body background. Clicks inside a popup are left alone so text can be
+ * selected out of it; clicking the row's own "i" again is left to the browser,
+ * which toggles that <details> shut on its own.
+ *
+ * This also enforces one-at-a-time: opening a second "i" closes the first,
+ * since the first does not contain the click.
+ *
+ * @param {Event} e
+ */
+function closeMetricInfo(e) {
+  const inside = e.target instanceof Element
+    ? e.target.closest('.breakdown-row__info')
+    : null;
+  document.querySelectorAll('.breakdown-row__info[open]').forEach(d => {
+    if (d !== inside) d.open = false;
+  });
+}
+
+/** Escape closes an open metric popup — <details> has no native Escape. */
+function onMetricInfoKeydown(e) {
+  if (e.key !== 'Escape') return;
+  const open = document.querySelectorAll('.breakdown-row__info[open]');
+  if (!open.length) return;
+  // Focus is on the summary that opened it; leave it there so the reader keeps
+  // their place in the row order rather than being dropped at the document top.
+  open.forEach(d => { d.open = false; });
+}
+
 // ─── Public init ─────────────────────────────────────────────────────────────
 
 /**
@@ -1613,6 +1726,13 @@ export function initMatchup() {
   // perGw strip cells are torn down and rebuilt on every renderMatchup().
   _grid.addEventListener('click',   onStripActivate);
   _grid.addEventListener('keydown', onStripKeydown);
+
+  // Metric "i" popups dismiss on any outside click, so the listener has to sit
+  // above the module's own DOM. Capture phase: a handler further down that
+  // stops propagation (or a re-render that replaces the clicked node before the
+  // event bubbles back up) would otherwise leave the popup stranded open.
+  document.addEventListener('click',   closeMetricInfo, true);
+  document.addEventListener('keydown', onMetricInfoKeydown);
 
   // Defensive: if data is already fresh (sessionStorage hydration) trigger now,
   // since data:ready was emitted before this subscription was registered.
