@@ -157,13 +157,17 @@ gaffer-iq/                          (= projects/gaffer-iq/ in the repo)
     │   ├── lineup.js           # Starting XI/bench selection + XI expected points.
     │   │                       #   Shared by dashboard.js and transfers.js — see note below.
     │   ├── transfers.js        # Enumerates squad swaps; scores each on 5 lanes (FEATURE_ENGINE §14).
-    │   └── strategy.js         # Normalises the 5 lanes into one weekly verdict (FEATURE_ENGINE §14).
+    │   ├── strategy.js         # Normalises the 5 lanes into one weekly verdict (FEATURE_ENGINE §14).
+    │   └── season.js           # Whole-season model for the Full Season strip: per-GW matchups,
+    │                           #   postponement inference, chip windows (FEATURE_ENGINE §15).
     │
     └── modules/                # The feature views. These OWN the DOM; engine never does.
         ├── landing.js          # Landing page — the front page at the bare URL.
         │                       #   Presentational; owns the scroll-reveal system
         │                       #   and the `is-landing` body class only.
         ├── matchup.js          # Matchup Analyser.
+        ├── fullSeason.js       # Full Season strip on the Matchup page: GW1–38 ribbon, chip
+        │                       #   rail, expand/collapse choreography (FEATURE_ENGINE §15).
         ├── fixtures.js         # Fixtures: GW grid, league table, team schedule, H2H.
         ├── ranker.js           # Player Ranker.
         ├── dashboard.js        # GW Decision Dashboard.
@@ -480,6 +484,7 @@ HORIZONS = {
 - For multi-GW horizons, a team/player's score is the **aggregate of its per-fixture composite scores across the horizon's GWs**, with a configurable aggregation method (default: mean, with an option for "worst-case" / minimum to surface fixture traps). The aggregation method and any GW-distance decay live in `config.js` and are detailed in `FEATURE_ENGINE.md`.
 - **Blank and double gameweeks** must be handled explicitly: a team with no fixture in a GW contributes a defined "blank" value (not zero, not skipped silently); a team with two fixtures has them collapsed to a per-GW mean and then lifted by `DGW_UPLIFT`, so a double adds *return* rather than doubling that gameweek's weight. `composite.js`'s `fixturesForTeamInWindow` resolves each team's fixture list per horizon, including these cases; `engine/fixtures.js` provides the display-side fold (`groupPerGwSlots`) and the irregularity summary. **Do not assume one-fixture-per-GW anywhere** — in particular, `perGw`'s length is not the horizon's length.
 - **Postponed fixtures** (`event: null`) are retained in `season.pendingFixtures` / `pendingFixturesByTeam` and are **display-only**. They have no gameweek, so nothing that aggregates over a gameweek window may read them — `fixturesForTeamInWindow`'s `f.gw === null` guard is what makes retaining them safe, and it must stay.
+- **The Full Season strip's postponement inference does not change this.** `engine/season.js`'s `attributePostponements` (`FEATURE_ENGINE.md` §15.3) derives *which gameweek's hole* a postponed fixture likely came from, so the strip can show it in context. That derived gameweek is display-only in exactly the same sense as above: it is written nowhere but the strip's own note text, never merged back onto the fixture object, and never read by `fixturesForTeamInWindow` or any horizon aggregation — the `f.gw === null` guard above is untouched and still sees every postponed fixture's real, unattributed `gw`. The feature looks like it contradicts "postponed fixtures have no gameweek to sit inside"; it does not, because the inference lives entirely outside the aggregation path this guard protects.
 
 ---
 

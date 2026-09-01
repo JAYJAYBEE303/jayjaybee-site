@@ -1324,3 +1324,48 @@ Four hard conditions can override the ranked lanes. Each supplies its own headli
 
 1. **Estimated inputs downgrade confidence** (§14.6) — a verdict never sounds more certain than its weakest load-bearing input.
 2. **Empty boards state their emptiness** — a lane with nothing to say (most often Structure Fix, §14.3; sometimes Future Prep when no swing clears `FUTURE_MIN_FAR_GAIN`) renders an explicit "nothing here" state. Per `CONVENTIONS.md` §9, a board never pads itself with a weaker suggestion to look busy — silence is the honest answer some weeks.
+
+---
+
+## 15. Full Season strip (`engine/season.js`)
+
+Full design: `docs/superpowers/specs/2026-09-01-full-season-strip-design.md`. Rendered by `modules/fullSeason.js` as a collapsed GW1–38 ribbon on the Matchup page, each column expanding into a floating detail panel. Several rules below ship differently than that spec's §6 describes — the divergences are called out inline, and **the code is what's documented here, not the spec.**
+
+### 15.1 Two-sided matchup read (`buildGameweekMatchups`)
+
+A fixture is scored **twice**, once from each side's own `scoreFixture` call. The matchup's headline `value` is the higher of the two, and the side that produced it becomes `favouredId` — so the panel's "which team does this fixture favour" indicator falls out of the same number rather than needing a second rule to agree with it. A club playing twice in the gameweek (an occurrence count over `homeTeamId`/`awayTeamId`, not a squad import) marks every fixture it appears in that week `isDouble`. Rows are sorted by `value` descending and capped at `SEASON_TOP_MATCHUPS` (3).
+
+### 15.2 Week strength (`isLoadedWeek`)
+
+A week reads as **loaded** once at least `SEASON_LOADED_MIN_GREAT` (2) of its (already-capped-at-3) top matchups clear `BANDS.great` (75). Postponed rows are excluded from the count before the threshold is applied — a `null` `value` must neither trip the comparison nor throw. One blowout fixture is an ordinary week with a good fixture in it; two together is what the UI's glow is for.
+
+### 15.3 Postponement attribution — an inference, and display-only (`attributePostponements`)
+
+FPL sets `event: null` on a postponed fixture and does not retain the gameweek it was originally scheduled for — `season.pendingFixtures` carries these with `gw === null`, exactly as ARCHITECTURE.md §9 describes. The Full Season strip still wants to show *where* a postponement left a hole, so `attributePostponements` derives one:
+
+1. For every gameweek that has **any** scheduled fixture, collect the clubs with no fixture in it.
+2. A pending fixture is a candidate for a gameweek only if **both** its clubs are blank there.
+3. It is attributed to the **earliest** such gameweek — a rearranged fixture always lands later than the hole it left, never earlier.
+4. A gameweek with **no** scheduled fixtures at all is skipped outright, not treated as a hole — every club is trivially "blank" in an unplayed stretch of the season, and matching on that would wrongly swallow every pending fixture into the first empty gameweek found.
+
+**This is display-only.** The inferred gameweek is written nowhere but the strip's own `note` text (worded to say the attribution is *inferred*, so a wrong guess reads as a guess) — it is never merged back onto the fixture object and never reaches `scoreFixture` or any horizon aggregation. ARCHITECTURE.md §9's rule that gameweek aggregation must skip `f.gw === null` fixtures — enforced by `fixturesForTeamInWindow`'s own guard — is completely untouched by this: that guard only ever sees the fixture's real (`null`) `gw`, because `attributePostponements`'s output is consumed nowhere near it. §9's statement that a postponed fixture "has no gameweek to sit inside" and this feature's inferred gameweek are not in tension — one is about what feeds a score, the other is purely what a panel note says.
+
+### 15.4 Bottom-up matchup slot filling (`fillMatchupSlots`)
+
+Once a gameweek's live matchups and its attributed postponements are both known, they share the same `SEASON_TOP_MATCHUPS` (3) slots — live rows fill from the top, postponements from the **bottom**. Slot 1 is reserved for a live fixture whenever one exists at all, so a week with two postponements out of three reads as "one real fixture left to plan around" rather than being visually indistinguishable from an ordinary three-fixture week with the rows merely reordered. Only when no live fixture remains at all does a postponement occupy slot 1.
+
+### 15.5 Player form cache (`buildPlayerFormCache`)
+
+`calcPlayerForm` reads a player's own history and the league context — neither depends on which gameweek is being asked about — so it is computed exactly **once per player** (~700 calls) into a `Map<playerId, PlayerForm>`, and every one of the 38 per-gameweek `buildGameweekPlayers` passes reads from that cache instead of recomputing it. Only the cheap part — which clubs have a fixture that specific week, and that week's best fixture score per club — repeats 38 times. This is what keeps a league-wide top-5 ranking for all 38 gameweeks affordable; without the cache the same ~700 form computations would re-run once per gameweek instead of once, total. The ranking is deliberately squad-agnostic throughout — no `ownedBy` filter anywhere in the read — so the strip works before anyone has imported a team.
+
+### 15.6 Chip windows, searched per half (`buildChipWindows`, `recomputeChipWindows`)
+
+GW1–`CHIP_RESET_AFTER_GW` (19) and GW20–38 are searched **independently**, which is also the entire mechanism that stops a window straddling the reset — a candidate run that would cross GW19 is simply never assembled in either half's search. FPL reissues every chip after GW19, so a window spanning it would be advice nobody could act on.
+
+**Wildcard — diverges from spec §6.5.** The design spec describes the wildcard window as chosen "across the top `WC_TOP_TEAMS` clubs", mirroring how the existing squad-aware planner chip logic (`engine/chips.js`, which genuinely does read `WC_TOP_TEAMS` — FEATURE_ENGINE.md's Planner sections) picks its wildcard point. The shipped rule is different, and `WC_TOP_TEAMS` is never imported by `season.js` at all: for every contiguous run of `WC_WINDOW` (5) gameweeks sitting wholly inside the half, `buildChipWindows` sums each week's `matchupTotal` (the sum of that week's top-3 matchup values from §15.1) and picks the run with the highest total. That is a whole-league fixture-quality read, not a top-N-clubs read — consistent with the rest of the strip's squad-agnostic design (§15.5), but not what the spec proposed. Do not "fix" this back to a `WC_TOP_TEAMS` read without re-reading this note; it is deliberate.
+
+**Free Hit and Triple Captain omit themselves when nothing discriminates them.** Free Hit picks the single week with the highest `blankCount` in the half; Triple Captain picks the single week with the highest `bestPlayerPoints`. Both are found with an `Array.reduce` seeded on the half's first row (`rows[0]`) and a strict `>` comparison — and both are then gated by a floor check before being pushed: `blankCount > 0` for Free Hit, `bestPlayerPoints > 0` for Triple Captain. The floor exists because a strict `>` reduce seeded on `rows[0]` has a blind spot: when every row in the half is tied — concretely, `blankCount` is 0 everywhere because nothing has actually blanked yet, or `bestPlayerPoints` is 0 everywhere because the player pass hasn't run yet (see below) — the reduce never finds anything greater than its own seed, so it silently returns `rows[0]` itself: gameweek 1, or GW20 in the second half. Pushed unconditionally, that would render as if gameweek one were a considered recommendation, and it would be indistinguishable in the UI from a genuine one. The floor check is what stops that: a half with nothing to discriminate on now omits the chip's bar from the rail entirely. An absent bar reads correctly as "nothing to recommend yet, or nothing damaged"; a bar confidently sitting on gameweek one when the truth is "no real signal" does not, and a wrong-but-confident recommendation is worse than none.
+
+**Two-phase computation.** `buildSeasonModel` is normally called once with `{ skipPlayers: true }` (from `modules/fullSeason.js`'s `rebuild()`) so the ribbon can paint immediately from fixtures and matchups alone, without waiting on the ~700 form computations §15.5 describes. At that moment every gameweek's `players` is `null` and every `gwStats` entry's `bestPlayerPoints` is `0` — so the omission rule above correctly withholds Triple Captain from this first pass. That is the rule working as designed, not a bug to chase down. The module's chunked background pass (`runPlayerPass`) then fills `g.players` gameweek by gameweek and, once every week has its top five, calls `recomputeChipWindows(model)` — which rebuilds `gwStats` from the now-populated `players` and re-runs `buildChipWindows` for real — before the module repaints the rail. Triple Captain can therefore visibly appear on the rail a few seconds after Wildcard and Free Hit do; that lag is the two-phase design showing through, not a race to fix.
+
+**Downstream, for context:** `modules/fullSeason.js`'s rail renders one bar per chip window that covers a given gameweek, not a single "winner" — Free Hit and Triple Captain can legitimately land on the same week within a half, and both bars are drawn stacked inside that gameweek's cell rather than one being dropped silently.
