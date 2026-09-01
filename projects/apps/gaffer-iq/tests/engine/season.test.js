@@ -178,3 +178,53 @@ test('attributePostponements ignores weeks with no fixtures at all', () => {
   const map = attributePostponements(pending, ctx);
   assert.equal(map.has(7), false);
 });
+
+// ─── fillMatchupSlots ──────────────────────────────────────────────────────────
+
+const live = n => Array.from({ length: n }, (_, i) => ({
+  fixtureId: 100 + i, value: 90 - i * 10, postponed: false,
+}));
+const pp = n => Array.from({ length: n }, (_, i) => ({
+  id: 200 + i, homeTeamId: 1, awayTeamId: 2,
+}));
+
+test('fillMatchupSlots leaves a clean week untouched', () => {
+  const out = fillMatchupSlots(live(3), []);
+  assert.equal(out.length, 3);
+  assert.equal(out.some(m => m.postponed), false);
+  assert.deepEqual(out.map(m => m.value), [90, 80, 70]);
+});
+
+test('fillMatchupSlots puts one postponement in the LAST slot', () => {
+  const out = fillMatchupSlots(live(3), pp(1));
+  assert.equal(out.length, 3);
+  assert.deepEqual(out.map(m => m.postponed), [false, false, true]);
+  // Slot 1 keeps the week's genuine best fixture.
+  assert.equal(out[0].value, 90);
+});
+
+test('fillMatchupSlots fills upward for two postponements', () => {
+  const out = fillMatchupSlots(live(3), pp(2));
+  assert.deepEqual(out.map(m => m.postponed), [false, true, true]);
+  assert.equal(out[0].value, 90);
+});
+
+test('fillMatchupSlots keeps slot 1 live even with three postponements', () => {
+  // Three would fill every slot; slot 1 is reserved for a real fixture
+  // whenever one exists, because that is the whole point of the ordering.
+  const out = fillMatchupSlots(live(3), pp(3));
+  assert.deepEqual(out.map(m => m.postponed), [false, true, true]);
+});
+
+test('fillMatchupSlots allows an all-postponed week when nothing is live', () => {
+  const out = fillMatchupSlots([], pp(2));
+  assert.deepEqual(out.map(m => m.postponed), [true, true]);
+});
+
+test('fillMatchupSlots marks postponed rows as unscored', () => {
+  const [row] = fillMatchupSlots([], pp(1));
+  assert.equal(row.value, null);
+  assert.equal(row.favouredId, null);
+  assert.equal(row.homeId, 1);
+  assert.equal(row.awayId, 2);
+});

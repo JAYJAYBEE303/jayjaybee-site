@@ -121,3 +121,47 @@ export function attributePostponements(pending, ctx) {
   }
   return out;
 }
+
+/**
+ * Lay a gameweek's rows out, postponements filling FROM THE BOTTOM.
+ *
+ * Slot 1 always holds the week's genuine best fixture whenever one exists, no
+ * matter how much of the schedule has fallen over. Two postponements therefore
+ * read as "one real fixture left to plan around", which is the signal worth
+ * acting on — where sorting them in among the live rows would just look like a
+ * thin week.
+ *
+ * @param {Array<object>} liveRows   buildGameweekMatchups output, descending
+ * @param {Array<object>} postponed  fixtures attributed to this gameweek
+ * @returns {Array<object>}  at most SEASON_TOP_MATCHUPS rows
+ */
+export function fillMatchupSlots(liveRows, postponed) {
+  const total = Math.min(SEASON_TOP_MATCHUPS, liveRows.length + postponed.length);
+  const slots = new Array(total).fill(null);
+
+  // Reserve slot 0 for a live fixture whenever there is one to put there, then
+  // fill postponements upward from the bottom of what remains.
+  const reserved = liveRows.length > 0 ? 1 : 0;
+  const room     = total - reserved;
+  const ppShown  = Math.min(postponed.length, room);
+
+  for (let i = 0; i < ppShown; i++) {
+    const f = postponed[i];
+    slots[total - 1 - i] = {
+      fixtureId:  f.id,
+      homeId:     f.homeTeamId,
+      awayId:     f.awayTeamId,
+      favouredId: null,
+      value:      null,
+      band:       'neutral',
+      isDouble:   false,
+      postponed:  true,
+    };
+  }
+
+  let next = 0;
+  for (let i = 0; i < total; i++) {
+    if (!slots[i]) slots[i] = liveRows[next++] ?? null;
+  }
+  return slots.filter(Boolean);
+}
