@@ -149,6 +149,20 @@
   list-style: none;
 }
 
+/* Chip-reset boundary — the hairline between GW19 and GW20 in the team
+   navigator. FPL reissues every chip after GW19, so fixtures either side of
+   this line cannot be planned against the same chips; without the rule the
+   list reads as one uninterrupted run.
+
+   A rule, not a row: zero height, no padding and no hit area, so it separates
+   the rows without ever looking like one of them. The margin is what gives it
+   room to read as deliberate against the list's own 2px row gap. */
+.gw-nav__chip-reset {
+  height: 0;
+  border-top: 1px solid var(--color-border);
+  margin: var(--space-2) var(--space-1);
+}
+
 /* The team navigator's full-season list. Only this variant scrolls — see the
    .team-nav note above for why the GW navigator does not. */
 .gw-nav__list--scroll {
@@ -884,8 +898,7 @@
 /* ─── Pairing info disclosure — reveals the named players behind a pairing ─── */
 /* Each pairing row is now a <details>; the row itself is the <summary>, with a
    small "i" affordance at its right edge. The native triangle is suppressed
-   because the "i" is the affordance. Same disclosure pattern as
-   .matchup-card__duels below — no new interaction model. */
+   because the "i" is the affordance. */
 
 /* The row-separator border moved here: the .counter-pairing elements are no
    longer siblings of each other, they're each wrapped in their own <details>. */
@@ -1003,31 +1016,10 @@
 
 /* ═══════════════════════════════════════════════════════════════════════════
    INDIVIDUAL DUELS — player-vs-player rows
-   Used by the Individual Duels section AND by the pairing info panels above,
-   so both read identically. (These classes previously had no styles at all.)
+   Rendered inside the pairing info panels above, which name the players behind
+   one pairing. The standalone "Individual Duels" disclosure these were shared
+   with has been removed, so this is now their only caller.
    ═══════════════════════════════════════════════════════════════════════════ */
-
-.matchup-card__duels {
-  border-top: 1px solid var(--color-border-subtle);
-  padding-top: var(--space-2);
-}
-
-.matchup-card__duels-summary {
-  cursor: pointer;
-  font-size: var(--font-size-xs);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--color-muted);
-}
-
-.matchup-card__duels-summary:hover {
-  color: var(--color-accent);
-}
-
-.individual-duels {
-  padding-top: var(--space-2);
-}
 
 .individual-duel {
   display: grid;

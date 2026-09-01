@@ -968,6 +968,14 @@ export const CHIP_LABELS = {
   triplecaptain: 'Triple Captain',
 };
 
+// The last gameweek of the first chip half. FPL reissues every chip after this
+// gameweek, so a chip held now cannot be carried past it and one spent now is
+// replaced anyway — which makes the GW19/GW20 join a real planning boundary
+// rather than an arbitrary midpoint. Currently display-only: the Matchup
+// Analyser's team navigator rules a hairline across it so a run of fixtures
+// either side of the reset is not read as one continuous window.
+export const CHIP_RESET_AFTER_GW = 19;
+
 // How many candidate GWs ahead of currentGw to evaluate for each chip.
 // Higher = considers timing further out, but cost is roughly O(CHIP_PLAN_HORIZON
 // × teams × WC_WINDOW) scoreFixture calls (cached per (team, fixture)).

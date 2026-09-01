@@ -16,7 +16,7 @@
 import { store } from '../store.js';
 import {
   BANDS, HORIZONS, WEIGHTS, FORM_WINDOW_GWS, CHANNEL_MATURITY_FULL_MATCHES,
-  H2H_MEETING_WINDOW,
+  H2H_MEETING_WINDOW, CHIP_RESET_AFTER_GW,
 } from '../config.js';
 import { buildScoreContext, scoreFixture, scoreOverHorizon } from '../engine/composite.js';
 import {
@@ -566,6 +566,29 @@ function buildTeamFixtureRow(f, ctx, team) {
 }
 
 /**
+ * Do two gameweeks sit on opposite sides of the chip reset?
+ *
+ * Asked of ADJACENT ROWS rather than looked up per gameweek, which is what
+ * makes it hold for a team with no fixture in GW19 or GW20: the hairline lands
+ * between whichever two weeks actually straddle the boundary. It is also
+ * direction-agnostic, so it works just as well on the off-season list, which
+ * runs latest-first.
+ *
+ * @param {number} a  the previous row's gameweek
+ * @param {number} b  this row's gameweek
+ */
+function crossesChipReset(a, b) {
+  return (a <= CHIP_RESET_AFTER_GW) !== (b <= CHIP_RESET_AFTER_GW);
+}
+
+// The hairline itself. role="separator" rather than aria-hidden: the line
+// carries meaning, so the label is the only way a screen reader gets it.
+const CHIP_RESET_DIVIDER =
+  `<li class="gw-nav__chip-reset" role="separator"`
+  + ` aria-label="Chips reset after Gameweek ${CHIP_RESET_AFTER_GW}"`
+  + ` title="FPL chips reset after Gameweek ${CHIP_RESET_AFTER_GW}"></li>`;
+
+/**
  * Render the .team-nav panel for the team at _teamIndex: a prev/next header
  * (badge + full name, arrows always active — this list loops both ends, see
  * teamNavPrev/teamNavNext) and ALL of that team's remaining fixtures,
@@ -603,9 +626,20 @@ function buildTeamNavPanel() {
     : teamFixtures.filter(f => !f.played)
         .sort((a, b) => a.gw - b.gw || (a.kickoff || '').localeCompare(b.kickoff || ''));
 
-  const rows = fixtures
-    .map(f => buildTeamFixtureRow(f, ctx, team))
-    .join('');
+  // Built in a loop rather than .map().join('') so the chip-reset hairline can
+  // be pushed BETWEEN two rows. prevGw tracks the last row actually rendered,
+  // not the last fixture considered — buildTeamFixtureRow returns '' when a
+  // team record is missing, and a divider hung off a row that never rendered
+  // would land in the wrong place.
+  const rows = [];
+  let prevGw = null;
+  for (const f of fixtures) {
+    const row = buildTeamFixtureRow(f, ctx, team);
+    if (!row) continue;
+    if (prevGw !== null && crossesChipReset(prevGw, f.gw)) rows.push(CHIP_RESET_DIVIDER);
+    rows.push(row);
+    prevGw = f.gw;
+  }
 
   _teamNav.innerHTML = `
     <div class="gw-nav__header">
@@ -618,7 +652,7 @@ function buildTeamNavPanel() {
       <button class="gw-nav__arrow gw-nav__arrow--next" type="button"
               aria-label="Next team">›</button>
     </div>
-    <ul class="gw-nav__list gw-nav__list--scroll">${rows}</ul>
+    <ul class="gw-nav__list gw-nav__list--scroll">${rows.join('')}</ul>
   `;
 
   _teamNavRenderedTeamId = team.id;
@@ -891,7 +925,6 @@ function buildPerGwStrip(team, perGw, pending = []) {
 /**
  * Build and return a <article> DOM node for one team's side of the matchup.
  * Shows: single-fixture CompositeScore breakdown + horizon aggregate strip
- * + (Phase 4-2) collapsible individual duels section when available.
  *
  * @param {Team}           team
  * @param {'Home'|'Away'}  venue
@@ -1007,8 +1040,6 @@ function buildCard(team, venue, score, fdr, horizonScore, horizon, duels, defend
       <h3 class="matchup-card__section-title">Defending Counters</h3>
       ${buildCounterPairings(defending.pairings, DEFENDING_PAIRING_LABELS, 'defending', oppDuels, settled)}
     </div>
-
-    ${buildIndividualDuels(duels)}
 
     ${horizonSection}
   `;
@@ -1330,8 +1361,7 @@ const STYLE_RULE_LABELS = {
  * Opening it gives, in order: an explanation of what the score and the two
  * percentages actually mean (buildPairingExplainer), then the named players
  * behind that pairing via duelsForPairing() over the already-computed
- * calcIndividualDuels result. Same disclosure pattern as the Individual Duels
- * section below — no new interaction model, no new dependency.
+ * calcIndividualDuels result — no new dependency.
  *
  * The explainer was added because the panel previously opened straight onto
  * the player list: it answered "who is involved" but never "what am I looking
@@ -1486,9 +1516,13 @@ function buildPairingExplainer(p, key, perspective, isChannel, hasValue) {
 }
 
 /**
- * List the named players behind one pairing, newest-style rows reusing the
- * existing .individual-duel classes so the panel matches the Individual Duels
- * section visually.
+ * List the named players behind one pairing, as .individual-duel rows.
+ *
+ * These panels are now the ONLY place duels are rendered. There used to be a
+ * separate "Individual Duels" disclosure at the foot of each card listing the
+ * same players again, detached from the pairing that produced them; it was
+ * removed because a flat top-N list says nothing the reader can act on once
+ * every pairing already names its own players in context.
  *
  * Renders NOTHING when there are no duels to show — see the note at the guard
  * below. Duels are empty whenever player summaries or ICT data haven't loaded
@@ -1537,46 +1571,6 @@ function buildPairingPlayers(duels, pairingKey, perspective) {
       </div>
     `.trim();
   }).join('');
-}
-
-// ─── Build: individual duels (Phase 4-2) ─────────────────────────────────────
-
-/**
- * Build a collapsible <details> block listing the top individual player-vs-player
- * duels. Supplementary to the position-group pairings above — both render, the
- * duels complement the aggregate read. Renders nothing when duels is empty
- * (no summaries / no ICT data classification) so the section gracefully
- * degrades to position-group only.
- */
-function buildIndividualDuels(duels) {
-  if (!duels || duels.length === 0) return '';
-
-  const rows = duels.map(d => {
-    const atkForm = Math.round(d.attacker.formValue);
-    const defForm = Math.round(d.defender.formValue);
-    const score   = Math.round(d.duelScore);
-    return `
-      <div class="individual-duel">
-        <span class="individual-duel__attacker">
-          ${esc(d.attacker.name)}
-          <span class="individual-duel__form">${atkForm}</span>
-        </span>
-        <span class="individual-duel__vs">vs</span>
-        <span class="individual-duel__defender">
-          ${esc(d.defender.name)}
-          <span class="individual-duel__form">${defForm}</span>
-        </span>
-        <span class="score-chip score-chip--${esc(d.band)} individual-duel__score">${score}</span>
-      </div>
-    `.trim();
-  }).join('');
-
-  return `
-    <details class="matchup-card__duels">
-      <summary class="matchup-card__duels-summary">Individual Duels (top ${duels.length})</summary>
-      <div class="individual-duels">${rows}</div>
-    </details>
-  `;
 }
 
 // ─── Event handlers ───────────────────────────────────────────────────────────
