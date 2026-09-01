@@ -1235,12 +1235,18 @@ function render() {
 function rebuild() {
   const season = store.getSeason();
   if (!season) return;
-  // Same options matchup.js passes (js/modules/matchup.js buildCtx), so the
-  // strip and the cards above it score from identical inputs.
+  // The SAME options matchup.js passes (js/modules/matchup.js buildCtx) — all
+  // six, not a subset. Omitting teamXgBySlug alone makes
+  // buildChannelProfilesByTeamId return {}, which silently degrades the
+  // counter-matchup sub-metric, so a fixture would band and COLOUR differently
+  // in a ribbon tile than in the card directly above it.
   const ctx = buildScoreContext(season, {
     playerSummariesById: store.getAllPlayerSummaries(),
     leagueXg:            store.getLeagueXg(),
     leagueXgPrev:        store.getLeagueXgPrev(),
+    leagueXgHistory:     store.getLeagueXgHistory(),
+    teamXgBySlug:        store.getAllTeamXg(),
+    currentGw:           store.getCurrentGw() ?? store.getNextGw() ?? 1,
   });
   _model = buildSeasonModel(ctx, season, { skipPlayers: true });
   render();
