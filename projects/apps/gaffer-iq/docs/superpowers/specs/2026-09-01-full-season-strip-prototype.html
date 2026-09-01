@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en" data-mock="full-season-strip">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Full Season — Matchup page strip</title>
+<style>
+:root{
+  --color-bg:#0d1117; --color-surface:#161b22; --color-surface-raised:#1c2128;
+  --color-border:#30363d; --color-border-subtle:#21262d;
+  --color-text:#e6edf3; --color-muted:#8b949e; --color-accent:#58a6ff;
+  --color-accent-muted:rgba(88,166,255,.10);
+  --band-great:#1f8c48; --band-good:#3fb950; --band-neutral:#6e7681;
+  --band-tough:#d29922; --band-brutal:#f85149; --band-light-green:#6fcf78;
+  --band-great-bg:rgba(31,140,72,.15); --band-good-bg:rgba(63,185,80,.12);
+  --band-neutral-bg:rgba(110,118,129,.12); --band-brutal-bg:rgba(248,81,73,.12);
+  --band-deep-blue:#1f6feb; --band-orange:#f0883e;
+  --col-w:54px; --col-past:22px; --col-wide:268px; --col-gap:4px; --col-h:92px;
+  --t:330ms;                                   /* one phase; 3 × 330 = 990ms */
+  --ease:cubic-bezier(.32,.72,0,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--color-bg);color:var(--color-text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  font-size:14px;line-height:1.5;padding:0 0 40px}
+
+/* ── mock Matchup page above, so the overlay can be judged in context ── */
+.nav{display:flex;gap:20px;align-items:center;padding:12px 24px;border-bottom:1px solid var(--color-border-subtle);background:var(--color-surface)}
+.nav b{color:var(--color-accent)}
+.nav span{color:var(--color-muted);font-size:13px}
+.wrap{padding:20px 24px}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:22px}
+.card{border:1px solid var(--color-border);border-left:3px solid var(--band-tough);border-radius:10px;background:var(--color-surface);padding:16px 20px}
+.card--good{border-left-color:var(--band-good)}
+.card h3{font-size:16px;margin-bottom:12px}
+.card .row{display:grid;grid-template-columns:110px 1fr 34px;gap:10px;align-items:center;font-size:12px;color:var(--color-muted);padding:3px 0}
+.bar{height:6px;border-radius:3px;background:var(--color-surface-raised);overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--band-good)}
+.mockhint{font-size:11.5px;color:var(--color-muted);margin-bottom:14px}
+
+/* ── the strip ──────────────────────────────────────────────────────── */
+.strip{border:1px solid var(--color-border);border-radius:10px;background:var(--color-surface);overflow:hidden}
+.strip__head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:11px 18px;
+  border-bottom:1px solid var(--color-border-subtle);background:var(--color-surface-raised)}
+.strip__title{font-size:15px;font-weight:700}
+.strip__body{padding:14px 18px 16px}
+.ctl{display:flex;align-items:center;gap:7px;margin-left:auto}
+.ctl__lab{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--color-muted);font-weight:700}
+.ctl__btn{font:inherit;font-size:11.5px;padding:3px 11px;border-radius:20px;cursor:pointer;
+  background:var(--color-surface);border:1px solid var(--color-border);color:var(--color-muted)}
+.ctl__btn:hover{border-color:var(--color-muted);color:var(--color-text)}
+.ctl__btn.is-on{background:var(--color-accent-muted);border-color:var(--color-accent);color:var(--color-accent);font-weight:700}
+.readout{font-size:11px;color:var(--color-muted);font-variant-numeric:tabular-nums;margin-bottom:10px}
+.readout b{color:var(--color-text)}
+
+/* Fixed-width columns in a horizontal scroller. Squeezing 38 weeks into the
+   page width made every tile unreadable; the scroller was never the problem —
+   the panel escaping its clipping was, and a fixed-position float does that
+   whether or not the track scrolls. */
+.scroller{overflow-x:auto;padding-bottom:4px}
+.track{min-width:max-content}
+.ribbon{display:flex;gap:var(--col-gap);align-items:flex-start}
+.gw{position:relative;width:var(--col-w);flex:none;
+  border:1px solid var(--color-border-subtle);border-radius:6px;
+  background:var(--color-surface-raised);padding:5px 4px;
+  display:flex;flex-direction:column;gap:3px;cursor:pointer;overflow:hidden;
+  transition:border-color .16s,box-shadow .16s,background .16s}
+.gw:hover{border-color:var(--color-muted)}
+.gw--past{opacity:.4;background:transparent;border-style:dashed;width:var(--col-past)}
+.gw--hot{border-color:var(--band-good);box-shadow:0 0 0 1px rgba(63,185,80,.3),0 0 13px rgba(63,185,80,.2)}
+/* --under hides the summary the float is covering; --wide is the width
+   change, and belongs to phase 2 only. The ribbon can open a proper gap again
+   now the track scrolls instead of sharing one fixed page width. */
+.gw--under .summary{opacity:0}
+.gw.gw--wide{width:var(--col-wide)}
+.rail__cell.rail__cell--wide{width:var(--col-wide)}
+
+/* Chip rail — now BELOW the ribbon, because the panel expands upward and would
+   otherwise cover it. Mirrors the ribbon's flex sizing exactly so every band
+   stays locked to its column. */
+.rail{display:flex;gap:var(--col-gap);height:7px;margin-top:6px}
+.rail__cell{position:relative;width:var(--col-w);flex:none;transition:width var(--t) var(--ease)}
+.rail__cell--past{width:var(--col-past)}
+.rail__cell--tc{background:var(--band-orange)}
+.rail__cell--wc{background:var(--band-deep-blue)}
+.rail__cell--fh{background:var(--band-tough)}
+/* Paints the run across the flex gap using an overlay, NOT a negative margin.
+   A negative margin consumes layout width, which pushed every cell after a
+   bridged one leftward — 32px of cumulative drift by the end of the season and
+   the bands no longer sat over their gameweeks. */
+.rail__cell--bridge::after{content:"";position:absolute;top:0;bottom:0;
+  left:100%;width:var(--col-gap);background:inherit}
+.rail__cell--head{border-top-left-radius:3px;border-bottom-left-radius:3px}
+.rail__cell--tail{border-top-right-radius:3px;border-bottom-right-radius:3px}
+.rail__split{width:1px;flex:none}
+
+.split{width:1px;flex:none;align-self:flex-start;height:var(--col-h);
+  background:var(--color-border);position:relative}
+.split::after{content:"CHIPS RESET";position:absolute;bottom:-14px;left:50%;
+  transform:translateX(-50%);white-space:nowrap;font-size:7.5px;font-weight:700;
+  letter-spacing:.1em;color:var(--color-muted)}
+
+/* The collapsed number lives INSIDE .summary and the open "GW n" title inside
+   .body, so each fades with the group it belongs to. They used to be one
+   element that was simply retitled, which left it at full opacity while
+   everything around it faded — the header stayed lit on a panel whose content
+   had already gone. */
+.gw__n{flex:none;text-align:center;font-size:10px;font-weight:700;color:var(--color-muted);
+  font-variant-numeric:tabular-nums;line-height:1.4;transition:color .16s}
+.gw--hot .gw__n{color:var(--band-good)}
+.gw__title{font-size:13px;font-weight:700;color:var(--color-accent);
+  line-height:1.4;margin-bottom:6px}
+.summary{display:flex;flex-direction:column;gap:3px;transition:opacity var(--t) ease}
+.gw.is-open .summary{position:absolute;top:5px;left:4px;right:4px;opacity:0;pointer-events:none}
+.fx{height:14px;border-radius:3px;display:flex;align-items:center;justify-content:center;gap:2px;flex:none}
+.fx--great{background:var(--band-great-bg);border:1px solid var(--band-great)}
+.fx--good{background:var(--band-good-bg);border:1px solid var(--band-good)}
+.fx--neu{background:var(--band-neutral-bg);border:1px solid var(--color-border)}
+.fx--dgw{outline:1px solid var(--color-accent);outline-offset:1px}
+.fx--pp{outline:1px solid var(--band-brutal);outline-offset:1px;opacity:.75}
+.swatch{width:11px;height:11px;border-radius:2px;flex:none;display:inline-block}
+.dots{display:flex;gap:2px;justify-content:center;margin-top:1px;min-height:7px;flex:none}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--band-good)}
+.dot--hi{background:var(--band-light-green);box-shadow:0 0 5px rgba(111,207,120,.9)}
+
+/* ── the floating panel — grows UPWARD ───────────────────────────────── */
+/* Pinned by its BOTTOM edge to the column's bottom, so animating height makes
+   it climb into the page rather than push everything below it down. Fixed so
+   it paints over the matchup cards above. */
+.gw.gw--float,
+.gw.gw--float.is-open{position:fixed;z-index:60;margin:0;flex:0 0 auto;
+  background:var(--color-surface)}
+/* The accent chrome is its OWN class, deliberately not .is-open.
+   .is-open carries layout — the summary's positioning, the header size — and
+   `position` cannot be transitioned, so it can only be dropped at the start of
+   phase 3. The chrome must be dropped at the START of the collapse instead, so
+   its 2t transition-delay is what schedules the fade rather than compounding
+   with a 2t setTimeout and never running before the node is removed.
+   Padding rides with the chrome so the box lands on the column's geometry. */
+.gw.gw--float.gw--chrome{
+  border-color:var(--color-accent);
+  box-shadow:0 0 0 1px var(--color-accent),0 -10px 30px rgba(0,0,0,.55);
+  padding:8px 10px}
+
+.body{opacity:0;transition:opacity var(--t) ease}
+.body--in{opacity:1}
+.lab{font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--color-muted);font-weight:700;display:block;margin:0 0 5px}
+.plist+.lab,.fxrow+.lab{margin-top:10px}
+.fxrow{display:flex;align-items:center;gap:5px;font-size:12px;padding:4px 7px;border-radius:4px;margin-bottom:3px;white-space:nowrap}
+.fxrow--great{background:var(--band-great-bg)}
+.fxrow--good{background:var(--band-good-bg)}
+.fxrow--neu{background:var(--band-neutral-bg)}
+.fxrow--pp{background:var(--band-brutal-bg);outline:1px solid var(--band-brutal);outline-offset:-1px}
+.fxrow--pp .side__t{color:var(--color-muted)}
+.pptag{font-size:8.5px;font-weight:700;color:var(--band-brutal);letter-spacing:.04em}
+.badge{width:17px;height:17px;object-fit:contain;flex:none;border-radius:50%;background:rgba(255,255,255,.06)}
+.side{display:inline-flex;align-items:center;gap:4px;padding:1px 4px 1px 1px;border-radius:20px;border:1px solid transparent}
+.side--fav{border-color:var(--band-light-green);background:rgba(111,207,120,.10)}
+.side--fav .side__t{color:var(--band-light-green);font-weight:700}
+.side__t{font-size:11px}
+.v{color:var(--color-muted);font-size:10px}
+.dgwtag{font-size:8.5px;font-weight:700;color:var(--color-accent);letter-spacing:.04em}
+.sc{margin-left:auto;font-size:11px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--color-muted)}
+.plist{display:flex;flex-direction:column;gap:3px}
+.prow{display:grid;grid-template-columns:22px 1fr auto auto;gap:7px;align-items:center;white-space:nowrap;
+  font-size:11.5px;padding:3px 7px;border-radius:4px;background:var(--color-surface-raised);border:1px solid transparent}
+.prow--hi{border-color:rgba(111,207,120,.45)}
+.prow--hi .prow__nm{color:var(--band-light-green)}
+.prow__pos{font-size:8.5px;font-weight:700;color:var(--color-muted)}
+.prow__nm{overflow:hidden;text-overflow:ellipsis}
+.prow__px{font-size:10px;color:var(--color-muted);font-variant-numeric:tabular-nums}
+.prow__pts{font-size:11px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--color-text);
+  background:var(--color-bg);border:1px solid var(--color-border);border-radius:4px;padding:0 5px;min-width:30px;text-align:right}
+.prow--hi .prow__pts{border-color:rgba(111,207,120,.5);color:var(--band-light-green)}
+.note{margin-top:10px;padding-top:8px;border-top:1px solid var(--color-border-subtle);font-size:11px;color:var(--color-muted);white-space:normal}
+
+.key{margin-top:20px;padding-top:14px;border-top:1px solid var(--color-border-subtle);
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:14px 22px}
+.key__grp{display:flex;flex-direction:column;gap:6px}
+.key__h{font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--color-muted);font-weight:700}
+.key__i{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--color-muted)}
+.sw{width:15px;height:11px;border-radius:3px;flex:none}
+.sw--dot{width:8px;height:8px;border-radius:50%}
+.sw--bar{width:24px;height:7px;border-radius:3px}
+.sw--line{width:2px;height:14px;background:var(--color-border)}
+@media (prefers-reduced-motion:reduce){ :root{--t:0ms} }
+</style>
+</head>
+<body>
+
+<div class="nav"><b>Gaffer IQ</b><span>Matchup</span><span>Fixtures</span><span>Ranker</span><span>Dashboard</span><span>Planner</span></div>
+
+<div class="wrap">
+  <p class="mockhint">Mock Matchup page. The two cards stand in for the real ones — open a gameweek below and the panel climbs over them.</p>
+  <div class="cards">
+    <div class="card card--good"><h3>Liverpool</h3>
+      <div class="row">Base FPL Difficulty<div class="bar"><i style="width:30%"></i></div>30</div>
+      <div class="row">Counter-Matchup<div class="bar"><i style="width:50%"></i></div>50</div>
+      <div class="row">Team Form<div class="bar"><i style="width:39%"></i></div>39</div>
+      <div class="row">H2H History<div class="bar"><i style="width:100%"></i></div>100</div>
+    </div>
+    <div class="card"><h3>Ipswich Town</h3>
+      <div class="row">Base FPL Difficulty<div class="bar"><i style="width:70%"></i></div>70</div>
+      <div class="row">Counter-Matchup<div class="bar"><i style="width:50%"></i></div>50</div>
+      <div class="row">Team Form<div class="bar"><i style="width:40%"></i></div>40</div>
+      <div class="row">H2H History<div class="bar"><i style="width:0%"></i></div>0</div>
+    </div>
+  </div>
+
+  <div class="strip">
+    <div class="strip__head">
+      <span class="strip__title">Full Season</span>
+      <div class="ctl">
+        <span class="ctl__lab">Total</span>
+        <button class="ctl__btn" data-speed="660">660ms</button>
+        <button class="ctl__btn" data-speed="825">825ms</button>
+        <button class="ctl__btn is-on" data-speed="990">990ms</button>
+        <button class="ctl__btn" data-slowmo>0.25× slow-mo</button>
+      </div>
+    </div>
+    <div class="strip__body">
+      <p class="readout" id="readout"></p>
+      <div class="scroller"><div class="track">
+        <div class="ribbon" id="ribbon"></div>
+        <div class="rail" id="rail"></div>
+      </div></div>
+
+      <div class="key">
+        <div class="key__grp">
+          <span class="key__h">Matchup one-sidedness</span>
+          <span class="key__i"><i class="sw" style="background:var(--band-great-bg);border:1px solid var(--band-great)"></i> Heavily favoured</span>
+          <span class="key__i"><i class="sw" style="background:var(--band-good-bg);border:1px solid var(--band-good)"></i> Favoured</span>
+          <span class="key__i"><i class="sw" style="background:var(--band-neutral-bg);border:1px solid var(--color-border)"></i> Even</span>
+        </div>
+        <div class="key__grp">
+          <span class="key__h">Schedule</span>
+          <span class="key__i"><i class="sw" style="outline:1px solid var(--color-accent);outline-offset:-1px;background:var(--band-neutral-bg)"></i> Double gameweek</span>
+          <span class="key__i"><i class="sw" style="outline:1px solid var(--band-brutal);outline-offset:-1px;background:var(--band-brutal-bg)"></i> Postponed fixture</span>
+          <span class="key__i"><i class="sw sw--line"></i> Chip reset (after GW19)</span>
+        </div>
+        <div class="key__grp">
+          <span class="key__h">Players</span>
+          <span class="key__i"><i class="sw sw--dot" style="background:var(--band-good)"></i> In the week's top five</span>
+          <span class="key__i"><i class="sw sw--dot" style="background:var(--band-light-green);box-shadow:0 0 6px rgba(111,207,120,.9)"></i> Standout — captaincy shout</span>
+          <span class="key__i"><i class="sw" style="border:1px solid var(--band-light-green);background:rgba(111,207,120,.1)"></i> Favoured side of a matchup</span>
+        </div>
+        <div class="key__grp">
+          <span class="key__h">Chip windows</span>
+          <span class="key__i"><i class="sw sw--bar" style="background:var(--band-deep-blue)"></i> Wildcard</span>
+          <span class="key__i"><i class="sw sw--bar" style="background:var(--band-orange)"></i> Triple Captain</span>
+          <span class="key__i"><i class="sw sw--bar" style="background:var(--band-tough)"></i> Free Hit</span>
+        </div>
+        <div class="key__grp">
+          <span class="key__h">Week strength</span>
+          <span class="key__i"><i class="sw" style="border:1px solid var(--band-good);box-shadow:0 0 8px rgba(63,185,80,.5)"></i> Loaded — several one-sided ties</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const CODE={ARS:3,MCI:43,LIV:14,CHE:8,TOT:6,EVE:11,BUR:90,LUT:102,SHU:49,NEW:4,
+BHA:36,WHU:21,AVL:7,NFO:17,CRY:31,BOU:91,FUL:54,BRE:94};
+const SW={ARS:'#EF0107',MCI:'#6CABDD',LIV:'#C8102E',CHE:'#034694',TOT:'#cfd8e3',EVE:'#003399',
+BUR:'#6C1D45',LUT:'#F78F1E',SHU:'#EE2737',NEW:'#241F20',BHA:'#0057B8',WHU:'#7A263A',
+AVL:'#95BFE5',NFO:'#DD0000',CRY:'#1B458F',BOU:'#DA291C',FUL:'#e8e8e8',BRE:'#e30613'};
+const badge=c=>`<img class="badge" alt="" src="https://resources.premierleague.com/premierleague/badges/70/t${CODE[c]}.png">`;
+const T=[['MCI','LUT'],['LIV','BUR'],['ARS','SHU'],['CHE','EVE'],['TOT','CRY'],['NEW','BOU'],
+['BHA','FUL'],['AVL','BRE'],['NFO','WHU'],['MCI','SHU'],['ARS','LUT'],['LIV','EVE']];
+const NAMES=[['FWD','Haaland',14.2],['MID','Salah',13.1],['MID','Saka',9.4],['MID','Palmer',6.1],
+['DEF','Trippier',6.8],['MID','Ødegaard',8.5],['FWD','Watkins',8.9],['DEF','Gabriel',5.2],
+['MID','Foden',7.7],['FWD','Solanke',6.9]];
+const HOT=new Set([5,8,17,24,29,34]), DGW=new Set([8,25,34]);
+const POSTPONED=new Map([[6,1],[18,2],[29,1]]);
+const PAST=2, LAST=38, CHIP_RESET_AFTER=19;
+const CHIPS=[{k:'wc',from:5,to:8},{k:'tc',from:11,to:12},{k:'fh',from:18,to:18},
+             {k:'wc',from:24,to:27},{k:'tc',from:33,to:34},{k:'fh',from:29,to:29}];
+
+function gwData(n){
+  const seed=(n*37)%12, hot=HOT.has(n);
+  const fx=[0,1,2].map(i=>{
+    const t=T[(seed+i*4)%T.length], sc=hot?93-i*4:(n%3===0?82-i*6:70-i*7);
+    return {h:t[0],a:t[1],sc,band:sc>=85?'great':sc>=72?'good':'neu',
+      dgw:DGW.has(n)&&i===0,favHome:(seed+i)%3!==0};
+  });
+  const pp=POSTPONED.get(n)||0;
+  const ordered=[null,null,null];
+  for(let i=0;i<Math.min(pp,3);i++){
+    const t=T[(seed+(2-i)*4)%T.length];
+    ordered[2-i]={h:t[0],a:t[1],pp:true};
+  }
+  let k=0; for(let i=0;i<3;i++)if(!ordered[i])ordered[i]=fx[k++];
+  const rows=ordered.filter(Boolean);
+  const pl=[0,1,2,3,4].map(i=>{
+    const p=NAMES[(seed+i*3)%NAMES.length], base=hot?9.4:6.8;
+    return {pos:p[0],nm:p[1],px:p[2],pts:(base-i*.7+((seed+i)%3)*.4).toFixed(1),hi:hot&&i<(n===8?3:2)};
+  });
+  return {n,hot,fx:rows,pl,note:pp>1?`${pp} fixtures postponed — only one matchup left to plan around.`
+    :pp===1?'One fixture postponed; it will be rescheduled into a later gameweek.'
+    :DGW.has(n)?'Double gameweek. Strongest captaincy week of this stretch.'
+    :hot?'Several heavily one-sided fixtures land together here.'
+    :'An ordinary week — nothing worth holding a transfer for.'};
+}
+const DATA=Array.from({length:LAST},(_,i)=>gwData(i+1));
+
+function colHTML(d){
+  if(d.n<=PAST)return `<div class="gw gw--past" data-gw="${d.n}"><div class="gw__n">${d.n}</div></div>`;
+  const fx=d.fx.map(f=>f.pp
+    ?`<div class="fx fx--neu fx--pp"><i class="swatch" style="background:${SW[f.h]}"></i><i class="swatch" style="background:${SW[f.a]}"></i></div>`
+    :`<div class="fx fx--${f.band}${f.dgw?' fx--dgw':''}"><i class="swatch" style="background:${SW[f.h]}"></i><i class="swatch" style="background:${SW[f.a]}"></i></div>`).join('');
+  return `<div class="gw${d.hot?' gw--hot':''}" data-gw="${d.n}">
+    <div class="summary"><div class="gw__n">${d.n}</div>${fx}
+      <div class="dots">${d.pl.map(p=>`<i class="dot${p.hi?' dot--hi':''}"></i>`).join('')}</div></div>
+    <div class="body"></div></div>`;
+}
+const side=(c,f)=>`<span class="side${f?' side--fav':''}">${badge(c)}<span class="side__t">${c}</span></span>`;
+function bodyHTML(d){
+  const fx=d.fx.map(f=>f.pp
+    ?`<div class="fxrow fxrow--pp">${side(f.h,false)}<span class="v">v</span>${side(f.a,false)}<span class="pptag">PP</span><span class="sc">—</span></div>`
+    :`<div class="fxrow fxrow--${f.band}">${side(f.h,f.favHome)}<span class="v">v</span>${side(f.a,!f.favHome)}${f.dgw?'<span class="dgwtag">DGW</span>':''}<span class="sc">${f.sc}</span></div>`).join('');
+  const pl=d.pl.map(p=>`<div class="prow${p.hi?' prow--hi':''}">
+    <span class="prow__pos">${p.pos}</span><span class="prow__nm">${p.nm}</span>
+    <span class="prow__px">£${p.px}m</span><span class="prow__pts">${p.pts}</span></div>`).join('');
+  return `<div class="gw__title">GW ${d.n}</div>
+    <span class="lab">Top matchups</span>${fx}
+    <span class="lab">Must-have players &nbsp;<span style="text-transform:none;letter-spacing:0;font-weight:400">price · projected pts</span></span>
+    <div class="plist">${pl}</div><p class="note">${d.note}</p>`;
+}
+
+const chipAt=n=>CHIPS.find(x=>n>=x.from&&n<=x.to);
+const railCells=[],cols=[];
+for(const d of DATA){
+  const c=chipAt(d.n);
+  const continues=!!c&&d.n!==CHIP_RESET_AFTER&&chipAt(d.n+1)===c;
+  const cls=['rail__cell'];
+  if(d.n<=PAST)cls.push('rail__cell--past');
+  if(c){ cls.push('rail__cell--'+c.k);
+    if(d.n===c.from)cls.push('rail__cell--head');
+    if(!continues)cls.push('rail__cell--tail'); else cls.push('rail__cell--bridge'); }
+  railCells.push(`<div class="${cls.join(' ')}" data-gw="${d.n}"></div>`);
+  cols.push(colHTML(d));
+  if(d.n===CHIP_RESET_AFTER){
+    railCells.push('<div class="rail__split"></div>');
+    cols.push('<div class="split" role="separator" aria-label="Chips reset after Gameweek 19"></div>');
+  }
+}
+document.getElementById('rail').innerHTML=railCells.join('');
+document.getElementById('ribbon').innerHTML=cols.join('');
+{ const c=document.querySelector('.gw:not(.gw--past)');
+  if(c)document.documentElement.style.setProperty('--col-h',c.offsetHeight+'px'); }
+
+// ── motion ───────────────────────────────────────────────────────────────
+const root=document.documentElement;
+let PHASE=330, SLOWMO=1;
+const COL_WIDE=268, COL_W=54;
+const D=()=>PHASE*SLOWMO;
+const railOf=n=>document.querySelector(`.rail__cell[data-gw="${n}"]`);
+function applyPhases(){
+  root.style.setProperty('--t',D()+'ms');
+  document.getElementById('readout').innerHTML=
+    `Expand <b>${PHASE}ms</b> vertical → <b>${PHASE}ms</b> horizontal → <b>${PHASE}ms</b> fade = <b>${PHASE*3}ms</b>`
+    +(SLOWMO!==1?` · playing at ${SLOWMO}× (<b>${PHASE*3*SLOWMO}ms</b> on screen)`:'');
+}
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+function heightAt(el,w){
+  const saved=el.getAttribute('style');
+  el.style.transition='none'; el.style.width=w+'px'; el.style.height='auto';
+  const h=el.offsetHeight;
+  if(saved===null)el.removeAttribute('style'); else el.setAttribute('style',saved);
+  return h;
+}
+
+/**
+ * cubic-bezier(.32,.72,0,1) evaluated in JS, so a scripted scroll can ride the
+ * exact same curve as the CSS width transition beside it. Without this the two
+ * halves of phase 2 (the column widening, the track scrolling) would drift
+ * apart mid-flight even though they start and end together.
+ */
+function bezier(x1,y1,x2,y2){
+  const cx=3*x1, bx=3*(x2-x1)-cx, ax=1-cx-bx;
+  const cy=3*y1, by=3*(y2-y1)-cy, ay=1-cy-by;
+  const X=u=>((ax*u+bx)*u+cx)*u;
+  const Y=u=>((ay*u+by)*u+cy)*u;
+  return t=>{
+    let lo=0,hi=1,u=t;
+    for(let i=0;i<24;i++){ const x=X(u); if(Math.abs(x-t)<1e-4)break;
+      if(x<t)lo=u; else hi=u; u=(lo+hi)/2; }
+    return Y(u);
+  };
+}
+const EASE=bezier(.32,.72,0,1);
+
+const GROW=COL_WIDE-COL_W;
+
+/**
+ * How far to scroll the track right while the column widens — which is what
+ * decides the DIRECTION the expansion appears to happen in.
+ *
+ *   0        the panel opens rightward, the column's left edge stays put
+ *   GROW/2   it opens centrally, the weeks either side parting around it
+ *   GROW     it opens leftward, every collapsed week sliding left
+ *
+ * Centre is the default because it disturbs the least on each side. Near the
+ * right-hand edge there is no room to open rightward at all, so the shift
+ * rises to whatever keeps the full panel on screen — up to GROW, which is the
+ * "expand fully left" case. Near the left-hand edge the shift is capped by how
+ * much track actually exists to the column's left, so the column can never be
+ * pushed off the start of the ribbon.
+ */
+function scrollShiftFor(col,scEl){
+  const c=col.getBoundingClientRect(), s=scEl.getBoundingClientRect();
+  const overflow=Math.max(0,(c.left+COL_WIDE)-(s.right-8));  // what must move to fit
+  const spaceLeft=Math.max(0,c.left-s.left);                 // track available leftward
+  const headroom=(scEl.scrollWidth+GROW-scEl.clientWidth)-scEl.scrollLeft;
+  return Math.round(Math.max(0,Math.min(GROW/2>overflow?GROW/2:overflow,GROW,spaceLeft,headroom)));
+}
+
+/**
+ * Scroll `el` from→to along EASE, starting after `delay`, over `dur`.
+ *
+ * The rAF loop runs even when from === to. It is not only driving the scroll —
+ * it is also what re-glues every open panel to its column each frame, and the
+ * column moves during this window whether or not the track scrolls: a week
+ * collapsing earlier in the ribbon drags everything after it. Returning early
+ * on a zero-distance scroll left the panel stranded 214px from its own column.
+ */
+function animateScroll(el,from,to,delay,dur){
+  return new Promise(res=>{
+    setTimeout(()=>{
+      const t0=performance.now();
+      (function step(){
+        const p=Math.min(1,(performance.now()-t0)/dur);
+        if(to!==from)el.scrollLeft=from+(to-from)*EASE(p);
+        placeFloats();
+        if(p<1)requestAnimationFrame(step); else res();
+      })();
+    },delay);
+  });
+}
+
+const floats=new Set();
+let openCol=null, openFloat=null;
+
+/** Pin each float by its BOTTOM edge to its column's bottom, so growing the
+ *  height makes it climb up the page instead of pushing anything down. */
+function placeFloats(){
+  for(const pair of floats){
+    const {el,col}=pair;
+    const r=col.getBoundingClientRect();
+    el.style.bottom=(innerHeight-r.bottom)+'px';
+    // ALWAYS anchored to the column's LEFT edge, nudged by a fixed offset.
+    //
+    // Anchoring the near-the-edge case to the column's RIGHT edge was wrong:
+    // the column widens to 268px during phase 2, so its right edge moves, and
+    // a panel pinned to the collapsed right edge ended up 214px to the left,
+    // sitting over three earlier gameweeks. The left edge does not move when
+    // the column grows rightward, so it is the only stable reference; `nudge`
+    // is computed once at open time and never changes, so nothing shifts
+    // mid-animation either.
+    el.style.right='auto';
+    el.style.left=Math.max(8,r.left+pair.nudge)+'px';
+  }
+}
+document.querySelector('.scroller').addEventListener('scroll',placeFloats,{passive:true});
+addEventListener('scroll',placeFloats,{passive:true});
+addEventListener('resize',placeFloats,{passive:true});
+
+async function expand(col,prev){
+  const d=DATA[+col.dataset.gw-1];
+  const el=document.createElement('div');
+  el.className='gw gw--float'+(d.hot?' gw--hot':'');
+  el.innerHTML=col.innerHTML;
+  const r0=col.getBoundingClientRect();
+  el.style.transition='none';
+  el.style.width=r0.width+'px';
+  el.style.height=r0.height+'px';
+  document.body.appendChild(el);
+  // Decided once, at open time, from where the panel WOULD end up at full
+  // width — so the anchor never flips mid-animation.
+  // `nudge` is now only a last-resort clamp — the adaptive scroll below is
+  // what normally keeps the panel on screen, so this is 0 in every ordinary
+  // case. It still matters when the track has no room left to scroll.
+  const scEl=document.querySelector('.scroller');
+  const pair={el,col,nudge:0,shift:0};
+  floats.add(pair);
+  openCol=col; openFloat=el;
+  col.classList.add('gw--under');
+  placeFloats();
+
+  el.querySelector('.body').innerHTML=bodyHTML(d);
+  // Measure the open height, then put the float BACK to its closed appearance
+  // and commit that. is-open is re-applied below, after the transition is
+  // armed, so the accent border and padding animate in with phase 1 instead of
+  // snapping on at frame 0.
+  el.classList.add('is-open');
+  const h1=heightAt(el,COL_WIDE);
+  el.classList.remove('is-open');
+  el.style.width=r0.width+'px'; el.style.height=r0.height+'px';
+  el.offsetHeight;
+
+  // ALL THREE PHASES ARE ARMED AT ONCE, chained by transition-delay. Awaiting
+  // each transitionend and then starting the next cost a frame at both
+  // handoffs, which is why 3×330 measured 999ms instead of 990. The browser
+  // now runs them back to back with no gap of its own.
+  const t=D();
+  el.style.transition=`height ${t}ms var(--ease) 0ms, width ${t}ms var(--ease) ${t}ms,`
+    +`border-color ${t}ms ease 0ms, box-shadow ${t}ms ease 0ms, padding ${t}ms var(--ease) 0ms`;
+  el.classList.add('is-open','gw--chrome');
+  el.style.height=h1+'px';
+  el.style.width=COL_WIDE+'px';
+  // Phase 2 also opens the gap in the ribbon: same duration, same delay, so
+  // the column and its rail cell widen in step with the float above them.
+  col.style.transition=`width ${t}ms var(--ease) ${t}ms`;
+  railOf(d.n).style.transitionDelay=t+'ms';
+  col.classList.add('gw--wide');
+  railOf(d.n).classList.add('rail__cell--wide');
+  // Directional expansion: the column always grows rightward in flow, and the
+  // track scrolls under it by `shift` so the growth READS as centred, leftward
+  // or rightward depending on where the week sits.
+  //
+  // THE CLICKED COLUMN IS THE FIXED REFERENCE. When another week is already
+  // open, two things move the track at once: that week shrinking by GROW, and
+  // this week's own directional shift. Running them as two scroll animations
+  // made the whole season drift, because they fought over one scrollLeft.
+  //
+  // They are resolved into ONE target instead. If the collapsing week sits
+  // EARLIER in the ribbon, its shrink drags everything after it — this column
+  // included — GROW to the left, so the scroll has to give that back before
+  // applying the direction. A later one has no effect on this column at all.
+  pair.shift=scrollShiftFor(col,scEl);
+  const flowDelta=(prev&&prev.col!==col&&+prev.col.dataset.gw<+col.dataset.gw)?-GROW:0;
+  const maxScroll=scEl.scrollWidth-scEl.clientWidth;
+  const target=Math.max(0,Math.min(maxScroll,scEl.scrollLeft+flowDelta+pair.shift));
+  pair.nudge=Math.min(0,(innerWidth-12)-(r0.left-pair.shift+COL_WIDE));
+  animateScroll(scEl,scEl.scrollLeft,target,t,t);
+  const body=el.querySelector('.body');
+  body.style.transitionDelay=(2*t)+'ms';
+  body.classList.add('body--in');
+  await wait(3*t+40);
+  if(openFloat===el){ body.style.transitionDelay=''; el.style.transition=''; }
+}
+
+/** Owns its float outright: never aborts, always cleans up. */
+async function collapse(el,col,skipScroll){
+  if(!el||!col||el.__closing)return;
+  el.__closing=true;
+  if(openFloat===el){ openFloat=null; openCol=null; }
+  const t=D();
+  const body=el.querySelector('.body');
+
+  // The collapsed height to land on — read from the real column, not from the
+  // --col-h string, so it stays honest if the summary's content ever changes.
+  const hEnd=col.offsetHeight;
+
+  body.style.transitionDelay='0ms';
+  body.classList.remove('body--in');
+  el.style.height=el.offsetHeight+'px';
+  el.offsetHeight;
+  // ALL THREE PHASES ARMED AT ONCE, chained by delay — the mirror of expand.
+  //
+  // The height target is assigned HERE, not inside a setTimeout. It used to be
+  // set at 2t while the rule ALSO carried a 2t delay, so the vertical collapse
+  // did not begin until 4t and would have ended at 5t — but the element is
+  // removed at 3t, so it never played at all. That was the "delayed, then
+  // sharp" collapse: a stalled phase followed by the node vanishing.
+  el.style.transition=`width ${t}ms var(--ease) ${t}ms, height ${t}ms var(--ease) ${2*t}ms,`
+    +`border-color ${t}ms ease ${2*t}ms, box-shadow ${t}ms ease ${2*t}ms, padding ${t}ms var(--ease) ${2*t}ms`;
+  el.style.width=COL_W+'px';
+  el.style.height=hEnd+'px';
+  // Dropped NOW so the 2t delay on the rule above is what times the fade.
+  el.classList.remove('gw--chrome');
+  // Only a PLAIN close winds its own shift back. During a switch the incoming
+  // week owns the scroll, so this one must not touch it.
+  const scEl=document.querySelector('.scroller');
+  const pr=[...floats].find(x=>x.el===el);
+  animateScroll(scEl,scEl.scrollLeft,
+    (!skipScroll&&pr&&pr.shift)?scEl.scrollLeft-pr.shift:scEl.scrollLeft,t,t);
+  col.style.transition=`width ${t}ms var(--ease) ${t}ms`;
+  railOf(col.dataset.gw).style.transitionDelay=t+'ms';
+  col.classList.remove('gw--wide');
+  railOf(col.dataset.gw).classList.remove('rail__cell--wide');
+  // At the start of phase 3, hand the column back at the same moment the float
+  // begins shedding its own open state. Both then fade their summaries in
+  // together behind an opaque panel, so by the time the float is removed the
+  // column underneath is ALREADY at full opacity — previously it started
+  // fading in only after the float vanished, which read as the same graphics
+  // flickering back in.
+  setTimeout(()=>{
+    el.classList.remove('is-open');
+    col.classList.remove('gw--under');
+  },2*t);
+
+  await wait(3*t+60);
+  el.remove();
+  for(const p of floats)if(p.el===el)floats.delete(p);
+  col.classList.remove('gw--under');   // no-op if phase 3 already did it
+  col.removeAttribute('style');
+  railOf(col.dataset.gw).style.transitionDelay='';
+}
+const closeOpen=()=>{ if(openFloat)collapse(openFloat,openCol); };
+
+document.addEventListener('click',e=>{
+  if(e.target.closest('.ctl'))return;
+  const inFloat=e.target.closest('.gw--float');
+  const col=e.target.closest('.gw:not(.gw--float)');
+  if(inFloat||(col&&col===openCol)){ closeOpen(); return; }
+  if(col&&!col.classList.contains('gw--past')){
+    const prev=openFloat?{el:openFloat,col:openCol}:null;
+    if(prev)collapse(prev.el,prev.col,true);   // skips its scroll; not awaited
+    expand(col,prev);
+    return;
+  }
+  closeOpen();
+},true);
+document.addEventListener('keydown',e=>{ if(e.key==='Escape')closeOpen(); });
+
+document.querySelector('.ctl').addEventListener('click',e=>{
+  const b=e.target.closest('.ctl__btn'); if(!b)return;
+  if(b.dataset.slowmo!==undefined){ SLOWMO=SLOWMO===1?.25:1; b.classList.toggle('is-on',SLOWMO!==1); }
+  else{ PHASE=Math.round(+b.dataset.speed/3);
+    document.querySelectorAll('.ctl__btn[data-speed]').forEach(x=>x.classList.toggle('is-on',x===b)); }
+  applyPhases();
+});
+applyPhases();
+</script>
+</body>
+</html>
