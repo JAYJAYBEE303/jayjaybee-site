@@ -287,7 +287,15 @@ function placeFloats() {
   for (const pair of floats) {
     const { el, col } = pair;
     const r = col.getBoundingClientRect();
-    el.style.bottom = (innerHeight - r.bottom) + 'px';
+    // NOT innerHeight: it includes the horizontal scrollbar's thickness. A
+    // fixed-position element with no transformed ancestor is positioned
+    // against the INITIAL CONTAINING BLOCK, whose height is
+    // document.documentElement.clientHeight — which EXCLUDES that scrollbar.
+    // The Matchup page carries a standing ~8px horizontal document overflow
+    // (open or closed, unrelated to this feature) so the scrollbar is always
+    // showing, and innerHeight here silently added its ~15px to every
+    // `bottom`, floating every panel that far above the column it belongs to.
+    el.style.bottom = (document.documentElement.clientHeight - r.bottom) + 'px';
     // ALWAYS anchored to the column's LEFT edge, nudged by a fixed offset
     // computed once at open time (see `nudge` in expand()) and never touched
     // again — anchoring to the RIGHT edge instead moves as the column widens.
