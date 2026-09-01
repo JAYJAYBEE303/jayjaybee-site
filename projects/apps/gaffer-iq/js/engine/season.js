@@ -7,8 +7,9 @@
  * See docs/superpowers/specs/2026-09-01-full-season-strip-design.md.
  */
 
-import { SEASON_TOP_MATCHUPS, SEASON_LOADED_MIN_GREAT, BANDS } from '../config.js';
-import { scoreFixture } from './composite.js';
+import { SEASON_TOP_MATCHUPS, SEASON_TOP_PLAYERS, SEASON_LOADED_MIN_GREAT, BANDS } from '../config.js';
+import { scoreFixture, calcAvgPointsPerGw, calcExpectedPoints } from './composite.js';
+import { calcPlayerForm, calcPlayingLikelihood } from './form.js';
 
 /** Premier League seasons are 38 gameweeks. */
 export const LAST_GW = 38;
@@ -164,4 +165,83 @@ export function fillMatchupSlots(liveRows, postponed) {
     if (!slots[i]) slots[i] = liveRows[next++] ?? null;
   }
   return slots.filter(Boolean);
+}
+
+/**
+ * Player form for the whole pool, computed ONCE.
+ *
+ * This is what makes 38 gameweeks of league-wide ranking affordable:
+ * calcPlayerForm reads a player's history and the league context, neither of
+ * which depends on which gameweek you are asking about. Only the cheap
+ * per-gameweek fixture read repeats.
+ *
+ * @param {object} ctx
+ * @returns {Map<number, object>} player id → PlayerForm
+ */
+export function buildPlayerFormCache(ctx) {
+  const cache = new Map();
+  for (const list of Object.values(ctx.playersByTeamId || {})) {
+    for (const p of list) cache.set(p.id, calcPlayerForm(p, ctx));
+  }
+  return cache;
+}
+
+/**
+ * The players most worth owning for ONE gameweek, league-wide.
+ *
+ * Deliberately not squad-aware: the strip is a season guide that has to work
+ * before anyone has imported a team.
+ *
+ * @param {number} gw
+ * @param {object} ctx
+ * @param {Map<number, object>} formCache  from buildPlayerFormCache
+ * @param {{project?: Function}} [opts]    projection injection point, for tests
+ * @returns {Array<object>}  at most SEASON_TOP_PLAYERS, points descending
+ */
+export function buildGameweekPlayers(gw, ctx, formCache, opts = {}) {
+  const fixtures = (ctx.fixtures || []).filter(f => f.gw === gw);
+  if (fixtures.length === 0) return [];
+
+  // How many games each club plays this week, and its best fixture score.
+  // The fixture scores are only needed by the real projection, so they are
+  // skipped entirely when a test injects `project`.
+  const counts = new Map();
+  const bestFixture = new Map();
+  for (const f of fixtures) {
+    for (const teamId of [f.homeTeamId, f.awayTeamId]) {
+      counts.set(teamId, (counts.get(teamId) ?? 0) + 1);
+      const team = ctx.teamsById[teamId];
+      if (!team || opts.project) continue;
+      const s = scoreFixture(team, f, ctx);
+      const prev = bestFixture.get(teamId);
+      if (!prev || s.value > prev.value) bestFixture.set(teamId, s);
+    }
+  }
+
+  const project = opts.project ?? ((player, fixtureCount) => {
+    const form    = formCache.get(player.id) ?? calcPlayerForm(player, ctx);
+    const playing = calcPlayingLikelihood(player, form);
+    const avg     = calcAvgPointsPerGw(player, ctx);
+    const fx      = bestFixture.get(player.teamId) ?? { value: 50 };
+    return calcExpectedPoints(avg, fx, playing, fixtureCount);
+  });
+
+  const rows = [];
+  for (const [teamId, list] of Object.entries(ctx.playersByTeamId || {})) {
+    const count = counts.get(Number(teamId));
+    if (!count) continue;                       // club is blank this week
+    for (const p of list) {
+      const proj = project(p, count);
+      rows.push({
+        playerId: p.id,
+        name:     p.name,
+        position: p.position,
+        teamId:   p.teamId,
+        price:    p.price,
+        points:   proj.value,
+      });
+    }
+  }
+
+  return rows.sort((a, b) => b.points - a.points).slice(0, SEASON_TOP_PLAYERS);
 }

@@ -6,7 +6,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildGameweekMatchups, isLoadedWeek, attributePostponements, fillMatchupSlots } from '../../js/engine/season.js';
+import {
+  buildGameweekMatchups, isLoadedWeek, attributePostponements, fillMatchupSlots,
+  buildGameweekPlayers,
+} from '../../js/engine/season.js';
 
 /**
  * Minimal ctx double. buildGameweekMatchups only reads `fixtures` and
@@ -227,4 +230,73 @@ test('fillMatchupSlots marks postponed rows as unscored', () => {
   assert.equal(row.favouredId, null);
   assert.equal(row.homeId, 1);
   assert.equal(row.awayId, 2);
+});
+
+// ─── buildGameweekPlayers ──────────────────────────────────────────────────
+
+function playerCtx(fixtures) {
+  return {
+    fixtures,
+    teamsById: { 1: { id: 1 }, 2: { id: 2 } },
+    playersByTeamId: {
+      1: [
+        { id: 11, teamId: 1, name: 'Alpha', position: 'FWD', price: 10 },
+        { id: 12, teamId: 1, name: 'Bravo', position: 'MID', price: 8 },
+      ],
+      2: [{ id: 21, teamId: 2, name: 'Charlie', position: 'DEF', price: 5 }],
+    },
+  };
+}
+// Projection injection: every player scores its own id, so ordering is exact.
+const projectFrom = table => (player, fixtureCount) =>
+  ({ value: (table[player.id] ?? 0) * fixtureCount, estimated: false });
+
+test('buildGameweekPlayers ranks the league for one gameweek', () => {
+  const ctx = playerCtx([{ id: 30, gw: 5, homeTeamId: 1, awayTeamId: 2 }]);
+  const out = buildGameweekPlayers(5, ctx, new Map(), {
+    project: projectFrom({ 11: 9, 12: 4, 21: 6 }),
+  });
+  assert.deepEqual(out.map(p => p.playerId), [11, 21, 12]);
+  assert.equal(out[0].points, 9);
+});
+
+test('buildGameweekPlayers excludes clubs with no fixture that week', () => {
+  const ctx = playerCtx([{ id: 30, gw: 5, homeTeamId: 1, awayTeamId: 2 }]);
+  ctx.fixtures.push({ id: 31, gw: 6, homeTeamId: 1, awayTeamId: 2 });
+  ctx.playersByTeamId[3] = [{ id: 31, teamId: 3, name: 'Delta', position: 'MID', price: 6 }];
+  ctx.teamsById[3] = { id: 3 };
+  const out = buildGameweekPlayers(5, ctx, new Map(), {
+    project: projectFrom({ 11: 9, 12: 4, 21: 6, 31: 100 }),
+  });
+  assert.equal(out.some(p => p.playerId === 31), false);
+});
+
+test('buildGameweekPlayers passes the fixture count through for a double', () => {
+  const ctx = playerCtx([
+    { id: 30, gw: 5, homeTeamId: 1, awayTeamId: 2 },
+    { id: 31, gw: 5, homeTeamId: 1, awayTeamId: 2 },
+  ]);
+  const out = buildGameweekPlayers(5, ctx, new Map(), {
+    project: projectFrom({ 11: 5, 12: 1, 21: 1 }),
+  });
+  // Team 1 plays twice, so its projection doubles; team 2 also plays twice.
+  assert.equal(out[0].playerId, 11);
+  assert.equal(out[0].points, 10);
+});
+
+test('buildGameweekPlayers caps at SEASON_TOP_PLAYERS', () => {
+  const ctx = playerCtx([{ id: 30, gw: 5, homeTeamId: 1, awayTeamId: 2 }]);
+  ctx.playersByTeamId[1].push(
+    { id: 13, teamId: 1, name: 'E', position: 'MID', price: 5 },
+    { id: 14, teamId: 1, name: 'F', position: 'MID', price: 5 },
+    { id: 15, teamId: 1, name: 'G', position: 'MID', price: 5 },
+    { id: 16, teamId: 1, name: 'H', position: 'MID', price: 5 },
+  );
+  const out = buildGameweekPlayers(5, ctx, new Map(), { project: projectFrom({}) });
+  assert.equal(out.length, 5);
+});
+
+test('buildGameweekPlayers returns nothing for a gameweek with no fixtures', () => {
+  const ctx = playerCtx([{ id: 30, gw: 5, homeTeamId: 1, awayTeamId: 2 }]);
+  assert.deepEqual(buildGameweekPlayers(9, ctx, new Map(), { project: projectFrom({}) }), []);
 });
