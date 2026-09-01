@@ -16,6 +16,7 @@
 import { store } from '../store.js';
 import {
   BANDS, HORIZONS, WEIGHTS, FORM_WINDOW_GWS, CHANNEL_MATURITY_FULL_MATCHES,
+  H2H_MEETING_WINDOW,
 } from '../config.js';
 import { buildScoreContext, scoreFixture, scoreOverHorizon } from '../engine/composite.js';
 import {
@@ -36,38 +37,6 @@ const METRIC_LABELS = {
   history:        'H2H History',
   // styleClash:  'Style Clash',   // removed — see WEIGHTS in config.js.
   //   METRIC_ORDER derives from these keys, so dropping the label drops the row.
-};
-
-// Plain-English meaning of each breakdown metric, for the "i" popup beside its
-// row. One sentence, framed as what the number describes about an actual match
-// — deliberately NOT how it is computed. The weight, the maturity counter and
-// the row's own title= tooltip already carry the mechanical detail; what the
-// popup answers is "what am I even looking at", which is the question a reader
-// meeting the row for the first time actually has.
-//
-// homeAway is keyed by venue because the row itself is: the same metric is
-// labelled "Home Advantage" on one card and "Away Disadvantage" on the other,
-// and a single shared sentence would read as a non-sequitur under one of them.
-const METRIC_MEANINGS = {
-  baseDifficulty:
-    "How strong this opponent is as a side, the way you'd size them up from the "
-    + "league table before kick-off — before form, venue or styles come into it.",
-  counterMatchup:
-    'Whether the way this team tries to score is the same way this particular '
-    + 'opponent tends to get hurt — pace in behind against a slow back line, '
-    + 'say, or corners against a defence that keeps losing headers.',
-  teamForm:
-    "How well the team has actually been playing in its recent matches, rather "
-    + "than how good its squad is supposed to be on paper.",
-  history:
-    'Whether these two clubs have a pattern when they meet — some fixtures just '
-    + 'keep going one way regardless of where either side sits in the table.',
-  homeAway: {
-    Home: 'How much this team is lifted by playing at their own ground, in front '
-        + 'of their own crowd, with no travel in their legs.',
-    Away: 'How much this team tends to drop off on the road, where the crowd is '
-        + 'against them and the trip takes something out of the performance.',
-  },
 };
 
 // Tiebreak for metrics on equal weight (teamForm and history are both 0.15).
@@ -97,6 +66,45 @@ const METRIC_ORDER = Object.keys(METRIC_LABELS).sort((a, b) =>
 const MATURITY_THRESHOLDS = {
   teamForm:       FORM_WINDOW_GWS,
   counterMatchup: CHANNEL_MATURITY_FULL_MATCHES,
+};
+
+// Plain-English meaning of each breakdown metric, for the "i" popup beside its
+// row. Says what the number describes about an actual match, and names the
+// input it is read off — enough for a reader meeting the row for the first
+// time to know what they are looking at, without restating the arithmetic.
+//
+// Every count in the copy is interpolated from config rather than written out:
+// the two ramping metrics quote MATURITY_THRESHOLDS (which is why this is
+// declared after it) and H2H quotes H2H_MEETING_WINDOW. Those numbers have
+// been retuned before, and a sentence that repeats one by hand is a sentence
+// that will eventually contradict the n/N counter on its own row.
+const METRIC_MEANINGS = {
+  baseDifficulty:
+    "How strong this opponent is as a side, the way you'd size them up from "
+    + 'the league table before kick-off. Fetched by FPL base difficulty value, '
+    + 'used as a baseline.',
+  counterMatchup:
+    'Whether the way this team prefers to attack is the same way this '
+    + 'particular opponent tends to concede, and vice-versa. Calculations '
+    + 'shown with below attacking/defending counters, requires minimum '
+    + `${MATURITY_THRESHOLDS.counterMatchup} games to reach full maturity.`,
+  teamForm:
+    'How well the team has actually been playing in its recent matches '
+    + 'relative to the strength of the sides faced (e.g. W/A strong sides & '
+    + 'L/A weak sides count more than W/A weak sides & L/A strong sides). '
+    + `Requires minimum ${MATURITY_THRESHOLDS.teamForm} games to reach full `
+    + 'maturity.',
+  history:
+    'Head to head history. Calculated by the percentage of the total possible '
+    + `points won over the last ${H2H_MEETING_WINDOW} meetings.`,
+  // One text for both venues: the sentence describes the DIFFERENCE between
+  // the two sides' home/away records, which reads the same way from either
+  // card. The popup's title still says "Home Advantage" or "Away
+  // Disadvantage", so which side is being described stays clear.
+  homeAway:
+    "The home/away winrate difference compared with the opposite team's. This "
+    + "metric is low weight as it's not a defining factor unless a matchup is "
+    + 'relatively close.',
 };
 
 // Attacking pairing labels. Covers both the role-mode keys (stVsCb/wmVsFb/
@@ -1091,8 +1099,8 @@ function maturityTooltip(key, m, progress) {
 
 /**
  * The "i" affordance at the right edge of a breakdown row, and the popup it
- * opens: one plain-English sentence saying what the metric describes about a
- * real match.
+ * opens: a plain-English note saying what the metric describes about a real
+ * match and where its number comes from.
  *
  * Built as a <details> for the same reason the counter pairings are — the open
  * state is the browser's, so nothing here has to track it. The difference is
@@ -1113,8 +1121,7 @@ function maturityTooltip(key, m, progress) {
  *   a metric with no explanation on file
  */
 function buildMetricInfo(key, venue) {
-  const entry = METRIC_MEANINGS[key];
-  const text  = typeof entry === 'string' ? entry : entry?.[venue];
+  const text = METRIC_MEANINGS[key];
   // An unexplained metric still emits the cell — .breakdown-rows is one shared
   // grid, so a missing cell would pull every later row's columns out of phase.
   if (!text) return '<span class="breakdown-row__info"></span>';
