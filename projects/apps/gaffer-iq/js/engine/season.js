@@ -318,6 +318,27 @@ export function buildChipWindows(gwStats, opts = {}) {
 }
 
 /**
+ * Recompute the chip windows from a model whose players have since arrived.
+ *
+ * buildSeasonModel runs first with `skipPlayers` so the ribbon can paint from
+ * fixtures alone, and at that point every gameweek's `bestPlayerPoints` is 0 —
+ * which silently pins Triple Captain to the first gameweek of each half,
+ * because its `reduce` never finds a value greater than its seed. The module
+ * calls this once its background pass has filled `players`.
+ *
+ * @param {object} model  a SeasonModel whose gameweeks now carry `players`
+ * @returns {Array<object>}  fresh chip windows
+ */
+export function recomputeChipWindows(model) {
+  return buildChipWindows(model.gameweeks.map(g => ({
+    gw:               g.gw,
+    matchupTotal:     g.matchups.reduce((a, m) => a + (m.value ?? 0), 0),
+    blankCount:       g.blankCount,
+    bestPlayerPoints: g.players?.[0]?.points ?? 0,
+  })));
+}
+
+/**
  * Plain-English note for one gameweek. The panel shows this under its rows.
  * Postponement wording says the attribution is INFERRED, because it is — see
  * attributePostponements.

@@ -16,7 +16,9 @@ import {
   SEASON_TOP_PLAYERS,
 } from '../config.js';
 import { buildScoreContext } from '../engine/composite.js';
-import { buildSeasonModel } from '../engine/season.js';
+import {
+  buildSeasonModel, buildPlayerFormCache, buildGameweekPlayers, recomputeChipWindows,
+} from '../engine/season.js';
 
 let _root = null, _ribbon = null, _rail = null, _scroller = null;
 let _model = null;
@@ -437,7 +439,13 @@ async function expand(col, prev) {
   const flowDelta = (prev && prev.col !== col && +prev.col.dataset.gw < gw) ? -GROW : 0;
   const maxScroll = _scroller.scrollWidth - _scroller.clientWidth;
   const target = Math.max(0, Math.min(maxScroll, _scroller.scrollLeft + flowDelta + pair.shift));
-  pair.nudge = Math.min(0, (innerWidth - 12) - (r0.left - pair.shift + SEASON_COL_WIDE));
+  // NOT innerWidth: it includes the vertical scrollbar's width. The Matchup
+  // page has vertical overflow, so the scrollbar is always showing and
+  // innerWidth here would silently claim ~15px more room than the viewport
+  // actually has, letting a panel opened near the right edge overhang it.
+  // document.documentElement.clientWidth excludes it, mirroring the
+  // clientHeight reasoning in placeFloats() above.
+  pair.nudge = Math.min(0, (document.documentElement.clientWidth - 12) - (r0.left - pair.shift + SEASON_COL_WIDE));
   animateScroll(_scroller, _scroller.scrollLeft, target, T, T);
 
   body.style.transitionDelay = (2 * T) + 'ms';
@@ -590,6 +598,76 @@ function render() {
   renderKey();
 }
 
+let _passId = 0;
+
+/**
+ * Fill in every gameweek's top five, one week at a time.
+ *
+ * The ribbon paints from fixtures alone first, because the player half needs
+ * ~700 form computations before it can rank anything and that is far too long
+ * to hold the first paint. Weeks land progressively; a panel opened before its
+ * week arrives shows skeleton rows (see bodyHTML/skeletonPlayerRowsHTML).
+ *
+ * `_passId` abandons an in-flight pass when the data refreshes underneath it,
+ * exactly as ranker.js's `_computeId` does — a second data:ready (rebuild()
+ * calls this again) must not let a stale pass keep writing into a `_model`
+ * it no longer owns.
+ */
+async function runPlayerPass(ctx) {
+  const my = ++_passId;
+  const formCache = buildPlayerFormCache(ctx);
+  for (const g of _model.gameweeks) {
+    if (my !== _passId) return;                 // superseded
+    g.players = buildGameweekPlayers(g.gw, ctx, formCache);
+    paintDots(g);
+    refreshOpenPanel(g);
+    await new Promise(r => setTimeout(r, 0));   // yield a frame
+  }
+  // The chip windows were first computed against players that had not arrived
+  // yet, which pins Triple Captain to each half's opening gameweek. Now that
+  // every week has its five, they can be computed for real and the rail
+  // repainted — renderRail() is written to be safe to call twice.
+  _model.chipWindows = recomputeChipWindows(_model);
+  renderRail();
+}
+
+/** Repaint one column's dots once its players have arrived.
+ *
+ * Scoped to `_ribbon`, never to a `.season-gw--float` — the float is a
+ * document.body sibling holding a static clone of the column's innerHTML
+ * taken at expand() time (see expand()), so it carries no `[data-gw]` of its
+ * own for this selector to match. An open float is therefore untouched by
+ * this repaint; its player rows are handled separately by refreshOpenPanel().
+ */
+function paintDots(g) {
+  const dots = _ribbon?.querySelector(`.season-gw[data-gw="${g.gw}"] .season-gw__dots`);
+  if (!dots) return;
+  dots.innerHTML = (g.players ?? [])
+    .map((p, i) => `<i class="season-gw__dot${i < 2 ? ' season-gw__dot--standout' : ''}"></i>`)
+    .join('');
+}
+
+/**
+ * If the gameweek that just got its players is ALSO the one currently open in
+ * a floating panel, swap its skeleton rows for the real ones in place.
+ *
+ * expand() renders the float's body once, from whatever `g.players` held at
+ * that moment (see bodyHTML()). A week opened before the pass reaches it gets
+ * skeleton rows there, and nothing else in the pass ever revisits an
+ * already-rendered float — so without this the panel would sit "loading"
+ * forever even after `_model.gameweeks[i].players` has the real answer.
+ * Reaching into just `.season-plist` (not re-running bodyHTML wholesale)
+ * avoids disturbing the fixture rows, note, or the open/close choreography's
+ * own inline styles.
+ */
+function refreshOpenPanel(g) {
+  if (!openFloat || !openCol || +openCol.dataset.gw !== g.gw) return;
+  const plist = openFloat.querySelector('.season-plist');
+  if (!plist) return;
+  plist.innerHTML = g.players.map(playerRowHTML).join('');
+  plist.removeAttribute('aria-busy');
+}
+
 function rebuild() {
   const season = store.getSeason();
   if (!season) return;
@@ -621,6 +699,7 @@ function rebuild() {
   });
   _model = buildSeasonModel(ctx, season, { skipPlayers: true });
   render();
+  runPlayerPass(ctx);
 }
 
 let _pendingRender = false;   // data changed while off screen — render on activation
