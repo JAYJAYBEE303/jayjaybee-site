@@ -1489,7 +1489,12 @@ Port `.gw--float`, `.body`, `.fxrow*`, `.prow*`, `.side*` and the `is-open` / ch
 .season-gw--float.season-gw--chrome { /* accent border, shadow, padding */ }
 ```
 
-The panel is pinned by its **bottom** edge (`el.style.bottom = innerHeight - colRect.bottom`) so it grows upward over the matchup cards.
+The panel is pinned by its **bottom** edge so it grows upward over the matchup
+cards — using `document.documentElement.clientHeight - colRect.bottom`, NOT
+`innerHeight`. `innerHeight` includes the horizontal scrollbar's thickness while
+a fixed element's containing block excludes it, so `innerHeight` floats the
+panel above its column by the scrollbar's height on any page with horizontal
+overflow. The Matchup page has some.
 
 - [ ] **Step 3: Verify the choreography in the browser**
 
