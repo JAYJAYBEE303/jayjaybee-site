@@ -232,6 +232,7 @@ function skeletonPanel(lines = 3) {
  *  existing band colour). Mirrors the identical helper in modules/ranker.js.
  *  See FEATURE_ENGINE.md §13. */
 function rankTierClass(rankTier) {
+  if (rankTier === 'positionBest')     return ' score-chip--rank-gold';
   if (rankTier === 'positionElite')    return ' score-chip--rank-green';
   if (rankTier === 'positionStrong')   return ' score-chip--rank-light-green';
   if (rankTier === 'topPercentile')    return ' score-chip--rank-neutral';

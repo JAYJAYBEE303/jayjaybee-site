@@ -748,14 +748,28 @@ export const RELATIVE_EDGE_SENSITIVITY = 0.5;
 // confident data", not trip at a stricter bar than that.
 export const CONFIDENCE_FLOOR = 0.5;
 
-// Band thresholds — lower bound of each band (inclusive).
-// See FEATURE_ENGINE.md §8.4. CSS modifier classes must match these strings.
-export const BANDS = {
-  great:   75,
-  good:    60,
-  neutral: 41,
-  tough:   26,
-  brutal:   0,
+// Band thresholds — lower bound of each band (inclusive). Seven tiers, one
+// scale, every 0-100 integer in the app. See FEATURE_ENGINE.md §8.4; CSS
+// modifier classes must match these strings.
+//
+// Named BANDS_V2 because it replaced a five-tier BANDS: the ends gained a tier
+// each ('excellent' splits the old top band so a genuinely exceptional fixture
+// stops sharing a colour with a merely strong one, 'extreme' does the mirror at
+// the bottom), and the middle moved — 'good' is blue now rather than a second
+// green, which frees green to mean one thing (see base.css).
+//
+// Widening the ends is what the extra tiers buy: the old scale spent three of
+// its five bands on 41-100 and lumped everything under 26 together, so the
+// numbers a user actually acts on — the very best and the ones to avoid
+// outright — were the ones it resolved worst.
+export const BANDS_V2 = {
+  excellent: 80,
+  great:     65,
+  good:      57,
+  neutral:   44,
+  tough:     36,
+  brutal:    21,
+  extreme:    0,
 };
 
 // ─── §8 / ARCHITECTURE §9  Planning horizons ─────────────────────────────────
@@ -1028,6 +1042,13 @@ export const SEASON_STANDOUT_PLAYERS = 2;
 // good fixture in it, two is a week worth waiting for.
 export const SEASON_LOADED_MIN_GREAT = 2;
 
+// The rating a matchup must clear to count towards a "loaded" week. A NUMBER,
+// not a band foot: it was BANDS.great back when that meant 75, and it stayed at
+// 75 when the seven-tier scale put 'great' at 65. Following the band would have
+// quietly loosened the bar and lit up half the season, so it is pinned here
+// where retuning it is a deliberate act. See engine/season.js isLoadedWeek.
+export const SEASON_LOADED_MIN_VALUE = 75;
+
 // One phase of the expand/collapse choreography. Three phases run back to back
 // (vertical, horizontal, fade), so the whole transition is 3x this.
 export const SEASON_PHASE_MS = 330;
@@ -1165,14 +1186,16 @@ export const PRICE_BUY_NOW_SCORE_MIN = 55;
 
 // ─── Rank-relative player colouring (Ranker / Planner / Dashboard) ───────────
 
-// MODEL: this is a SEPARATE colouring axis from BANDS (§8.4) — BANDS classifies
-// a score against the fixed 0–100 scale; these tiers classify a player against
-// the CURRENT POOL, so "worth strongly considering" pops out regardless of how
-// the absolute scale happens to be distributed this season. Precedence, most
-// to least specific: RANK_ELITE_COUNT_BY_POS > RANK_STRONG_COUNT_BY_POS >
-// RANK_BOTTOM_PERCENTILE. A player outside all three keeps their existing
-// BANDS colour — this system only overrides colour for the standout tiers,
-// not the unremarkable middle. See FEATURE_ENGINE.md §13.
+// MODEL: this is a SEPARATE colouring axis from BANDS_V2 (§8.4) — that scale
+// classifies a score against the fixed 0–100 range; these tiers classify a
+// player against the CURRENT POOL, so "worth strongly considering" pops out
+// regardless of how the absolute scale happens to be distributed this season.
+// Precedence, most to least specific: rank 1 of the position ('positionBest',
+// which needs no constant — it is literally the top one) >
+// RANK_ELITE_COUNT_BY_POS > RANK_STRONG_COUNT_BY_POS > RANK_TOP_PERCENTILE >
+// RANK_BOTTOM_PERCENTILE. In practice every player lands in one of these, so
+// on a player chip this axis determines the colour outright and the band class
+// underneath it is a fallback. See FEATURE_ENGINE.md §13.
 
 // MODEL: the two "worth considering" tiers are PER-POSITION fixed counts, not
 // pool-wide — a pool-wide count/percentile systematically buried Forwards (few

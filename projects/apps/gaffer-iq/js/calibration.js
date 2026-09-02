@@ -9,7 +9,6 @@
 
 import { store } from './store.js';
 import { buildScoreContext, scoreFixture } from './engine/composite.js';
-import { BANDS } from './config.js';
 
 // ─── localStorage key helpers ────────────────────────────────────────────────
 
@@ -135,18 +134,27 @@ function outcomeDirection(goalsFor, goalsAgainst) {
 
 /**
  * Return whether a band prediction was correct given an actual outcome.
- * Bands 'great' / 'good' predict a win; 'tough' / 'brutal' predict a loss;
+ * Everything above 'neutral' predicts a win, everything below predicts a loss,
  * 'neutral' predicts a draw — a conservative but interpretable mapping.
+ *
+ * Covers all seven current tiers AND the five the old scale used, because the
+ * snapshots this reads are persisted: history recorded before BANDS_V2 still
+ * holds 'great'/'good'/'tough'/'brutal' strings, and those keep the same side
+ * of the line they always had, so the accuracy series stays continuous across
+ * the change rather than going null for every pre-v2 fixture.
  *
  * @param {string} band     predicted band string
  * @param {'win'|'draw'|'loss'} actual
  * @returns {boolean|null}  null when the match hasn't been played yet
  */
+const WIN_BANDS  = new Set(['excellent', 'great', 'good']);
+const LOSS_BANDS = new Set(['tough', 'brutal', 'extreme']);
+
 function isBandCorrect(band, actual) {
   if (!band || !actual) return null;
-  if (band === 'great' || band === 'good')     return actual === 'win';
-  if (band === 'neutral')                       return actual === 'draw';
-  if (band === 'tough' || band === 'brutal')   return actual === 'loss';
+  if (WIN_BANDS.has(band))   return actual === 'win';
+  if (band === 'neutral')    return actual === 'draw';
+  if (LOSS_BANDS.has(band))  return actual === 'loss';
   return null;
 }
 

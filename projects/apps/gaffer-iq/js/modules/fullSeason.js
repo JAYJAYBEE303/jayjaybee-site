@@ -15,7 +15,7 @@ import {
   CHIP_RESET_AFTER_GW, SEASON_COL_W, SEASON_COL_WIDE, SEASON_PHASE_MS,
   SEASON_TOP_PLAYERS, SEASON_STANDOUT_PLAYERS,
 } from '../config.js';
-import { buildScoreContext } from '../engine/composite.js';
+import { buildScoreContext, bandFromValue } from '../engine/composite.js';
 import {
   buildSeasonModel, buildPlayerFormCache, buildGameweekPlayers, recomputeChipWindows,
 } from '../engine/season.js';
@@ -65,7 +65,7 @@ function columnHTML(g) {
   // which the tint does on its own; the clubs are named in the panel.
   const tiles = g.matchups.map(m => {
     const cls = m.postponed ? 'season-gw__tile season-gw__tile--postponed'
-      : `season-gw__tile season-gw__tile--${esc(m.band)}${m.isDouble ? ' season-gw__tile--double' : ''}`;
+      : `season-gw__tile season-gw__tile--${esc(bandFromValue(m.value))}${m.isDouble ? ' season-gw__tile--double' : ''}`;
     return `<span class="${cls}"></span>`;
   }).join('');
   const dots = dotsHTML(g.players);
@@ -153,9 +153,13 @@ function renderKey() {
     + '</div>';
   key.innerHTML = [
     group('Matchup one-sidedness', [
-      ['season-key__swatch--great', 'Heavily favoured'],
-      ['season-key__swatch--good',  'Favoured'],
-      ['season-key__swatch--even',  'Even'],
+      // Four rungs, not three: m.value is always the FAVOURED side's score
+      // (engine/season.js), so a tile never lands below the neutral band and
+      // the key only ever needs the top half of the scale.
+      ['season-key__swatch--excellent', 'Exceptional'],
+      ['season-key__swatch--great',     'Heavily favoured'],
+      ['season-key__swatch--good',      'Favoured'],
+      ['season-key__swatch--even',      'Even'],
     ]),
     group('Schedule', [
       ['season-key__swatch--double',    'Double gameweek'],
@@ -337,7 +341,7 @@ function fixtureRowHTML(m) {
       + `<span class="season-v">v</span>${sideHTML(m.awayId, false)}`
       + `<span class="season-pptag">PP</span><span class="season-sc">—</span></div>`;
   }
-  return `<div class="season-fxrow season-fxrow--${esc(m.band)}">${sideHTML(m.homeId, m.favouredId === m.homeId)}`
+  return `<div class="season-fxrow season-fxrow--${esc(bandFromValue(m.value))}">${sideHTML(m.homeId, m.favouredId === m.homeId)}`
     + `<span class="season-v">v</span>${sideHTML(m.awayId, m.favouredId === m.awayId)}`
     + `${m.isDouble ? '<span class="season-dgwtag">DGW</span>' : ''}`
     + `<span class="season-sc">${Math.round(m.value)}</span></div>`;

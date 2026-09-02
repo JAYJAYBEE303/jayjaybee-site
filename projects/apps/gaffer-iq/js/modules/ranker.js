@@ -20,12 +20,13 @@
 import { store } from '../store.js';
 import {
   HORIZONS, RANKER_CHUNK_SIZE, SUMMARY_FETCH_CHUNK_SIZE,
-  PRICE_FILTER_MIN, PRICE_FILTER_MAX, PRICE_FILTER_STEP, BANDS,
+  PRICE_FILTER_MIN, PRICE_FILTER_MAX, PRICE_FILTER_STEP,
   RANK_ELITE_COUNT_BY_POS, RANK_STRONG_COUNT_BY_POS,
   RANK_TOP_PERCENTILE, RANK_BOTTOM_PERCENTILE,
 } from '../config.js';
 import {
   buildScoreContext, scorePlayer, attachRankTiers, calcLastSeasonAvgPointsPerGw,
+  bandFromValue, rankTierMapBy,
 } from '../engine/composite.js';
 import { fetchPlayerSummary } from '../api.js';
 import { normalisePlayerSummary } from '../engine/normalise.js';
@@ -137,24 +138,12 @@ function displayName(player) {
   return player.fullName || player.name;
 }
 
-/**
- * Map a 0–100 value to a band string, reading thresholds from config so this
- * render helper stays in sync with the engine. Not analytical — display only.
- * Mirrors the identical helper in modules/matchup.js (CONVENTIONS.md §5.2).
- */
-function bandFromValue(v) {
-  if (v >= BANDS.great)   return 'great';
-  if (v >= BANDS.good)    return 'good';
-  if (v >= BANDS.neutral) return 'neutral';
-  if (v >= BANDS.tough)   return 'tough';
-  return 'brutal';
-}
-
 /** rankTier (composite.js → calcRankTier) → the .score-chip--rank-* modifier
- *  suffix. Every player gets one of the five now (calcRankTier only returns
+ *  suffix. Every player gets one of the six now (calcRankTier only returns
  *  null for a malformed/empty pool), so '' is effectively unreachable in
  *  practice — kept as a safe fallback, not a normal case. See FEATURE_ENGINE.md §13. */
 function rankTierClass(rankTier) {
+  if (rankTier === 'positionBest')     return ' score-chip--rank-gold';
   if (rankTier === 'positionElite')    return ' score-chip--rank-green';
   if (rankTier === 'positionStrong')   return ' score-chip--rank-light-green';
   if (rankTier === 'topPercentile')    return ' score-chip--rank-neutral';
@@ -175,18 +164,37 @@ const POSITION_LABELS = { GKP: 'goalkeepers', DEF: 'defenders', MID: 'midfielder
  * are POOL-WIDE (not per-position — see calcRankTier's JSDoc), so their text
  * doesn't mention a position; midPercentile's implied width (100% minus the
  * other two) is likewise derived from config, not a hardcoded "35%".
+ *
+ * `metric` names WHICH column's ranking this is. Three columns now carry these
+ * chips and each is ranked on its own number, so a tooltip that only said "top
+ * 5 defenders in the game" would be the same sentence under three different
+ * colourings — and wrong for two of them.
  */
-function rankTierTitle(rankTier, position) {
+function rankTierTitle(rankTier, position, metric = 'rating') {
   const posLabel = POSITION_LABELS[position] ?? 'players';
-  if (rankTier === 'positionElite')  return `Top ${RANK_ELITE_COUNT_BY_POS[position]} ${posLabel} in the game`;
-  if (rankTier === 'positionStrong') return `Top ${RANK_STRONG_COUNT_BY_POS[position]} ${posLabel} in the game`;
-  if (rankTier === 'topPercentile')    return `Top ${Math.round(RANK_TOP_PERCENTILE * 100)}% of players in the game`;
-  if (rankTier === 'bottomPercentile') return `Bottom ${Math.round(RANK_BOTTOM_PERCENTILE * 100)}% of players in the game`;
+  if (rankTier === 'positionBest')   return `Best ${metric} of all ${posLabel} in the game`;
+  if (rankTier === 'positionElite')  return `Top ${RANK_ELITE_COUNT_BY_POS[position]} ${posLabel} in the game by ${metric}`;
+  if (rankTier === 'positionStrong') return `Top ${RANK_STRONG_COUNT_BY_POS[position]} ${posLabel} in the game by ${metric}`;
+  if (rankTier === 'topPercentile')    return `Top ${Math.round(RANK_TOP_PERCENTILE * 100)}% of players in the game by ${metric}`;
+  if (rankTier === 'bottomPercentile') return `Bottom ${Math.round(RANK_BOTTOM_PERCENTILE * 100)}% of players in the game by ${metric}`;
   if (rankTier === 'midPercentile') {
     const midPct = Math.round((1 - RANK_TOP_PERCENTILE - RANK_BOTTOM_PERCENTILE) * 100);
-    return `Middle ${midPct}% of players in the game`;
+    return `Middle ${midPct}% of players in the game by ${metric}`;
   }
   return '';
+}
+
+/**
+ * Wrap an already-built cell body in a rank-coloured chip.
+ *
+ * Returns the body UNWRAPPED when there is no tier — a player outside the
+ * ranked pool for this metric (no Cost/Pt, last season's figure still
+ * loading). A chip with no colour would read as a fourth state the table does
+ * not have; the bare number is the honest rendering of "not ranked here".
+ */
+function metricChip(body, rankTier, title) {
+  if (!rankTier) return body;
+  return `<span class="score-chip${rankTierClass(rankTier)}" title="${esc(title)}">${body}</span>`;
 }
 
 /**
@@ -602,8 +610,12 @@ function buildFixtureStrip(perGw, pending = []) {
  * @param {object} pendingCtx  the Season, read for pendingFixturesByTeam only.
  *   Passed down rather than rebuilt per row: buildCtx() is far too expensive to
  *   call ~700 times per render, and the pending index is identical for every row.
+ * @param {{avg: Map, cost: Map}} metricRanks  per-metric rank-tier lookups for
+ *   the Avg Pts/GW and Cost/Pt columns (renderTable → rankTierMapBy). Each
+ *   column is ranked on ITS OWN number — reusing the Value tier here would
+ *   colour three columns by one metric and say nothing about the other two.
  */
-function buildRow({ player, team, score, rankTier }, nextFixtureRankById, lastSeasonByPlayerId, pendingCtx) {
+function buildRow({ player, team, score, rankTier }, nextFixtureRankById, lastSeasonByPlayerId, pendingCtx, metricRanks) {
   const statusMark = player.status !== 'available'
     ? `<span class="ranker-status-badge" title="${esc(player.statusNote || player.status)}">!</span>`
     : '';
@@ -628,9 +640,15 @@ function buildRow({ player, team, score, rankTier }, nextFixtureRankById, lastSe
     } else {
       const seasonLabel = esc(ls.seasonName ?? 'last season');
       const title = `${seasonLabel}'s average — not this season's`;
-      avgPtsDisplay = `${ls.avg.toFixed(1)}<span class="ranker-est-mark" title="${title}">~</span>`;
+      avgPtsDisplay = metricChip(
+        `${ls.avg.toFixed(1)}<span class="ranker-est-mark" title="${title}">~</span>`,
+        metricRanks.avg.get(player.id),
+        rankTierTitle(metricRanks.avg.get(player.id), player.position, `Avg Pts/GW (${seasonLabel})`));
       costPerPointDisplay = ls.cost !== null
-        ? `£${esc(ls.cost.toFixed(2))}m<span class="ranker-est-mark" title="Derived from ${title}">~</span>`
+        ? metricChip(
+            `£${esc(ls.cost.toFixed(2))}m<span class="ranker-est-mark" title="Derived from ${title}">~</span>`,
+            metricRanks.cost.get(player.id),
+            rankTierTitle(metricRanks.cost.get(player.id), player.position, `Cost/Pt (${seasonLabel})`))
         : '<span class="ranker-no-fixtures" title="No past-season data for this player">—</span>';
     }
   } else {
@@ -640,15 +658,21 @@ function buildRow({ player, team, score, rankTier }, nextFixtureRankById, lastSe
     const avgPtsEstMark = avgPts.estimated
       ? `<span class="ranker-est-mark" title="${avgPtsTitle}">~</span>`
       : '';
-    avgPtsDisplay = `${avgPts.value.toFixed(1)}${avgPtsEstMark}`;
+    avgPtsDisplay = metricChip(
+      `${avgPts.value.toFixed(1)}${avgPtsEstMark}`,
+      metricRanks.avg.get(player.id),
+      rankTierTitle(metricRanks.avg.get(player.id), player.position, 'Avg Pts/GW'));
 
     // Cost/Pt is DERIVED from avgPointsPerGw (price ÷ avgPointsPerGw.value) —
     // when that input is estimated, flag the derived figure too, for the same
     // explainability reason.
     costPerPointDisplay = score.costPerPoint !== null
-      ? `£${esc(score.costPerPoint.toFixed(2))}m${avgPts.estimated
-          ? `<span class="ranker-est-mark" title="Derived from an estimated Avg Pts/GW — ${avgPtsTitle}">~</span>`
-          : ''}`
+      ? metricChip(
+          `£${esc(score.costPerPoint.toFixed(2))}m${avgPts.estimated
+            ? `<span class="ranker-est-mark" title="Derived from an estimated Avg Pts/GW — ${avgPtsTitle}">~</span>`
+            : ''}`,
+          metricRanks.cost.get(player.id),
+          rankTierTitle(metricRanks.cost.get(player.id), player.position, 'Cost/Pt'))
       : '<span class="ranker-no-fixtures">—</span>';
   }
 
@@ -698,7 +722,7 @@ function buildRow({ player, team, score, rankTier }, nextFixtureRankById, lastSe
       </td>
       <td class="ranker-table__td ranker-table__td--value">
         <span class="score-chip score-chip--${esc(score.band)}${estClass}${rankTierClass(rankTier)}"
-              title="${rankTier ? esc(rankTierTitle(rankTier, player.position)) : ''}">${Math.round(score.value)}</span>
+              title="${rankTier ? esc(rankTierTitle(rankTier, player.position, 'rating')) : ''}">${Math.round(score.value)}</span>
       </td>
       <td class="ranker-table__td ranker-table__td--next-fixture"
           title="Fixture + counter-matchup favourability, excluding form">
@@ -858,9 +882,32 @@ function renderTable() {
   // Only built in 'lastSeason' mode. buildCtx() is safe to call unconditionally
   // here — _rows is only ever populated after rebuildRowsChunked has already
   // built (and required a non-null) ctx once, so the season is guaranteed loaded.
+  //
+  // Built over _rows, not `filtered`: the rank tiers below are computed from it,
+  // and they follow the same full-pool rule as the Value column — "best forward
+  // for Cost/Pt" has to mean the same thing whichever filter pills are active.
   const lastSeasonByPlayerId = _avgPtsMode === 'lastSeason'
-    ? buildLastSeasonLookup(filtered, buildCtx())
+    ? buildLastSeasonLookup(_rows, buildCtx())
     : null;
+
+  // Avg Pts/GW and Cost/Pt each get their OWN per-position ranking, on their
+  // own number — not the Value column's tier repeated across the row, which
+  // would colour a Cost/Pt cell by something that is not Cost/Pt.
+  //
+  // Both read whichever season the toggle is showing, so the colours always
+  // describe the figures actually on screen. Recomputed per render rather than
+  // cached because the inputs move underneath them: last-season averages land
+  // row by row as the bulk load streams in.
+  const metricRanks = {
+    avg: rankTierMapBy(_rows, ({ player, score }) => (lastSeasonByPlayerId
+      ? lastSeasonByPlayerId.get(player.id)?.avg ?? null
+      : score.avgPointsPerGw.value)),
+    // Ascending: Cost/Pt is £ per point, so the CHEAPEST points in the game are
+    // the top of this column.
+    cost: rankTierMapBy(_rows, ({ player, score }) => (lastSeasonByPlayerId
+      ? lastSeasonByPlayerId.get(player.id)?.cost ?? null
+      : score.costPerPoint), { ascending: true }),
+  };
 
   const sorted = applySort(filtered, lastSeasonByPlayerId);
 
@@ -869,7 +916,7 @@ function renderTable() {
   const pendingCtx = store.getSeason();
 
   _tbody.innerHTML = sorted
-    .map(row => buildRow(row, nextFixtureRankById, lastSeasonByPlayerId, pendingCtx))
+    .map(row => buildRow(row, nextFixtureRankById, lastSeasonByPlayerId, pendingCtx, metricRanks))
     .join('');
   _tbody.removeAttribute('aria-busy');
 }

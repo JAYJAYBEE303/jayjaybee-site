@@ -345,8 +345,13 @@
   text-align: center;
 }
 
-.gw-nav__venue--home { color: var(--band-great); }
-.gw-nav__venue--away { color: var(--band-brutal); }
+.gw-nav__venue--home { color: var(--band-green); }
+/* Primitives, not band tokens: an away fixture is not a 21-35 rating, it is
+   just away. These two used to borrow --band-great/--band-brutal (the same
+   pair .squad-import-status--success/error uses), which the seven-tier scale
+   re-points — green would have survived, but red would have turned orange for
+   no reason anyone could name. See base.css. */
+.gw-nav__venue--away { color: var(--band-red); }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    MATCHUP GRID — two-column layout for home/away cards
@@ -393,6 +398,9 @@
 .matchup-card--neutral { border-left-color: var(--band-neutral); }
 .matchup-card--tough   { border-left-color: var(--band-tough); }
 .matchup-card--brutal  { border-left-color: var(--band-brutal); }
+/* The two tiers the seven-tier scale added at the ends of the old five. */
+.matchup-card--excellent { border-left-color: var(--band-excellent); }
+.matchup-card--extreme   { border-left-color: var(--band-extreme); }
 
 /* Low-confidence cards get a hatched overlay so the provisional nature is
    immediately visible without hiding the data — see ARCHITECTURE.md §11. */
@@ -479,6 +487,26 @@
 .score-pill--neutral { background: var(--band-neutral-bg); border-color: var(--band-neutral); color: var(--band-neutral); }
 .score-pill--tough   { background: var(--band-tough-bg);   border-color: var(--band-tough);   color: var(--band-tough); }
 .score-pill--brutal  { background: var(--band-brutal-bg);  border-color: var(--band-brutal);  color: var(--band-brutal); }
+/* Top tier carries a glow the other six do not — the pill is the card's
+   headline, and 80+ is the one reading the page exists to spot. Gold chrome,
+   silver ink: see --band-excellent-ink in base.css for why this tier alone
+   splits the two. The text glow is warm-white rather than pure white so the
+   digits read as lit BY the gold around them; a cold white halo made the
+   number look pasted on. */
+.score-pill--excellent {
+  background: var(--band-excellent-bg);
+  border-color: var(--band-excellent);
+  color: var(--band-excellent-ink);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--band-excellent) 35%, transparent);
+  text-shadow:
+    0 0 10px color-mix(in srgb, var(--band-excellent-ink) 60%, transparent),
+    0 0 20px color-mix(in srgb, var(--band-excellent) 45%, transparent);
+}
+/* Border keeps the dark red — it is what makes the bottom tier read as its own
+   thing beside orange — but the digits lift to --band-red: 20pt bold in
+   #b62324 on this background is dimmer than every other pill on the page, and
+   the number is the thing being read. Same split as .score-chip--extreme. */
+.score-pill--extreme { background: var(--band-extreme-bg); border-color: var(--band-extreme); color: var(--band-red); }
 
 /* Provisional: muted + hatched — score still shown, never hidden */
 .score-pill--provisional {
@@ -541,23 +569,73 @@
 .score-chip--neutral { background: var(--band-neutral-bg); color: var(--band-neutral); }
 .score-chip--tough   { background: var(--band-tough-bg);   color: var(--band-tough); }
 .score-chip--brutal  { background: var(--band-brutal-bg);  color: var(--band-brutal); }
+/* Same gold-chrome/silver-ink split as the pill, at chip scale — where it
+   matters more, not less: these digits are 11px and were the hardest gold
+   text on the page to read. Glow radii scale down with the type.
+   The gold edge is an INSET ring, not a border: .score-chip has none, and a
+   real 1px border would grow this tier's chips by 2px in each axis — enough
+   to jog the row it sits in, and only for the rows that happen to be 80+. The
+   ring follows --radius-sm on its own, and the outer glow still reads as the
+   pill's does because both come off the same box-shadow. */
+.score-chip--excellent {
+  background: var(--band-excellent-bg);
+  color: var(--band-excellent-ink);
+  box-shadow:
+    inset 0 0 0 1px var(--band-excellent),
+    0 0 6px color-mix(in srgb, var(--band-excellent) 45%, transparent);
+  text-shadow:
+    0 0 6px color-mix(in srgb, var(--band-excellent-ink) 55%, transparent),
+    0 0 12px color-mix(in srgb, var(--band-excellent) 50%, transparent);
+}
+/* Dark red is dark: at chip size the solid hue is too low-contrast to read as
+   text on this background, so the text lifts to --band-red and the dark red
+   stays as the fill it tints. */
+.score-chip--extreme { background: var(--band-extreme-bg); color: var(--band-red); }
 
 /* Rank-relative tiers (pool-percentile, NOT the 0-100 band above — see
    FEATURE_ENGINE.md §13). Rendered ALONGSIDE a .score-chip--{band} class, never
-   instead of it — these rules come after the five band rules above so they win
+   instead of it — these rules come after the seven band rules above so they win
    the cascade at equal specificity, without needing !important or JS to strip
-   the band class. Every player now gets exactly one of these five (calcRankTier
+   the band class. Every player now gets exactly one of these six (calcRankTier
    no longer returns null except for a malformed/empty pool), so in practice
    this block fully determines colour, not just for a handful of standouts.
    rank-neutral/rank-yellow are their OWN classes (not a reuse of .score-chip--
    neutral/.score-chip--tough directly) specifically so their cascade position
-   here — after ALL FIVE band classes, not just some — is guaranteed regardless
-   of which band a given player's own absolute score happens to carry. */
-.score-chip--rank-green       { background: var(--band-great-bg);       color: var(--band-great); }
-.score-chip--rank-light-green { background: var(--band-light-green-bg); color: var(--band-light-green); }
-.score-chip--rank-red         { background: var(--band-brutal-bg);      color: var(--band-brutal); }
-.score-chip--rank-neutral     { background: var(--band-neutral-bg);     color: var(--band-neutral); }
-.score-chip--rank-yellow      { background: var(--band-tough-bg);       color: var(--band-tough); }
+   here — after ALL SEVEN band classes, not just some — is guaranteed regardless
+   of which band a given player's own absolute score happens to carry.
+
+   These are named after their COLOUR, not their tier, so they read the
+   primitives directly: this axis is deliberately not on the 0-100 scale and
+   must not move when that scale is re-pointed.
+
+   The blue was light green until the seven-tier scale landed. Two greens one
+   step apart is a distinction the eye has to work for, and the column was
+   asking it to do that ~700 rows deep; against the dark green above it, blue
+   separates at a glance and costs nothing, since nothing else in this table
+   is blue. */
+.score-chip--rank-green       { background: var(--band-dark-green-bg); color: var(--band-dark-green); }
+.score-chip--rank-light-green { background: var(--band-blue-bg);       color: var(--band-blue); }
+.score-chip--rank-red         { background: var(--band-red-bg);        color: var(--band-red); }
+.score-chip--rank-neutral     { background: var(--band-neutral-bg);    color: var(--band-neutral); }
+.score-chip--rank-yellow      { background: var(--band-amber-bg);      color: var(--band-amber); }
+
+/* Rank 1 of a position — the gold the 0-100 scale gives its top tier, on the
+   one rank tier scarce enough to earn it: exactly four chips on the whole
+   table, one per position, however the pool moves (calcRankTier,
+   'positionBest'). Same gold-chrome/silver-ink split and the same glow as
+   .score-chip--excellent, so "best there is" reads identically whether it was
+   earned on the absolute scale or the relative one. Last in the block, so it
+   beats rank-green for the player who is both. */
+.score-chip--rank-gold {
+  background: var(--band-excellent-bg);
+  color: var(--band-excellent-ink);
+  box-shadow:
+    inset 0 0 0 1px var(--band-excellent),
+    0 0 6px color-mix(in srgb, var(--band-excellent) 45%, transparent);
+  text-shadow:
+    0 0 6px color-mix(in srgb, var(--band-excellent-ink) 55%, transparent),
+    0 0 12px color-mix(in srgb, var(--band-excellent) 50%, transparent);
+}
 
 /* Estimated compact chip — dashed border in the band's own colour, ~ prefix. */
 .score-chip--estimated {
@@ -603,11 +681,11 @@
   /* FDR 1=easy→great colour, 5=hard→brutal colour (inverted vs Gaffer IQ) */
 }
 
-.fdr-comparison__value[data-fdr="1"] { color: var(--band-great); }
-.fdr-comparison__value[data-fdr="2"] { color: var(--band-good); }
+.fdr-comparison__value[data-fdr="1"] { color: var(--band-dark-green); }
+.fdr-comparison__value[data-fdr="2"] { color: var(--band-green); }
 .fdr-comparison__value[data-fdr="3"] { color: var(--band-neutral); }
-.fdr-comparison__value[data-fdr="4"] { color: var(--band-tough); }
-.fdr-comparison__value[data-fdr="5"] { color: var(--band-brutal); }
+.fdr-comparison__value[data-fdr="4"] { color: var(--band-amber); }
+.fdr-comparison__value[data-fdr="5"] { color: var(--band-red); }
 
 .fdr-comparison__scale {
   font-size: var(--font-size-xs);
@@ -646,7 +724,7 @@
 
 /* Low confidence: provisional indicator in caution colour */
 .confidence-indicator--low .confidence-indicator__value {
-  color: var(--band-tough);
+  color: var(--band-amber);
 }
 
 .confidence-indicator--low .confidence-indicator__label::after {
@@ -766,6 +844,8 @@
 .breakdown-row__bar--neutral { background: var(--band-neutral); }
 .breakdown-row__bar--tough   { background: var(--band-tough); }
 .breakdown-row__bar--brutal  { background: var(--band-brutal); }
+.breakdown-row__bar--excellent { background: var(--band-excellent); }
+.breakdown-row__bar--extreme   { background: var(--band-extreme); }
 
 /* Estimated sub-metric bar: reduced opacity + striped overlay (the "dashed" fill). */
 .breakdown-row__bar--estimated {
@@ -804,7 +884,7 @@
    emits this class, so it simply never appears there). */
 .breakdown-row__est {
   font-size: var(--font-size-xs);
-  color: var(--band-tough);
+  color: var(--band-amber);
   font-weight: 700;
   cursor: default;
   width: 12px;
@@ -1165,6 +1245,16 @@
 .pgw-cell--neutral { background: var(--band-neutral-bg); color: var(--band-neutral); border-color: var(--band-neutral); }
 .pgw-cell--tough   { background: var(--band-tough-bg);   color: var(--band-tough);   border-color: var(--band-tough); }
 .pgw-cell--brutal  { background: var(--band-brutal-bg);  color: var(--band-brutal);  border-color: var(--band-brutal); }
+.pgw-cell--excellent {
+  background: var(--band-excellent-bg);
+  color: var(--band-excellent-ink);
+  border-color: var(--band-excellent);
+  text-shadow:
+    0 0 6px color-mix(in srgb, var(--band-excellent-ink) 55%, transparent),
+    0 0 12px color-mix(in srgb, var(--band-excellent) 50%, transparent);
+}
+/* Text lifts to --band-red for the same reason .score-chip--extreme's does. */
+.pgw-cell--extreme { background: var(--band-extreme-bg); color: var(--band-red); border-color: var(--band-extreme); }
 
 /* Estimated fixture cell — dashed border, reduced opacity. */
 .pgw-cell--estimated {
@@ -1244,7 +1334,7 @@
   width: 4px;
   height: 4px;
   border-radius: var(--radius-pill);
-  background: var(--band-tough);
+  background: var(--band-amber);
 }
 
 /* Postponed: lives OFF the strip, because it has no gameweek to sit in. */
@@ -1792,9 +1882,21 @@
    favour of the dashed-border/muted-label treatment alone. */
 .ranker-est-mark {
   font-size: var(--font-size-xs);
-  color: var(--band-tough);
+  color: var(--band-amber);
   font-weight: 700;
   cursor: default;
+}
+
+/* Inside a rank chip the "~" takes the chip's own colour. Its amber is a
+   THIRD-party hue in there — it neither belongs to the tier nor reads as the
+   marker it does against plain body text, and at gold it actively muddied the
+   glow. Ranked cells are wider than the Value chip's digits, so these chips
+   size to their content rather than sitting on the 32px floor. */
+.score-chip .ranker-est-mark { color: inherit; }
+
+.ranker-table__td--avg-pts .score-chip,
+.ranker-table__td--cost-per-point .score-chip {
+  min-width: 0;
 }
 
 /* Next-fixture rank tag, shown beside its score chip */
@@ -1861,8 +1963,8 @@
   justify-content: center;
   font-size: var(--font-size-xs);
   font-weight: 800;
-  color: var(--band-brutal);
-  background: var(--band-brutal-bg);
+  color: var(--band-red);
+  background: var(--band-red-bg);
   border-radius: 50%;
   width: 14px;
   height: 14px;
@@ -1884,10 +1986,10 @@
 }
 
 /* Band modifiers mirror the score band colour convention (CONVENTIONS.md §5.2) */
-.ranker-min-badge--great   { background: var(--band-great-bg);   color: var(--band-great); }
-.ranker-min-badge--good    { background: var(--band-good-bg);    color: var(--band-good); }
+.ranker-min-badge--great   { background: var(--band-dark-green-bg);   color: var(--band-dark-green); }
+.ranker-min-badge--good    { background: var(--band-green-bg);    color: var(--band-green); }
 .ranker-min-badge--neutral { background: var(--band-neutral-bg); color: var(--band-neutral); }
-.ranker-min-badge--tough   { background: var(--band-tough-bg);   color: var(--band-tough); }
+.ranker-min-badge--tough   { background: var(--band-amber-bg);   color: var(--band-amber); }
 
 /* ─── Fixture strip inside table cell ────────────────────────────────────── */
 
@@ -2181,8 +2283,8 @@
 }
 
 .dash-squad-slot__remove:hover {
-  color: var(--band-brutal);
-  background: var(--band-brutal-bg);
+  color: var(--band-red);
+  background: var(--band-red-bg);
 }
 
 /* ─── Decisions panel (right column) ─────────────────────────────────────── */
@@ -2430,8 +2532,8 @@
 /* GW LIVE — green with a gentle pulse to signal active data. */
 .gw-state-badge--live {
   background: rgba(63, 185, 80, 0.13);
-  color: var(--band-great);
-  border: 1px solid var(--band-great);
+  color: var(--band-dark-green);
+  border: 1px solid var(--band-dark-green);
   animation: gw-badge-pulse 1.8s ease-in-out infinite;
 }
 
@@ -2475,7 +2577,7 @@
   font-size: var(--font-size-xs);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  color: var(--band-good);
+  color: var(--band-green);
   white-space: nowrap;
   line-height: 1.4;
   /* Always follows a .dash-breakdown chip; both former wrappers that used to
@@ -2516,14 +2618,14 @@
 
 /* Rotation Risk — amber/tough band */
 .dash-flag--rotation {
-  background: var(--band-tough-bg);
-  color: var(--band-tough);
+  background: var(--band-amber-bg);
+  color: var(--band-amber);
 }
 
 /* Tough Fixture — red/brutal band */
 .dash-flag--fixture {
-  background: var(--band-brutal-bg);
-  color: var(--band-brutal);
+  background: var(--band-red-bg);
+  color: var(--band-red);
 }
 
 /* Low Confidence — uses --color-estimated so all estimated indicators share one token */
@@ -2534,8 +2636,8 @@
 
 /* Availability Doubt — red/brutal band */
 .dash-flag--availability {
-  background: var(--band-brutal-bg);
-  color: var(--band-brutal);
+  background: var(--band-red-bg);
+  color: var(--band-red);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -2650,9 +2752,9 @@
 }
 
 .planner-hit-toggle.is-active {
-  background: var(--band-tough-bg);
-  border-color: var(--band-tough);
-  color: var(--band-tough);
+  background: var(--band-amber-bg);
+  border-color: var(--band-amber);
+  color: var(--band-amber);
 }
 
 .planner-hit-toggle:hover:not(.is-active) {
@@ -2965,8 +3067,8 @@
   line-height: 1;
 }
 
-.planner-delta--gain { color: var(--band-good); }
-.planner-delta--loss { color: var(--band-brutal); }
+.planner-delta--gain { color: var(--band-green); }
+.planner-delta--loss { color: var(--band-red); }
 
 /* Estimated delta: underlying projections have low confidence. */
 .planner-delta--estimated {
@@ -3017,9 +3119,9 @@
   letter-spacing: 0.04em;
   white-space: nowrap;
   line-height: 1.6;
-  background: var(--band-tough-bg);
-  color: var(--band-tough);
-  border: 1px solid var(--band-tough);
+  background: var(--band-amber-bg);
+  color: var(--band-amber);
+  border: 1px solid var(--band-amber);
 }
 
 /* ─── Player projection block ────────────────────────────────────────────── */
@@ -3047,13 +3149,13 @@
 }
 
 .planner-player__dir--out {
-  background: var(--band-brutal-bg);
-  color: var(--band-brutal);
+  background: var(--band-red-bg);
+  color: var(--band-red);
 }
 
 .planner-player__dir--in {
-  background: var(--band-good-bg);
-  color: var(--band-good);
+  background: var(--band-green-bg);
+  color: var(--band-green);
 }
 
 .planner-player__info {
@@ -3184,8 +3286,8 @@
 }
 
 .calib-btn--clear {
-  color: var(--band-brutal);
-  border-color: var(--band-brutal);
+  color: var(--band-red);
+  border-color: var(--band-red);
 }
 
 .calib-empty {
@@ -3233,12 +3335,12 @@
 }
 
 .calib-call--correct {
-  color: var(--band-good);
+  color: var(--band-green);
   font-weight: 700;
 }
 
 .calib-call--wrong {
-  color: var(--band-brutal);
+  color: var(--band-red);
   font-weight: 700;
 }
 
@@ -3393,8 +3495,8 @@
 }
 
 .squad-import-status--loading { color: var(--color-muted); font-style: italic; }
-.squad-import-status--success { color: var(--band-great);  font-weight: 600; }
-.squad-import-status--error   { color: var(--band-brutal); font-weight: 600; }
+.squad-import-status--success { color: var(--band-dark-green);  font-weight: 600; }
+.squad-import-status--error   { color: var(--band-red); font-weight: 600; }
 .squad-import-status--idle    { color: var(--color-muted); }
 
 /* Team info line: "Team Name · Manager · Overall rank: N" */
@@ -3557,13 +3659,13 @@
 }
 
 .ranker-price-change--rise {
-  color: var(--band-great);
-  background: color-mix(in srgb, var(--band-great) 12%, transparent);
+  color: var(--band-dark-green);
+  background: color-mix(in srgb, var(--band-dark-green) 12%, transparent);
 }
 
 .ranker-price-change--fall {
-  color: var(--band-brutal);
-  background: color-mix(in srgb, var(--band-brutal) 12%, transparent);
+  color: var(--band-red);
+  background: color-mix(in srgb, var(--band-red) 12%, transparent);
 }
 
 .ranker-price-change--stable {
@@ -3589,19 +3691,19 @@
 }
 
 .planner-price-warning--buy-now {
-  color: var(--band-great);
-  background: color-mix(in srgb, var(--band-great) 15%, transparent);
-  border: 1px solid color-mix(in srgb, var(--band-great) 35%, transparent);
+  color: var(--band-dark-green);
+  background: color-mix(in srgb, var(--band-dark-green) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--band-dark-green) 35%, transparent);
 }
 
 .planner-price-warning--rise {
-  color: var(--band-good);
-  background: color-mix(in srgb, var(--band-good) 12%, transparent);
+  color: var(--band-green);
+  background: color-mix(in srgb, var(--band-green) 12%, transparent);
 }
 
 .planner-price-warning--fall {
-  color: var(--band-brutal);
-  background: color-mix(in srgb, var(--band-brutal) 12%, transparent);
+  color: var(--band-red);
+  background: color-mix(in srgb, var(--band-red) 12%, transparent);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -4199,9 +4301,9 @@
 }
 
 .fx-status--live {
-  background: var(--band-good-bg);
-  border-color: var(--band-good);
-  color: var(--band-good);
+  background: var(--band-green-bg);
+  border-color: var(--band-green);
+  color: var(--band-green);
 }
 
 .fx-status--upcoming {
@@ -4525,9 +4627,9 @@
   background: var(--band-neutral);
 }
 
-.fx-pip--w { background: var(--band-good); }
+.fx-pip--w { background: var(--band-green); }
 .fx-pip--d { background: var(--band-neutral); }
-.fx-pip--l { background: var(--band-brutal); }
+.fx-pip--l { background: var(--band-red); }
 
 /* ─── Team pane ──────────────────────────────────────────────────────────── */
 
@@ -4715,9 +4817,9 @@
 
 /* The three result tiles borrow band colour so the split reads at a glance:
    team A wins, draws, team B wins (CONVENTIONS.md §5.2 colours). */
-.fx-h2h-tile--a { border-color: var(--band-good);    background: var(--band-good-bg); }
+.fx-h2h-tile--a { border-color: var(--band-green);    background: var(--band-green-bg); }
 .fx-h2h-tile--d { border-color: var(--band-neutral); background: var(--band-neutral-bg); }
-.fx-h2h-tile--b { border-color: var(--band-tough);   background: var(--band-tough-bg); }
+.fx-h2h-tile--b { border-color: var(--band-amber);   background: var(--band-amber-bg); }
 
 .fx-h2h-tile__value {
   font-family: var(--font-mono);
@@ -4881,8 +4983,8 @@
    the same green .fx-pip--w uses for a win. See base.css. */
 .fx-zone-key--ucl  { background: var(--band-deep-blue); }
 .fx-zone-key--uel  { background: var(--band-orange); }
-.fx-zone-key--uecl { background: var(--band-good); }
-.fx-zone-key--rel  { background: var(--band-brutal); }
+.fx-zone-key--uecl { background: var(--band-green); }
+.fx-zone-key--rel  { background: var(--band-red); }
 
 /* Below this width .fx-table-wrap scrolls rather than crushing 13 columns. */
 .fx-league { min-width: 820px; }
@@ -4925,8 +5027,8 @@ th.fx-league__num { text-align: right; }
    a border-collapse table is unreliable across the first-cell boundary. */
 .fx-league__row--ucl  .fx-league__pos { box-shadow: inset 3px 0 0 var(--band-deep-blue); }
 .fx-league__row--uel  .fx-league__pos { box-shadow: inset 3px 0 0 var(--band-orange); }
-.fx-league__row--uecl .fx-league__pos { box-shadow: inset 3px 0 0 var(--band-good); }
-.fx-league__row--rel  .fx-league__pos { box-shadow: inset 3px 0 0 var(--band-brutal); }
+.fx-league__row--uecl .fx-league__pos { box-shadow: inset 3px 0 0 var(--band-green); }
+.fx-league__row--rel  .fx-league__pos { box-shadow: inset 3px 0 0 var(--band-red); }
 
 .fx-league__move {
   width: 3ch;
@@ -4934,9 +5036,9 @@ th.fx-league__num { text-align: right; }
   font-size: var(--font-size-xs);
 }
 
-.fx-league__move--up   { color: var(--band-good); }
+.fx-league__move--up   { color: var(--band-green); }
 .fx-league__move--flat { color: var(--color-muted); }
-.fx-league__move--down { color: var(--band-brutal); }
+.fx-league__move--down { color: var(--band-red); }
 
 .fx-league__team {
   min-width: 18ch;
@@ -5034,11 +5136,11 @@ img.fx-crest {
 /* Official FPL 1–5 difficulty on the Next column. Direction is opposite to the
    Gaffer IQ score — 1 is easiest — so the band mapping is reversed here
    (CONVENTIONS.md §5.2, and see .fdr-chip which does the same job elsewhere). */
-.fx-fdr--1 { border-color: var(--band-great);   color: var(--band-great);   }
-.fx-fdr--2 { border-color: var(--band-good);    color: var(--band-good);    }
+.fx-fdr--1 { border-color: var(--band-dark-green);   color: var(--band-dark-green);   }
+.fx-fdr--2 { border-color: var(--band-green);    color: var(--band-green);    }
 .fx-fdr--3 { border-color: var(--band-neutral); color: var(--band-neutral); }
-.fx-fdr--4 { border-color: var(--band-tough);   color: var(--band-tough);   }
-.fx-fdr--5 { border-color: var(--band-brutal);  color: var(--band-brutal);  }
+.fx-fdr--4 { border-color: var(--band-amber);   color: var(--band-amber);   }
+.fx-fdr--5 { border-color: var(--band-red);  color: var(--band-red);  }
 
 /* Result box beside each team on a completed fixture. Sits on the inside edge
    of each side so the pair mirrors around the scoreline (.fx-side--away is
@@ -5058,9 +5160,9 @@ img.fx-crest {
   line-height: 1;
 }
 
-.fx-result--w { background: var(--band-good-bg);    border-color: var(--band-good);    color: var(--band-good);    }
+.fx-result--w { background: var(--band-green-bg);    border-color: var(--band-green);    color: var(--band-green);    }
 .fx-result--d { background: var(--band-neutral-bg); border-color: var(--band-neutral); color: var(--color-muted);  }
-.fx-result--l { background: var(--band-brutal-bg);  border-color: var(--band-brutal);  color: var(--band-brutal);  }
+.fx-result--l { background: var(--band-red-bg);  border-color: var(--band-red);  color: var(--band-red);  }
 
 /* ─── Match timeline (Understat) ─────────────────────────────────────────────
    Two sides split by a central spine: home events left of it, away events
@@ -5179,8 +5281,8 @@ img.fx-crest {
   background: var(--color-surface-raised);
 }
 
-.fx-tl__player--off { color: var(--band-brutal); font-weight: 400; }
-.fx-tl__player--on  { color: var(--band-good); }
+.fx-tl__player--off { color: var(--band-red); font-weight: 400; }
+.fx-tl__player--on  { color: var(--band-green); }
 .fx-tl__arrow       { color: var(--color-muted); }
 
 /* Available to any content that must exist for assistive tech but not on
@@ -5298,8 +5400,8 @@ img.fx-crest {
   white-space: nowrap;
 }
 
-.fx-xi__swap--off { color: var(--band-brutal); }
-.fx-xi__swap--on  { color: var(--band-good); }
+.fx-xi__swap--off { color: var(--band-red); }
+.fx-xi__swap--on  { color: var(--band-green); }
 
 .fx-xi__mins {
   font-family: var(--font-mono);
@@ -5473,7 +5575,7 @@ img.fx-crest {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--band-good);
+  background: var(--band-green);
   flex-shrink: 0;
 }
 
@@ -5535,7 +5637,7 @@ img.fx-crest {
   transform: translateX(-50%);
   width: min(560px, 88vw);
   padding: var(--space-7);
-  border-left: 3px solid var(--band-brutal);
+  border-left: 3px solid var(--band-red);
   box-shadow: var(--shadow-raised);
   z-index: 3;
 }
@@ -5582,17 +5684,17 @@ img.fx-crest {
 }
 
 .landing-pill--brutal {
-  background: var(--band-brutal-bg);
-  border-color: var(--band-brutal);
-  color: var(--band-brutal);
+  background: var(--band-red-bg);
+  border-color: var(--band-red);
+  color: var(--band-red);
   padding: var(--space-3) var(--space-5);
   min-width: 76px;
 }
 
 .landing-pill--great {
-  background: var(--band-great-bg);
-  border-color: var(--band-great);
-  color: var(--band-great);
+  background: var(--band-dark-green-bg);
+  border-color: var(--band-dark-green);
+  color: var(--band-dark-green);
   padding: var(--space-2) var(--space-3);
   min-width: 52px;
 }
@@ -5648,7 +5750,7 @@ img.fx-crest {
 .landing-metric__fill {
   height: 100%;
   border-radius: var(--radius-sm);
-  background: var(--band-brutal);
+  background: var(--band-red);
 }
 
 /* Fixed widths, not computed ones — this card is a worked example, so the fill
@@ -5683,7 +5785,7 @@ img.fx-crest {
   width: 150px;
   padding: var(--space-3);
   border-style: var(--estimated-border-style);
-  border-color: var(--band-tough);
+  border-color: var(--band-amber);
   box-shadow: var(--shadow-float-soft);
   opacity: 0.92;
   animation: landing-float-3 7s ease-in-out infinite;
@@ -5749,16 +5851,16 @@ img.fx-crest {
 }
 
 .landing-chip--good {
-  background: var(--band-good-bg);
-  color: var(--band-good);
+  background: var(--band-green-bg);
+  color: var(--band-green);
 }
 
 /* Dashed + amber, matching how the app flags a score below the confidence
    floor everywhere else. */
 .landing-chip--estimated {
-  border: 1px solid var(--band-tough);
+  border: 1px solid var(--band-amber);
   border-style: var(--estimated-border-style);
-  color: var(--band-tough);
+  color: var(--band-amber);
 }
 
 .landing-chip--mid {
@@ -6066,8 +6168,8 @@ img.fx-crest {
   margin-bottom: var(--space-3);
 }
 
-.planner-verdict--dominant { border-left-color: var(--band-great); }
-.planner-verdict--clear    { border-left-color: var(--band-good); }
+.planner-verdict--dominant { border-left-color: var(--band-dark-green); }
+.planner-verdict--clear    { border-left-color: var(--band-green); }
 .planner-verdict--close    { border-left-color: var(--band-neutral); }
 .planner-verdict--estimated { border-left-style: dashed; }
 
@@ -6177,7 +6279,7 @@ img.fx-crest {
   padding: var(--space-1) 0;
 }
 
-.planner-verdict__trigger-mark { color: var(--band-brutal); font-weight: 700; }
+.planner-verdict__trigger-mark { color: var(--band-red); font-weight: 700; }
 
 /* ─── Transfer Planner: lens boards ────────────────────────────────────────── */
 
@@ -6285,8 +6387,8 @@ img.fx-crest {
   background: var(--color-bg);
 }
 
-.planner-swap-row__badge--urgent    { color: var(--band-brutal); font-weight: 700; }
-.planner-swap-row__badge--xi        { color: var(--band-good); }
+.planner-swap-row__badge--urgent    { color: var(--band-red); font-weight: 700; }
+.planner-swap-row__badge--xi        { color: var(--band-green); }
 /* --estimated removed: the estimated signal now sits on the value itself
    (.planner-swap-row__value--estimated) rather than in its own column. */
 
@@ -6323,8 +6425,8 @@ img.fx-crest {
   background: var(--color-bg);
 }
 
-.dash-squad-slot__diff--benched { color: var(--band-good); }
-.dash-squad-slot__diff--started { color: var(--band-tough); }
+.dash-squad-slot__diff--benched { color: var(--band-green); }
+.dash-squad-slot__diff--started { color: var(--band-amber); }
 .dash-squad-slot__diff--armband { color: var(--band-orange); font-weight: 700; }
 
 /* WHERE THIS LIVES, AND WHY IT IS LAST IN THE FILE.
@@ -6644,14 +6746,19 @@ img.fx-crest {
   opacity: 0;
 }
 
-/* A "loaded" week (SEASON_LOADED_MIN_GREAT+ great-band matchups) gets a
-   green glow so it stands out while scrolling past, before any column is
-   opened. */
+/* A "loaded" week (SEASON_LOADED_MIN_GREAT+ matchups at 75+ — see
+   isLoadedWeek in engine/season.js, which is a fixed number and not the top
+   band's foot) gets a green glow so it stands out while scrolling past,
+   before any column is opened. */
+/* Primitive green, not --band-good: "this week is loaded" is a property of the
+   week, not a 57-64 rating, and --band-good is blue. Same reasoning for every
+   primitive below (the top-five dots, the key's swatches for them) — see
+   base.css, "Band colours: PRIMITIVES". */
 .season-gw--hot {
-  border-color: var(--band-good);
+  border-color: var(--band-green);
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--band-good) 30%, transparent),
-    0 0 13px color-mix(in srgb, var(--band-good) 20%, transparent);
+    0 0 0 1px color-mix(in srgb, var(--band-green) 30%, transparent),
+    0 0 13px color-mix(in srgb, var(--band-green) 20%, transparent);
 }
 
 .season-gw__n {
@@ -6666,7 +6773,7 @@ img.fx-crest {
 }
 
 .season-gw--hot .season-gw__n {
-  color: var(--band-good);
+  color: var(--band-green);
 }
 
 .season-gw__summary {
@@ -6703,21 +6810,25 @@ img.fx-crest {
   flex: none;
 }
 
-/* Heavily favoured gets --band-elite (base.css), not --band-great — see that
-   token's own comment. --band-great stays the shared cross-app "great" colour
-   (CONVENTIONS.md §5.2); this is a local emphasis so the top band actually
-   reads as the strongest tile at 14px tall, instead of quietly losing to
-   --good's brighter green beside it. The glow is soft (small blur, low
-   opacity) — this is a 14px tile in a 38-column ribbon, not a hero element. */
-.season-gw__tile--great {
-  background: var(--band-elite-bg);
-  border: 1px solid var(--band-elite);
-  box-shadow: 0 0 5px color-mix(in srgb, var(--band-elite) 60%, transparent);
+/* The gold glow used to live on --great, as a local emphasis making the old
+   scale's top band read as strongest at 14px tall. The seven-tier scale gives
+   that job a band of its own (--excellent, 80+), so the treatment moved up one
+   rung and --great is now simply the scale's green. The glow stays soft (small
+   blur, low opacity) — this is a 14px tile in a 38-column ribbon, not a hero
+   element. A tile is banded off the FAVOURED side's score, which is never
+   below 50, so the three bottom tiers below never appear on the ribbon; they
+   are here because the expanded panel's fixture rows share this scale. */
+.season-gw__tile--excellent {
+  background: var(--band-excellent-bg);
+  border: 1px solid var(--band-excellent);
+  box-shadow: 0 0 5px color-mix(in srgb, var(--band-excellent) 60%, transparent);
 }
+.season-gw__tile--great   { background: var(--band-great-bg);   border: 1px solid var(--band-great); }
 .season-gw__tile--good    { background: var(--band-good-bg);    border: 1px solid var(--band-good); }
 .season-gw__tile--neutral { background: var(--band-neutral-bg); border: 1px solid var(--color-border); }
 .season-gw__tile--tough   { background: var(--band-tough-bg);   border: 1px solid var(--band-tough); }
 .season-gw__tile--brutal  { background: var(--band-brutal-bg);  border: 1px solid var(--band-brutal); }
+.season-gw__tile--extreme { background: var(--band-extreme-bg); border: 1px solid var(--band-extreme); }
 
 /* Double gameweek: rides alongside a band modifier above (columnHTML emits
    both classes on the same tile), so this only adds the accent ring. */
@@ -6732,7 +6843,7 @@ img.fx-crest {
 .season-gw__tile--postponed {
   background: var(--band-neutral-bg);
   border: 1px solid var(--color-border);
-  outline: 1px solid var(--band-brutal);
+  outline: 1px solid var(--band-red);
   outline-offset: 1px;
   opacity: 0.75;
 }
@@ -6753,7 +6864,7 @@ img.fx-crest {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--band-good);
+  background: var(--band-green);
 }
 
 /* Matches .season-key__swatch--standout's treatment so the ribbon's standout
@@ -6827,7 +6938,7 @@ img.fx-crest {
 
 .season-rail__bar--wildcard      { background: var(--band-deep-blue); }
 .season-rail__bar--triplecaptain { background: var(--band-orange); }
-.season-rail__bar--freehit       { background: var(--band-tough); }
+.season-rail__bar--freehit       { background: var(--band-amber); }
 
 /* Bridges a chip window's run across the ribbon's flex gap with an overlay,
    NOT a negative margin. A negative margin consumes layout width, which
@@ -6896,14 +7007,15 @@ img.fx-crest {
   display: inline-block;
 }
 
-/* Matches .season-gw__tile--great's gold above, not --band-great — the key
-   would otherwise lie about what the ribbon's top-band tiles actually look
+/* Each swatch matches its .season-gw__tile--* twin above exactly, glow
+   included — the key would otherwise lie about what the ribbon's tiles look
    like. */
-.season-key__swatch--great {
-  background: var(--band-elite-bg);
-  border: 1px solid var(--band-elite);
-  box-shadow: 0 0 5px color-mix(in srgb, var(--band-elite) 60%, transparent);
+.season-key__swatch--excellent {
+  background: var(--band-excellent-bg);
+  border: 1px solid var(--band-excellent);
+  box-shadow: 0 0 5px color-mix(in srgb, var(--band-excellent) 60%, transparent);
 }
+.season-key__swatch--great { background: var(--band-great-bg);   border: 1px solid var(--band-great); }
 .season-key__swatch--good  { background: var(--band-good-bg);    border: 1px solid var(--band-good); }
 .season-key__swatch--even  { background: var(--band-neutral-bg); border: 1px solid var(--color-border); }
 
@@ -6914,8 +7026,8 @@ img.fx-crest {
 }
 
 .season-key__swatch--postponed {
-  background: var(--band-brutal-bg);
-  outline: 1px solid var(--band-brutal);
+  background: var(--band-red-bg);
+  outline: 1px solid var(--band-red);
   outline-offset: -1px;
 }
 
@@ -6932,7 +7044,7 @@ img.fx-crest {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--band-good);
+  background: var(--band-green);
 }
 
 .season-key__swatch--standout {
@@ -6953,11 +7065,11 @@ img.fx-crest {
    reads as a bar rather than a tile. */
 .season-key__swatch--wildcard      { width: 24px; height: 7px; background: var(--band-deep-blue); }
 .season-key__swatch--triplecaptain { width: 24px; height: 7px; background: var(--band-orange); }
-.season-key__swatch--freehit       { width: 24px; height: 7px; background: var(--band-tough); }
+.season-key__swatch--freehit       { width: 24px; height: 7px; background: var(--band-amber); }
 
 .season-key__swatch--loaded {
-  border: 1px solid var(--band-good);
-  box-shadow: 0 0 8px color-mix(in srgb, var(--band-good) 50%, transparent);
+  border: 1px solid var(--band-green);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--band-green) 50%, transparent);
 }
 
 /* ─── Expand/collapse panel (Task 10) ────────────────────────────────────────
@@ -7055,19 +7167,43 @@ img.fx-crest {
 .season-fxrow--neutral { background: var(--band-neutral-bg); }
 .season-fxrow--tough   { background: var(--band-tough-bg); }
 .season-fxrow--brutal  { background: var(--band-brutal-bg); }
+/* The top tier carries its gold edge and glow here too — this row is the same
+   fixture as the ribbon tile that glows above it, and the panel was the one
+   place that treatment was missing. `outline` rather than `border`, matching
+   --pp below: .season-fxrow has no border, so a real one would make only the
+   80+ rows 2px taller and break the panel's row rhythm. The score lifts to
+   silver for the reason every other 80+ number does — see
+   --band-excellent-ink in base.css. The other six tiers stay flat fills; a
+   panel where every row glowed would say nothing. */
+.season-fxrow--excellent {
+  background: var(--band-excellent-bg);
+  outline: 1px solid var(--band-excellent);
+  outline-offset: -1px;
+  box-shadow: 0 0 7px color-mix(in srgb, var(--band-excellent) 40%, transparent);
+}
+
+.season-fxrow--excellent .season-sc {
+  color: var(--band-excellent-ink);
+  text-shadow:
+    0 0 6px color-mix(in srgb, var(--band-excellent-ink) 55%, transparent),
+    0 0 12px color-mix(in srgb, var(--band-excellent) 50%, transparent);
+}
+
+.season-fxrow--extreme   { background: var(--band-extreme-bg); }
 
 .season-fxrow--pp {
-  background: var(--band-brutal-bg);
-  outline: 1px solid var(--band-brutal);
+  background: var(--band-red-bg);
+  outline: 1px solid var(--band-red);
   outline-offset: -1px;
 }
 
 .season-fxrow--pp .season-side__t { color: var(--color-muted); }
 
+/* Primitive red — "postponed" is a fact about the fixture, not a rating. */
 .season-pptag {
   font-size: 0.53125rem;
   font-weight: 700;
-  color: var(--band-brutal);
+  color: var(--band-red);
   letter-spacing: 0.04em;
 }
 

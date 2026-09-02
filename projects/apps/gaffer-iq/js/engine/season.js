@@ -8,7 +8,8 @@
  */
 
 import {
-  SEASON_TOP_MATCHUPS, SEASON_TOP_PLAYERS, SEASON_LOADED_MIN_GREAT, BANDS,
+  SEASON_TOP_MATCHUPS, SEASON_TOP_PLAYERS, SEASON_LOADED_MIN_GREAT,
+  SEASON_LOADED_MIN_VALUE,
   CHIP_RESET_AFTER_GW, WC_WINDOW,
 } from '../config.js';
 import { scoreFixture, calcAvgPointsPerGw, calcExpectedPoints } from './composite.js';
@@ -67,13 +68,21 @@ export function buildGameweekMatchups(gw, ctx, opts = {}) {
 
 /**
  * Is this a week worth waiting for? True once SEASON_LOADED_MIN_GREAT of the
- * week's top matchups reach the `great` band. One blowout is an ordinary week
- * with a good fixture in it; several together is a different thing.
+ * week's top matchups clear SEASON_LOADED_MIN_VALUE (75). One blowout is an
+ * ordinary week with a good fixture in it; several together is a different
+ * thing.
+ *
+ * The bar is a NUMBER, not "whatever the top band starts at" — it stayed put
+ * when the tiles moved onto the seven-tier scale, where 75 sits inside 'great'
+ * (65-79) rather than at its foot. Following the band would have quietly
+ * loosened the bar to 65 and lit up half the season. So a loaded week is not
+ * "two great-looking tiles"; it is two matchups at 75+, which is why the glow
+ * lives on the column and not on the tiles.
  *
  * @param {Array<object>} matchups  buildGameweekMatchups output
  */
 export function isLoadedWeek(matchups) {
-  return matchups.filter(m => !m.postponed && m.value >= BANDS.great).length
+  return matchups.filter(m => !m.postponed && m.value >= SEASON_LOADED_MIN_VALUE).length
     >= SEASON_LOADED_MIN_GREAT;
 }
 

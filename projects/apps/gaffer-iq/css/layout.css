@@ -168,10 +168,10 @@ body:has(.landing.is-active) .app-error-banner {
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
-  background: var(--band-brutal-bg);
-  border: 1px solid var(--band-brutal);
+  background: var(--band-red-bg);
+  border: 1px solid var(--band-red);
   border-radius: var(--radius-md);
-  color: var(--band-brutal);
+  color: var(--band-red);
   font-size: var(--font-size-sm);
   margin-bottom: var(--space-4);
 }
@@ -186,9 +186,9 @@ body:has(.landing.is-active) .app-error-banner {
 
 .app-error-banner__retry {
   background: none;
-  border: 1px solid var(--band-brutal);
+  border: 1px solid var(--band-red);
   border-radius: var(--radius-sm);
-  color: var(--band-brutal);
+  color: var(--band-red);
   cursor: pointer;
   font-size: var(--font-size-sm);
   font-family: var(--font-sans);
@@ -198,7 +198,7 @@ body:has(.landing.is-active) .app-error-banner {
 }
 
 .app-error-banner__retry:hover {
-  background: var(--band-brutal-bg);
+  background: var(--band-red-bg);
 }
 
 /* ─── Module loading / placeholder ──────────────────────────────────────── */

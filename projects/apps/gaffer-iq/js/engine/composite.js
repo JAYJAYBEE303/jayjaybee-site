@@ -8,7 +8,7 @@
  */
 
 import {
-  WEIGHTS, BANDS, CONFIDENCE_FLOOR, LEAGUE_AVG_STRENGTH,
+  WEIGHTS, BANDS_V2, CONFIDENCE_FLOOR, LEAGUE_AVG_STRENGTH,
   STACK_PIVOT, STACK_CURVE, STACK_MAX_PENALTY, RELATIVE_EDGE_SENSITIVITY,
   HORIZON_DECAY, AGG_METHOD, W_MEAN, W_MIN, BLANK_GW_VALUE, DGW_UPLIFT,
   PROJ_FORM, PROJ_FIXTURE, PROJ_COUNTER, PROJ_MINUTES, EXPECTED_PTS_FIXTURE_SWING,
@@ -239,24 +239,27 @@ export function buildScoreContext(season, opts = {}) {
 }
 
 /**
- * Map a 0–100 value onto its band string. Thresholds come from config (BANDS);
- * never inline a literal here — CSS modifier classes (.score-pill--great etc.)
- * key off this string, so the colour mapping stays single-sourced.
+ * Map a 0–100 value onto its band string — the seven-tier scale (config.js
+ * BANDS_V2). Thresholds come from config; never inline a literal here — CSS
+ * modifier classes (.score-pill--great etc.) key off this string, so the
+ * colour mapping stays single-sourced.
  *
- * Rounds BEFORE comparing against BANDS — every UI surface displays
+ * Rounds BEFORE comparing against the thresholds — every UI surface displays
  * Math.round(value), so banding the raw unrounded value could label a
- * displayed "40" as 'tough' whenever the true value was e.g. 39.6 (< the
- * neutral threshold pre-rounding, but rounds up to display as 40). Rounding
+ * displayed "44" as 'tough' whenever the true value was e.g. 43.6 (< the
+ * neutral threshold pre-rounding, but rounds up to display as 44). Rounding
  * here keeps the label always consistent with the number the user actually
  * sees, at every boundary.
  */
-function bandFromValue(value) {
+export function bandFromValue(value) {
   const rounded = Math.round(value);
-  if (rounded >= BANDS.great)   return 'great';
-  if (rounded >= BANDS.good)    return 'good';
-  if (rounded >= BANDS.neutral) return 'neutral';
-  if (rounded >= BANDS.tough)   return 'tough';
-  return 'brutal';
+  if (rounded >= BANDS_V2.excellent) return 'excellent';
+  if (rounded >= BANDS_V2.great)     return 'great';
+  if (rounded >= BANDS_V2.good)      return 'good';
+  if (rounded >= BANDS_V2.neutral)   return 'neutral';
+  if (rounded >= BANDS_V2.tough)     return 'tough';
+  if (rounded >= BANDS_V2.brutal)    return 'brutal';
+  return 'extreme';
 }
 
 // ─── §8.6  Stacking penalty ───────────────────────────────────────────────────
@@ -601,7 +604,8 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
  * @param {object} ctx      output of buildScoreContext
  * @returns {CompositeScore}
  *   value: 0–100, higher = easier/better fixture for `team`. Direction: higher = better.
- *   band: 'great' | 'good' | 'neutral' | 'tough' | 'brutal' (see BANDS in config).
+ *   band: 'excellent' | 'great' | 'good' | 'neutral' | 'tough' | 'brutal' | 'extreme'
+ *         (see BANDS_V2 in config).
  *   confidence: 0–1; the WEAKER (min) of the two sides' own confidence — the
  *     final value depends on both raw reads, so it can only be as trustworthy
  *     as the less-certain of the two.
@@ -1237,11 +1241,12 @@ export function rankPlayers(players, horizon, ctx) {
  *
  * Precedence (most to least specific), each tier evaluated in order and the
  * first match wins:
- *   1. 'positionElite'    — positionIndex < RANK_ELITE_COUNT_BY_POS[position]
- *   2. 'positionStrong'   — positionIndex < RANK_STRONG_COUNT_BY_POS[position]
- *   3. 'topPercentile'    — index < poolSize * RANK_TOP_PERCENTILE
- *   4. 'bottomPercentile' — index >= poolSize * (1 - RANK_BOTTOM_PERCENTILE)
- *   5. 'midPercentile'    — everyone else
+ *   1. 'positionBest'     — positionIndex === 0
+ *   2. 'positionElite'    — positionIndex < RANK_ELITE_COUNT_BY_POS[position]
+ *   3. 'positionStrong'   — positionIndex < RANK_STRONG_COUNT_BY_POS[position]
+ *   4. 'topPercentile'    — index < poolSize * RANK_TOP_PERCENTILE
+ *   5. 'bottomPercentile' — index >= poolSize * (1 - RANK_BOTTOM_PERCENTILE)
+ *   6. 'midPercentile'    — everyone else
  * A position-elite player is always also position-strong (the elite count is
  * always ≤ the strong count for every position) — elite is checked first
  * specifically because it is the more exclusive, "definitely worth squad
@@ -1275,17 +1280,66 @@ export function rankPlayers(players, horizon, ctx) {
  * @param {number} poolSize       total size of the pool `index` was ranked within
  * @param {number} positionIndex  0-based rank among players of the SAME position only
  * @param {string} position       the player's position (GKP/DEF/MID/FWD)
- * @returns {'positionElite'|'positionStrong'|'topPercentile'|'bottomPercentile'|'midPercentile'|null}
+ * MODEL: 'positionBest' has no config constant because it has no threshold to
+ * tune — it is literally rank 1, so there are always exactly four of them on
+ * the board (one per position) however the pool moves. That fixed scarcity is
+ * the whole signal, and is why it earns the gold treatment the 0-100 scale
+ * reserves for its top tier: a count that cannot inflate.
+ *
+ * @returns {'positionBest'|'positionElite'|'positionStrong'|'topPercentile'|'bottomPercentile'|'midPercentile'|null}
  */
 export function calcRankTier(index, poolSize, positionIndex, position) {
   const eliteCount  = RANK_ELITE_COUNT_BY_POS[position]  ?? 0;
   const strongCount = RANK_STRONG_COUNT_BY_POS[position] ?? 0;
+  if (positionIndex === 0)         return 'positionBest';
   if (positionIndex < eliteCount)  return 'positionElite';
   if (positionIndex < strongCount) return 'positionStrong';
   if (poolSize <= 0 || index < 0 || index >= poolSize) return null;
   if (index < poolSize * RANK_TOP_PERCENTILE)           return 'topPercentile';
   if (index >= poolSize * (1 - RANK_BOTTOM_PERCENTILE)) return 'bottomPercentile';
   return 'midPercentile';
+}
+
+/**
+ * Rank an UNSORTED row array by an arbitrary metric and return the tiers as a
+ * lookup, for a column that is not the headline score. Same tiers, same
+ * per-position logic and the same full-pool rule as `attachRankTiers` — the
+ * only things that vary are which number is being ranked and which end of it
+ * is good.
+ *
+ * `ascending` exists for metrics where LOWER wins: Cost/Pt is £ per point, so
+ * the cheapest points in the game belong at the top of that column, not the
+ * bottom. Getting it backwards would not throw — it would quietly gild the
+ * worst player in every position — so the direction is always the caller's
+ * explicit choice, never inferred from the numbers.
+ *
+ * The pool is the rows that HAVE the metric, not every row passed in, so the
+ * percentile tiers stay honest: if only ~200 of ~700 players hold a Cost/Pt,
+ * "bottom 40%" has to mean 40% of those 200.
+ *
+ * @param {{player: Player, score: object}[]} rows  any order
+ * @param {(row: object) => number|null} valueOf    the metric to rank on
+ * @param {{ascending?: boolean}} [opts]            true when lower is better
+ * @returns {Map<number, string|null>}  playerId -> rankTier; a player with no
+ *   value for this metric is absent from the map entirely
+ */
+export function rankTierMapBy(rows, valueOf, { ascending = false } = {}) {
+  const ranked = [];
+  for (const row of rows) {
+    const v = valueOf(row);
+    // A row with no value on this metric is not last, it is ABSENT: a player
+    // with no points has no Cost/Pt at all, and ranking them worst would paint
+    // a colour onto a cell that reads "—". They leave the pool entirely.
+    if (typeof v !== 'number' || !Number.isFinite(v)) continue;
+    ranked.push({ row, v });
+  }
+  ranked.sort((a, b) => (ascending ? a.v - b.v : b.v - a.v));
+
+  const map = new Map();
+  for (const r of attachRankTiers(ranked.map(x => x.row))) {
+    if (r.player?.id != null) map.set(r.player.id, r.rankTier);
+  }
+  return map;
 }
 
 /**

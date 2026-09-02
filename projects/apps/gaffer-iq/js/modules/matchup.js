@@ -15,10 +15,12 @@
 
 import { store } from '../store.js';
 import {
-  BANDS, HORIZONS, WEIGHTS, FORM_WINDOW_GWS, CHANNEL_MATURITY_FULL_MATCHES,
+  HORIZONS, WEIGHTS, FORM_WINDOW_GWS, CHANNEL_MATURITY_FULL_MATCHES,
   H2H_MEETING_WINDOW, CHIP_RESET_AFTER_GW,
 } from '../config.js';
-import { buildScoreContext, scoreFixture, scoreOverHorizon } from '../engine/composite.js';
+import {
+  buildScoreContext, scoreFixture, scoreOverHorizon, bandFromValue,
+} from '../engine/composite.js';
 import {
   calcIndividualDuels, calcCounterMatchupMirrored, duelsForPairing,
 } from '../engine/counter.js';
@@ -260,17 +262,6 @@ function esc(str) {
 }
 
 /**
- * Map a 0–100 value to a band string, reading thresholds from config so this
- * render helper stays in sync with the engine. Not analytical — display only.
- */
-function bandFromValue(v) {
-  if (v >= BANDS.great)   return 'great';
-  if (v >= BANDS.good)    return 'good';
-  if (v >= BANDS.neutral) return 'neutral';
-  if (v >= BANDS.tough)   return 'tough';
-  return 'brutal';
-}
-
 /**
  * Build a fresh score context from the current store state.
  * Passes all cached player summaries so calcPlayerForm uses real per-GW data
@@ -436,7 +427,7 @@ function navScoreChip(team, fixture, ctx) {
   if (!fixtureScoreSettled(fixture)) return skeletonChip('gw-nav__score');
   const score = scoreFixture(team, fixture, ctx);
   const estClass = score.provisional ? ' score-chip--estimated' : '';
-  return `<span class="score-chip score-chip--${esc(score.band)}${estClass} gw-nav__score"
+  return `<span class="score-chip score-chip--${esc(bandFromValue(score.value))}${estClass} gw-nav__score"
                 title="${esc(`${team.name}'s Gaffer IQ score for this fixture`)}">${Math.round(score.value)}</span>`;
 }
 
@@ -859,7 +850,7 @@ function buildPerGwStrip(team, perGw, pending = []) {
 
   const slotHtml = slots.map(slot => {
     const cells = slot.fixtures.map(entry => {
-      const bandClass  = entry.isBlank ? 'neutral' : entry.band;
+      const bandClass  = entry.isBlank ? 'neutral' : bandFromValue(entry.value);
       const estClass   = (!entry.isBlank && entry.provisional) ? ' pgw-cell--estimated' : '';
       const blkClass   = entry.isBlank ? ' pgw-cell--blank' : '';
       const tbcClass   = entry.provisionalKickoff ? ' pgw-cell--tbc' : '';
@@ -954,7 +945,7 @@ function buildCard(team, venue, score, fdr, horizonScore, horizon, duels, defend
   // Band colour comes off the score, so an unsettled card would otherwise be
   // tinted by a number it is not yet showing — and would re-tint when the real
   // one landed. Neutral until settled: the card states its verdict once.
-  card.className = `matchup-card matchup-card--${settled ? score.band : 'neutral'}`;
+  card.className = `matchup-card matchup-card--${settled ? bandFromValue(score.value) : 'neutral'}`;
   if (settled && score.provisional) card.classList.add('matchup-card--provisional');
   if (!settled) card.setAttribute('aria-busy', 'true');
 
@@ -971,7 +962,8 @@ function buildCard(team, venue, score, fdr, horizonScore, horizon, duels, defend
   // reader can see which gameweeks are still landing.
   const horizonSettled = showHorizonSection
     && horizonScore.perGw.every(entry => entry.isBlank || perGwEntrySettled(team, entry));
-  const horizonBand        = horizonSettled ? (horizonScore?.band ?? 'neutral') : 'neutral';
+  const horizonBand        = horizonSettled && horizonScore
+    ? bandFromValue(horizonScore.value) : 'neutral';
   const horizonValue       = horizonScore ? Math.round(horizonScore.value) : '—';
   const horizonChip        = horizonSettled
     ? `<span class="score-chip score-chip--${esc(horizonBand)} horizon-summary__score">${horizonValue}</span>`
@@ -1004,9 +996,9 @@ function buildCard(team, venue, score, fdr, horizonScore, horizon, duels, defend
 
     <div class="matchup-card__score-row">
       ${settled ? `
-      <div class="score-pill score-pill--${esc(score.band)}${provisionalClass}">
+      <div class="score-pill score-pill--${esc(bandFromValue(score.value))}${provisionalClass}">
         <span class="score-pill__value">${Math.round(score.value)}</span>
-        <span class="score-pill__band">${esc(score.band)}</span>
+        <span class="score-pill__band">${esc(bandFromValue(score.value))}</span>
       </div>` : `
       <div class="score-pill skeleton" aria-hidden="true"
            title="Still calculating — waiting on this fixture's counter-matchup data">
@@ -1567,7 +1559,7 @@ function buildPairingPlayers(duels, pairingKey, perspective) {
           <span class="individual-duel__role">${esc(second.role)}</span>
           <span class="individual-duel__form">${secondForm}</span>
         </span>
-        <span class="score-chip score-chip--${esc(d.band)} individual-duel__score">${Math.round(d.duelScore)}</span>
+        <span class="score-chip score-chip--${esc(bandFromValue(d.duelScore))} individual-duel__score">${Math.round(d.duelScore)}</span>
       </div>
     `.trim();
   }).join('');

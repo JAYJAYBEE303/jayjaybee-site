@@ -25,57 +25,108 @@
   --color-accent:         #58a6ff;
   --color-accent-muted:   rgba(88, 166, 255, 0.10);
 
-  /* --- Score band colours — one definition, used everywhere -------------- */
-  --band-great:    #1f8c48;
-  --band-good:     #3fb950;
-  --band-neutral:  #6e7681;
-  --band-tough:    #d29922;
-  --band-brutal:   #f85149;
-
-  /* --- Full Season strip: a local gold emphasis on --band-great, NOT a sixth
-     band colour (CONVENTIONS.md §5.2 — the five above still mean fixture
-     quality everywhere else in the app). --band-great itself is a dark green,
-     deliberately calmer than --band-good since "heavily favoured" is one tick
-     ABOVE "favoured" on the same scale, not a different signal. But sitting
-     directly beside --band-good's brighter green at 14px tall on the strip's
-     collapsed tiles, that restraint reads as LESS important rather than more.
-     Gold breaks out of the green family entirely so the top band can glow
-     without implying a new band. Checked side by side against --band-tough
-     (#d29922, a duller amber): this is measurably brighter (higher L in HSL)
-     and more saturated, so the two stay clearly distinct even at a glance. */
-  --band-elite: #ffc83d;
-
-  /* --- Rank-relative colour (pool-percentile tiers, NOT a 0-100 band —
-     see FEATURE_ENGINE.md §13). Bottom-50% reuses --band-brutal and the
-     top-15-fixed-count tier reuses --band-great below; light-green is the
-     one genuinely new colour needed, for the top-20%-percentile tier. A
-     soft/desaturated green rather than a true lime — lime read too bright
-     against this dark palette. */
+  /* --- Band colours: PRIMITIVES ------------------------------------------
+     A hue, named after itself and nothing else. Nothing outside this block
+     should reference one directly unless it genuinely means "this colour"
+     rather than "this rating" — the semantic layer below is what components
+     read. The split exists so a scale can be re-pointed — either wholesale
+     (the five-tier scale became seven by editing the semantics below, not
+     every component) or in a scope. A scoped block cannot define --band-good
+     in terms of --band-great: both resolve against the scope's OWN values and
+     the reference goes circular. Every scale therefore reads from this layer,
+     which no scope ever overrides. */
+  --band-dark-green: #1f8c48;
+  --band-green:      #3fb950;
+  --band-blue:       #1f6feb;
+  --band-gold:       #ffc83d;
+  --band-grey:       #6e7681;
+  --band-amber:      #d29922;
+  --band-yellow:     #e3b341;
+  --band-orange:     #f0883e;
+  --band-red:        #f85149;
+  --band-dark-red:   #b62324;
+  /* Not a rating hue — the INK the top tier's digits are set in, on top of its
+     gold. Cooler and brighter than --color-text (#e6edf3) so it reads as
+     silver against a warm ground rather than as ordinary body text that
+     happens to be sitting there. */
+  --band-silver:     #f4f8fd;
+  /* Soft/desaturated rather than a true lime — lime read too bright against
+     this dark palette. */
   --band-light-green: #6fcf78;
 
-  /* --- Competition-zone colour (league table stripes and legend, NOT a
-     0-100 band — see components.css .fx-zone-key). The three European
-     places used to borrow --band-great, --band-good and --band-light-green,
-     which put three greens in one legend and read as a severity scale
-     rather than three separate competitions. Deep blue and orange are the
-     two colours the palette was missing; Conference keeps a green and takes
-     --band-good, the same green the form column uses for a win, so the
-     table carries one green meaning "good" instead of three meaning
-     nothing in particular. Held to the --band-… prefix per CONVENTIONS.md
-     §5.3 rather than opening a new one. Same Primer steps as the greens
-     they sit beside: blue-6 against --band-great's green-6, orange-4
-     against --band-good's green-4. */
-  --band-deep-blue: #1f6feb;
-  --band-orange:    #f0883e;
-
-  /* --- Band background tints (card/chip backgrounds) --------------------- */
-  --band-great-bg:       rgba(31, 140, 72,  0.15);
-  --band-good-bg:        rgba(63, 185, 80,  0.12);
-  --band-neutral-bg:     rgba(110, 118, 129, 0.10);
-  --band-tough-bg:       rgba(210, 153, 34,  0.12);
-  --band-elite-bg:       rgba(255, 200, 61,  0.16);
-  --band-brutal-bg:      rgba(248, 81,  73,  0.12);
+  /* Tints, for the fill behind a chip/tile whose text or border takes the
+     solid hue above. Alpha varies by hue, not by accident: the darker the
+     colour the more of it is needed before the tint reads at all. */
+  --band-dark-green-bg:  rgba(31, 140, 72,  0.15);
+  --band-green-bg:       rgba(63, 185, 80,  0.12);
+  --band-blue-bg:        rgba(31, 111, 235, 0.16);
+  --band-gold-bg:        rgba(255, 200, 61, 0.16);
+  --band-grey-bg:        rgba(110, 118, 129, 0.10);
+  --band-amber-bg:       rgba(210, 153, 34, 0.12);
+  --band-yellow-bg:      rgba(227, 179, 65, 0.13);
+  --band-orange-bg:      rgba(240, 136, 62, 0.13);
+  --band-red-bg:         rgba(248, 81,  73, 0.12);
+  --band-dark-red-bg:    rgba(182, 35,  36, 0.20);
   --band-light-green-bg: rgba(111, 207, 120, 0.13);
+
+  /* --- Band colours: SEMANTICS -------------------------------------------
+     What a rating MEANS, one definition used everywhere (CONVENTIONS.md
+     §5.2). Seven tiers, the whole app (config.js BANDS_V2):
+
+       80+     excellent   gold        65-79  great    green
+       57-64   good        blue        44-56  neutral  grey
+       36-43   tough       yellow      21-35  brutal   orange
+       0-20    extreme     dark red
+
+     These are re-pointable: a surface that needs a tier in a different hue
+     overrides the SEMANTIC token in its own scope rather than writing a rule
+     per component. That is only possible because every value here reads from
+     the primitive layer above, which no scope overrides. Anything that borrows
+     a band colour for something that is NOT a rating must read a primitive
+     instead, or it silently changes meaning with the scale. */
+  --band-great:   var(--band-green);
+  --band-good:    var(--band-blue);
+  --band-neutral: var(--band-grey);
+  --band-tough:   var(--band-yellow);
+  --band-brutal:  var(--band-orange);
+
+  --band-great-bg:   var(--band-green-bg);
+  --band-good-bg:    var(--band-blue-bg);
+  --band-neutral-bg: var(--band-grey-bg);
+  --band-tough-bg:   var(--band-yellow-bg);
+  --band-brutal-bg:  var(--band-orange-bg);
+
+  /* The two tiers the seven-tier scale added at the ends. Gold is deliberately
+     outside the green family: "exceptional" is not "one tick greener than
+     great", and at 14px on the Full Season ribbon a fourth green would simply
+     lose to the third. Checked against --band-yellow beside it — measurably
+     brighter and more saturated, so the two never blur. */
+  --band-excellent:       var(--band-gold);
+  --band-excellent-bg:    var(--band-gold-bg);
+  /* The top tier is the one place the scale splits chrome from ink. Gold on
+     gold is the lowest-contrast text on the page — the tint that makes the
+     tier unmistakable at a glance is the same thing that dims the number
+     inside it, and the number is what is actually being read. So the border,
+     fill and glow stay gold and the digits go silver, lit by their own glow so
+     they read as part of the same lamp rather than as plain white text
+     dropped on top. No other tier needs this: none of the other six put their
+     text on a tint of its own colour at this weight. */
+  --band-excellent-ink: var(--band-silver);
+  --band-extreme:      var(--band-dark-red);
+  --band-extreme-bg:   var(--band-dark-red-bg);
+
+  /* --- Non-rating band colours -------------------------------------------
+     Held to the --band-… prefix per CONVENTIONS.md §5.3 rather than opening a
+     new one, but these are NOT points on the 0-100 scale and must not be
+     re-pointed with it. --band-light-green above is the rank-relative
+     top-20%-percentile tier (FEATURE_ENGINE.md §13); the two below are the
+     league table's Champions and Europa zones (Conference takes --band-good's
+     green, so the table carries one green meaning "good" instead of three
+     meaning nothing in particular). --band-elite lived here too — the Full
+     Season strip's gold — and is gone: the seven-tier scale gave that gold a
+     band of its own, so the strip reads --band-excellent like everything else
+     and the alias had no consumers left. */
+  --band-deep-blue: var(--band-blue);
 
   /* --- Spacing scale (4-point grid) -------------------------------------- */
   --space-1:  4px;
@@ -167,6 +218,7 @@
   --pos-mid: #a371f7;   /* purple    */
   --pos-fwd: #ff9f5b;   /* orange    */
 }
+
 
 body {
   font-family: var(--font-sans);

@@ -21,8 +21,8 @@
  */
 
 import { store }       from '../store.js';
-import { HORIZONS, BANDS, SQUAD_LIMITS, SQUAD_TOTAL } from '../config.js';
-import { buildScoreContext, scorePlayer, rankPlayers, attachRankTiers } from '../engine/composite.js';
+import { HORIZONS, SQUAD_LIMITS, SQUAD_TOTAL } from '../config.js';
+import { buildScoreContext, scorePlayer, rankPlayers, attachRankTiers, bandFromValue } from '../engine/composite.js';
 import { groupPerGwSlots }              from '../engine/fixtures.js';
 import { pickStartingXI }               from '../engine/lineup.js';
 import { fetchLivePoints }               from '../api.js';
@@ -137,6 +137,7 @@ function esc(str) {
  *  existing band colour). Mirrors the identical helper in modules/ranker.js.
  *  See FEATURE_ENGINE.md §13. */
 function rankTierClass(rankTier) {
+  if (rankTier === 'positionBest')     return ' score-chip--rank-gold';
   if (rankTier === 'positionElite')    return ' score-chip--rank-green';
   if (rankTier === 'positionStrong')   return ' score-chip--rank-light-green';
   if (rankTier === 'topPercentile')    return ' score-chip--rank-neutral';
@@ -152,19 +153,6 @@ function rankTierClass(rankTier) {
  */
 function isScoreEstimated(score) {
   return Boolean(score?.breakdown?.form?.estimated || score?.breakdown?.counter?.estimated);
-}
-
-/**
- * Map a 0–100 value to a band string, reading thresholds from config so this
- * render helper stays in sync with the engine. Not analytical — display only.
- * Mirrors matchup.js's bandFromValue (each module keeps its own per CONVENTIONS.md).
- */
-function bandFromValue(v) {
-  if (v >= BANDS.great)   return 'great';
-  if (v >= BANDS.good)    return 'good';
-  if (v >= BANDS.neutral) return 'neutral';
-  if (v >= BANDS.tough)   return 'tough';
-  return 'brutal';
 }
 
 // ─── Score breakdown disclosure (Phase 6) ─────────────────────────────────────
@@ -488,7 +476,10 @@ function getRiskFlags(player, score) {
   const flags = [];
   const ms = score.breakdown?.form?.minutesSecurity ?? 0;
   if (ms < MIN_SEC_RISK)               flags.push('rotation');
-  if (score.band === 'brutal')          flags.push('fixture');
+  // Both bottom tiers, not just 'brutal': the seven-tier scale split the old
+  // 0-25 band in two (21-35 brutal, 0-20 extreme), so testing 'brutal' alone
+  // would silently stop flagging the very worst fixtures in the app.
+  if (score.band === 'brutal' || score.band === 'extreme') flags.push('fixture');
   if (score.breakdown?.form?.estimated) flags.push('confidence');
   if (player.status !== 'available')    flags.push('availability');
   return flags;

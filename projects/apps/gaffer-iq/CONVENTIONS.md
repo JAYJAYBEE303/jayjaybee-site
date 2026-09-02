@@ -97,23 +97,32 @@ Use a pragmatic BEM (Block / Element / Modifier). Lowercase, kebab-case, no IDs 
 - **Modifier** = a variant/state, `block--modifier` or `block__element--modifier`.
 
 ### 5.2 Score bands → classes
-The five composite bands map to fixed modifier classes, used everywhere a score is shown so colour is consistent across all four modules:
+Composite bands map to fixed modifier classes, used everywhere a score is shown so colour is consistent across all four modules:
 ```
---great   /* most favourable */
+--excellent  /* most favourable */
+--great
 --good
 --neutral
 --tough
---brutal  /* least favourable */
+--brutal
+--extreme    /* least favourable */
 ```
-e.g. `<span class="score-pill score-pill--good">`. The band string in `CompositeScore.band` maps 1:1 to these. Define the colour for each band **once** as a CSS variable in `base.css`; never hard-code a hex per component.
+e.g. `<span class="score-pill score-pill--good">`. Define the colour for each band **once** as a CSS variable in `base.css`; never hard-code a hex per component.
+
+One scale, seven tiers, every 0–100 integer (`FEATURE_ENGINE.md` §8.4). `engine/composite.js → bandFromValue` is the only implementation — read `CompositeScore.band` where a score object is at hand, and call `bandFromValue` for the 0–100 numbers that aren't one (a breakdown metric, an inverted difficulty, a duel score). Never write the thresholds out again. Two rules govern the tokens behind these classes:
+- New band colours go in the **semantic** layer (`--band-good`), never the primitive one (`--band-green`) — the primitives are hues, and re-pointing one changes every scale at once.
+- A component that borrows a band token for something that is **not** a rating (an H/A letter, a "postponed" tag, a chip-window bar, a rank-tier chip) must reference the **primitive**, or it silently changes meaning the day the scale is re-pointed under it. This is not hypothetical: the seven-tier scale moved `brutal` from red to orange, and every borrowed "error" colour in the app would have gone orange with it.
+
+**A class name means the same tier, not necessarily the same hex.** Semantic tokens are re-pointable in a scope, which is how a surface gets a tier in a different hue without a rule per component. Nothing scopes them today, but the mechanism is the reason for the primitive/semantic split — see §5.3. One gotcha if you do: a scope only reaches its own subtree, and `.season-gw--float` is appended to `document.body`, so a portalled element needs naming in the selector explicitly.
 
 ### 5.3 Design tokens
-- All colours, spacing, radii, font sizes, and the five band colours are CSS custom properties declared in `:root` in `base.css`. Components reference `var(--…)` only. No raw hex or px-spacing literals in `components.css`/`layout.css` except inside `:root`.
+- All colours, spacing, radii, font sizes, and the band colours are CSS custom properties declared in `:root` in `base.css`. Components reference `var(--…)` only. No raw hex or px-spacing literals in `components.css`/`layout.css` except inside `:root`.
 - Token naming: `--color-…`, `--space-…`, `--radius-…`, `--font-…`, `--band-…`, `--shadow-…`. e.g. `--band-brutal`, `--space-2`, `--color-bg`, `--shadow-float`.
 - **Fonts are system stacks, with exactly one exception.** `--font-sans` and `--font-mono` load nothing over the network. `--font-display` (Anton, via Google Fonts in `index.html`) exists solely for the landing hero headline and must not spread to any other element — a second consumer means either self-hosting it or dropping it. It is a single-weight face: reference it with `font-weight: 400`, never a bolder value, or the browser synthesises a fake bold.
 - `--shadow-…` was added with the landing page (`base.css`, "Elevation"). Two raw `box-shadow` recipes predate it inline in `components.css` (`.dash-search-results`, `.squad-import-panel`) and are deliberately left as-is — retrofitting them is a separate change needing its own visual review. New elevation goes through a token.
 - No inline styles in HTML and no `style.foo =` in JS except for genuinely dynamic values (e.g. a computed bar width). Toggle classes, don't write style strings.
-- `--band-…` also covers colours that aren't one of the original five score bands: `--band-light-green` for rank-relative player colouring (see `FEATURE_ENGINE.md` §13), and `--band-deep-blue` / `--band-orange` for the league table's Champions and Europa zones. Same naming convention, same `:root` location. Extend this block for any future colour need before reaching for a raw hex — or a new prefix — anywhere else.
+- `--band-…` is two layers. **Primitives** name a hue and nothing else (`--band-green`, `--band-yellow`, `--band-dark-red`, each with a `-bg` tint); **semantics** name a meaning and point at a primitive (`--band-great`, `--band-excellent`). Components read semantics; the non-rating cases in §5.2 read primitives. The split is what lets a scale be re-pointed in a scope at all — a scoped `--band-good: var(--band-great)` would resolve against the scope's own values and go circular. It is also what made the five-tier → seven-tier move a handful of lines in `:root` rather than a sweep of every component.
+- `--band-…` also covers colours that aren't points on the 0–100 scale: `--band-silver` (the ink the gold tier's digits are set in), `--band-light-green`, and `--band-deep-blue` for the league table's zones. Rank-relative player colouring (`FEATURE_ENGINE.md` §13) is a second colour axis and reads primitives directly for exactly the reason above. Same naming convention, same `:root` location. Extend this block for any future colour need before reaching for a raw hex — or a new prefix — anywhere else.
 
 ### 5.4 Skeletons (values that have not settled)
 

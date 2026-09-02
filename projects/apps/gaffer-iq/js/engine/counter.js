@@ -26,7 +26,7 @@ import {
   CHAIN_UNIT_ANCHORS,
   COUNTER_ATTACK_WEIGHT,
   COUNTER_DEFENCE_WEIGHT,
-  BANDS,
+  BANDS_V2,
 } from '../config.js';
 import { clamp, normaliseLinear } from '../util.js';
 import { calcPlayerForm } from './form.js';
@@ -727,13 +727,17 @@ const DUEL_OPPONENT_ROLES = {
   CM: ['CB', 'DM'],
 };
 
-/** Map a 0–100 value to a band string using config thresholds. */
+/** Map a 0–100 value to a band string using config thresholds. Mirrors
+ *  composite.js's bandFromValue rather than importing it: composite.js already
+ *  imports this module, and a cycle for five lines buys nothing. */
 function bandFromValue(v) {
-  if (v >= BANDS.great)   return 'great';
-  if (v >= BANDS.good)    return 'good';
-  if (v >= BANDS.neutral) return 'neutral';
-  if (v >= BANDS.tough)   return 'tough';
-  return 'brutal';
+  if (v >= BANDS_V2.excellent) return 'excellent';
+  if (v >= BANDS_V2.great)     return 'great';
+  if (v >= BANDS_V2.good)      return 'good';
+  if (v >= BANDS_V2.neutral)   return 'neutral';
+  if (v >= BANDS_V2.tough)     return 'tough';
+  if (v >= BANDS_V2.brutal)    return 'brutal';
+  return 'extreme';
 }
 
 /**
