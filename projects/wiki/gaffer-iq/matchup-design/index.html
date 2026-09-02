@@ -5,10 +5,10 @@ slug: matchup-design
 order: 70
 group: Matchups
 title: Design
-lede: Graphical rather than number-heavy — the deep dive in the centre, gameweek and team lists either side, and the season strip along the bottom.
+lede: Why the page ended up graphical rather than number-heavy — several containers, each answering a different question about the season ahead.
 ---
 
-<p>There are several ways I could have made it easy for the user to see
+<p>There are several ways I could've made it easy for the user to see
 what they want to see. Do they want to see deep dives into specific
 matchups? Do they want to see what teams have strong or weak fixtures
 coming up? Does the user want to go through each gameweek and see what
@@ -18,27 +18,17 @@ weekends?</p>
 
 <p>Well… why not all of it?</p>
 
+<h2>In concept</h2>
+
 <p>There are a lot of ways a user might want to see this information,
-so instead of having the page be number-heavy I went in the direction
-of something more graphical, interactive, and comprehensive to use and
-understand. The deep dive into a specific matchup sits in the centre,
-allowing for a comprehensive breakdown of what makes a matchup sway one
-way and by how much, with small info buttons the user will see to
-elaborate on a metric but which are not invasively spaced.</p>
-
-<p>Two containers then sit left and right: the left shows all the
-matches by gameweek, the right shows all the matches upcoming by team.
-There is not a lot to expand on in either, so they sit nicely to one
-side with the information in the containers kept minimal.</p>
-
-<p>The bottom strip provides the view with the best horizon, and this
-took a lot of work to get right — balancing interaction, animation,
-spacing and graphic indications. It is designed to highlight the
-notable matches when considering FPL specifically: strong and weak
-gameweeks, matches with extreme one-sided predictions, strong captaincy
-predictions, double gameweeks, postponed fixtures, and suggested best
-times to use an FPL chip. Getting the animations, spacing, colour
-coding and methods, general design philosophy and error presentation
-ironed out took roughly a million tokens of repeated tweaks, bug fixing
-and testing, but I think it is one of the most useful tools on the site
-for FPL users specifically.</p>
+so instead of having the page be number-heavy, I instead went in the
+direction of something that is more graphical, interactive, and
+comprehensive to use and understand. I'd do this with different
+containers of information, some providing more of a deep dive than
+others, providing the user different perspectives on how to view the
+season. I was thinking about having the deep dive into specific
+matchups in the middle as this will provide the most important general
+info on matchups, views for future gameweeks and a team's upcoming
+fixtures, and a way to see the highlighted info for all upcoming
+gameweeks which would improve the user's foresight for the season
+ahead.</p>
