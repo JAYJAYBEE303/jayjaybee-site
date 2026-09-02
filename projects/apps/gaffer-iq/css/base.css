@@ -37,7 +37,19 @@
      which no scope ever overrides. */
   --band-dark-green: #1f8c48;
   --band-green:      #3fb950;
+  /* Down to a single consumer, --band-deep-blue, and therefore to a single
+     job: the league table's Champions zone. It is no longer any kind of
+     "blue" the reader is asked to interpret — --band-light-blue below is the
+     app's blue, on both the 0-100 band scale and the ranker's rank-relative
+     chips. Do not reach for this one for anything new. */
   --band-blue:       #1f6feb;
+  /* The light blue 'good' reads in. Deliberately the same value as
+     --color-accent, and deliberately NOT that token: a rating is not chrome,
+     and the day the accent moves this band must not move with it. #1f6feb,
+     the blue it replaced, was the darkest hue in the scale and the only one
+     that had to be hunted for at chip size — backwards for the second-best
+     tier. */
+  --band-light-blue: #58a6ff;
   --band-gold:       #ffc83d;
   --band-grey:       #6e7681;
   --band-amber:      #d29922;
@@ -45,6 +57,11 @@
   --band-orange:     #f0883e;
   --band-red:        #f85149;
   --band-dark-red:   #b62324;
+  /* Not a hue — a void. Below every surface in the palette (--color-bg is
+     #0d1117), so a tile filled with it reads as a hole punched in the page
+     rather than as one more coloured chip. It is the bottom tier's fill, the
+     mirror of what gold does at the top. */
+  --band-black:      #0c0c0c;
   /* Not a rating hue — the INK the top tier's digits are set in, on top of its
      gold. Cooler and brighter than --color-text (#e6edf3) so it reads as
      silver against a warm ground rather than as ordinary body text that
@@ -59,7 +76,7 @@
      colour the more of it is needed before the tint reads at all. */
   --band-dark-green-bg:  rgba(31, 140, 72,  0.15);
   --band-green-bg:       rgba(63, 185, 80,  0.12);
-  --band-blue-bg:        rgba(31, 111, 235, 0.16);
+  --band-light-blue-bg:  rgba(88, 166, 255, 0.14);
   --band-gold-bg:        rgba(255, 200, 61, 0.16);
   --band-grey-bg:        rgba(110, 118, 129, 0.10);
   --band-amber-bg:       rgba(210, 153, 34, 0.12);
@@ -67,6 +84,10 @@
   --band-orange-bg:      rgba(240, 136, 62, 0.13);
   --band-red-bg:         rgba(248, 81,  73, 0.12);
   --band-dark-red-bg:    rgba(182, 35,  36, 0.20);
+  /* Opaque, unlike every other fill here: a tint of black over a dark surface
+     is just a slightly darker surface, and the point of this one is that it
+     is not a surface at all. */
+  --band-black-bg:       #0c0c0c;
   --band-light-green-bg: rgba(111, 207, 120, 0.13);
 
   /* --- Band colours: SEMANTICS -------------------------------------------
@@ -74,9 +95,9 @@
      §5.2). Seven tiers, the whole app (config.js BANDS_V2):
 
        80+     excellent   gold        65-79  great    green
-       57-64   good        blue        44-56  neutral  grey
-       36-43   tough       yellow      21-35  brutal   orange
-       0-20    extreme     dark red
+       57-64   good        light blue  44-56  neutral  grey
+       36-43   tough       yellow      21-35  brutal   red
+       0-20    extreme     black chrome, dark red ink
 
      These are re-pointable: a surface that needs a tier in a different hue
      overrides the SEMANTIC token in its own scope rather than writing a rule
@@ -85,16 +106,34 @@
      a band colour for something that is NOT a rating must read a primitive
      instead, or it silently changes meaning with the scale. */
   --band-great:   var(--band-green);
-  --band-good:    var(--band-blue);
+  /* A light blue, not the deep #1f6feb this tier started on: that blue read
+     as the heaviest, darkest step in a scale where 'good' is meant to be the
+     second-best, and it was the one hue that had to be looked for rather than
+     seen. Lifting it stays clear of the green above (hue 212 against 132,
+     which separates at 14px on the Full Season ribbon, where two adjacent
+     greens did not). The ranker's rank-relative chip followed it off the deep
+     blue for a different reason — see .score-chip--rank-light-green — reading
+     the same PRIMITIVE rather than this semantic, so the two axes stay free
+     to move apart while the app still has exactly one blue. --band-blue keeps
+     the league table's Champions zone via --band-deep-blue, which never meant
+     a rating. */
+  --band-good:    var(--band-light-blue);
   --band-neutral: var(--band-grey);
   --band-tough:   var(--band-yellow);
-  --band-brutal:  var(--band-orange);
+  /* Red, not orange. The two bottom tiers are the ones a reader acts on
+     fastest, and orange-then-dark-red asked them to rank two warm tints of
+     similar weight; red-then-black is a step change, and it puts the app's
+     ordinary "bad" colour on the ordinary bad band. --band-orange is
+     untouched and still carries its non-rating jobs (the Europa zone, the
+     Triple Captain rail, the armband delta), which is exactly what the
+     primitive/semantic split is for. */
+  --band-brutal:  var(--band-red);
 
   --band-great-bg:   var(--band-green-bg);
-  --band-good-bg:    var(--band-blue-bg);
+  --band-good-bg:    var(--band-light-blue-bg);
   --band-neutral-bg: var(--band-grey-bg);
   --band-tough-bg:   var(--band-yellow-bg);
-  --band-brutal-bg:  var(--band-orange-bg);
+  --band-brutal-bg:  var(--band-red-bg);
 
   /* The two tiers the seven-tier scale added at the ends. Gold is deliberately
      outside the green family: "exceptional" is not "one tick greener than
@@ -112,16 +151,32 @@
      dropped on top. No other tier needs this: none of the other six put their
      text on a tint of its own colour at this weight. */
   --band-excellent-ink: var(--band-silver);
-  --band-extreme:      var(--band-dark-red);
-  --band-extreme-bg:   var(--band-dark-red-bg);
+  /* The bottom tier splits fill from ink for the same reason the top one
+     does, and mirrors its shape: a fill that names the tier at a glance and
+     an ink that is not the fill. Where gold is a lamp, this is a void — the
+     fill goes black and the digits are the darkest red in the palette, with
+     the border drawn in that same dark red so the black reads as bounded
+     rather than as a hole in the card. That border is the mirror of the one
+     gold carries where the middle five tiers have none. No glow: the top tier
+     glows because it is the thing to look for, and the bottom tier is not.
+     Dark red on black is a deliberate ~3:1 read — it is the one tier meant to
+     look like somewhere you do not want to be.
+
+     --band-extreme is now black, so it is the fill and nothing else. A surface
+     that paints a bare band-coloured mark with no fill behind it — a bar, a
+     card's accent stripe — must read the INK instead, or it paints black on
+     near-black and shows nothing. */
+  --band-extreme:      var(--band-black);
+  --band-extreme-bg:   var(--band-black-bg);
+  --band-extreme-ink:  var(--band-dark-red);
 
   /* --- Non-rating band colours -------------------------------------------
      Held to the --band-… prefix per CONVENTIONS.md §5.3 rather than opening a
      new one, but these are NOT points on the 0-100 scale and must not be
      re-pointed with it. --band-light-green above is the rank-relative
      top-20%-percentile tier (FEATURE_ENGINE.md §13); the two below are the
-     league table's Champions and Europa zones (Conference takes --band-good's
-     green, so the table carries one green meaning "good" instead of three
+     league table's Champions and Europa zones (Conference takes the primitive
+     --band-green directly, so the table carries one green instead of three
      meaning nothing in particular). --band-elite lived here too — the Full
      Season strip's gold — and is gone: the seven-tier scale gave that gold a
      band of its own, so the strip reads --band-excellent like everything else

@@ -1140,11 +1140,10 @@ function maturityTooltip(key, m, progress) {
  * match and where its number comes from.
  *
  * Built as a <details> for the same reason the counter pairings are — the open
- * state is the browser's, so nothing here has to track it. The difference is
- * that this panel is absolutely positioned rather than in flow: a breakdown row
- * is a compact single line, and pushing five rows apart to reveal a sentence
- * would move every number the reader was comparing. The pairing rows below can
- * afford to expand because their panel IS the content; this one is a footnote.
+ * state is the browser's, so nothing here has to track it — and, like them,
+ * absolutely positioned rather than in flow: these rows are compact single
+ * lines, and pushing them apart to reveal a sentence would move every number
+ * the reader was comparing.
  *
  * The <summary> itself carries the button styling (rather than wrapping a span,
  * as .counter-pairing-info__btn does) so the affordance is the focusable
@@ -1349,11 +1348,14 @@ const STYLE_RULE_LABELS = {
  * team-strength proxy, not a real player-form read. Shown as "N/A" rather
  * than the fallback number, so it doesn't read as a genuine calculated score.
  *
- * Each row is wrapped in a <details> whose summary carries a small "i" button.
- * Opening it gives, in order: an explanation of what the score and the two
- * percentages actually mean (buildPairingExplainer), then the named players
- * behind that pairing via duelsForPairing() over the already-computed
- * calcIndividualDuels result — no new dependency.
+ * Each row carries a small "i" button at its right edge — a <details> whose
+ * <summary> IS the button, opening an overlay popup exactly as the breakdown
+ * metrics above do. It gives, in order: an explanation of what the score and
+ * the two percentages actually mean (buildPairingExplainer), then the named
+ * players behind that pairing via duelsForPairing() over the already-computed
+ * calcIndividualDuels result — no new dependency. The popup overlays rather
+ * than expanding in flow so opening one does not push the pairings below it
+ * down the card, out from under the reader's eye.
  *
  * The explainer was added because the panel previously opened straight onto
  * the player list: it answered "who is involved" but never "what am I looking
@@ -1407,22 +1409,25 @@ function buildCounterPairings(pairings, labels, perspective, duels, settled = tr
       ? `<span class="counter-pairing__detail">${detail}</span>`
       : '<span class="counter-pairing__detail skeleton" aria-hidden="true">Atk 00% / Def 00%</span>';
 
+    const infoLabel = `What does the ${labels[key] ?? key} pairing mean?`;
+
     return `
-      <details class="counter-pairing-info"${settled ? '' : ' aria-busy="true"'}>
-        <summary class="counter-pairing-info__summary">
-          <span class="counter-pairing${rowClass}">
-            <span class="counter-pairing__label">${label}</span>
-            ${scoreCell}
-            ${detailCell}
-          </span>
-          <span class="counter-pairing-info__btn" aria-hidden="true"
-                title="Show the players behind this pairing">i</span>
-        </summary>
-        <div class="counter-pairing-info__panel">
-          ${buildPairingExplainer(p, key, perspective, isChannel, hasValue)}
-          ${buildPairingPlayers(duels, key, perspective)}
-        </div>
-      </details>
+      <div class="counter-pairing-row"${settled ? '' : ' aria-busy="true"'}>
+        <span class="counter-pairing${rowClass}">
+          <span class="counter-pairing__label">${label}</span>
+          ${scoreCell}
+          ${detailCell}
+        </span>
+        <details class="counter-pairing-info">
+          <summary class="counter-pairing-info__btn"
+                   title="${esc(infoLabel)}"
+                   aria-label="${esc(infoLabel)}">i</summary>
+          <div class="counter-pairing-info__panel" role="note">
+            ${buildPairingExplainer(p, key, perspective, isChannel, hasValue)}
+            ${buildPairingPlayers(duels, key, perspective)}
+          </div>
+        </details>
+      </div>
     `.trim();
   }).join('');
 }
@@ -1660,8 +1665,14 @@ function onStripKeydown(e) {
   onStripActivate(e);
 }
 
+/** Both "i" popups on the matchup card: breakdown metrics and counter
+ *  pairings. They share one dismissal model because they are one interaction —
+ *  an overlay footnote anchored to a round "i" at a row's right edge. */
+const INFO_POPUPS      = '.breakdown-row__info, .counter-pairing-info';
+const INFO_POPUPS_OPEN = '.breakdown-row__info[open], .counter-pairing-info[open]';
+
 /**
- * Close every open metric "i" popup except the one the click landed inside.
+ * Close every open "i" popup except the one the click landed inside.
  *
  * Bound on the document rather than on _grid because the whole point is to
  * catch clicks that land ANYWHERE else — the page header, the navigator, the
@@ -1676,17 +1687,17 @@ function onStripKeydown(e) {
  */
 function closeMetricInfo(e) {
   const inside = e.target instanceof Element
-    ? e.target.closest('.breakdown-row__info')
+    ? e.target.closest(INFO_POPUPS)
     : null;
-  document.querySelectorAll('.breakdown-row__info[open]').forEach(d => {
+  document.querySelectorAll(INFO_POPUPS_OPEN).forEach(d => {
     if (d !== inside) d.open = false;
   });
 }
 
-/** Escape closes an open metric popup — <details> has no native Escape. */
+/** Escape closes an open popup — <details> has no native Escape. */
 function onMetricInfoKeydown(e) {
   if (e.key !== 'Escape') return;
-  const open = document.querySelectorAll('.breakdown-row__info[open]');
+  const open = document.querySelectorAll(INFO_POPUPS_OPEN);
   if (!open.length) return;
   // Focus is on the summary that opened it; leave it there so the reader keeps
   // their place in the row order rather than being dropped at the document top.

@@ -172,39 +172,48 @@
 
       <section class="module-view" data-module="matchup" aria-label="Matchup Analyser">
         <div class="matchup-shell">
-          <aside class="gw-nav" aria-label="Gameweek navigator"></aside>
-          <div class="matchup-grid">
-            <!-- Two placeholder cards, replaced wholesale by renderMatchup().
-                 They are here rather than left to the module so the first paint
-                 already has the shape of the answer: the module graph is large
-                 enough that the browser paints before main.js runs, and a bare
-                 line of text was what filled that gap. Kept deliberately dumb —
-                 no score row, no breakdown — since the module owns every state
-                 after this one. -->
-            <article class="matchup-card matchup-card--neutral" aria-busy="true">
-              <div class="skeleton-lines" role="status" aria-label="Loading FPL data">
-                <span class="skeleton skeleton--text"></span>
-                <span class="skeleton skeleton--text"></span>
-                <span class="skeleton skeleton--text"></span>
-                <span class="skeleton skeleton--text"></span>
-              </div>
-            </article>
-            <article class="matchup-card matchup-card--neutral" aria-hidden="true">
-              <div class="skeleton-lines">
-                <span class="skeleton skeleton--text"></span>
-                <span class="skeleton skeleton--text"></span>
-                <span class="skeleton skeleton--text"></span>
-                <span class="skeleton skeleton--text"></span>
-              </div>
-            </article>
+          <!-- Row 1 — the three columns. A wrapper of its own rather than
+               three items in the shell's grid: the season strip below has to
+               span the full width, and .team-nav is sticky, which Chrome
+               constrains to the whole GRID rather than to the item's own row
+               — so a full-width second grid row would have the pinned team
+               panel slide down over the strip. Two boxes stacked, and the
+               strip is simply out of the sticky element's reach. -->
+          <div class="matchup-shell__main">
+            <aside class="gw-nav" aria-label="Gameweek navigator"></aside>
+            <div class="matchup-grid">
+              <!-- Two placeholder cards, replaced wholesale by renderMatchup().
+                   They are here rather than left to the module so the first paint
+                   already has the shape of the answer: the module graph is large
+                   enough that the browser paints before main.js runs, and a bare
+                   line of text was what filled that gap. Kept deliberately dumb —
+                   no score row, no breakdown — since the module owns every state
+                   after this one. -->
+              <article class="matchup-card matchup-card--neutral" aria-busy="true">
+                <div class="skeleton-lines" role="status" aria-label="Loading FPL data">
+                  <span class="skeleton skeleton--text"></span>
+                  <span class="skeleton skeleton--text"></span>
+                  <span class="skeleton skeleton--text"></span>
+                  <span class="skeleton skeleton--text"></span>
+                </div>
+              </article>
+              <article class="matchup-card matchup-card--neutral" aria-hidden="true">
+                <div class="skeleton-lines">
+                  <span class="skeleton skeleton--text"></span>
+                  <span class="skeleton skeleton--text"></span>
+                  <span class="skeleton skeleton--text"></span>
+                  <span class="skeleton skeleton--text"></span>
+                </div>
+              </article>
+            </div>
+            <aside class="team-nav" aria-label="Team fixture navigator"></aside>
           </div>
-          <aside class="team-nav" aria-label="Team fixture navigator"></aside>
 
           <!-- FULL SEASON — GW1-38 planning strip (js/modules/fullSeason.js).
-               Container only; the module fills it. Second row of the shell's
-               grid (grid-column: 1 / 3 in components.css), spanning the
-               gw-nav + matchup-grid columns only — team-nav (grid-row: 1 / 3)
-               stretches down the full height beside it instead. -->
+               Container only; the module fills it. A sibling of the three-
+               column row above rather than a cell inside it, so the ribbon
+               runs the full window width — see .matchup-shell in
+               components.css. -->
           <section class="season-strip" aria-label="Full season outlook">
             <header class="season-strip__head">
               <h2 class="season-strip__title">Full Season</h2>

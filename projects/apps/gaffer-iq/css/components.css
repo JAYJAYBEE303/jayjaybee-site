@@ -12,15 +12,21 @@
    of short fixture rows, not a filter stack.
    ═══════════════════════════════════════════════════════════════════════════ */
 
+/* The shell is two stacked boxes: the three-column row (.matchup-shell__main)
+   and the full-width season strip under it.
+
+   The strip used to be a second row of ONE grid, spanning columns 1-2 while
+   team-nav spanned both rows beside it. Widening that span to the full width
+   is not something the single grid can express: .team-nav is position: sticky,
+   and Chrome constrains a sticky grid item to the whole grid container rather
+   than to its own grid area — so the pinned panel slid 343px down over the
+   strip as soon as the strip stopped sitting beside it. Splitting the two rows
+   into two boxes puts the strip outside the sticky element's containing block
+   entirely, which is a structural answer rather than a z-index one. */
 .matchup-shell {
-  display: grid;
-  /* Team nav's rows are now a single content-hugging cluster (score, opponent,
-     H/A, GW — see .gw-nav__fixture--team), not the GW nav's side-by-side
-     comparison, so it no longer needs extra width of its own: same 260px as
-     the GW nav column. */
-  grid-template-columns: 260px 1fr 260px;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-6);
-  align-items: start;
   /* Break out of .app-main's max-width:1400px + centering (layout.css) —
      same escape .ranker-shell uses below, for the same reason: the fixed-
      width side navigators were squeezing the middle column's two team cards
@@ -38,8 +44,19 @@
   padding: 0 var(--space-6);
 }
 
+.matchup-shell__main {
+  display: grid;
+  /* Team nav's rows are now a single content-hugging cluster (score, opponent,
+     H/A, GW — see .gw-nav__fixture--team), not the GW nav's side-by-side
+     comparison, so it no longer needs extra width of its own: same 260px as
+     the GW nav column. */
+  grid-template-columns: 260px 1fr 260px;
+  gap: var(--space-6);
+  align-items: start;
+}
+
 @media (max-width: 900px) {
-  .matchup-shell {
+  .matchup-shell__main {
     grid-template-columns: 1fr;
   }
 }
@@ -80,47 +97,65 @@
 .team-nav {
   display: flex;
   flex-direction: column;
-  /* Viewport, less the sticky nav above it and the same gap on both sides, so
-     the panel's bottom edge lands where its top offset implies it should. */
-  max-height: calc(100vh - var(--app-header-height) - (var(--space-6) * 2));
-  /* .season-strip (below the shell's main row — see its own grid-column: 1/3)
-     is a second grid row beneath gw-nav + matchup-grid only; spanning both
-     rows here is what makes team-nav run the full height beside it instead
-     of stopping level with row 1. Reset to auto at the 900px breakpoint
-     above, where the shell collapses to a single column.
+  /* The panel ends exactly where the two matchup cards beside it do — it is
+     one of three columns in a row, and a fourth column of unrelated length
+     hanging below the other two read as an accident rather than a choice.
+     Its own list is 38 rows long and would otherwise set the row's height
+     itself, so this is not something align-self can express.
 
-     grid-column: 3 has to be pinned explicitly alongside grid-row here, not
-     left to auto-placement — a grid item with a definite ROW but an auto
-     COLUMN is placed by an earlier pass of the placement algorithm than
-     plain auto/auto items (gw-nav, matchup-grid) or items merely locked to a
-     COLUMN (season-strip), and that earlier pass runs against an otherwise
-     EMPTY grid. Left auto, team-nav's column would win column 1 — the first
-     free one on an empty grid — shunting gw-nav and matchup-grid rightward
-     by a column and, worse, occupying column 1 across both rows so
-     season-strip's own 1/3 span can no longer fit in row 2 at all and gets
-     pushed into a phantom row 3 underneath everything. Pinning the column
-     here forces team-nav into the fully-positioned first pass instead,
-     leaving the two auto items to fall into columns 1 and 2 in source order
-     exactly as they did before this feature existed. */
+     height: 0 + min-height is the grid idiom for "fill the row, but do not
+     size it". A definite height of 0 contributes nothing when the auto row is
+     measured, so the row takes its height from .matchup-grid (and .gw-nav)
+     alone; the percentage in min-height then resolves against that settled
+     row height and stretches the panel back over it. align-self: stretch
+     cannot do this — a stretched item still contributes its content height to
+     the row, which is the 38-row list this rule exists to ignore.
+
+     The min() keeps the viewport cap the panel has always had: the cards can
+     run far past one screen, and matching them literally would leave a sticky
+     panel taller than the window it is pinned inside — the inner list, not the
+     panel, is what absorbs the overflow (.gw-nav__list--scroll below). The cap
+     is the viewport less the sticky nav above it and the same gap on both
+     sides, so the panel's bottom edge lands where its top offset implies it
+     should. It is a min-height rather than a max-height because min-height
+     wins over max-height when the two disagree, which would have unpinned the
+     cap the moment the cards grew past it.
+
+     Both are reset at the 900px breakpoint below, where each panel is its own
+     single-column row: a row sized by an item contributing 0 would be 0 tall,
+     and 100% of that would collapse the panel outright. */
+  height: 0;
+  min-height: min(
+    100%,
+    calc(100vh - var(--app-header-height) - (var(--space-6) * 2))
+  );
+  /* Third column of .matchup-shell__main, which is now a single-row grid —
+     the season strip is a sibling of that grid, not a second row of it, so
+     this panel simply ends level with the cards beside it. It used to carry
+     grid-row: 1 / 3 to stretch down past them, alongside a strip that
+     occupied only columns 1-2; see .matchup-shell for why that arrangement
+     could not survive the strip going full width.
+
+     Auto-placement would put it here anyway (it is the third item in source
+     order), but the column stays pinned: it is what the layout means, and it
+     keeps the panel on the right regardless of what else joins the row. */
   grid-column: 3;
-  grid-row: 1 / 3;
 }
 
-/* Reset BOTH of the properties above once the shell collapses to a single
-   column (.matchup-shell's own 900px override, MATCHUP SHELL section top of
+/* Reset the column once the row collapses to a single one
+   (.matchup-shell__main's own 900px override, MATCHUP SHELL section top of
    file). This has to sit AFTER the unconditional rule above, not merely
    inside a media query positioned earlier in the file — a media condition
    being true does not move a rule later in the cascade; two rules of equal
    specificity still resolve by source order, so a mobile override written
    above its unconditional counterpart loses to it. Left unreset, grid-column:
-   3 / grid-row: 1 / 3 would ask for a 3rd column that no longer exists in the
-   collapsed 1-column grid, growing a phantom implicit one to satisfy it and
-   quietly reintroducing a side-by-side layout under the stack this
-   breakpoint exists to produce. */
+   3 would ask for a 3rd column that no longer exists in the collapsed
+   1-column grid, growing a phantom implicit one to satisfy it and quietly
+   reintroducing a side-by-side layout under the stack this breakpoint exists
+   to produce. */
 @media (max-width: 900px) {
   .team-nav {
     grid-column: auto;
-    grid-row: auto;
   }
 }
 
@@ -348,9 +383,9 @@
 .gw-nav__venue--home { color: var(--band-green); }
 /* Primitives, not band tokens: an away fixture is not a 21-35 rating, it is
    just away. These two used to borrow --band-great/--band-brutal (the same
-   pair .squad-import-status--success/error uses), which the seven-tier scale
-   re-points — green would have survived, but red would have turned orange for
-   no reason anyone could name. See base.css. */
+   pair .squad-import-status--success/error uses), and --band-brutal has since
+   been re-pointed twice — red, then orange, then back to red — while this
+   letter never meant anything but "away". See base.css. */
 .gw-nav__venue--away { color: var(--band-red); }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -398,9 +433,13 @@
 .matchup-card--neutral { border-left-color: var(--band-neutral); }
 .matchup-card--tough   { border-left-color: var(--band-tough); }
 .matchup-card--brutal  { border-left-color: var(--band-brutal); }
-/* The two tiers the seven-tier scale added at the ends of the old five. */
+/* The two tiers the seven-tier scale added at the ends of the old five.
+   The bottom one takes its INK, not its chrome: this stripe is a bare 3px
+   mark with the card behind it, and --band-extreme is now black, which on a
+   #161b22 card is a stripe you cannot see. Same reason the breakdown bars
+   below read the ink. */
 .matchup-card--excellent { border-left-color: var(--band-excellent); }
-.matchup-card--extreme   { border-left-color: var(--band-extreme); }
+.matchup-card--extreme   { border-left-color: var(--band-extreme-ink); }
 
 /* Low-confidence cards get a hatched overlay so the provisional nature is
    immediately visible without hiding the data — see ARCHITECTURE.md §11. */
@@ -502,11 +541,18 @@
     0 0 10px color-mix(in srgb, var(--band-excellent-ink) 60%, transparent),
     0 0 20px color-mix(in srgb, var(--band-excellent) 45%, transparent);
 }
-/* Border keeps the dark red — it is what makes the bottom tier read as its own
-   thing beside orange — but the digits lift to --band-red: 20pt bold in
-   #b62324 on this background is dimmer than every other pill on the page, and
-   the number is the thing being read. Same split as .score-chip--extreme. */
-.score-pill--extreme { background: var(--band-extreme-bg); border-color: var(--band-extreme); color: var(--band-red); }
+/* The bottom tier is the top tier's mirror: a fill that names it, an ink that
+   is not the fill, and an edge where the middle five have none. Black where
+   gold has gold, the darkest red in the palette where gold has silver — and
+   the border takes that same ink, since a black border on a black fill is no
+   border at all and this tier has to read as bounded rather than as a hole in
+   the card. No glow, unlike the top tier: gold glows because 80+ is the thing
+   the reader is hunting for, and this is the opposite errand. */
+.score-pill--extreme {
+  background: var(--band-extreme-bg);
+  border-color: var(--band-extreme-ink);
+  color: var(--band-extreme-ink);
+}
 
 /* Provisional: muted + hatched — score still shown, never hidden */
 .score-pill--provisional {
@@ -587,10 +633,17 @@
     0 0 6px color-mix(in srgb, var(--band-excellent-ink) 55%, transparent),
     0 0 12px color-mix(in srgb, var(--band-excellent) 50%, transparent);
 }
-/* Dark red is dark: at chip size the solid hue is too low-contrast to read as
-   text on this background, so the text lifts to --band-red and the dark red
-   stays as the fill it tints. */
-.score-chip--extreme { background: var(--band-extreme-bg); color: var(--band-red); }
+/* The mirror of .score-chip--excellent above: black fill, dark red ink, and a
+   ring in that same ink — INSET for the same reason gold's is, since
+   .score-chip has no border and a real 1px one would grow only this tier's
+   chips by 2px in each axis and jog the rows they sit in. The ring is what
+   makes the tier visible here at all: a black fill on a dark card is
+   otherwise just a gap in the row. No glow — see .score-pill--extreme. */
+.score-chip--extreme {
+  background: var(--band-extreme-bg);
+  color: var(--band-extreme-ink);
+  box-shadow: inset 0 0 0 1px var(--band-extreme-ink);
+}
 
 /* Rank-relative tiers (pool-percentile, NOT the 0-100 band above — see
    FEATURE_ENGINE.md §13). Rendered ALONGSIDE a .score-chip--{band} class, never
@@ -612,9 +665,15 @@
    step apart is a distinction the eye has to work for, and the column was
    asking it to do that ~700 rows deep; against the dark green above it, blue
    separates at a glance and costs nothing, since nothing else in this table
-   is blue. */
+   is blue. It reads --band-light-blue, the same primitive the 'good' band
+   reads: these two axes are independent and must be free to move apart, but
+   "the blue one" has to be ONE blue app-wide, or a reader carrying a colour
+   from the Matchup page to this table finds a second, darker blue here and
+   has to ask whether the difference means something. The deep #1f6feb this
+   used to be lost that argument for the same reason it lost it as a band —
+   at 11px on this ground it is the one hue that has to be hunted for. */
 .score-chip--rank-green       { background: var(--band-dark-green-bg); color: var(--band-dark-green); }
-.score-chip--rank-light-green { background: var(--band-blue-bg);       color: var(--band-blue); }
+.score-chip--rank-light-green { background: var(--band-light-blue-bg); color: var(--band-light-blue); }
 .score-chip--rank-red         { background: var(--band-red-bg);        color: var(--band-red); }
 .score-chip--rank-neutral     { background: var(--band-neutral-bg);    color: var(--band-neutral); }
 .score-chip--rank-yellow      { background: var(--band-amber-bg);      color: var(--band-amber); }
@@ -845,7 +904,9 @@
 .breakdown-row__bar--tough   { background: var(--band-tough); }
 .breakdown-row__bar--brutal  { background: var(--band-brutal); }
 .breakdown-row__bar--excellent { background: var(--band-excellent); }
-.breakdown-row__bar--extreme   { background: var(--band-extreme); }
+/* Ink, not chrome: a bar is a bare mark on a track, and black would paint
+   nothing. Same call as .matchup-card--extreme's stripe above. */
+.breakdown-row__bar--extreme   { background: var(--band-extreme-ink); }
 
 /* Estimated sub-metric bar: reduced opacity + striped overlay (the "dashed" fill). */
 .breakdown-row__bar--estimated {
@@ -1014,37 +1075,50 @@
   color: var(--color-muted);
 }
 
-/* ─── Pairing info disclosure — reveals the named players behind a pairing ─── */
-/* Each pairing row is now a <details>; the row itself is the <summary>, with a
-   small "i" affordance at its right edge. The native triangle is suppressed
-   because the "i" is the affordance. */
+/* ─── Pairing info popup — reveals the named players behind a pairing ─── */
+/* The "i" at the row's right edge is a <details> of its own, exactly as the
+   breakdown rows above are: the <summary> IS the button, so the affordance is
+   what takes focus, and the panel it opens OVERLAYS the card instead of
+   expanding inside it.
 
-/* The row-separator border moved here: the .counter-pairing elements are no
-   longer siblings of each other, they're each wrapped in their own <details>. */
-.counter-pairing-info + .counter-pairing-info {
-  border-top: 1px solid var(--color-border-subtle);
-}
+   It used to be the whole row that was the <summary>, with the panel in flow
+   below it — opening one pushed every pairing under it down the card, which
+   moved the numbers the reader was mid-comparison on. Same reason the metric
+   popups overlay; both are now the same interaction.
 
-.counter-pairing-info__summary {
+   Light-dismiss (outside click, Escape) is wired in matchup.js alongside the
+   metric popups — <details> has neither natively. */
+
+/* The row-separator border lives on the row wrapper: the .counter-pairing
+   elements are each inside their own flex row beside the "i". */
+.counter-pairing-row {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  cursor: pointer;
-  list-style: none;
+  /* The popup anchors to the ROW, not to the 18px "i" beside it: a pairing
+     panel carries an explanation and a player list, which is wider than the
+     card at any fixed width. Spanning the row keeps it inside the card. */
+  position: relative;
 }
 
-.counter-pairing-info__summary::-webkit-details-marker {
-  display: none;
+.counter-pairing-row + .counter-pairing-row {
+  border-top: 1px solid var(--color-border-subtle);
 }
 
-/* The pairing row keeps its own grid; it just has to fill the summary now. */
-.counter-pairing-info__summary .counter-pairing {
+/* The pairing keeps its own grid; it just has to fill the row now. */
+.counter-pairing-row .counter-pairing {
   flex: 1;
   min-width: 0;
 }
 
+.counter-pairing-info {
+  flex-shrink: 0;
+}
+
 .counter-pairing-info__btn {
   flex-shrink: 0;
+  cursor: pointer;
+  list-style: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1061,16 +1135,43 @@
   transition: color 0.1s, border-color 0.1s;
 }
 
-.counter-pairing-info__summary:hover .counter-pairing-info__btn,
+.counter-pairing-info__btn::-webkit-details-marker {
+  display: none;
+}
+
+.counter-pairing-info__btn:hover,
 .counter-pairing-info[open] .counter-pairing-info__btn {
   color: var(--color-accent);
   border-color: var(--color-accent);
 }
 
+.counter-pairing-info__btn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Overlay panel, matched to .breakdown-row__info-pop above — same chrome, but
+   spanning the row rather than sized to the "i", because this one carries an
+   explanation and a player list. Capped in height so a long duel list scrolls
+   inside the popup instead of running off the card. */
 .counter-pairing-info__panel {
-  padding: var(--space-2) 0 var(--space-3) var(--space-3);
-  border-left: 2px solid var(--color-border-subtle);
-  margin-left: var(--space-2);
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  left: 0;
+  right: 0;
+  z-index: 50;
+  max-height: min(60vh, 26rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-3);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  text-align: left;
+  white-space: normal;
+  font-weight: 400;
+  cursor: default;
 }
 
 /* Explanation block at the top of a pairing's "i" panel — what the score and
@@ -1253,8 +1354,15 @@
     0 0 6px color-mix(in srgb, var(--band-excellent-ink) 55%, transparent),
     0 0 12px color-mix(in srgb, var(--band-excellent) 50%, transparent);
 }
-/* Text lifts to --band-red for the same reason .score-chip--extreme's does. */
-.pgw-cell--extreme { background: var(--band-extreme-bg); color: var(--band-red); border-color: var(--band-extreme); }
+/* Black cell, dark red border and digits — the same treatment as
+   .score-chip--extreme, on the surface where these cells sit beside the
+   excellent cell's gold. The cell already reserves a 1px border, so this one
+   is a real border rather than an inset ring. */
+.pgw-cell--extreme {
+  background: var(--band-extreme-bg);
+  color: var(--band-extreme-ink);
+  border-color: var(--band-extreme-ink);
+}
 
 /* Estimated fixture cell — dashed border, reduced opacity. */
 .pgw-cell--estimated {
@@ -3773,8 +3881,14 @@
   /* With the panel no longer pinned, a viewport-height cap would trap the
      season list in a small inner scroller in the middle of a page that already
      scrolls — two scrollbars for one list. Let it run at full length here and
-     scroll with the page, which is the natural gesture on a narrow screen. */
+     scroll with the page, which is the natural gesture on a narrow screen.
+
+     height/min-height undo the fill-the-row pair from the same rule: stacked,
+     this panel IS its own row, so a 0 contribution would size that row to 0
+     and 100% of 0 would collapse the panel to nothing. */
   .team-nav {
+    height: auto;
+    min-height: 0;
     max-height: none;
   }
 
@@ -4816,10 +4930,17 @@
 }
 
 /* The three result tiles borrow band colour so the split reads at a glance:
-   team A wins, draws, team B wins (CONVENTIONS.md §5.2 colours). */
-.fx-h2h-tile--a { border-color: var(--band-green);    background: var(--band-green-bg); }
+   team A wins, draws, team B wins (CONVENTIONS.md §5.2 colours).
+
+   Green / grey / RED, which is exactly what .fx-pip--w/--d/--l paints in the
+   run of results a few lines below these tiles. "Man City wins" and a red pip
+   are the same event described twice on the same screen, and while the third
+   tile was amber the page said so in two colours — leaving the reader to work
+   out whether amber was a softer kind of loss. It is not: these are wins for
+   the other side, and the app's colour for that is red everywhere else. */
+.fx-h2h-tile--a { border-color: var(--band-green);   background: var(--band-green-bg); }
 .fx-h2h-tile--d { border-color: var(--band-neutral); background: var(--band-neutral-bg); }
-.fx-h2h-tile--b { border-color: var(--band-amber);   background: var(--band-amber-bg); }
+.fx-h2h-tile--b { border-color: var(--band-red);     background: var(--band-red-bg); }
 
 .fx-h2h-tile__value {
   font-family: var(--font-mono);
@@ -6606,30 +6727,21 @@ img.fx-crest {
   --season-col-past: 22px;
   --season-col-gap: 4px;
 
-  /* Second row of .matchup-shell's grid (components.css, MATCHUP SHELL
-     above), spanning the gw-nav + matchup-grid columns only — team-nav's own
-     grid-row: 1 / 3 is what runs it down the full height beside this instead.
-     No margin-top here any more: the shell's own `gap` (--space-6, the same
-     value this margin used to add) already spaces this row from the row
-     above it, and keeping both would have doubled the gap. Reset to
-     grid-column: auto at the 900px breakpoint, where the shell collapses to
-     a single column and this span would otherwise force a phantom one. */
-  grid-column: 1 / 3;
+  /* The second box of .matchup-shell (components.css, MATCHUP SHELL above),
+     stacked under the three-column row and stretching the shell's full
+     width — the whole window, since the shell itself escapes app-main's
+     max-width. 38 gameweeks is a lot of horizontal track: every pixel the
+     strip gains is track the reader does not have to scroll for, and it was
+     previously boxed out of the 260px team-nav column for no reason but that
+     the sticky team panel used to stretch down beside it.
+
+     No margin-top here: the shell's own `gap` (--space-6, the same value this
+     margin used to add) already spaces it from the row above, and keeping both
+     would have doubled the gap. */
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: var(--color-surface);
   overflow: hidden;
-}
-
-/* Reset grid-column: 1 / 3 once the shell collapses to a single column
-   (.matchup-shell's own 900px override, MATCHUP SHELL section top of file) —
-   see the matching .team-nav reset there for why this has to come AFTER the
-   rule above rather than merely inside an earlier media query: source order
-   decides between equal-specificity rules regardless of which one carries a
-   media condition. Left unreset, this would ask for a 3rd grid line that no
-   longer exists, growing a phantom implicit column to satisfy it. */
-@media (max-width: 900px) {
-  .season-strip { grid-column: auto; }
 }
 
 .season-strip__head {
@@ -6828,7 +6940,10 @@ img.fx-crest {
 .season-gw__tile--neutral { background: var(--band-neutral-bg); border: 1px solid var(--color-border); }
 .season-gw__tile--tough   { background: var(--band-tough-bg);   border: 1px solid var(--band-tough); }
 .season-gw__tile--brutal  { background: var(--band-brutal-bg);  border: 1px solid var(--band-brutal); }
-.season-gw__tile--extreme { background: var(--band-extreme-bg); border: 1px solid var(--band-extreme); }
+/* The border reads the INK, not --band-extreme: the fill is black now, so a
+   black border on it would draw nothing and a 14px tile would go missing from
+   the ribbon entirely. */
+.season-gw__tile--extreme { background: var(--band-extreme-bg); border: 1px solid var(--band-extreme-ink); }
 
 /* Double gameweek: rides alongside a band modifier above (columnHTML emits
    both classes on the same tile), so this only adds the accent ring. */
@@ -6882,11 +6997,21 @@ img.fx-crest {
    align-items: flex-start only governs the columns, so this item still
    stretches on its own. The "chips reset" label is carried by the span's
    title/aria-label attributes (see fullSeason.js render()), not a visible
-   ::after tag. */
+   ::after tag.
+
+   The margin is what makes the break read, exactly as .gw-nav__chip-reset's
+   does in the team navigator: a hairline sitting in the ribbon's own 4px
+   column gap is just a thinner column edge, and the reader has to be told
+   what it means rather than seeing it. --space-1 a side puts 12px of clear
+   track either side of the rule against 4px between neighbouring columns —
+   three times the rhythm, on 54px columns, which separates without opening a
+   hole the eye has to jump. The navigator can afford its --space-2 because
+   its rows are 2px apart; the same value here would cost a column's width. */
 .season-split {
   width: 1px;
   flex: none;
   align-self: stretch;
+  margin: 0 var(--space-1);
   background: var(--color-border);
 }
 
@@ -6958,8 +7083,12 @@ img.fx-crest {
 .season-rail__bar--tail { border-top-right-radius: 3px; border-bottom-right-radius: 3px; }
 
 /* Lines up under .season-split — no visible mark of its own here, the divider
-   above already carries the label. */
-.season-rail__split { width: 1px; flex: none; }
+   above already carries the label. The margin is not decoration: this row's
+   cells line up with the ribbon's columns only because both rows are built
+   from the same widths in the same order, so the split's own footprint has to
+   match its twin above or every chip band from GW20 on slides 8px left of the
+   gameweek it belongs to. */
+.season-rail__split { width: 1px; flex: none; margin: 0 var(--space-1); }
 
 /* ─── Colour key ──────────────────────────────────────────────────────────── */
 
@@ -7189,7 +7318,18 @@ img.fx-crest {
     0 0 12px color-mix(in srgb, var(--band-excellent) 50%, transparent);
 }
 
-.season-fxrow--extreme   { background: var(--band-extreme-bg); }
+/* Carries its edge here for the same reason the top tier carries its gold
+   one: this row is the same fixture as the tile above it, and a black row with
+   no outline would read as an empty gap in the panel. `outline` rather than
+   `border`, matching --excellent and --pp — .season-fxrow has no border, so a
+   real one would make only these rows 2px taller. */
+.season-fxrow--extreme {
+  background: var(--band-extreme-bg);
+  outline: 1px solid var(--band-extreme-ink);
+  outline-offset: -1px;
+}
+
+.season-fxrow--extreme .season-sc { color: var(--band-extreme-ink); }
 
 .season-fxrow--pp {
   background: var(--band-red-bg);
