@@ -49,7 +49,8 @@ import {
  * @param {object[]} [opts.leagueXgHistory]    Understat league/EPL payloads for the seasons before those two
  *   (UNDERSTAT_HISTORY_SEASONS, config.js), newest first — feeds only the cross-season head-to-head
  *   window (engine/h2h.js); [] or absent when none loaded
- * @param {number} [opts.currentGw]            override; defaults to season.currentGw, then nextGw, then 1
+ * @param {number} [opts.currentGw]            override; defaults to season.upcomingGw (the round still
+ *                                              to be played), then currentGw, then 1
  * @returns {object} ctx consumed by calcBase/HomeAway/Form/Style/Counter/FixtureHistory.
  *
  *   ctx shape:
@@ -229,7 +230,7 @@ export function buildScoreContext(season, opts = {}) {
     rollingVenueStatsByTeamId,
     // Phase 4 — the older Understat payloads, see above and §4.
     leagueXgHistory,
-    currentGw:           opts.currentGw ?? season.currentGw ?? season.nextGw ?? 1,
+    currentGw:           opts.currentGw ?? season.upcomingGw ?? season.currentGw ?? 1,
     leagueAvgStrength,
     // Gameweeks actually played, derived from the pool's minutes rather than a
     // counter — see buildPlaytimeContext.

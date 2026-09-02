@@ -32,7 +32,10 @@ function render() {
   if (!_root) return;
 
   const season    = store.getSeason();
-  const currentGw = store.getCurrentGw();
+  // The window starts at the round still to be played, not FPL's is_current —
+  // otherwise a bar whose whole job is to warn about what is COMING spends the
+  // days between rounds warning about a gameweek already in the record books.
+  const currentGw = store.getUpcomingGw();
   if (!season || currentGw === null) {
     _root.hidden = true;
     return;

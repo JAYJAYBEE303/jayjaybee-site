@@ -353,6 +353,47 @@ export function normalisePlayerSummary(raw) {
 }
 
 /**
+ * The earliest gameweek that still has football to come.
+ *
+ * MODEL: FPL's `is_current` is NOT "the round we are looking forward to". It
+ * is set at a round's own deadline and stays there until the NEXT round's
+ * deadline — so from Sunday full time until the following Friday it names a
+ * gameweek in which every match has already been played. Anything that asks
+ * "which round is coming up" and reads currentGw therefore offers a finished
+ * gameweek as the next matchup, which is what the Ranker's fixture horizon and
+ * the Full Season strip were both doing between rounds.
+ *
+ * The rule is one line: once the current round is FINISHED, the upcoming round
+ * is the next one. While it is still being played it stays the upcoming round,
+ * because its remaining fixtures genuinely are still to come and belong in a
+ * horizon.
+ *
+ * Distinct from planner.js's `planningGw`, which advances at KICKOFF rather
+ * than at full time — a transfer deadline is gone the moment the round starts,
+ * so the planner must look further ahead than a fixture horizon does. Both
+ * live alongside `currentGw`, which the Dashboard's live scoreboard and
+ * calibration's snapshot still want in its raw FPL meaning.
+ *
+ * @param {{id: number, finished: boolean, isCurrent: boolean, isNext: boolean}[]} events
+ * @returns {number} a gameweek id; 1 when there is nothing to go on
+ */
+export function deriveUpcomingGw(events) {
+  const list    = events || [];
+  const current = list.find(e => e.isCurrent) ?? null;
+  const nextId  = list.find(e => e.isNext)?.id ?? null;
+
+  if (!current) return nextId ?? 1;
+  if (!current.finished) return current.id;
+
+  // Finished. `is_next` is null after the final gameweek of a season, and one
+  // past the end is the honest answer there: every gameweek then reads as
+  // played and every horizon window comes back empty, rather than the season's
+  // last round being presented as still to come. Same fallback shape as
+  // planner.js's `nextGw ?? currentGw + 1`.
+  return nextId ?? current.id + 1;
+}
+
+/**
  * Composes the full normalised season from the two static payloads.
  * Pure — does not mutate inputs; constructs fresh objects throughout.
  * @param {object}   rawBootstrap   bootstrap-static/ response
@@ -360,7 +401,7 @@ export function normalisePlayerSummary(raw) {
  * @returns {Season}  { teams, teamsById, players, playersById,
  *                      fixtures, fixturesById,
  *                      pendingFixtures, pendingFixturesByTeam,
- *                      positions, events, currentGw, nextGw }
+ *                      positions, events, currentGw, nextGw, upcomingGw }
  */
 export function normaliseSeason(rawBootstrap, rawFixtures) {
   if (!rawBootstrap || !Array.isArray(rawBootstrap.teams)) {
@@ -437,6 +478,9 @@ export function normaliseSeason(rawBootstrap, rawFixtures) {
 
   const currentGw = events.find(e => e.isCurrent)?.id ?? null;
   const nextGw    = events.find(e => e.isNext)?.id    ?? null;
+  // "Which round is coming up" — see deriveUpcomingGw. Kept beside the two raw
+  // FPL flags rather than derived at each call site so every view agrees.
+  const upcomingGw = deriveUpcomingGw(events);
 
   return {
     teams, teamsById,
@@ -444,7 +488,7 @@ export function normaliseSeason(rawBootstrap, rawFixtures) {
     fixtures: sortedFixtures, fixturesById,
     pendingFixtures, pendingFixturesByTeam,
     positions, events,
-    currentGw, nextGw,
+    currentGw, nextGw, upcomingGw,
   };
 }
 

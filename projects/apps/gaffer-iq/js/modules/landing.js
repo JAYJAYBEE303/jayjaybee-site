@@ -119,7 +119,7 @@ function renderGameweek() {
   const slot = root?.querySelector('[data-landing-gw]');
   if (!slot) return;
 
-  const gw = store.getCurrentGw() ?? store.getNextGw();
+  const gw = store.getUpcomingGw() ?? store.getCurrentGw();
   if (!gw) return;
 
   slot.textContent = `Live for Gameweek ${gw}`;

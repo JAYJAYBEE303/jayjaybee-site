@@ -150,6 +150,10 @@ function getPositions()               { return state.season?.positions ?? []; }
 function getEvents()                  { return state.season?.events ?? []; }
 function getCurrentGw()               { return state.season?.currentGw ?? null; }
 function getNextGw()                  { return state.season?.nextGw ?? null; }
+// The gameweek still to be played — see engine/normalise.js deriveUpcomingGw.
+// Anything asking "which round is coming up" wants THIS, not getCurrentGw(),
+// which keeps naming a round for days after its last whistle.
+function getUpcomingGw()              { return state.season?.upcomingGw ?? null; }
 function getPlayerSummary(playerId)   { return state.playerSummaries[playerId] ?? null; }
 function getAllPlayerSummaries()       { return state.playerSummaries; }
 function getLeagueXg()                { return state.leagueXg; }
@@ -522,7 +526,7 @@ export const store = {
   subscribe, emit,
   getSeason, getTeams, getTeam, getPlayers, getPlayer,
   getFixtures, getFixture, getPositions, getEvents,
-  getCurrentGw, getNextGw, getPlayerSummary, getAllPlayerSummaries,
+  getCurrentGw, getNextGw, getUpcomingGw, getPlayerSummary, getAllPlayerSummaries,
   getLeagueXg, getLeagueXgPrev, getLeagueXgHistory, getTeamXg, getAllTeamXg,
   isTeamScoreSettled, isTeamXgSettled,
   getLive, getMatchDetail,

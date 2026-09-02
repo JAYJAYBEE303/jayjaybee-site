@@ -722,7 +722,7 @@ function rebuild() {
     leagueXgPrev:        store.getLeagueXgPrev(),
     leagueXgHistory:     store.getLeagueXgHistory(),
     teamXgBySlug:        store.getAllTeamXg(),
-    currentGw:           store.getCurrentGw() ?? store.getNextGw() ?? 1,
+    currentGw:           store.getUpcomingGw() ?? store.getCurrentGw() ?? 1,
   });
   _model = buildSeasonModel(ctx, season, { skipPlayers: true });
   render();

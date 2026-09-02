@@ -505,7 +505,7 @@ window.__engine = {
       leagueXgPrev: store.getLeagueXgPrev(),
       leagueXgHistory: store.getLeagueXgHistory(),
       teamXgBySlug: store.getAllTeamXg(),
-      currentGw: gw ?? store.getCurrentGw() ?? store.getNextGw() ?? 1,
+      currentGw: gw ?? store.getUpcomingGw() ?? store.getCurrentGw() ?? 1,
       ...opts,
     });
   },
