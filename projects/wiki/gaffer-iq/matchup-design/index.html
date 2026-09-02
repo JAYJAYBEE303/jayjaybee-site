@@ -5,8 +5,40 @@ slug: matchup-design
 order: 70
 group: Matchups
 title: Design
-status: draft
-lede: How the analyser page is laid out, and why the deep dive reads downward from one headline number to the players underneath it.
+lede: Graphical rather than number-heavy — the deep dive in the centre, gameweek and team lists either side, and the season strip along the bottom.
 ---
 
-<p>Placeholder. This entry will cover the layout of the Matchup Analyser — the pairing header, the sub-metric breakdown beneath it, and the popups that open a single counter-matchup up to name the players behind it.</p>
+<p>There are several ways I could have made it easy for the user to see
+what they want to see. Do they want to see deep dives into specific
+matchups? Do they want to see what teams have strong or weak fixtures
+coming up? Does the user want to go through each gameweek and see what
+each matchup looks like? Do they want to see the key information worth
+holding onto for each gameweek, to see overall high and low potential
+weekends?</p>
+
+<p>Well… why not all of it?</p>
+
+<p>There are a lot of ways a user might want to see this information,
+so instead of having the page be number-heavy I went in the direction
+of something more graphical, interactive, and comprehensive to use and
+understand. The deep dive into a specific matchup sits in the centre,
+allowing for a comprehensive breakdown of what makes a matchup sway one
+way and by how much, with small info buttons the user will see to
+elaborate on a metric but which are not invasively spaced.</p>
+
+<p>Two containers then sit left and right: the left shows all the
+matches by gameweek, the right shows all the matches upcoming by team.
+There is not a lot to expand on in either, so they sit nicely to one
+side with the information in the containers kept minimal.</p>
+
+<p>The bottom strip provides the view with the best horizon, and this
+took a lot of work to get right — balancing interaction, animation,
+spacing and graphic indications. It is designed to highlight the
+notable matches when considering FPL specifically: strong and weak
+gameweeks, matches with extreme one-sided predictions, strong captaincy
+predictions, double gameweeks, postponed fixtures, and suggested best
+times to use an FPL chip. Getting the animations, spacing, colour
+coding and methods, general design philosophy and error presentation
+ironed out took roughly a million tokens of repeated tweaks, bug fixing
+and testing, but I think it is one of the most useful tools on the site
+for FPL users specifically.</p>
