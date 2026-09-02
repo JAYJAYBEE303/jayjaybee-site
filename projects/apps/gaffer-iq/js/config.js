@@ -1018,6 +1018,11 @@ export const BB_MIN_DOUBLES = 2;
 export const SEASON_TOP_MATCHUPS = 3;
 export const SEASON_TOP_PLAYERS  = 5;
 
+// How many of a gameweek's top players read as standouts rather than merely
+// present. Both the collapsed column's dots and the expanded panel's rows key
+// off this one number, so the two can never disagree about who is highlighted.
+export const SEASON_STANDOUT_PLAYERS = 2;
+
 // How many of a week's top matchups must land in the `great` band before the
 // week reads as "loaded". Two of three: one blowout is an ordinary week with a
 // good fixture in it, two is a week worth waiting for.

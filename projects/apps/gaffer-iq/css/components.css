@@ -7043,6 +7043,15 @@ img.fx-crest {
   border: 1px solid transparent;
 }
 
+/* SEASON_STANDOUT_PLAYERS rows (playerRowHTML) — the panel-row half of what
+   .season-gw__dot--standout and .season-key__swatch--standout already
+   promise, so a standout reads the same wherever it appears. Kept to a
+   border tint plus the light-green name/points, deliberately without a
+   filled background — a row highlight is emphasis, not the alert-red
+   .season-gw__tile--brutal fill uses elsewhere on the strip. */
+.season-prow--hi { border-color: color-mix(in srgb, var(--band-light-green) 45%, transparent); }
+.season-prow--hi .season-prow__nm { color: var(--band-light-green); }
+
 .season-prow__pos {
   font-size: 0.53125rem;
   font-weight: 700;
@@ -7071,6 +7080,11 @@ img.fx-crest {
   padding: 0 5px;
   min-width: 30px;
   text-align: right;
+}
+
+.season-prow--hi .season-prow__pts {
+  border-color: color-mix(in srgb, var(--band-light-green) 50%, transparent);
+  color: var(--band-light-green);
 }
 
 .season-note {

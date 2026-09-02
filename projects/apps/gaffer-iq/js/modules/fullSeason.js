@@ -13,7 +13,7 @@
 import { store } from '../store.js';
 import {
   CHIP_RESET_AFTER_GW, SEASON_COL_W, SEASON_COL_WIDE, SEASON_PHASE_MS,
-  SEASON_TOP_PLAYERS,
+  SEASON_TOP_PLAYERS, SEASON_STANDOUT_PLAYERS,
 } from '../config.js';
 import { buildScoreContext } from '../engine/composite.js';
 import {
@@ -28,6 +28,20 @@ function esc(str) {
   return String(str)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;')
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/**
+ * Dot markup for a gameweek's top players — one dot per player, the first
+ * SEASON_STANDOUT_PLAYERS carrying the glow class. Shared by columnHTML
+ * (the initial paint, before the background pass has filled `players`) and
+ * paintDots (the repaint once it has) so the two call sites can never drift
+ * apart on which dots read as standouts — they previously did (columnHTML
+ * had no standout class at all).
+ */
+function dotsHTML(players) {
+  return (players ?? [])
+    .map((p, i) => `<i class="season-gw__dot${i < SEASON_STANDOUT_PLAYERS ? ' season-gw__dot--standout' : ''}"></i>`)
+    .join('');
 }
 
 /**
@@ -54,7 +68,7 @@ function columnHTML(g) {
       : `season-gw__tile season-gw__tile--${esc(m.band)}${m.isDouble ? ' season-gw__tile--double' : ''}`;
     return `<span class="${cls}"></span>`;
   }).join('');
-  const dots = (g.players ?? []).map(() => '<i class="season-gw__dot"></i>').join('');
+  const dots = dotsHTML(g.players);
   return `<div class="season-gw${g.loaded ? ' season-gw--hot' : ''}" data-gw="${g.gw}"
                role="button" tabindex="0" aria-expanded="false"
                aria-label="Gameweek ${g.gw}">
@@ -329,8 +343,15 @@ function fixtureRowHTML(m) {
     + `<span class="season-sc">${Math.round(m.value)}</span></div>`;
 }
 
-function playerRowHTML(p) {
-  return `<div class="season-prow">`
+/**
+ * `i` arrives for free — every call site below uses this directly as an
+ * Array.map callback, and map passes (element, index) to it. Same index
+ * rule as dotsHTML's standout cutoff, so a panel's highlighted rows and its
+ * column's glowing dots are always naming the same two players.
+ */
+function playerRowHTML(p, i) {
+  const hi = i < SEASON_STANDOUT_PLAYERS ? ' season-prow--hi' : '';
+  return `<div class="season-prow${hi}">`
     + `<span class="season-prow__pos">${esc(p.position)}</span>`
     + `<span class="season-prow__nm">${esc(p.name)}</span>`
     + `<span class="season-prow__px">£${p.price.toFixed(1)}m</span>`
@@ -646,9 +667,7 @@ async function runPlayerPass(ctx) {
 function paintDots(g) {
   const dots = _ribbon?.querySelector(`.season-gw[data-gw="${g.gw}"] .season-gw__dots`);
   if (!dots) return;
-  dots.innerHTML = (g.players ?? [])
-    .map((p, i) => `<i class="season-gw__dot${i < 2 ? ' season-gw__dot--standout' : ''}"></i>`)
-    .join('');
+  dots.innerHTML = dotsHTML(g.players);
 }
 
 /**
