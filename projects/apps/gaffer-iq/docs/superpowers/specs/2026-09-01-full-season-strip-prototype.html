@@ -448,7 +448,12 @@ function placeFloats(){
   for(const pair of floats){
     const {el,col}=pair;
     const r=col.getBoundingClientRect();
-    el.style.bottom=(innerHeight-r.bottom)+'px';
+    // clientHeight, NOT innerHeight: innerHeight includes the horizontal
+    // scrollbar's thickness, but a fixed element's containing block is the
+    // initial containing block, which excludes it. Using innerHeight floats
+    // the panel above its column by exactly the scrollbar's height on any
+    // page that has horizontal overflow.
+    el.style.bottom=(document.documentElement.clientHeight-r.bottom)+'px';
     // ALWAYS anchored to the column's LEFT edge, nudged by a fixed offset.
     //
     // Anchoring the near-the-edge case to the column's RIGHT edge was wrong:

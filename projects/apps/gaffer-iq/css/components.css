@@ -6416,3 +6416,668 @@ img.fx-crest {
 .skeleton-lines .skeleton--text:last-child {
   width: 60%;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FULL SEASON STRIP — GW1-38 planning ribbon (Matchup page)
+   js/modules/fullSeason.js. Task 8 ships the collapsed ribbon only: the
+   container chrome and the collapsed columns. .season-rail (chip windows)
+   and .season-key (colour key) are empty containers here on purpose — Tasks
+   9-11 add their markup and rules to this same section, and Task 10 adds the
+   expand/collapse panel's own rules alongside .season-gw below.
+   BEM-lite per CONVENTIONS.md §5.1. Band colours reuse existing tokens.
+   See docs/superpowers/specs/2026-09-01-full-season-strip-design.md.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Container chrome ───────────────────────────────────────────────────── */
+
+/* --season-t / --season-ease live on :root, NOT on .season-strip below, even
+   though they are used nowhere outside this feature. expand() clones a
+   column into a standalone .season-gw--float element and appends it to
+   document.body (position: fixed, so it can escape .season-scroller's
+   overflow clipping — see the float rules further down) — that element is a
+   COUSIN of .season-strip in the DOM, not a descendant of it, so a custom
+   property scoped to .season-strip does not inherit onto it. A transition
+   whose var(--season-ease) fails to resolve is an INVALID declaration, which
+   drops the whole rule silently — the float would simply never animate.
+   --season-t is set by initFullSeason() from SEASON_PHASE_MS (style.setProperty
+   on document.documentElement), so JS and CSS never disagree about the phase
+   length. --season-ease has no config.js constant of its own (nothing outside
+   CSS needs the control points) so it stays a plain literal — js/modules/
+   fullSeason.js's ported bezier()/EASE use the SAME four numbers so a
+   scripted scroll rides the identical curve as this CSS transition. */
+:root {
+  --season-ease: cubic-bezier(.32, .72, 0, 1);
+}
+
+.season-strip {
+  /* --season-col-w / --season-col-wide are set by initFullSeason() from
+     js/config.js's SEASON_COL_W / SEASON_COL_WIDE (style.setProperty), so the
+     ribbon's pixel geometry has exactly one source of truth — see js/modules/
+     fullSeason.js. These two have no config constant of their own (nothing
+     outside CSS needs them) so they stay here as plain literals:
+     --season-col-past is the played-week stub's width, --season-col-gap is
+     the gap between ribbon columns (prototype's --col-past / --col-gap).
+     They are scoped to .season-strip rather than :root (unlike --season-t /
+     --season-ease above) because every rule that reads them — .season-gw,
+     .season-gw--wide, .season-rail__cell — applies only to elements that stay
+     inside .season-strip for their whole life; only the FLOAT ever leaves it,
+     and the float never carries these two classes. */
+  --season-col-past: 22px;
+  --season-col-gap: 4px;
+
+  margin-top: var(--space-6);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+
+.season-strip__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-raised);
+}
+
+.season-strip__title {
+  font-size: var(--font-size-md);
+  font-weight: 700;
+}
+
+.season-strip__body {
+  padding: var(--space-3) var(--space-4) var(--space-4);
+}
+
+/* ─── Scroller — fixed-width columns; 38 weeks never share the page width ─── */
+
+.season-scroller {
+  overflow-x: auto;
+  padding-bottom: var(--space-1);
+}
+
+.season-track {
+  min-width: max-content;
+}
+
+.season-ribbon {
+  display: flex;
+  gap: var(--season-col-gap);
+  /* Each column keeps its own natural height instead of stretching to the
+     tallest one — a played-week stub (number only) stays visibly shorter
+     than a scored week (tiles + dots). */
+  align-items: flex-start;
+}
+
+/* ─── Collapsed column ───────────────────────────────────────────────────── */
+
+.season-gw {
+  position: relative;
+  width: var(--season-col-w);
+  flex: none;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-raised);
+  padding: 5px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.16s, box-shadow 0.16s, background 0.16s;
+}
+
+.season-gw:hover {
+  border-color: var(--color-muted);
+}
+
+.season-gw:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.season-gw--past {
+  width: var(--season-col-past);
+  opacity: 0.4;
+  background: transparent;
+  border-style: dashed;
+  cursor: default;
+}
+
+/* Phase 2's width target on the collapsed column and its rail cell (below).
+   The float itself has its own width — set directly on .season-gw--float,
+   below — this is only what the space it VACATES/opens does. */
+.season-gw--wide {
+  width: var(--season-col-wide);
+}
+
+/* Hides the summary the float above it is covering. Its opacity is what
+   .season-gw__summary's own transition (below) animates — this class only
+   supplies the target value, at whatever moment expand()/collapse() toggle
+   it. */
+.season-gw--under .season-gw__summary {
+  opacity: 0;
+}
+
+/* A "loaded" week (SEASON_LOADED_MIN_GREAT+ great-band matchups) gets a
+   green glow so it stands out while scrolling past, before any column is
+   opened. */
+.season-gw--hot {
+  border-color: var(--band-good);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--band-good) 30%, transparent),
+    0 0 13px color-mix(in srgb, var(--band-good) 20%, transparent);
+}
+
+.season-gw__n {
+  flex: none;
+  text-align: center;
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+  transition: color 0.16s;
+}
+
+.season-gw--hot .season-gw__n {
+  color: var(--band-good);
+}
+
+.season-gw__summary {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  transition: opacity var(--season-t) ease;
+}
+
+/* Once the float is open, the summary it clones (see expand()) is taken out
+   of flow and hidden — the panel's own .season-gw__title/.season-fxrow/
+   .season-plist content (in .season-gw__body) is what shows instead. Offsets
+   match .season-gw's own padding (5px 4px) so the absolutely-positioned
+   summary still lands exactly where it sat before it was pulled out of flow. */
+.season-gw.is-open .season-gw__summary {
+  position: absolute;
+  top: 5px;
+  left: 4px;
+  right: 4px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* One tile per top matchup (SEASON_TOP_MATCHUPS of them) — the band tint
+   alone encodes one-sidedness. No club swatches: a normalised Team carries
+   no club colour, only name/shortName/code/badgeUrl (see columnHTML). */
+.season-gw__tile {
+  height: 14px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  flex: none;
+}
+
+.season-gw__tile--great   { background: var(--band-great-bg);   border: 1px solid var(--band-great); }
+.season-gw__tile--good    { background: var(--band-good-bg);    border: 1px solid var(--band-good); }
+.season-gw__tile--neutral { background: var(--band-neutral-bg); border: 1px solid var(--color-border); }
+.season-gw__tile--tough   { background: var(--band-tough-bg);   border: 1px solid var(--band-tough); }
+.season-gw__tile--brutal  { background: var(--band-brutal-bg);  border: 1px solid var(--band-brutal); }
+
+/* Double gameweek: rides alongside a band modifier above (columnHTML emits
+   both classes on the same tile), so this only adds the accent ring. */
+.season-gw__tile--double {
+  outline: 1px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+/* Postponed: columnHTML emits this WITHOUT a band class (there is no score to
+   band), so unlike --double it has to state its own neutral-ish fill rather
+   than layering onto one. */
+.season-gw__tile--postponed {
+  background: var(--band-neutral-bg);
+  border: 1px solid var(--color-border);
+  outline: 1px solid var(--band-brutal);
+  outline-offset: 1px;
+  opacity: 0.75;
+}
+
+.season-gw__dots {
+  display: flex;
+  gap: 2px;
+  justify-content: center;
+  margin-top: 1px;
+  min-height: 7px;
+  flex: none;
+}
+
+/* Player projections are Task 11's job (g.players is null until then, so no
+   dots render yet) — this rule just states what a dot looks like once they
+   do. */
+.season-gw__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--band-good);
+}
+
+/* Matches .season-key__swatch--standout's treatment so the ribbon's standout
+   dots deliver on what the key promises. */
+.season-gw__dot--standout {
+  background: var(--band-light-green);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--band-light-green) 90%, transparent);
+}
+
+/* ─── Chip-reset divider ─────────────────────────────────────────────────── */
+
+/* Sits between GW19 and GW20 (CHIP_RESET_AFTER_GW). align-self: stretch fills
+   it to the ribbon row's own cross-axis size — the tallest column in that
+   row — standing in for the prototype's JS-measured --col-h; .season-ribbon's
+   align-items: flex-start only governs the columns, so this item still
+   stretches on its own. The "chips reset" label is carried by the span's
+   title/aria-label attributes (see fullSeason.js render()), not a visible
+   ::after tag. */
+.season-split {
+  width: 1px;
+  flex: none;
+  align-self: stretch;
+  background: var(--color-border);
+}
+
+/* ─── Chip rail ───────────────────────────────────────────────────────────── */
+
+/* Sits below the ribbon (not overlapping it), so the prototype's floating
+   expand/collapse panel — Task 10 — can grow upward without covering it.
+   Mirrors .season-ribbon's flex sizing (width/gap) exactly: a chip band's
+   left edge lands on its gameweek's left edge only because both rows share
+   the same --season-col-w / --season-col-gap tokens. */
+.season-rail {
+  display: flex;
+  gap: var(--season-col-gap);
+  height: 7px;
+  margin-top: 6px;
+}
+
+/* The cell itself carries no colour any more — a gameweek can be covered by
+   MORE THAN ONE chip window at once (the busiest week and the best captain
+   week can legitimately coincide), so colour lives on a .season-rail__bar
+   child instead. Cell width/gap is untouched by this — it is still what
+   locks the rail to the ribbon's columns. */
+.season-rail__cell {
+  position: relative;
+  width: var(--season-col-w);
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  /* JS only ever sets transition-delay on this rule (expand()/collapse()) —
+     the property/duration/ease stay fixed here, the same split the ribbon
+     column and the float use. */
+  transition: width var(--season-t) var(--season-ease);
+}
+
+.season-rail__cell--past { width: var(--season-col-past); }
+
+/* Mirrors .season-gw--wide exactly, so a chip band's cell widens in lockstep
+   with its column above it. */
+.season-rail__cell--wide { width: var(--season-col-wide); }
+
+/* One bar per matched window. flex: 1 splits the cell's height evenly across
+   however many windows cover this gameweek, so two colliding chips read as a
+   two-tone bar instead of one hiding the other. */
+.season-rail__bar {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.season-rail__bar--wildcard      { background: var(--band-deep-blue); }
+.season-rail__bar--triplecaptain { background: var(--band-orange); }
+.season-rail__bar--freehit       { background: var(--band-tough); }
+
+/* Bridges a chip window's run across the ribbon's flex gap with an overlay,
+   NOT a negative margin. A negative margin consumes layout width, which
+   drifts every later cell leftward — 32px of accumulated error by GW38 in
+   the prototype's first attempt — taking the bands off their gameweeks.
+   Lives on the bar (not the cell) so `background: inherit` picks up THIS
+   window's own colour even when it is one of several stacked bars. */
+.season-rail__bar--bridge::after {
+  content: "";
+  position: absolute;
+  top: 0; bottom: 0; left: 100%;
+  width: var(--season-col-gap);
+  background: inherit;
+}
+
+.season-rail__bar--head { border-top-left-radius: 3px; border-bottom-left-radius: 3px; }
+.season-rail__bar--tail { border-top-right-radius: 3px; border-bottom-right-radius: 3px; }
+
+/* Lines up under .season-split — no visible mark of its own here, the divider
+   above already carries the label. */
+.season-rail__split { width: 1px; flex: none; }
+
+/* ─── Colour key ──────────────────────────────────────────────────────────── */
+
+/* Static legend beneath the strip. Every graphic used on the ribbon and rail
+   is named here (fullSeason.js renderKey()) so a first-time reader isn't
+   left guessing what a tint or a dot means. */
+.season-key {
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border-subtle);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(185px, 1fr));
+  gap: 14px 22px;
+}
+
+.season-key__group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.season-key__heading {
+  font-size: 0.625rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  font-weight: 700;
+}
+
+.season-key__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+}
+
+/* Base swatch is the "band tile" shape (matches .season-gw__tile's rounding);
+   modifiers below override size/shape for the dot, bar and line variants. */
+.season-key__swatch {
+  width: 15px;
+  height: 11px;
+  border-radius: var(--radius-sm);
+  flex: none;
+  display: inline-block;
+}
+
+.season-key__swatch--great { background: var(--band-great-bg);   border: 1px solid var(--band-great); }
+.season-key__swatch--good  { background: var(--band-good-bg);    border: 1px solid var(--band-good); }
+.season-key__swatch--even  { background: var(--band-neutral-bg); border: 1px solid var(--color-border); }
+
+.season-key__swatch--double {
+  background: var(--band-neutral-bg);
+  outline: 1px solid var(--color-accent);
+  outline-offset: -1px;
+}
+
+.season-key__swatch--postponed {
+  background: var(--band-brutal-bg);
+  outline: 1px solid var(--band-brutal);
+  outline-offset: -1px;
+}
+
+/* The chip-reset divider is a vertical rule, not a tile — this swatch matches
+   its shape rather than the default rectangle. */
+.season-key__swatch--split {
+  width: 2px;
+  height: 14px;
+  border-radius: 0;
+  background: var(--color-border);
+}
+
+.season-key__swatch--player {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--band-good);
+}
+
+.season-key__swatch--standout {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--band-light-green);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--band-light-green) 90%, transparent);
+}
+
+.season-key__swatch--favoured {
+  background: var(--band-light-green-bg);
+  border: 1px solid var(--band-light-green);
+}
+
+/* Chip-window colours match the rail bands above 1:1 (season-rail__bar's
+   --wildcard/--triplecaptain/--freehit), just wider than tall so the swatch
+   reads as a bar rather than a tile. */
+.season-key__swatch--wildcard      { width: 24px; height: 7px; background: var(--band-deep-blue); }
+.season-key__swatch--triplecaptain { width: 24px; height: 7px; background: var(--band-orange); }
+.season-key__swatch--freehit       { width: 24px; height: 7px; background: var(--band-tough); }
+
+.season-key__swatch--loaded {
+  border: 1px solid var(--band-good);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--band-good) 50%, transparent);
+}
+
+/* ─── Expand/collapse panel (Task 10) ────────────────────────────────────────
+   js/modules/fullSeason.js's expand()/collapse() clone a column's markup into
+   a standalone .season-gw--float element and drive the three-phase 990ms
+   choreography on it directly (inline `transition`/style writes, chained by
+   transition-delay). Everything below is the STATIC half of that: the shapes
+   these classes put on screen, not the timing, which lives entirely in JS so
+   there is exactly one place a phase length can be wrong.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* Fixed, so it escapes .season-scroller's overflow-x:auto clipping — a
+   non-visible overflow on one axis forces the other to auto per spec, and an
+   in-flow panel would either be clipped or spawn a second scrollbar rather
+   than floating over the page. Both selectors are needed: an equal-specificity
+   .season-gw rule earlier in this file sets `position: relative`, and without
+   the second selector here that rule would win once .is-open is also present
+   (same specificity, later rule wins) and reset position back to relative
+   mid-animation. */
+.season-gw.season-gw--float,
+.season-gw.season-gw--float.is-open {
+  position: fixed;
+  z-index: 60;
+  margin: 0;
+  flex: 0 0 auto;
+  background: var(--color-surface);
+}
+
+/* The accent chrome is its OWN class, deliberately not .is-open. .is-open
+   carries LAYOUT (the summary's positioning, above) — `position` cannot be
+   transitioned, so it can only be dropped at the very start of phase 3. The
+   chrome has to come off at the START of collapse() instead, so its OWN 2×T
+   transition-delay is what schedules the border/shadow/padding fade, rather
+   than a setTimeout racing (and compounding with) that same delay. Padding
+   rides with the chrome so the box lands on the column's own geometry when
+   collapsed. */
+.season-gw--float.season-gw--chrome {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 1px var(--color-accent), var(--shadow-raised);
+  padding: 8px 10px;
+}
+
+/* The panel's own content, faded in as phase 3 — opacity only, so it can sit
+   behind the height/width phases without ever affecting their geometry. */
+.season-gw__body {
+  opacity: 0;
+  transition: opacity var(--season-t) ease;
+}
+
+.season-gw__body--in { opacity: 1; }
+
+/* The "GW n" title lives HERE, inside .season-gw__body, not as a retitled
+   copy of .season-gw__n — see columnHTML()'s own comment. Each fades with the
+   group it belongs to instead of staying lit while its surroundings change. */
+.season-gw__title {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--color-accent);
+  line-height: 1.4;
+  margin-bottom: 6px;
+}
+
+.season-lab {
+  display: block;
+  font-size: 0.59375rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  font-weight: 700;
+  margin: 0 0 5px;
+}
+
+.season-plist + .season-lab,
+.season-fxrow + .season-lab {
+  margin-top: 10px;
+}
+
+/* One row per top matchup — the panel's equivalent of a collapsed tile, now
+   with both sides named. Band modifiers reuse the SAME tokens as
+   .season-gw__tile--* above, so a fixture reads the same colour collapsed and
+   open. */
+.season-fxrow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--font-size-xs);
+  padding: 4px 7px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 3px;
+  white-space: nowrap;
+}
+
+.season-fxrow--great   { background: var(--band-great-bg); }
+.season-fxrow--good    { background: var(--band-good-bg); }
+.season-fxrow--neutral { background: var(--band-neutral-bg); }
+.season-fxrow--tough   { background: var(--band-tough-bg); }
+.season-fxrow--brutal  { background: var(--band-brutal-bg); }
+
+.season-fxrow--pp {
+  background: var(--band-brutal-bg);
+  outline: 1px solid var(--band-brutal);
+  outline-offset: -1px;
+}
+
+.season-fxrow--pp .season-side__t { color: var(--color-muted); }
+
+.season-pptag {
+  font-size: 0.53125rem;
+  font-weight: 700;
+  color: var(--band-brutal);
+  letter-spacing: 0.04em;
+}
+
+.season-dgwtag {
+  font-size: 0.53125rem;
+  font-weight: 700;
+  color: var(--color-accent);
+  letter-spacing: 0.04em;
+}
+
+/* One club within a .season-fxrow: badge + short name. --fav rings whichever
+   side buildGameweekMatchups picked as favoured (m.favouredId) — the same
+   composite comparison that chose the row's own band, not a second rule. */
+.season-side {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 4px 1px 1px;
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+}
+
+.season-side--fav {
+  border-color: var(--band-light-green);
+  background: var(--band-light-green-bg);
+}
+
+.season-side--fav .season-side__t {
+  color: var(--band-light-green);
+  font-weight: 700;
+}
+
+.season-side__t { font-size: 0.6875rem; }
+
+.season-badge {
+  width: 17px;
+  height: 17px;
+  object-fit: contain;
+  flex: none;
+  border-radius: 50%;
+  background: var(--color-surface-raised);
+}
+
+.season-v {
+  color: var(--color-muted);
+  font-size: 0.625rem;
+}
+
+.season-sc {
+  margin-left: auto;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-muted);
+}
+
+.season-plist {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.season-prow {
+  display: grid;
+  grid-template-columns: 22px 1fr auto auto;
+  gap: 7px;
+  align-items: center;
+  white-space: nowrap;
+  font-size: 0.71875rem;
+  padding: 3px 7px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-raised);
+  border: 1px solid transparent;
+}
+
+.season-prow__pos {
+  font-size: 0.53125rem;
+  font-weight: 700;
+  color: var(--color-muted);
+}
+
+.season-prow__nm {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.season-prow__px {
+  font-size: 0.625rem;
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.season-prow__pts {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0 5px;
+  min-width: 30px;
+  text-align: right;
+}
+
+.season-note {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border-subtle);
+  font-size: 0.6875rem;
+  color: var(--color-muted);
+  white-space: normal;
+}

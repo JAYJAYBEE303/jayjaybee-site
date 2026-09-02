@@ -1008,6 +1008,30 @@ export const FH_BLANK_THRESHOLD = 6;
 // considers a strong recommendation rather than a hold.
 export const BB_MIN_DOUBLES = 2;
 
+// ─── §12  Full Season strip (Matchup page) ───────────────────────────────────
+// See docs/superpowers/specs/2026-09-01-full-season-strip-design.md.
+
+// Matchup rows and player rows shown per gameweek. Three and five are what the
+// collapsed column has room for at 54px — the tiles and dots are the collapsed
+// summary of exactly these lists, so changing either number changes both the
+// panel and the ribbon glyph.
+export const SEASON_TOP_MATCHUPS = 3;
+export const SEASON_TOP_PLAYERS  = 5;
+
+// How many of a week's top matchups must land in the `great` band before the
+// week reads as "loaded". Two of three: one blowout is an ordinary week with a
+// good fixture in it, two is a week worth waiting for.
+export const SEASON_LOADED_MIN_GREAT = 2;
+
+// One phase of the expand/collapse choreography. Three phases run back to back
+// (vertical, horizontal, fade), so the whole transition is 3x this.
+export const SEASON_PHASE_MS = 330;
+
+// Ribbon column geometry. Fixed rather than flexed to the page width: 38 weeks
+// sharing one viewport made every tile unreadable.
+export const SEASON_COL_W    = 54;
+export const SEASON_COL_WIDE = 268;
+
 // ─── §11  Boot and render performance ────────────────────────────────────────
 
 // How long main.js waits to batch team-xG arrivals into ONE data:ready emit.
