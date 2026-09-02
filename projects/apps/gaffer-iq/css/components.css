@@ -83,6 +83,45 @@
   /* Viewport, less the sticky nav above it and the same gap on both sides, so
      the panel's bottom edge lands where its top offset implies it should. */
   max-height: calc(100vh - var(--app-header-height) - (var(--space-6) * 2));
+  /* .season-strip (below the shell's main row — see its own grid-column: 1/3)
+     is a second grid row beneath gw-nav + matchup-grid only; spanning both
+     rows here is what makes team-nav run the full height beside it instead
+     of stopping level with row 1. Reset to auto at the 900px breakpoint
+     above, where the shell collapses to a single column.
+
+     grid-column: 3 has to be pinned explicitly alongside grid-row here, not
+     left to auto-placement — a grid item with a definite ROW but an auto
+     COLUMN is placed by an earlier pass of the placement algorithm than
+     plain auto/auto items (gw-nav, matchup-grid) or items merely locked to a
+     COLUMN (season-strip), and that earlier pass runs against an otherwise
+     EMPTY grid. Left auto, team-nav's column would win column 1 — the first
+     free one on an empty grid — shunting gw-nav and matchup-grid rightward
+     by a column and, worse, occupying column 1 across both rows so
+     season-strip's own 1/3 span can no longer fit in row 2 at all and gets
+     pushed into a phantom row 3 underneath everything. Pinning the column
+     here forces team-nav into the fully-positioned first pass instead,
+     leaving the two auto items to fall into columns 1 and 2 in source order
+     exactly as they did before this feature existed. */
+  grid-column: 3;
+  grid-row: 1 / 3;
+}
+
+/* Reset BOTH of the properties above once the shell collapses to a single
+   column (.matchup-shell's own 900px override, MATCHUP SHELL section top of
+   file). This has to sit AFTER the unconditional rule above, not merely
+   inside a media query positioned earlier in the file — a media condition
+   being true does not move a rule later in the cascade; two rules of equal
+   specificity still resolve by source order, so a mobile override written
+   above its unconditional counterpart loses to it. Left unreset, grid-column:
+   3 / grid-row: 1 / 3 would ask for a 3rd column that no longer exists in the
+   collapsed 1-column grid, growing a phantom implicit one to satisfy it and
+   quietly reintroducing a side-by-side layout under the stack this
+   breakpoint exists to produce. */
+@media (max-width: 900px) {
+  .team-nav {
+    grid-column: auto;
+    grid-row: auto;
+  }
 }
 
 .gw-nav__header {
@@ -6465,11 +6504,30 @@ img.fx-crest {
   --season-col-past: 22px;
   --season-col-gap: 4px;
 
-  margin-top: var(--space-6);
+  /* Second row of .matchup-shell's grid (components.css, MATCHUP SHELL
+     above), spanning the gw-nav + matchup-grid columns only — team-nav's own
+     grid-row: 1 / 3 is what runs it down the full height beside this instead.
+     No margin-top here any more: the shell's own `gap` (--space-6, the same
+     value this margin used to add) already spaces this row from the row
+     above it, and keeping both would have doubled the gap. Reset to
+     grid-column: auto at the 900px breakpoint, where the shell collapses to
+     a single column and this span would otherwise force a phantom one. */
+  grid-column: 1 / 3;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: var(--color-surface);
   overflow: hidden;
+}
+
+/* Reset grid-column: 1 / 3 once the shell collapses to a single column
+   (.matchup-shell's own 900px override, MATCHUP SHELL section top of file) —
+   see the matching .team-nav reset there for why this has to come AFTER the
+   rule above rather than merely inside an earlier media query: source order
+   decides between equal-specificity rules regardless of which one carries a
+   media condition. Left unreset, this would ask for a 3rd grid line that no
+   longer exists, growing a phantom implicit column to satisfy it. */
+@media (max-width: 900px) {
+  .season-strip { grid-column: auto; }
 }
 
 .season-strip__head {
@@ -6496,6 +6554,31 @@ img.fx-crest {
 .season-scroller {
   overflow-x: auto;
   padding-bottom: var(--space-1);
+  /* Same treatment as .gw-nav__list--scroll (MATCHUP SHELL above), mirrored
+     for a horizontal track: that scrollbar sets `width` on its ::-webkit-
+     scrollbar because it scrolls vertically, this one scrolls horizontally so
+     the equivalent rule sets `height` instead — `width` there does nothing
+     here. Firefox's two-property scrollbar-width/scrollbar-color pair needs
+     no such swap; it styles whichever axis actually overflows. */
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+
+.season-scroller::-webkit-scrollbar {
+  height: 8px;
+}
+
+.season-scroller::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.season-scroller::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: var(--radius-pill);
+}
+
+.season-scroller::-webkit-scrollbar-thumb:hover {
+  background: var(--color-muted);
 }
 
 .season-track {
@@ -6620,7 +6703,17 @@ img.fx-crest {
   flex: none;
 }
 
-.season-gw__tile--great   { background: var(--band-great-bg);   border: 1px solid var(--band-great); }
+/* Heavily favoured gets --band-elite (base.css), not --band-great — see that
+   token's own comment. --band-great stays the shared cross-app "great" colour
+   (CONVENTIONS.md §5.2); this is a local emphasis so the top band actually
+   reads as the strongest tile at 14px tall, instead of quietly losing to
+   --good's brighter green beside it. The glow is soft (small blur, low
+   opacity) — this is a 14px tile in a 38-column ribbon, not a hero element. */
+.season-gw__tile--great {
+  background: var(--band-elite-bg);
+  border: 1px solid var(--band-elite);
+  box-shadow: 0 0 5px color-mix(in srgb, var(--band-elite) 60%, transparent);
+}
 .season-gw__tile--good    { background: var(--band-good-bg);    border: 1px solid var(--band-good); }
 .season-gw__tile--neutral { background: var(--band-neutral-bg); border: 1px solid var(--color-border); }
 .season-gw__tile--tough   { background: var(--band-tough-bg);   border: 1px solid var(--band-tough); }
@@ -6803,7 +6896,14 @@ img.fx-crest {
   display: inline-block;
 }
 
-.season-key__swatch--great { background: var(--band-great-bg);   border: 1px solid var(--band-great); }
+/* Matches .season-gw__tile--great's gold above, not --band-great — the key
+   would otherwise lie about what the ribbon's top-band tiles actually look
+   like. */
+.season-key__swatch--great {
+  background: var(--band-elite-bg);
+  border: 1px solid var(--band-elite);
+  box-shadow: 0 0 5px color-mix(in srgb, var(--band-elite) 60%, transparent);
+}
 .season-key__swatch--good  { background: var(--band-good-bg);    border: 1px solid var(--band-good); }
 .season-key__swatch--even  { background: var(--band-neutral-bg); border: 1px solid var(--color-border); }
 

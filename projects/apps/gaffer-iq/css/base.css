@@ -32,6 +32,19 @@
   --band-tough:    #d29922;
   --band-brutal:   #f85149;
 
+  /* --- Full Season strip: a local gold emphasis on --band-great, NOT a sixth
+     band colour (CONVENTIONS.md §5.2 — the five above still mean fixture
+     quality everywhere else in the app). --band-great itself is a dark green,
+     deliberately calmer than --band-good since "heavily favoured" is one tick
+     ABOVE "favoured" on the same scale, not a different signal. But sitting
+     directly beside --band-good's brighter green at 14px tall on the strip's
+     collapsed tiles, that restraint reads as LESS important rather than more.
+     Gold breaks out of the green family entirely so the top band can glow
+     without implying a new band. Checked side by side against --band-tough
+     (#d29922, a duller amber): this is measurably brighter (higher L in HSL)
+     and more saturated, so the two stay clearly distinct even at a glance. */
+  --band-elite: #ffc83d;
+
   /* --- Rank-relative colour (pool-percentile tiers, NOT a 0-100 band —
      see FEATURE_ENGINE.md §13). Bottom-50% reuses --band-brutal and the
      top-15-fixed-count tier reuses --band-great below; light-green is the
@@ -60,6 +73,7 @@
   --band-good-bg:        rgba(63, 185, 80,  0.12);
   --band-neutral-bg:     rgba(110, 118, 129, 0.10);
   --band-tough-bg:       rgba(210, 153, 34,  0.12);
+  --band-elite-bg:       rgba(255, 200, 61,  0.16);
   --band-brutal-bg:      rgba(248, 81,  73,  0.12);
   --band-light-green-bg: rgba(111, 207, 120, 0.13);
 

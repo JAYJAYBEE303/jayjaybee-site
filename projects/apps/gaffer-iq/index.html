@@ -199,25 +199,27 @@
             </article>
           </div>
           <aside class="team-nav" aria-label="Team fixture navigator"></aside>
-        </div>
 
-        <!-- FULL SEASON — GW1-38 planning strip (js/modules/fullSeason.js).
-             Container only; the module fills it. Sits below the matchup shell
-             and runs the full page width. -->
-        <section class="season-strip" aria-label="Full season outlook">
-          <header class="season-strip__head">
-            <h2 class="season-strip__title">Full Season</h2>
-          </header>
-          <div class="season-strip__body">
-            <div class="season-scroller">
-              <div class="season-track">
-                <div class="season-ribbon" aria-label="Gameweeks 1 to 38"></div>
-                <div class="season-rail" aria-label="Chip windows"></div>
+          <!-- FULL SEASON — GW1-38 planning strip (js/modules/fullSeason.js).
+               Container only; the module fills it. Second row of the shell's
+               grid (grid-column: 1 / 3 in components.css), spanning the
+               gw-nav + matchup-grid columns only — team-nav (grid-row: 1 / 3)
+               stretches down the full height beside it instead. -->
+          <section class="season-strip" aria-label="Full season outlook">
+            <header class="season-strip__head">
+              <h2 class="season-strip__title">Full Season</h2>
+            </header>
+            <div class="season-strip__body">
+              <div class="season-scroller">
+                <div class="season-track">
+                  <div class="season-ribbon" aria-label="Gameweeks 1 to 38"></div>
+                  <div class="season-rail" aria-label="Chip windows"></div>
+                </div>
               </div>
+              <div class="season-key"></div>
             </div>
-            <div class="season-key"></div>
-          </div>
-        </section>
+          </section>
+        </div>
       </section>
 
       <!-- FIXTURES — structural blueprint (js/modules/fixtures.js).
