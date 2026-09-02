@@ -6663,6 +6663,13 @@ img.fx-crest {
   background: var(--band-good);
 }
 
+/* Matches .season-key__swatch--standout's treatment so the ribbon's standout
+   dots deliver on what the key promises. */
+.season-gw__dot--standout {
+  background: var(--band-light-green);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--band-light-green) 90%, transparent);
+}
+
 /* ─── Chip-reset divider ─────────────────────────────────────────────────── */
 
 /* Sits between GW19 and GW20 (CHIP_RESET_AFTER_GW). align-self: stretch fills
@@ -7036,14 +7043,6 @@ img.fx-crest {
   border: 1px solid transparent;
 }
 
-/* Reserved for Task 11: a signal for "this player is a standout this week"
-   has no field on the player model yet (g.players is null until that task's
-   background pass runs — see bodyHTML()/skeletonPlayerRowsHTML()). Ported now,
-   alongside the rest of the .prow family, so there is nothing left to wire in
-   CSS once that field exists. */
-.season-prow--hi { border-color: color-mix(in srgb, var(--band-light-green) 45%, transparent); }
-.season-prow--hi .season-prow__nm { color: var(--band-light-green); }
-
 .season-prow__pos {
   font-size: 0.53125rem;
   font-weight: 700;
@@ -7072,11 +7071,6 @@ img.fx-crest {
   padding: 0 5px;
   min-width: 30px;
   text-align: right;
-}
-
-.season-prow--hi .season-prow__pts {
-  border-color: color-mix(in srgb, var(--band-light-green) 50%, transparent);
-  color: var(--band-light-green);
 }
 
 .season-note {
