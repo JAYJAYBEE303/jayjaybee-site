@@ -5,8 +5,80 @@ slug: matchup-the-tools
 order: 80
 group: Matchups
 title: The tools
-status: draft
-lede: The controls that sit around the analyser, and what each one changes about the score you are looking at.
+lede: The four areas the page is built from — the central breakdown, the two side columns, and the season strip along the bottom.
 ---
 
-<p>Placeholder. This entry will cover the controls wrapped around the analyser — gameweek and horizon selection, venue, and the switches that decide which sub-metrics are shown and how far back they read.</p>
+<p>There are four main areas to provide this information:</p>
+
+<h2>Central: matchup breakdown</h2>
+
+<p>The central element is the deep dive into a specific matchup,
+allowing for a comprehensive breakdown of what makes a matchup sway one
+way and by how much. It shows decision weight, confidence, playstyle
+counters, and a score of the overall prediction. There are small info
+buttons that the user will see to elaborate on a metric in a way that
+isn't invasive on the design, allowing the user to understand exactly
+how a metric comes to show the decided integer.</p>
+
+<h2>Left: matchups by gameweek</h2>
+
+<p>The left column shows all the fixtures that are happening for one
+specific gameweek, allowing the user to understand who is playing who
+on what specific weeks. The user can also click on a matchup and the
+matchup breakdown will appear in the middle. This solely aims to
+provide the user with a different way to explore what's coming up in
+the season.</p>
+
+<h2>Right: fixtures by team</h2>
+
+<p>The column on the right shows all the fixtures that are ahead for
+the chosen team, meaning the user can see how strongly a team fares in
+its upcoming games. Similarly to the matchups by gameweek, the user can
+also click matchups to explore a deeper breakdown, and it serves the
+same purpose of providing alternative ways to filter what comes
+ahead.</p>
+
+<h2>Bottom: full season strip</h2>
+
+<p>The bottom strip provides the view with the best horizon, but this
+took the most work to get right, balancing interaction mechanics,
+animation, spacing, and graphic indications. This area is designed to
+highlight the notable matches when considering FPL specifically. It
+allows a view that highlights strong and weak gameweeks, matches with
+extreme one-sided predictions, strong captaincy predictions, double
+gameweeks, postponed fixtures, and suggested best times to use an FPL
+chip. The work taken to get the animations, spacing, colour coding and
+methods, general design philosophy, and presenting errors ironed out
+took roughly a million tokens of repeated tweaks, bug fixing, and
+testing to get right, but I think it's one of the most useful tools on
+the site for FPL users specifically.</p>
+
+<h2>Scoring philosophy</h2>
+
+<p>Every FPL tool gives you the same thing: a 1-to-5 star rating pulled
+straight from the official app. Gaffer IQ builds its own rating from
+scratch, and answers a sharper question; not "is this fixture hard,"
+but "is this fixture hard for this specific player, doing this specific
+job, right now." FPL's rating calls a match "easy" because the
+opponent's bottom of the table. Gaffer IQ checks whether your striker's
+opponent specifically has leaky centre-backs, whether that team plays
+completely differently at home versus away, and whether their rating is
+outdated and overrated. Several angles, calculated separately, then
+combined, because "hard fixture" and "hard fixture for a winger" are
+different questions, and most tools collapse them into one.</p>
+
+<p>The part that makes it trustworthy is how it handles weight and
+confidence. Not every signal gets an equal vote; recent form and team
+strength carry real weight; head-to-head history barely moves the
+needle, because a rivalry from three managers ago isn't strong evidence
+today. And when the data's too thin (a promoted team with no track
+record) the model doesn't fake confidence. It knows the difference
+between "no strong opinion" and "bad fixture," and never confuses the
+two. Most tools will happily hand you a confident number standing on
+almost nothing.</p>
+
+<p>Every score also comes with its reasoning attached — you can see
+exactly what pushed it up or down. It's not "trust us," it's "here's
+the case." In one line: this isn't a smarter-looking star rating; it's
+a tool that tells you where an edge is coming from, and how much to
+believe it.</p>
