@@ -2,6 +2,7 @@
 layout: default
 title_suffix: Wiki — Josh Bailey
 page_wide: true
+scroll_gate: false
 ---
 {%- comment -%}
 =============================================================================
@@ -24,6 +25,10 @@ page_wide: true
   that column, which leaves the prose far too narrow inside it. The flag
   widens the container for wiki entries only — every other page keeps the
   prose width it was designed around.
+
+  `scroll_gate: false` too — a wiki section is straight into reference
+  content the moment it loads (crumb, title, lede), same as /projects/
+  and /projects/wiki/. There's no hero to hold the body back for.
 
   Front matter a section page declares:
       layout:   wiki-entry          (required)
