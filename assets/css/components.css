@@ -135,12 +135,17 @@
    _layouts/default.html, which sets .wk-continue on <html> before
    first paint): the rails are the same nav chrome the reader was just
    looking at, so they skip the entrance fade and stay at rest.
-   `html.wk-continue .wk-rail` outranks the hidden-state rule above
-   (0,2,1 vs 0,2,0 for the .wk-rail match inside that :is()) so no
-   !important is needed. The article itself (.wk-crumb, .wk-art > h1,
-   etc.) is NOT listed here on purpose: that part is new every click
-   and keeps its fade. */
-html.wk-continue .wk-rail {
+   Needs .wk-layout in the chain to outrank the hidden-state rule
+   above: :is()'s specificity is the specificity of its single most
+   specific argument, for the WHOLE pseudo-class, not just whichever
+   branch actually matches — and something like ".about .section-head"
+   in that list already makes ".js :is(...)" work out to (0,3,0). Two
+   classes plus html here would only reach (0,2,1) and lose; the third
+   class from .wk-layout (a genuine ancestor of .wk-rail, see
+   wiki-entry.html) gets this to (0,3,1). The article itself
+   (.wk-crumb, .wk-art > h1, etc.) is NOT listed here on purpose: that
+   part is new every click and keeps its fade. */
+html.wk-continue .wk-layout .wk-rail {
   opacity: 1;
   transform: none;
   transition: none;
