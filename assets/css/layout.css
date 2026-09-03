@@ -247,10 +247,8 @@
    .section-title--display pattern used elsewhere. Markup + params live
    in _includes/projects-hero.html.
 
-   --lh-snug (not --lh-tight) on the title, matching .section-title
-   above: --fs-headline is this site's h2-scale token and always pairs
-   with --lh-snug; --lh-tight is reserved for --fs-display (.lede-line,
-   .section-title--display).
+   The title's own font-size/line-height reasoning is on .proj-hero-b__title
+   below.
 
    margin-bottom on .proj-hero-b matches --space-7, the same token
    .section-head declares below for exactly this purpose (the gap
@@ -293,10 +291,18 @@
   color: var(--fg-faint);
 }
 .proj-hero-b__n-slash { color: var(--accent); }
+/* --fs-subhead (not --fs-headline): the copy runs to ~45 characters,
+   and at headline scale that wraps to two lines on every viewport
+   width tested (375 / 640 / 800px) — the one-line reading is the
+   wanted one. --fs-subhead + --lh-snug is the same pairing h3 already
+   uses (global.css), so this borrows an existing type-scale step
+   rather than inventing a size between the two. text-wrap: balance
+   stays as a fallback only — if the copy ever grows past what fits,
+   it degrades to two even lines instead of overflowing. */
 .proj-hero-b__title {
   font-family: var(--font-serif);
   font-weight: var(--fw-regular);
-  font-size: var(--fs-headline);
+  font-size: var(--fs-subhead);
   line-height: var(--lh-snug);
   letter-spacing: var(--tr-headline);
   color: var(--fg);
