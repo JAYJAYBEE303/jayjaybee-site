@@ -1100,6 +1100,277 @@
 }
 
 /* =========================================================================
+   AI THESIS — long-form essay page (/ai-thesis/).
+   Mast + stat strip + sticky-rail TOC + article body, three chapters.
+   One-off page, so its rules live here rather than a new partial — same
+   call as .proj-hero-b above. Micro mono labels reuse .mono-label and
+   .accent (see global.css) instead of restating that pattern; chapter
+   tags reuse .chip. Font-size is the one type-scale category with no
+   existing rung small enough for these — --fs-mono stands in rather
+   than adding a token for what is currently a single page.
+   ========================================================================= */
+.es-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 2px;
+  width: 0%;
+  background: var(--accent);
+  z-index: 100;
+  transition: width var(--dur-1) var(--ease);
+}
+
+.es-mast {
+  max-width: 56rem;
+  margin: 0 auto;
+  padding: clamp(var(--space-6), 4vw, var(--space-8)) clamp(var(--space-4), 3vw, var(--space-7)) 0;
+}
+.es-mast__title {
+  font-family: var(--font-serif);
+  font-weight: var(--fw-regular);
+  font-size: clamp(2.25rem, 3.6vw + 1rem, 3.75rem);
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  color: var(--fg);
+  margin-top: var(--space-3);
+  text-wrap: balance;
+}
+.es-mast__dek {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: var(--fs-lede);
+  line-height: var(--lh-prose);
+  color: var(--fg-muted);
+  max-width: var(--measure-prose);
+  margin-top: var(--space-4);
+  text-wrap: pretty;
+}
+
+.es-stats {
+  max-width: 56rem;
+  margin: var(--space-6) auto 0;
+  padding: 0 clamp(var(--space-4), 3vw, var(--space-7));
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-top: var(--border-rule);
+  border-bottom: var(--border-hairline);
+}
+.es-stats div {
+  padding: var(--space-4) var(--space-5);
+  border-left: var(--border-hairline);
+}
+.es-stats div:first-child,
+.es-stats div:nth-child(3) { border-left: 0; }
+.es-stats dt {
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono-caps);
+  text-transform: uppercase;
+  color: var(--fg-faint);
+  margin: 0;
+}
+.es-stats dd {
+  margin: var(--space-2) 0 0;
+  font-family: var(--font-serif);
+  font-size: 1.375rem;
+  color: var(--fg);
+}
+
+.es-wrap {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 0 clamp(var(--space-4), 3vw, var(--space-7)) var(--space-9);
+  display: grid;
+  grid-template-columns: 13rem minmax(0, 1fr);
+  gap: clamp(var(--space-6), 4vw, var(--space-8));
+  align-items: start;
+}
+.es-rail {
+  position: sticky;
+  top: var(--space-6);
+  max-height: calc(100vh - var(--space-8));
+  overflow: auto;
+  padding-top: var(--space-7);
+}
+.es-rail__h {
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono-caps);
+  text-transform: uppercase;
+  color: var(--fg-faint);
+  padding-bottom: var(--space-2);
+  border-bottom: var(--border-hairline);
+  margin-bottom: var(--space-3);
+}
+.es-toc { display: flex; flex-direction: column; }
+.es-toc a {
+  text-decoration: none;
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  line-height: 1.35;
+  color: var(--fg-quiet);
+  padding: 5px 0 5px var(--space-3);
+  border-left: 1px solid var(--rule);
+  transition: color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+.es-toc a:hover { color: var(--fg); }
+.es-toc a.lvl3 { padding-left: var(--space-5); font-size: 0.75rem; }
+.es-toc a.is-active { color: var(--accent); border-left-color: var(--accent); }
+
+.es-art {
+  min-width: 0;
+  padding-top: var(--space-7);
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
+  line-height: var(--lh-prose);
+  color: var(--fg);
+  max-width: var(--measure-prose);
+}
+.es-chapter { scroll-margin-top: var(--space-6); }
+.es-chapter + .es-chapter { margin-top: var(--space-9); }
+.es-chapter__num {
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono-caps);
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.es-chapter__title {
+  font-family: var(--font-serif);
+  font-weight: var(--fw-regular);
+  font-size: var(--fs-headline);
+  line-height: 1.08;
+  letter-spacing: var(--tr-headline);
+  color: var(--fg);
+  margin-top: var(--space-2);
+  padding-bottom: var(--space-4);
+  border-bottom: var(--border-rule);
+}
+.es-chapter__tags {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-top: var(--space-4);
+}
+.es-chapter__tags .chip { cursor: default; }
+.es-chapter__tags .chip:hover {
+  background: transparent;
+  border-color: var(--rule-strong);
+  color: var(--fg);
+}
+
+.es-art h3 {
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono-caps);
+  text-transform: uppercase;
+  color: var(--fg-quiet);
+  margin-top: var(--space-6);
+  scroll-margin-top: var(--space-6);
+}
+.es-art > .es-chapter > h3:first-of-type { margin-top: var(--space-5); }
+.es-art p { margin-top: var(--space-4); text-wrap: pretty; }
+.es-art strong { font-weight: var(--fw-semibold); }
+
+.es-pull {
+  margin: var(--space-6) 0;
+  padding-left: var(--space-5);
+  border-left: 2px solid var(--accent);
+}
+.es-pull p {
+  margin-top: 0;
+  font-style: italic;
+  font-size: 1.1875rem;
+  line-height: 1.45;
+  color: var(--fg-muted);
+}
+
+.es-info {
+  margin: var(--space-6) 0;
+  border: var(--border-hairline);
+  background: var(--bg-recessed);
+}
+.es-info__head {
+  background: var(--fg);
+  color: var(--bg);
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono-caps);
+  text-transform: uppercase;
+  padding: 6px 12px;
+}
+.es-info__body {
+  padding: var(--space-4) var(--space-5);
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  line-height: 1.55;
+  color: var(--fg-muted);
+}
+.es-info__body ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.es-info__body li { position: relative; padding-left: var(--space-4); }
+.es-info__body li::before { content: "—"; position: absolute; left: 0; color: var(--fg-faint); }
+.es-info__body li b { font-weight: var(--fw-semibold); color: var(--fg); }
+
+.es-roman { list-style: none; padding: 0; counter-reset: er; margin-top: var(--space-4); }
+.es-roman li { position: relative; padding-left: var(--space-6); counter-increment: er; }
+.es-roman li + li { margin-top: var(--space-3); }
+.es-roman li::before {
+  content: counter(er, upper-roman);
+  position: absolute;
+  left: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  color: var(--accent);
+  letter-spacing: var(--tr-mono);
+}
+
+.es-close {
+  margin-top: var(--space-6);
+  padding-top: var(--space-4);
+  border-top: var(--border-hairline);
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono-caps);
+  text-transform: uppercase;
+  color: var(--fg-faint);
+}
+.es-end {
+  margin-top: var(--space-8);
+  padding-top: var(--space-5);
+  border-top: var(--border-rule);
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-5);
+  flex-wrap: wrap;
+}
+.es-end a {
+  text-decoration: none;
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono-caps);
+  text-transform: uppercase;
+  color: var(--fg-quiet);
+}
+.es-end a:hover { color: var(--accent); }
+
+@media (max-width: 40rem) {
+  .es-stats { grid-template-columns: repeat(2, 1fr); }
+  .es-stats div:nth-child(odd) { border-left: 0; }
+  .es-stats div:nth-child(n+3) { border-top: var(--border-hairline); }
+}
+@media (max-width: 56rem) {
+  .es-wrap { grid-template-columns: minmax(0, 1fr); }
+  .es-rail { display: none; }
+}
+
+/* =========================================================================
    RESPONSIVE — breakpoints that don't fit cleanly inside clamp().
    ========================================================================= */
 @media (max-width: 56rem) {

@@ -1,0 +1,182 @@
+---
+layout: default
+title: The AI Thesis — Josh Bailey
+description: A long-form essay — the Columbus theory of career risk, why this site exists, and how the skill set stays relevant while the ground keeps moving.
+scroll_gate: false
+---
+
+<!-- =============================================================
+     /ai-thesis — long-form essay page.
+
+     Inherits header, nav, footer, background, type scale, theme
+     toggle and paper grain from _layouts/default.html, same as
+     every other page. Nothing here restates that chrome.
+
+     `scroll_gate: false` for the same reason /projects/index.html
+     sets it: there's no hero to read first, the reader lands
+     straight in the mast + stats + article.
+
+     Woven in from the design-system's essay-page component
+     (Downloads/jayjaybee.com components/essay-page/essay.html):
+     the standalone .ds-bar top bar, its own theme toggle, and its
+     own <footer> were dropped as duplicates of what default.html
+     already provides site-wide. Everything else — mast, stat
+     strip, sticky TOC rail, chapters, pull quotes, info box, roman
+     list — is unchanged in structure, restyled to resolve entirely
+     through the site's own tokens (see .es-* in layout.css).
+     ============================================================= -->
+<div class="es-progress" id="es-progress" aria-hidden="true"></div>
+
+<div class="es-mast">
+  <p class="mono-label">Essay · Three chapters</p>
+  <h1 class="es-mast__title">New frontiers, old risks.</h1>
+  <p class="es-mast__dek">On the Columbus theory of a career, why I built this site instead of just talking about building things, and how the skill set stays worth something while the ground keeps moving.</p>
+</div>
+<dl class="es-stats">
+  <div><dt>Chapters</dt><dd>03</dd></div>
+  <div><dt>Read time</dt><dd>~9 min</dd></div>
+  <div><dt>Subject</dt><dd>Risk &amp; relevance</dd></div>
+  <div><dt>Revised</dt><dd>Sep 2026</dd></div>
+</dl>
+
+<div class="es-wrap">
+  <aside class="es-rail">
+    <p class="es-rail__h">Chapters</p>
+    <nav class="es-toc" id="es-toc" aria-label="Essay chapters"></nav>
+  </aside>
+
+  <article class="es-art">
+
+    <section class="es-chapter" id="columbus">
+      <p class="es-chapter__num">Chapter I</p>
+      <h2 class="es-chapter__title">The Columbus theory</h2>
+      <div class="es-chapter__tags"><span class="chip">Risk</span><span class="chip">Discovery</span><span class="chip">Economics</span></div>
+
+      <h3>Frontier of a new discovery</h3>
+      <p>Every field has a moment where the map runs out and someone has to sail past the edge of it anyway. In IT support that edge used to be virtualisation, then cloud identity, then zero-trust — now it's agentic tooling deciding which tickets even need a human. Nobody hands you a chart for that water. You go because the alternative is standing on a coastline that's already been fully surveyed by everyone else, competing for the same well-lit ground.</p>
+      <p>I don't think curiosity alone gets you there. Curiosity gets you reading about the frontier. What gets you <em>on the boat</em> is deciding the unmapped part is where the actual value is going to be created — before it's obvious, while it's still cheap to learn.</p>
+
+      <h3>Frontier on the drive (business and economics, not curious discovery)</h3>
+      <p>This is the distinction that matters and the one people skip. Columbus wasn't funded because Spain was curious about geography — he was funded because someone did the maths on a shorter spice route. The exploration was real, but the reason it existed was commercial.</p>
+      <p>Same applies here. I'm not learning agentic workflows or new dev tooling because it's a fun rabbit hole (though it is). I'm learning it because the organisations I want to be useful to are going to need someone who can translate "this new capability exists" into "here's what it's actually worth to us, and here's the risk if we don't move." That's a business skill wearing a technical costume.</p>
+
+      <div class="es-pull"><p>The frontier is only interesting to me for as long as it's also a market. Discovery that doesn't change what an employer will pay for is a hobby, and I already have those.</p></div>
+
+      <h3>The dangers weighed with the benefits</h3>
+      <p>Every frontier has the same four-sided risk, and I think you're obligated to actually weigh it rather than just feel excited about the upside:</p>
+      <ol class="es-roman">
+        <li><strong>The skill might not survive contact with reality.</strong> Plenty of "future of work" tooling quietly dies in eighteen months. Time spent there doesn't compound.</li>
+        <li><strong>You can out-run your own organisation.</strong> Knowing the frontier is worthless if nobody around you is ready to fund the crossing yet — timing your outward bet against your employer's actual appetite matters as much as the bet itself.</li>
+        <li><strong>Depth gets traded for breadth.</strong> Every hour on the new thing is an hour not spent getting genuinely excellent at the thing that already pays the bills.</li>
+        <li><strong>Being early looks identical to being wrong</strong>, right up until it doesn't. You have to be able to sit in that discomfort without folding.</li>
+      </ol>
+      <p>Against that: the benefit of being early is that you're cheap to acquire and hard to replace at exactly the same time — a combination that never happens once a frontier is mapped and everyone's credentialed for it.</p>
+
+      <aside class="es-info">
+        <p class="es-info__head">The wager, in short</p>
+        <div class="es-info__body">
+          <ul>
+            <li><b>Bet</b> — time and attention, not capital</li>
+            <li><b>Stake</b> — relevance three to five years out</li>
+            <li><b>Payoff</b> — early, cheap expertise in something that later matters</li>
+            <li><b>Loss</b> — a few months of learning that doesn't stick. Survivable</li>
+          </ul>
+        </div>
+      </aside>
+
+      <h3>The roll of the dice every career awaits</h3>
+      <p>Nobody gets to opt out of this. You can stand still and let the dice get rolled <em>for</em> you — by a reorg, a redundancy round, a platform going end-of-life — or you can roll it yourself, on your own schedule, while you've still got the runway to recover if it comes up wrong. I know which one I'd rather it be.</p>
+      <p class="es-close">End of chapter I</p>
+    </section>
+
+    <section class="es-chapter" id="why-site">
+      <p class="es-chapter__num">Chapter II</p>
+      <h2 class="es-chapter__title">Why I made this site</h2>
+      <div class="es-chapter__tags"><span class="chip">Upskilling</span><span class="chip">Portfolio</span><span class="chip">Practice</span></div>
+
+      <h3>It's the way to stay up-to-date</h3>
+      <p>I could read about new tooling. I could watch someone else demo it. Neither of those leave a mark the way shipping something does — the gap between "I understand how this works" and "I built a thing that works" is where most of the actually useful learning happens, and reading skips straight past it.</p>
+
+      <h3>Compatible upskilling for the future of development</h3>
+      <p>Desktop support doesn't hand you a natural excuse to touch a design system, a component library, or an AI-assisted build pipeline day to day. This site is the deliberate workaround — a low-stakes place to get fluent in the tools I think the next few years of my field are going to run on, without needing an employer's sign-off to try.</p>
+
+      <h3>Portfolio of single-handed creations</h3>
+      <p>Everything here — the site, the calculator, Gaffer IQ — I built alone, end to end: content, design, code, deployment. Not because collaboration isn't valuable, but because I wanted a body of work where I can account for every decision in it personally. That's a different kind of evidence than "I contributed to."</p>
+
+      <h3>Playground for experimenting with new dev methods</h3>
+      <p>A personal site has no stakeholders, no roadmap, no incident review if something breaks. That's precisely what makes it useful: it's the one place I can try an unfamiliar workflow — a new build approach, a new way of structuring a design system, a component pattern I haven't shipped before — and let it fail quietly if it needs to.</p>
+
+      <div class="es-pull"><p>If a personal site never breaks anything, you're not experimenting on it — you're just decorating a CV.</p></div>
+      <p class="es-close">End of chapter II</p>
+    </section>
+
+    <section class="es-chapter" id="relevance">
+      <p class="es-chapter__num">Chapter III</p>
+      <h2 class="es-chapter__title">How my skill set keeps me relevant</h2>
+      <div class="es-chapter__tags"><span class="chip">Communication</span><span class="chip">Delivery</span><span class="chip">Adaptability</span></div>
+
+      <h3>Articulating technical theory to non-technical stakeholders</h3>
+      <p>The technical answer is rarely the hard part. The hard part is saying it to someone who doesn't want the mechanism, they want the consequence — what breaks, what it costs, what changes for them on Monday. Five years on a Genius Bar and every desk-side ticket since has been training for exactly that translation, on repeat, under time pressure.</p>
+
+      <h3>Comprehensive and tapered communication methods</h3>
+      <p>The same incident gets written up three different ways depending on who's reading it: a one-line status for the stakeholder, a full root-cause note for the next engineer, a plain explanation for the person whose laptop it was. Same facts, different taper. Getting that instinctive is a skill in itself, and it doesn't show up on a CV line the way "resolved 200 tickets" does.</p>
+
+      <h3>Personable, client-focused delivery</h3>
+      <p>Support work is service work before it's technical work. The person in front of you is usually stressed, sometimes about something unrelated to the actual fault. Staying calm, warm, and specific — not scripted — is what turns a fix into a good experience rather than just a resolved ticket.</p>
+
+      <h3>The skillset to stay up-to-date and competent with exponentially changing technology</h3>
+      <p>This is the one that doesn't have an end state. Every tool I'm fluent in today has a shelf life I can't predict, so the actual skill isn't any one stack — it's the underlying habit of picking up the next one fast, without needing a course or a certificate to grant permission first. Chapters I and II are both evidence of that habit; this is the reason it has to keep running.</p>
+
+      <aside class="es-info">
+        <p class="es-info__head">The toolkit, plainly</p>
+        <div class="es-info__body">
+          <ul>
+            <li><b>Constant</b> — clear, honest communication, tapered to the audience</li>
+            <li><b>Variable</b> — whichever stack, tool, or platform is current</li>
+            <li><b>Method</b> — learn it by shipping something real with it, not by reading about it</li>
+            <li><b>Check</b> — does the thing I built actually work for someone other than me</li>
+          </ul>
+        </div>
+      </aside>
+      <p class="es-close">End of chapter III</p>
+    </section>
+
+    <div class="es-end">
+      <a href="/">← Back to home</a>
+      <a href="/projects/">See the projects →</a>
+    </div>
+  </article>
+</div>
+
+<!-- Scroll-spy TOC + reading-progress line. Page-specific behaviour,
+     not shared by any other page, so it's inline here rather than a
+     new sitewide asset/js/*.js file. Theme toggling is NOT duplicated
+     here — the header's #theme-toggle (animations.js) already covers
+     every page, this one included. -->
+<script>
+(function () {
+  var heads = [].slice.call(document.querySelectorAll('.es-art h2, .es-art h3'));
+  var toc = document.getElementById('es-toc');
+  var slugify = function (s) { return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); };
+  heads.forEach(function (h) { if (!h.id) h.id = slugify(h.textContent); });
+  toc.innerHTML = heads.map(function (h) {
+    return '<a href="#' + h.id + '" class="' + (h.tagName === 'H3' ? 'lvl3' : '') + '" data-t="' + h.id + '">' + h.textContent + '</a>';
+  }).join('');
+  var links = [].slice.call(toc.querySelectorAll('a'));
+
+  function spy() {
+    if (!heads.length) return;
+    var line = window.scrollY + 140, active = 0;
+    heads.forEach(function (h, i) { if (h.offsetTop <= line) active = i; });
+    links.forEach(function (a, i) { a.classList.toggle('is-active', i === active); });
+  }
+  function progress() {
+    var doc = document.documentElement;
+    var max = doc.scrollHeight - doc.clientHeight;
+    var pct = max > 0 ? (window.scrollY / max) * 100 : 0;
+    document.getElementById('es-progress').style.width = pct + '%';
+  }
+  window.addEventListener('scroll', function () { requestAnimationFrame(function () { spy(); progress(); }); }, { passive: true });
+  spy(); progress();
+})();
+</script>
