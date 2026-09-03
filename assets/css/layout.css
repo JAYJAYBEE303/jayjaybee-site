@@ -1114,10 +1114,15 @@
   top: 0;
   left: 0;
   height: 2px;
-  width: 0%;
+  width: 100%;
   background: var(--accent);
   z-index: 100;
-  transition: width var(--dur-1) var(--ease);
+  /* Scale, not width — the JS below sets --es-progress-scale on scroll,
+     so this animates transform instead of triggering layout on every
+     scroll tick. */
+  transform: scaleX(var(--es-progress-scale, 0));
+  transform-origin: left;
+  transition: transform var(--dur-1) var(--ease);
 }
 
 .es-mast {

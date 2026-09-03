@@ -173,8 +173,8 @@ scroll_gate: false
   function progress() {
     var doc = document.documentElement;
     var max = doc.scrollHeight - doc.clientHeight;
-    var pct = max > 0 ? (window.scrollY / max) * 100 : 0;
-    document.getElementById('es-progress').style.width = pct + '%';
+    var pct = max > 0 ? window.scrollY / max : 0;
+    document.getElementById('es-progress').style.setProperty('--es-progress-scale', pct);
   }
   window.addEventListener('scroll', function () { requestAnimationFrame(function () { spy(); progress(); }); }, { passive: true });
   spy(); progress();
