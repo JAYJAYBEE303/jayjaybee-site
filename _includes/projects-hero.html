@@ -1,0 +1,40 @@
+{%- comment -%}
+=============================================================================
+  projects-hero.html — the "ledger" hero variant: entry count on the left,
+  kicker/title/sub on the right. An alternate to the mono-label +
+  .section-title--display header pattern (see /projects/wiki/index.html for
+  that one) — this is the one /projects/index.html uses.
+
+  Usage:
+      {% include projects-hero.html
+         count="02/02"
+         kicker="Projects · shipped and written up"
+         title="A short list, kept honest."
+         sub="Everything below either runs in production or has a public
+              write-up — nothing half-built makes this page."
+         heading_id="work-heading" %}
+
+  All params optional except `title` — pass one. Jekyll has no clean
+  build-time assertion to enforce that (no plugin here to add one), so
+  an omitted `title` renders a real but empty <h1> rather than failing
+  the build; treat that as a call-site bug if it ever shows up.
+
+  `heading_id` is optional — set it when the section wrapping this
+  include uses `aria-labelledby` and needs the id on the <h1> itself
+  (as /projects/index.html's <section class="work"> does).
+=============================================================================
+{%- endcomment -%}
+<section class="proj-hero-b" aria-label="{{ include.kicker | default: "Projects" }}">
+  {%- if include.count %}
+  <p class="proj-hero-b__n" aria-hidden="true">{{ include.count | split: "/" | first }}<span>/</span>{{ include.count | split: "/" | last }}</p>
+  {%- endif %}
+  <div>
+    {%- if include.kicker %}
+    <p class="proj-hero-b__kicker">{{ include.kicker }}</p>
+    {%- endif %}
+    <h1{% if include.heading_id %} id="{{ include.heading_id }}"{% endif %} class="proj-hero-b__title">{{ include.title }}</h1>
+    {%- if include.sub %}
+    <p class="proj-hero-b__sub">{{ include.sub }}</p>
+    {%- endif %}
+  </div>
+</section>

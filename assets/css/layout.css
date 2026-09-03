@@ -241,6 +241,71 @@
 }
 
 /* =========================================================================
+   PROJECTS HERO (ledger variant)
+   Alternate opening-header treatment for /projects — a two-column ledger
+   row (entry count, then kicker/title/sub) instead of the mono-label +
+   .section-title--display pattern used elsewhere. Markup + params live
+   in _includes/projects-hero.html.
+
+   --lh-snug (not --lh-tight) on the title, matching .section-title
+   above: --fs-headline is this site's h2-scale token and always pairs
+   with --lh-snug; --lh-tight is reserved for --fs-display (.lede-line,
+   .section-title--display).
+   ========================================================================= */
+.proj-hero-b {
+  max-width: var(--measure-wide);
+  display: grid;
+  /* 5.5rem is a floor, not a fixed track: "NN/NN" at this clamp scale
+     renders wider than 5.5rem, and a fixed track lets nowrap content
+     overflow into the second column rather than growing to fit it.
+     minmax(...,  max-content) grows the track to the numeral's real
+     width instead. */
+  grid-template-columns: minmax(5.5rem, max-content) 1fr;
+  gap: var(--space-6);
+  align-items: start;
+}
+@media (max-width: 36rem) {
+  .proj-hero-b { grid-template-columns: 1fr; }
+}
+.proj-hero-b__n {
+  font-family: var(--font-mono);
+  font-size: clamp(2.5rem, 4vw + 1rem, 3.75rem);
+  line-height: 0.85;
+  letter-spacing: -0.01em;
+  color: var(--fg-faint);
+  /* The 5.5rem column is narrower than "NN/NN" at this clamp scale —
+     nowrap lets the numeral hang past its gutter (an editorial
+     ledger device) instead of wrapping mid-glyph across three lines. */
+  white-space: nowrap;
+}
+.proj-hero-b__n span { color: var(--accent); }
+.proj-hero-b__title {
+  font-family: var(--font-serif);
+  font-weight: var(--fw-regular);
+  font-size: var(--fs-headline);
+  line-height: var(--lh-snug);
+  letter-spacing: var(--tr-headline);
+  color: var(--fg);
+  text-wrap: balance;
+}
+.proj-hero-b__kicker {
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono-caps);
+  text-transform: uppercase;
+  color: var(--fg-quiet);
+  margin-bottom: var(--space-3);
+}
+.proj-hero-b__sub {
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
+  line-height: var(--lh-prose);
+  color: var(--fg-muted);
+  margin-top: var(--space-4);
+  max-width: var(--measure-prose);
+}
+
+/* =========================================================================
    LEDE — the opening line. The single biggest element on the page.
    ========================================================================= */
 .lede-block {

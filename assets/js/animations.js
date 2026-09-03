@@ -195,6 +195,7 @@
     '.roles .section-head',
     '.role-item',
     '.work  .section-head',
+    '.proj-hero-b',
     '.work-item',
     '.about  .section-head',
     '.about__rule',

@@ -16,8 +16,8 @@
    ========================================================================= */
 
 @import url('variables.css?v=41');
-@import url('layout.css?v=43');
-@import url('components.css?v=48');
+@import url('layout.css?v=44');
+@import url('components.css?v=49');
 @import url('wiki.css?v=7');
 
 /* =========================================================================
@@ -196,6 +196,7 @@ a:focus-visible {
     .roles .section-head,
     .role-item,
     .work  .section-head,
+    .proj-hero-b,
     .work-item,
     .about  .section-head,
     .about__rule,

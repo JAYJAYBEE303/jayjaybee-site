@@ -37,10 +37,12 @@ scroll_gate: false
      lands straight on the work.
      ============================================================ -->
 <section class="work" aria-labelledby="work-heading">
-  <header class="section-head">
-    <span class="mono-label">Selected&nbsp;work</span>
-    <h1 id="work-heading" class="section-title section-title--display">Things I've made.</h1>
-  </header>
+  {%- include projects-hero.html
+       count="02/02"
+       kicker="Projects · shipped and written up"
+       title="A short list, kept honest."
+       sub="Everything below either runs in production or has a public write-up — nothing half-built makes this page."
+       heading_id="work-heading" -%}
 
   <ol class="work-list" role="list">
 
