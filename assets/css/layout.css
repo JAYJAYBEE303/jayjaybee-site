@@ -1126,12 +1126,17 @@
 }
 
 .es-mast {
-  /* No padding-top here — .page already carries the header-to-content
-     gap (clamp(--space-7, 6vw, --space-10)), same as .lede-block and
-     .proj-hero-b. Stacking a second top padding on top of that was
-     the bug: doubled the gap under the header. */
+  /* .page's own padding-top (clamp(--space-7, 6vw, --space-10)) grows
+     past --space-7 on wide viewports — fine for .lede-block and
+     .proj-hero-b, which don't need to match anything below them. This
+     page does: the gap under the stat strip (.es-rail/.es-art's own
+     padding-top) is a flat --space-7. Cancelling the clamp's growth
+     here keeps the top gap pinned to exactly --space-7 too, so the
+     mast reads as evenly spaced above and below at every width. */
+  margin-top: calc(var(--space-7) - clamp(var(--space-7), 6vw, var(--space-10)));
   max-width: 56rem;
-  margin: 0 auto;
+  margin-left: auto;
+  margin-right: auto;
   padding: 0 clamp(var(--space-4), 3vw, var(--space-7)) 0;
 }
 .es-mast__title {
