@@ -271,15 +271,17 @@
 @media (max-width: 36rem) {
   .proj-hero-b { grid-template-columns: 1fr; }
 }
-/* The ledger numeral — deliberately stacked three lines (numerator /
-   slash / denominator), not left to wrap. It read as an accidental
-   line-break at first (the fixed 5.5rem column IS narrower than
-   "NN/NN" set inline), but that stacked look is the wanted one — a
-   flex column makes it deliberate and stable instead of depending on
-   the browser's own line-breaking around "/", which is fragile across
-   fonts/zoom levels. Each digit pair and the slash are separate <span>
-   children in the markup (see _includes/projects-hero.html) so this
-   never depends on where the browser happens to wrap. */
+/* The ledger numeral — deliberately stacked three lines by fixed
+   character position ("02" / "/0" / "2" for a "NN/NN" count), not
+   left to wrap. It first read as an accidental line-break (the fixed
+   5.5rem column IS narrower than "NN/NN" set inline), but that
+   2-2-1 stacked look is the wanted one — a flex column makes it
+   deliberate and stable instead of depending on the browser's own
+   line-breaking around "/", which is fragile across fonts/zoom
+   levels. The three chunks are separate <span class="proj-hero-b__n-line">
+   children in the markup (see _includes/projects-hero.html), sliced
+   by character index, so this never depends on where the browser
+   happens to wrap. */
 .proj-hero-b__n {
   display: flex;
   flex-direction: column;
