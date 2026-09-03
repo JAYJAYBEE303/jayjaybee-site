@@ -1283,7 +1283,13 @@
   scroll-margin-top: var(--space-6);
 }
 .es-art > .es-chapter > h3:first-of-type { margin-top: var(--space-5); }
-.es-art p { margin-top: var(--space-4); text-wrap: pretty; }
+/* :not() the two label <p>s below — .es-chapter__num and .es-close are
+   <p> tags too, so the bare ".es-art p" was catching them as well and
+   (being more specific than their own single-class rules) was winning:
+   .es-chapter__num picked up an unwanted --space-4 top margin it never
+   asked for, and .es-close's own explicit margin-top was being
+   overridden down to --space-4 instead of the --space-6 it declares. */
+.es-art p:not(.es-chapter__num):not(.es-close) { margin-top: var(--space-4); text-wrap: pretty; }
 .es-art strong { font-weight: var(--fw-semibold); }
 
 .es-pull {
