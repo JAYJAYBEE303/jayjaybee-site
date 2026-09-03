@@ -219,7 +219,12 @@
     '.wk-art__meta',
     '.wk-draft',
     '.wk-info',
-    '.wk-body',
+    // NOT '.wk-body': it's the whole rest of the article — several
+    // viewport-heights tall on longer entries. Gating an element that
+    // size behind a single IntersectionObserver threshold risks
+    // exactly the "looks like the content never loaded" failure this
+    // is meant to avoid. It renders visible immediately instead;
+    // .wk-crumb / h1 / lede / meta above still carry the entrance fade.
     '.wk-back',
     '.wk-pager',
     '.wk-rail',

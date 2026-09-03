@@ -60,6 +60,26 @@
       var root = document.documentElement;
       root.classList.replace('no-js', 'js');
 
+      // Wiki entry -> wiki entry: the left/right rails are the same
+      // navigation chrome the reader was just looking at, not new
+      // material — re-running their entrance fade on every click reads
+      // as the page reloading, not as content appearing. Checked here
+      // (referrer, before first paint) so the CSS override in
+      // components.css can hold them visible from the first frame,
+      // no flash of hidden-then-shown. Only the rails skip it — the
+      // article itself (.wk-art and its children) still fades in
+      // every time, because that part IS new each click.
+      try {
+        var ref = document.referrer;
+        if (ref) {
+          var refURL = new URL(ref);
+          if (refURL.origin === location.origin &&
+              /^\/projects\/wiki\/[^/]+\/[^/]+\/?$/.test(refURL.pathname)) {
+            root.classList.add('wk-continue');
+          }
+        }
+      } catch (e) {}
+
       // Pages opt out of the gate with `scroll_gate: false` in front
       // matter — a page's own, or (falling back, same as title_suffix
       // and page_wide above) its LAYOUT's, so wiki-entry.html can set
@@ -123,7 +143,7 @@
     })();
   </script>
 
-  <link rel="stylesheet" href="/assets/css/global.css?v=64" />
+  <link rel="stylesheet" href="/assets/css/global.css?v=65" />
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -338,7 +358,7 @@
     </div>
   </footer>
 
-  <script src="/assets/js/animations.js?v=15" defer></script>
+  <script src="/assets/js/animations.js?v=16" defer></script>
   <script src="/assets/js/search.js?v=3" defer></script>
 </body>
 </html>

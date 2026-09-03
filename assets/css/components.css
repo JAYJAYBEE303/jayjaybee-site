@@ -115,7 +115,6 @@
   .wk-art__meta,
   .wk-draft,
   .wk-info,
-  .wk-body,
   .wk-back,
   .wk-pager,
   .wk-rail,
@@ -130,6 +129,21 @@
   transition-delay: var(--reveal-delay, 0ms);
   /* GPU hint, dropped once .is-visible lands */
   will-change: opacity, transform;
+}
+
+/* Wiki entry -> wiki entry (see the referrer check in
+   _layouts/default.html, which sets .wk-continue on <html> before
+   first paint): the rails are the same nav chrome the reader was just
+   looking at, so they skip the entrance fade and stay at rest.
+   `html.wk-continue .wk-rail` outranks the hidden-state rule above
+   (0,2,1 vs 0,2,0 for the .wk-rail match inside that :is()) so no
+   !important is needed. The article itself (.wk-crumb, .wk-art > h1,
+   etc.) is NOT listed here on purpose: that part is new every click
+   and keeps its fade. */
+html.wk-continue .wk-rail {
+  opacity: 1;
+  transform: none;
+  transition: none;
 }
 
 /* Per-element starting transforms — variants. Set after the shared
@@ -183,7 +197,6 @@
   .wk-art__meta,
   .wk-draft,
   .wk-info,
-  .wk-body,
   .wk-back,
   .wk-pager,
   .wk-rail,
@@ -396,7 +409,6 @@ html:not(.is-home) :is(
   .wk-art__meta,
   .wk-draft,
   .wk-info,
-  .wk-body,
   .wk-back,
   .wk-pager,
   .wk-rail,
