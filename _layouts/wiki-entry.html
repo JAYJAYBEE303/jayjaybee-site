@@ -33,6 +33,9 @@ page_wide: true
       group:    Matchups            (rail heading)
       title:    Calculations
       lede:     one italic sentence (optional)
+      shape:    list of {group, terms} for this section's own infobox
+                (optional — see _includes/wiki-infobox.html. Terms are
+                glossary keys; one with no entry renders as plain text)
 
   revised, author and status are NOT declared per section. They are
   read from the parent app, so twelve pages do not restate the same
@@ -173,15 +176,23 @@ page_wide: true
       {%- endif %}
 
       {%- comment -%}
-        The infobox belongs to the APP, not to a section, so it renders on
-        the app's first section only — repeating an eight-row infobox on
-        twelve pages would bury the prose.
+        Every section carries an infobox, and it summarises THAT section:
+        a section declares its own `shape` (or `info`) in front matter and
+        that is what renders, headed by the section's own title.
+
+        The app's box is the fallback, and only on its first section. That
+        box describes the app's stack rather than any one section, so it
+        belongs on the write-up's front door and nowhere else — repeating
+        it on every section would say the same four groups twelve times.
+        A first section that declares its own `shape` overrides it.
 
         The launch button is app-level too, but it is a destination rather
         than reference material, so it lives in the right rail instead and
         is present on every section. See the rail below.
       {%- endcomment -%}
-      {%- if wk_idx == 0 %}
+      {%- if page.shape or page.info %}
+        {% include wiki-infobox.html app=page %}
+      {%- elsif wk_idx == 0 %}
         {%- if wk_app.shape or wk_app.info %}
         {% include wiki-infobox.html app=wk_app %}
         {%- endif %}

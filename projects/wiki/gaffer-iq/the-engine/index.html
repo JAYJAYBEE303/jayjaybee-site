@@ -7,7 +7,24 @@ group: Design Philosophy
 title: The engine
 revised: 2026-09-03
 lede: All the number-crunching in one place, the settings that control it in another, and a confidence level attached to every output.
+shape:
+  - group: Structure
+    terms:
+      - engine/
+      - Config file
+      - Pure functions
+  - group: Rule
+    terms:
+      - Settings, not formulas
+      - No bolted-on shortcuts
+  - group: Every output carries
+    terms:
+      - A stated direction
+      - A confidence level
+      - Max weight contribution
 ---
+
+<h2>One place for the numbers</h2>
 
 <p>To be able to predict how strong a player or fixture is, all the
 number-crunching lives in one place — <code>engine/</code>, containing
@@ -15,10 +32,14 @@ js files. If a view needs a new number, it gets added to the engine
 properly, not bolted on as a shortcut. That's what keeps every screen
 showing the same story.</p>
 
+<h2>Settings, not formulas</h2>
+
 <p>The settings that control the model (how much recent form matters,
 how much a tough opponent counts) live in one config file, separate
 from the formulas. Changing the model means adjusting a setting, never
 rewriting a formula.</p>
+
+<h2>Direction and confidence</h2>
 
 <p>Every calculation has to clearly state which way it points, as well
 as an acknowledged confidence level in each output according to max

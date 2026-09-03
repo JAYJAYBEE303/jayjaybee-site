@@ -7,7 +7,26 @@ group: Matchups
 title: Calculations
 revised: 2026-09-03
 lede: Five weighted sub-metrics, each with its own maturity curve, combined into one CompositeScore and mapped to five colour bands.
+shape:
+  - group: The five sub-metrics
+    terms:
+      - Base difficulty
+      - Counter-matchup
+      - Team form
+      - Head-to-head
+      - Home and away
+  - group: Controls
+    terms:
+      - CompositeScore
+      - Maturity curve
+      - Stacking penalty
+  - group: Sources
+    terms:
+      - FPL API
+      - Understat
 ---
+
+<h2>The five sub-metrics</h2>
 
 <p>Five weighted sub-metrics result in the overall score, known as the
 <code>CompositeScore</code>, as one number:</p>
@@ -72,6 +91,8 @@ lede: Five weighted sub-metrics, each with its own maturity curve, combined into
   an equal penalty for the away side, centred around a neutral 50.</li>
 </ul>
 
+<h2>The stacking penalty</h2>
+
 <p>A <strong>stacking penalty</strong> then applies across the
 sub-metrics. It and the base-difficulty weight are a matched pair — a
 weight that large would otherwise make a strong favourite's score
@@ -79,12 +100,24 @@ nearly immovable, and the penalty is what lets <em>several</em> poor
 secondary signals tip a fixture without letting any single one do it
 alone. Neither should be tuned without re-checking the other.</p>
 
+<h2>The five bands</h2>
+
 <p>The result maps to five bands, symmetric around a neutral midpoint,
-which drive colour everywhere in the app: <strong>great</strong>
-75–100, <strong>good</strong> 60–74, <strong>neutral</strong> 41–59,
-<strong>tough</strong> 26–40, <strong>brutal</strong> 0–25. Thresholds
-are config rather than literals, so the palette can be recalibrated
-after a season's distribution has actually been observed.</p>
+which drive colour everywhere in the app:</p>
+
+<ol>
+  <li><strong>Great</strong> — 75–100.</li>
+  <li><strong>Good</strong> — 60–74.</li>
+  <li><strong>Neutral</strong> — 41–59.</li>
+  <li><strong>Tough</strong> — 26–40.</li>
+  <li><strong>Brutal</strong> — 0–25.</li>
+</ol>
+
+<p>Thresholds are config rather than literals, so the palette can be
+recalibrated after a season's distribution has actually been
+observed.</p>
+
+<h2>The signal that was removed</h2>
 
 <p>There used to be a sixth signal, style clash, and removing it is the
 most instructive decision in the model. It substantially restated the

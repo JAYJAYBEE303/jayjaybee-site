@@ -195,3 +195,132 @@
     Storing fetched data temporarily instead of re-fetching, with an
     expiry rule for staleness.
   ref: the-data
+
+# -----------------------------------------------------------------------------
+# Model vocabulary. Added when every section gained its own infobox: a section
+# box names the terms that section is about, and these are the ones that recur
+# across more than one of them. Each `ref` points at the section that actually
+# explains the term, so a reader meeting it on Matchups can reach Calculations
+# in one click.
+# -----------------------------------------------------------------------------
+
+"compositescore":
+  kind: Model
+  text: >
+    The single number every fixture is reduced to. Five weighted
+    sub-metrics are scored separately and combined into it, and it is
+    what drives the colour band shown anywhere in the app.
+  ref: calculations
+
+"base difficulty":
+  kind: Sub-metric
+  text: >
+    FPL's own 1–5 rating, rescaled to 10/30/50/70/90 and used only as a
+    starting point. It is preseason-seeded, which is why team form
+    exists to correct it in-season.
+  ref: calculations
+
+"counter-matchup":
+  kind: Sub-metric
+  text: >
+    The heaviest calculation. Rather than asking how strong a team is,
+    it asks where each side is strongest and weakest, and whether those
+    shapes counter each other. Matures over 10 fixtures to a maximum
+    0.25 weight.
+  ref: calculations
+
+"team form":
+  kind: Sub-metric
+  text: >
+    Recent trajectory, adjusted for the strength of the opponents it was
+    earned against. Matures over 5 fixtures to a maximum 0.2 weight, so
+    two good games in August cannot read as perfect form.
+  ref: calculations
+
+"head-to-head":
+  kind: Sub-metric
+  text: >
+    The real cross-season record between two clubs. Deliberately capped
+    at a 0.1 weight — testing showed anything larger made predictions
+    worse, because a rivalry from three managers ago is weak evidence.
+  ref: fixtures-head-to-head
+
+"home and away":
+  kind: Sub-metric
+  text: >
+    How much venue matters to each side, measured as their home-versus-away
+    points gap relative to the rest of the league, then applied as a boost
+    to the home team and an equal penalty to the away team.
+  ref: calculations
+
+"maturity curve":
+  kind: Control
+  text: >
+    A per-sub-metric ramp that holds a signal's weight down until enough
+    fixtures have been played to trust it, rising linearly to its cap.
+    It is what stops wild early-season data driving the score.
+  ref: calculations
+
+"stacking penalty":
+  kind: Control
+  text: >
+    Applied across the sub-metrics so several weak secondary signals can
+    tip a fixture without any single one doing it alone. It and the
+    base-difficulty weight are a matched pair; neither is tuned alone.
+  ref: calculations
+
+"matchup breakdown":
+  kind: Region
+  text: >
+    The central element of the Matchups page — the deep dive on one
+    fixture, showing decision weight, confidence, playstyle counters and
+    the overall prediction score.
+  ref: matchup-the-tools
+
+"full season strip":
+  kind: Region
+  text: >
+    The bottom strip of the Matchups page, and the view with the longest
+    horizon. It marks the gameweeks worth planning around rather than
+    every fixture equally.
+  ref: matchup-the-tools
+
+"double gameweeks":
+  kind: FPL term
+  text: >
+    A gameweek in which a club plays twice, usually because an earlier
+    fixture was postponed and rescheduled into it. Highlighted on the
+    season strip because it changes captaincy and chip decisions.
+  ref: matchup-the-tools
+
+"subtabs":
+  kind: Pattern
+  text: >
+    The Fixtures page is split into four sub-views rather than one long
+    scroll, chosen because the volume of historical statistics would
+    otherwise bury whatever the reader came looking for.
+  ref: fixtures-design
+
+"starting xi":
+  kind: Data
+  text: >
+    A real teamsheet with formation, derived from Understat's rosters via
+    their position codes and substitution linkage. The FPL API exposes no
+    teamsheet of any kind.
+  ref: fixtures-gameweek
+
+"data density":
+  kind: Design problem
+  text: >
+    There is more data here than a page can show at once. The interface
+    answers it with clear containers, colour, spacing and separated
+    views rather than by showing less.
+  ref: the-interface
+
+"modular":
+  kind: Architecture
+  text: >
+    Data is parsed once and made available globally across the site
+    rather than re-fetched per view, which is what allows a new view to
+    be added without a new data path.
+  ref: approach

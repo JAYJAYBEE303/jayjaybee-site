@@ -417,8 +417,16 @@ a.wk-launch--rail {
   color: var(--fg);
   text-wrap: pretty;
 }
+/* The reset has to be `> *`, not `p`. `.wk-body p` is (0,1,1) and the flow
+   rule below is (0,1,0), so a `margin: 0` written against `p` outranks it and
+   every paragraph in the wiki computed margin-top: 0 — two paragraphs ran
+   together, and a paragraph after a list sat flush against its last item.
+   Resetting at the same specificity as the flow rule keeps the UA margins off
+   without out-ranking it, and the element rules further down this file
+   (h2, h3, ul, ol, blockquote, hr) are all (0,1,1) and still win. Matches the
+   design sheet, which resets nothing and relies on the flow rule alone. */
+.wk-body > * { margin: 0; }
 .wk-body > * + * { margin-top: var(--space-5); }
-.wk-body p { margin: 0; }
 
 /* h2 inherits family/weight/line-height/tracking from global.css's h2;
    only the step down to subhead and the structure are set here. */
@@ -453,6 +461,12 @@ a.wk-launch--rail {
   left: 0;
   color: var(--fg-faint);
 }
+/* The dot variant. A dash list reads as a set of parallel qualifications
+   ("no standings endpoint, no teamsheet"); a dot list reads as a plain
+   inventory of things present. Same geometry, different mark — opted
+   into per list with `<ul class="list--dot">`, so the dash stays the
+   default and nothing existing changes. */
+.wk-body ul.list--dot li::before { content: "\2022"; }
 .wk-body ol { list-style: none; margin: var(--space-5) 0 0; padding: 0; counter-reset: wk; }
 .wk-body ol li { position: relative; padding-left: var(--space-6); counter-increment: wk; }
 .wk-body ol li + li { margin-top: var(--space-3); }

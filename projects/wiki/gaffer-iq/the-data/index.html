@@ -7,22 +7,46 @@ group: Design Philosophy
 title: The data
 revised: 2026-09-03
 lede: Two sources, one serverless function, and everything else running in the browser — plus a frank list of what the FPL API does not give you.
+shape:
+  - group: Sources
+    terms:
+      - FPL API
+      - Understat
+  - group: Talking to them
+    terms:
+      - One Vercel function
+      - CORS
+      - Proxy
+      - Allowlist
+  - group: Everything else
+    terms:
+      - Client-side rendering
 ---
+
+<h2>Where the logic runs</h2>
 
 <p>Every piece of analytical logic runs in the browser. The one
 serverless function on Vercel exists solely because the FPL API sends
 no CORS headers — it fetches from an allowlist and forwards, and does
 nothing else.</p>
 
+<h2>The FPL API, and what it leaves out</h2>
+
 <p>The FPL API (<a href="https://fantasy.premierleague.com/api/"
 target="_blank" rel="noopener">fantasy.premierleague.com/api</a>)
 supplies the spine: squads, prices, positions, fixtures, per-player
 histories, live gameweek scoring. What it conspicuously does not supply
-is most of what makes a matchup readable. There is no standings
-endpoint, so the league table is accumulated from the fixtures feed
-instead. There is no access to any season but the current one. There
-are no minute timings, no goal-to-assist pairing, and no teamsheet of
-any kind.</p>
+is most of what makes a matchup readable:</p>
+
+<ul>
+  <li>No standings endpoint, so the league table is accumulated from the
+  fixtures feed instead.</li>
+  <li>No access to any season but the current one.</li>
+  <li>No minute timings, and no goal-to-assist pairing.</li>
+  <li>No teamsheet of any kind.</li>
+</ul>
+
+<h2>Understat, which fills the gaps</h2>
 
 <p>Understat, although not an API (<a href="https://understat.com"
 target="_blank" rel="noopener">understat.com</a>), fills those gaps:
