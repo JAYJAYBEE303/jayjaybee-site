@@ -119,7 +119,7 @@
     })();
   </script>
 
-  <link rel="stylesheet" href="/assets/css/global.css?v=60" />
+  <link rel="stylesheet" href="/assets/css/global.css?v=63" />
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -190,15 +190,22 @@
               </ul>
             </li>
 
-            <li><a class="site-nav__link site-nav__link--accent" href="/files/CV.pdf" target="_blank" rel="noopener">CV</a></li>
             <li><a class="site-nav__link" href="/#about">About me</a></li>
-            <li><a class="site-nav__link" href="/#contact">Contact</a></li>
+
+            <!-- Relative fragment, not "/#contact" — the footer this
+                 points at (id="contact") is in the shared layout, so
+                 it's on every page already. An absolute "/#contact"
+                 forced a detour home before jumping to it; "#contact"
+                 just scrolls the current page straight to its own
+                 footer, wherever that page is. -->
+            <li><a class="site-nav__link" href="#contact">Contact</a></li>
+
+            <li><a class="site-nav__link site-nav__link--accent" href="/files/CV.pdf" target="_blank" rel="noopener">CV</a></li>
 
             <!-- Projects — the wiki hub at /projects. Was a dropdown listing
                  each app directly; now a single link. The landing page lists
                  the work and sends each row to its write-up under
-                 /projects/wiki/; only a write-up links out to its app.
-                 Sits last: it leaves the site for a section of its own. -->
+                 /projects/wiki/; only a write-up links out to its app. -->
             <li><a class="site-nav__link" href="/projects/">Projects</a></li>
             <li><a class="site-nav__link" href="/ai-thesis/">Ai thesis</a></li>
 
