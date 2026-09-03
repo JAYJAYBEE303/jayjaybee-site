@@ -1126,9 +1126,13 @@
 }
 
 .es-mast {
+  /* No padding-top here — .page already carries the header-to-content
+     gap (clamp(--space-7, 6vw, --space-10)), same as .lede-block and
+     .proj-hero-b. Stacking a second top padding on top of that was
+     the bug: doubled the gap under the header. */
   max-width: 56rem;
   margin: 0 auto;
-  padding: clamp(var(--space-6), 4vw, var(--space-8)) clamp(var(--space-4), 3vw, var(--space-7)) 0;
+  padding: 0 clamp(var(--space-4), 3vw, var(--space-7)) 0;
 }
 .es-mast__title {
   font-family: var(--font-serif);
