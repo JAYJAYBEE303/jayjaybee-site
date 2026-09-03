@@ -1,0 +1,7 @@
+# Self-contained sub-apps under /projects/apps/. Each owns its whole
+# document (own <head>, fonts, tokens, stylesheets) and shares no code
+# with the site or with each other — see _config.yml's `layout: null`
+# scope for the same rule enforced at build time. Design-system
+# enforcement (tokens, CLAUDE.md directives, primitive reuse) does not
+# apply inside this path.
+projects/apps/**

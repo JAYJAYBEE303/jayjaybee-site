@@ -147,6 +147,13 @@ h3, .h3 {
   display: inline-block;
 }
 
+/* Accent inline emphasis — vermillion run inside prose (the About
+   section's quoted headings). A class rather than a repeated inline
+   `style="color: var(--accent);"` so the token is declared once. */
+.accent {
+  color: var(--accent);
+}
+
 /* Links — accent colour, underline tracks on hover */
 a {
   color: var(--link);
