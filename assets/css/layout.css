@@ -251,34 +251,46 @@
    above: --fs-headline is this site's h2-scale token and always pairs
    with --lh-snug; --lh-tight is reserved for --fs-display (.lede-line,
    .section-title--display).
+
+   margin-bottom on .proj-hero-b matches --space-7, the same token
+   .section-head declares below for exactly this purpose (the gap
+   before a section's list starts) — this is that same site-wide rule,
+   not a new value invented for this component. .work-item's own
+   border-top + padding-top: var(--space-7) still applies on top of
+   this, same as it always has for every .section-head + .work-list
+   pairing elsewhere on the site.
    ========================================================================= */
 .proj-hero-b {
   max-width: var(--measure-wide);
   display: grid;
-  /* 5.5rem is a floor, not a fixed track: "NN/NN" at this clamp scale
-     renders wider than 5.5rem, and a fixed track lets nowrap content
-     overflow into the second column rather than growing to fit it.
-     minmax(...,  max-content) grows the track to the numeral's real
-     width instead. */
-  grid-template-columns: minmax(5.5rem, max-content) 1fr;
+  grid-template-columns: 5.5rem 1fr;
   gap: var(--space-6);
   align-items: start;
+  margin-bottom: var(--space-7);
 }
 @media (max-width: 36rem) {
   .proj-hero-b { grid-template-columns: 1fr; }
 }
+/* The ledger numeral — deliberately stacked three lines (numerator /
+   slash / denominator), not left to wrap. It read as an accidental
+   line-break at first (the fixed 5.5rem column IS narrower than
+   "NN/NN" set inline), but that stacked look is the wanted one — a
+   flex column makes it deliberate and stable instead of depending on
+   the browser's own line-breaking around "/", which is fragile across
+   fonts/zoom levels. Each digit pair and the slash are separate <span>
+   children in the markup (see _includes/projects-hero.html) so this
+   never depends on where the browser happens to wrap. */
 .proj-hero-b__n {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   font-family: var(--font-mono);
   font-size: clamp(2.5rem, 4vw + 1rem, 3.75rem);
   line-height: 0.85;
   letter-spacing: -0.01em;
   color: var(--fg-faint);
-  /* The 5.5rem column is narrower than "NN/NN" at this clamp scale —
-     nowrap lets the numeral hang past its gutter (an editorial
-     ledger device) instead of wrapping mid-glyph across three lines. */
-  white-space: nowrap;
 }
-.proj-hero-b__n span { color: var(--accent); }
+.proj-hero-b__n-slash { color: var(--accent); }
 .proj-hero-b__title {
   font-family: var(--font-serif);
   font-weight: var(--fw-regular);

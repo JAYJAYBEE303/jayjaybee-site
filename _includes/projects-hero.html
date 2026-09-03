@@ -26,7 +26,13 @@
 {%- endcomment -%}
 <section class="proj-hero-b" aria-label="{{ include.kicker | default: "Projects" }}">
   {%- if include.count %}
-  <p class="proj-hero-b__n" aria-hidden="true">{{ include.count | split: "/" | first }}<span>/</span>{{ include.count | split: "/" | last }}</p>
+  {%- comment -%}
+    Deliberately three separate <span> children (numerator / slash /
+    denominator), not one text run with an inline <span> around the
+    slash — .proj-hero-b__n lays them out as a flex column so the
+    stack is stable, not dependent on the browser's own line-breaking.
+  {%- endcomment -%}
+  <p class="proj-hero-b__n" aria-hidden="true"><span>{{ include.count | split: "/" | first }}</span><span class="proj-hero-b__n-slash">/</span><span>{{ include.count | split: "/" | last }}</span></p>
   {%- endif %}
   <div>
     {%- if include.kicker %}
