@@ -16,14 +16,27 @@ rule at build time. Nothing below applies inside that path.
 ## Token source
 
 `assets/css/variables.css` is the one token file — colour, type
-family/scale, spacing, radii, shadows, motion. Every other stylesheet
-(`layout.css`, `components.css`, `wiki.css`) reads those tokens via
-`var(--...)` and declares no raw values of its own; `wiki.css`'s own
-header states this as a file rule. Follow the same rule in new CSS:
-**no hardcoded hex codes, no literal `px`/`rem` sizes outside a
-token, no inline `style="color: #..."` or similar** — resolve to an
-existing `--` custom property, or add one to `variables.css` if the
-value is genuinely new and reusable.
+family/scale, spacing steps, radii, shadows, motion (durations +
+easings). **These categories must always resolve through `var(--...)`
+— no raw hex, no raw font stacks, no literal `ms`/`cubic-bezier`, no
+inline `style="color: #..."` or similar.** Resolve to an existing `--`
+custom property, or add one to `variables.css` if the value is
+genuinely new and reusable.
+
+One-off *structural* dimensions — a grid-column width
+(`11rem 1fr`), a component's own `max-width` (`32ch`), a breakpoint
+(`@media (max-width: 56rem)`) — are legitimately literal in
+`layout.css` and `components.css`; that is this repo's real
+convention (see e.g. `.role-item`'s `grid-template-columns: 11rem 1fr`,
+`.footer-portrait`'s `width: 6rem`), not debt to clean up. Only
+promote one to a `--` token when it is reused across multiple rules —
+`wiki.css` does exactly this with its own `--wk-rail-w` etc. for
+measures with "no site-wide counterpart" (its own words).
+
+`wiki.css` alone holds itself to a stricter, file-scoped rule: *zero*
+literal values of any kind, including one-off structural ones — its
+own header states this explicitly. Match that stricter bar only
+inside `wiki.css`; don't import it into `layout.css`/`components.css`.
 
 Approved exceptions (checked, not tokens, not violations):
 - `assets/css/layout.css`'s `.footer-portrait` mask-image gradients
