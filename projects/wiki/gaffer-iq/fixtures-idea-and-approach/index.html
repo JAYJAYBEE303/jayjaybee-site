@@ -5,21 +5,21 @@ slug: fixtures-idea-and-approach
 order: 110
 group: Fixtures
 title: Idea and approach
-lede: The schedule-level companion to Matchups, and the one view that carries no scoring of its own.
+lede: True historical data, exactly as fetched — a manual, less-processed way to read the game for anyone who doesn't fully trust the engine's guessing.
 ---
 
-<p>The schedule-level companion to Matchups, and the one view that
-carries no scoring of its own. It answers <em>what and when</em>; the
-Matchup Analyser then explains it.</p>
+<p>I wanted to provide a different style of view; instead of providing
+calculated metrics for what lies ahead, I wanted to provide a page that
+displays true historical data which relies less on the engine. This
+gives the user a more open-to-interpretation perspective on fixtures,
+in the case that they don't fully trust the engine providing the
+guessing for them — the [[matchup-idea-and-approach|Matchups]] page
+won't suit everyone, nor will everyone trust the engine's guessing and
+suggestions, so to expand the target audience I realised I needed a way
+to allow the user to have a more manual way of reading the game.</p>
 
-<p>Four sub-views, all on live data. The gameweek grid gives kickoff
-times, results, per-fixture events and lineups. The league table is the
-one accumulated from the fixtures feed, with the European qualification
-and relegation zones each coloured separately. "By team" splits one
-club's season into results and upcoming. "Head-to-head" carries the
-full record for a pairing.</p>
-
-<p>They cross-link throughout: a club name in the table or in a fixture
-row opens By team on that club, and an opponent in By team — or the
-head-to-head block inside any fixture, played or upcoming — opens
-Head-to-head on that pairing.</p>
+<p>To do this, I chose to provide more rigid information that focuses
+on historical data that doesn't go through any processing change, and
+outputs useful data exactly as it was fetched. The understat.com API
+had everything needed to make this work effectively, meaning minimal
+data from the FPL API was needed to fill this area of the site.</p>
