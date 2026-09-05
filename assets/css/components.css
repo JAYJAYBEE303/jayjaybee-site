@@ -133,61 +133,54 @@
 
 /* Wiki entry -> wiki entry (see the referrer check in
    _layouts/default.html, which sets .wk-continue on <html> before
-   first paint): the rails AND the article's own chrome — crumb,
-   title, lede, meta strip, draft flag, infobox, backlinks, pager —
-   are all the same furniture the reader was just looking at (a
-   different value inside it, but the same shape), so none of it
-   re-runs its entrance fade. Only .wk-body is left out of this list:
-   it's the one thing that is genuinely new prose on every click, and
-   it gets its own fade below instead of the shared one above.
-   (Earlier version of this rule listed .wk-rail alone, on the theory
-   that the article head was "new every click" the same way its
-   content is — but a reader paging through entries reads that as the
-   whole page frame re-loading, not as new material appearing; the
-   .wk-body swap already carries that signal on its own.)
+   first paint, only when BOTH pages are sections of the same
+   write-up): the reader is staying inside one write-up, so the frame
+   around the article holds still — both rails and the breadcrumb,
+   which are the parts that either don't change at all or change only
+   by which row is marked current. Everything inside the article
+   itself still fades, so the swap reads as "this panel changed"
+   rather than "the page reloaded".
+   Arriving from ANYWHERE ELSE — /projects/wiki/, another write-up, a
+   direct link, off-site — sets no .wk-continue, none of this applies,
+   and the whole page performs its normal entrance. That is the point:
+   a first arrival should look like one.
    Needs .wk-layout in the chain to outrank the hidden-state rule
    above: :is()'s specificity is the specificity of its single most
    specific argument, for the WHOLE pseudo-class, not just whichever
    branch actually matches — and something like ".about .section-head"
    in that list already makes ".js :is(...)" work out to (0,3,0). Two
    classes plus html here would only reach (0,2,1) and lose; the third
-   class from .wk-layout (a genuine ancestor of every target below,
+   class from .wk-layout (a genuine ancestor of both targets below,
    see wiki-entry.html) gets this to (0,3,1) — confirmed live rather
    than assumed, since this exact specificity race already produced a
-   silent loss once (see the .wk-rail-only version's own history). */
+   silent loss once. */
 html.wk-continue .wk-layout :is(
   .wk-rail,
-  .wk-crumb,
-  .wk-art > h1,
-  .wk-art__lede,
-  .wk-art__meta,
-  .wk-draft,
-  .wk-info,
-  .wk-back,
-  .wk-pager
+  .wk-crumb
 ) {
   opacity: 1;
   transform: none;
   transition: none;
 }
 
-/* .wk-body's counterpart: on a continue-nav it's the only part of the
-   article that is genuinely new, so unlike everything above it DOES
-   fade in. This stays its own rule rather than joining .wk-body to
-   the sitewide hidden-state block above (or to BELOW_GATE_SELECTOR in
-   animations.js): that block is unconditional, and .wk-body can run
-   several viewport-heights on a long entry — gating it behind one
-   IntersectionObserver threshold on EVERY load (including a fresh
-   arrival, or a deep link landing mid-article) is exactly the
-   "content silently never appears" failure already ruled out once for
-   this element. Scoping the hidden state to .wk-continue keeps a
-   fresh arrival exactly as it is today (instant, ungated), and
-   revealed here specifically because a continue-nav is always a
-   forward click that lands scrolled to the top of the new page —
-   there's no "was this ever in the viewport" question left to ask, so
-   animations.js reveals it with a plain class add, no observer (see
-   revealContinueBody). */
-html.wk-continue .wk-layout .wk-body {
+/* The article's prose and its notes list. These are the only parts of
+   a wiki entry NOT handled by the shared reveal system above, and
+   they are kept out of it deliberately: .wk-body is the whole rest of
+   the article, several viewport-heights tall on a long entry, and the
+   shared observer only fires past a 0.06 intersection ratio — a
+   ratio an element that tall can fail to reach from a deep link or a
+   restored scroll position, leaving the text invisible until the
+   reader scrolls far enough to satisfy it. That is why it was pulled
+   out of the lists in the first place.
+   Being out of the lists is not the same as never fading, though.
+   The hidden state here is unconditional (every arrival, continue or
+   not), and animations.js reveals it on boot with a plain class add
+   and no observer at all — see revealArticleBody. Nothing about a
+   wiki entry's prose wants scroll-triggering: it starts within the
+   first viewport on every entry, so "reveal when scrolled to" and
+   "reveal on load" are the same moment, and only one of them has a
+   threshold that can silently not be met. */
+.js :is(.wk-body, .wk-notes) {
   opacity: 0;
   transform: translateY(10px);
   transition:
@@ -195,19 +188,18 @@ html.wk-continue .wk-layout .wk-body {
     transform var(--reveal-dur, 620ms) var(--ease);
   will-change: opacity, transform;
 }
-html.wk-continue .wk-layout .wk-body.is-visible {
+.js :is(.wk-body, .wk-notes).is-visible {
   opacity: 1;
   transform: none;
   will-change: auto;
 }
 /* Belt-and-braces, matching the sitewide failsafe's own pattern: if
-   revealContinueBody() never runs (a JS error earlier in boot(), a
-   markup edit that moves .wk-body outside .wk-layout), the reader
-   still gets the text — just without the fade — rather than a blank
-   article. Shorter than the sitewide 3s failsafe because this path
-   has no scroll- or gate-dependent trigger to wait out; if the class
-   hasn't landed within a beat of boot, it isn't coming. */
-html.wk-continue .wk-layout .wk-body:not(.is-visible) {
+   revealArticleBody() never runs (a JS error earlier in boot(), say),
+   the reader still gets the text — just without the fade — rather
+   than a blank article. Shorter than the sitewide 3s failsafe because
+   this path has no scroll- or gate-dependent trigger to wait out; if
+   the class hasn't landed within a beat of boot, it isn't coming. */
+.js :is(.wk-body, .wk-notes):not(.is-visible) {
   animation: failsafe-reveal 1ms linear 800ms forwards;
 }
 

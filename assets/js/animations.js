@@ -381,37 +381,40 @@
   }
 
   // -------------------------------------------------------------------------
-  // a.3 Wiki entry -> wiki entry — reveal .wk-body
+  // a.3 Wiki entry — reveal the article's prose
   //
-  // .wk-continue is set pre-paint in default.html when the referrer is
-  // another section of the same wiki. The CSS in components.css handles
-  // everything else for that case (freezing the rail and the article's
-  // own chrome at rest); this is the one element that still needs a JS
-  // hand, because it's the one thing that should still fade in.
+  // .wk-body (and the notes list that trails it) is excluded from
+  // BELOW_GATE_SELECTOR on purpose — see the comment there. It can be
+  // several viewport-heights tall, and the shared observer only fires
+  // past a 0.06 intersection ratio, which an element that tall can fail
+  // to reach from a deep link or a restored scroll position. That would
+  // leave the text invisible until the reader scrolled far enough to
+  // satisfy the threshold.
   //
-  // Deliberately NOT run through makeRevealObserver(): .wk-body is
-  // excluded from BELOW_GATE_SELECTOR on purpose (see the comment there)
-  // because it can be several viewport-heights tall, and gating anything
-  // that size behind a single IntersectionObserver threshold risks it
-  // silently never crossing that threshold — worst on a deep link or a
-  // restored scroll position landing mid-article. A continue-nav doesn't
-  // have that problem: it's always a forward click, which always lands
-  // scrolled to the top of the fresh page, so there's no "was this ever
-  // in the viewport" question left to answer. A plain, immediate reveal
-  // sidesteps the failure mode instead of risking it on a timer.
+  // So it gets no observer at all, just an immediate reveal on boot.
+  // Nothing about a wiki entry's prose wants scroll-triggering: it
+  // starts within the first viewport on every entry, so "reveal when
+  // scrolled to" and "reveal on load" are the same moment — and only
+  // one of them has a threshold that can silently go unmet.
+  //
+  // Runs on EVERY arrival, not just a continue-nav. On a continue-nav
+  // the CSS holds the rails and breadcrumb still and this is the fade
+  // the reader actually sees; on a first arrival it simply joins the
+  // rest of the page's entrance.
   // -------------------------------------------------------------------------
-  function revealContinueBody() {
-    if (!document.documentElement.classList.contains('wk-continue')) return;
-    var body = document.querySelector('.wk-body');
-    if (!body) return;
-    if (REDUCED_MOTION) { body.classList.add('is-visible'); return; }
-    // Defer one frame so the hidden starting state (set by the
-    // .wk-continue CSS rule) has actually been painted before the class
-    // flip kicks off the transition — same reasoning as the stagger
-    // reveal below.
-    requestAnimationFrame(function () {
-      body.classList.add('is-visible');
-    });
+  function revealArticleBody() {
+    var els = document.querySelectorAll('.wk-body, .wk-notes');
+    if (!els.length) return;
+
+    function show() {
+      els.forEach(function (el) { el.classList.add('is-visible'); });
+    }
+
+    if (REDUCED_MOTION) { show(); return; }
+    // Defer one frame so the hidden starting state has actually been
+    // painted before the class flip kicks off the transition — same
+    // reasoning as the stagger reveal above.
+    requestAnimationFrame(show);
   }
 
   // -------------------------------------------------------------------------
@@ -596,7 +599,7 @@
   // -------------------------------------------------------------------------
   function boot() {
     setupReveal();
-    revealContinueBody();
+    revealArticleBody();
     setupBioRace();
     setupMenuStagger();
     setupHaptics();

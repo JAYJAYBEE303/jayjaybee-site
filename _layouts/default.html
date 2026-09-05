@@ -60,21 +60,32 @@
       var root = document.documentElement;
       root.classList.replace('no-js', 'js');
 
-      // Wiki entry -> wiki entry: the left/right rails are the same
-      // navigation chrome the reader was just looking at, not new
-      // material — re-running their entrance fade on every click reads
-      // as the page reloading, not as content appearing. Checked here
-      // (referrer, before first paint) so the CSS override in
-      // components.css can hold them visible from the first frame,
-      // no flash of hidden-then-shown. Only the rails skip it — the
-      // article itself (.wk-art and its children) still fades in
-      // every time, because that part IS new each click.
+      // Wiki entry -> wiki entry, within the SAME write-up: the rails
+      // and the breadcrumb are the frame the reader was just looking
+      // at, not new material — re-running their entrance fade on every
+      // click reads as the page reloading, not as content appearing.
+      // Checked here (referrer, before first paint) so the CSS override
+      // in components.css can hold them still from the first frame, no
+      // flash of hidden-then-shown. Only that frame skips its entrance;
+      // the article's own content still fades every time.
+      //
+      // Both paths are matched, and the write-up slug has to be the
+      // same in each. Landing here from a DIFFERENT write-up would give
+      // a left rail listing entirely different sections, so freezing it
+      // would swap its contents with no transition at all — worse than
+      // the fade. Everything else (a first arrival, /projects/wiki/,
+      // a direct link, off-site) sets nothing and gets the normal
+      // full-page entrance, which is what a first arrival should look
+      // like.
+      var WK_ENTRY = /^\/projects\/wiki\/([^/]+)\/[^/]+\/?$/;
       try {
         var ref = document.referrer;
         if (ref) {
           var refURL = new URL(ref);
+          var from = WK_ENTRY.exec(refURL.pathname);
+          var here = WK_ENTRY.exec(location.pathname);
           if (refURL.origin === location.origin &&
-              /^\/projects\/wiki\/[^/]+\/[^/]+\/?$/.test(refURL.pathname)) {
+              from && here && from[1] === here[1]) {
             root.classList.add('wk-continue');
           }
         }
@@ -143,7 +154,7 @@
     })();
   </script>
 
-  <link rel="stylesheet" href="/assets/css/global.css?v=68" />
+  <link rel="stylesheet" href="/assets/css/global.css?v=69" />
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -358,7 +369,7 @@
     </div>
   </footer>
 
-  <script src="/assets/js/animations.js?v=17" defer></script>
+  <script src="/assets/js/animations.js?v=18" defer></script>
   <script src="/assets/js/search.js?v=3" defer></script>
 </body>
 </html>
