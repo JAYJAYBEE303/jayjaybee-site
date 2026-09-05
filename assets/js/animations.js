@@ -213,23 +213,49 @@
     '.es-rail',
     '.es-chapter',
     '.es-end',
+    // The wk-* elements are NOT here. They are still hidden by the same
+    // blocks in components.css as everything above, but they are revealed
+    // by setupWikiCascade() below instead of by this observer. See the
+    // comment on WK_CASCADE_SELECTOR for why.
+    '.footer-block',
+    '.footer-rule'
+  ].join(', ');
+
+  // A wiki entry reveals as ONE ordered cascade at boot, top to bottom,
+  // rather than through the scroll observer above.
+  //
+  // Two reasons it can't use the observer:
+  //
+  //   1. Order. The observer only orders the elements inside a single
+  //      callback batch, and .wk-body could never be in one — it's the
+  //      whole rest of the article, several viewport-heights tall, and
+  //      the observer's 0.06 intersection ratio is a threshold an
+  //      element that tall can fail to reach at all (from a deep link,
+  //      or a restored scroll position). Revealing it outside the
+  //      observer instead meant it landed at boot with no delay, ahead
+  //      of the title sitting above it — the page assembled out of
+  //      order, body first.
+  //
+  //   2. There is nothing to scroll-trigger. Every one of these starts
+  //      at or near the top of the page on a wiki entry, so "reveal when
+  //      scrolled to" and "reveal on load" are the same moment. The
+  //      cascade just does it in one pass, in the order they appear.
+  //
+  // Sorted by rendered position rather than DOM order because the three
+  // columns interleave: the right rail is last in the markup but starts
+  // level with the breadcrumb.
+  var WK_CASCADE_SELECTOR = [
+    '.wk-rail',
     '.wk-crumb',
     '.wk-art > h1',
     '.wk-art__lede',
     '.wk-art__meta',
     '.wk-draft',
     '.wk-info',
-    // NOT '.wk-body': it's the whole rest of the article — several
-    // viewport-heights tall on longer entries. Gating an element that
-    // size behind a single IntersectionObserver threshold risks
-    // exactly the "looks like the content never loaded" failure this
-    // is meant to avoid. It renders visible immediately instead;
-    // .wk-crumb / h1 / lede / meta above still carry the entrance fade.
+    '.wk-body',
+    '.wk-notes',
     '.wk-back',
-    '.wk-pager',
-    '.wk-rail',
-    '.footer-block',
-    '.footer-rule'
+    '.wk-pager'
   ].join(', ');
 
   // -------------------------------------------------------------------------
@@ -381,40 +407,61 @@
   }
 
   // -------------------------------------------------------------------------
-  // a.3 Wiki entry — reveal the article's prose
+  // a.3 Wiki entry — the ordered entrance cascade
   //
-  // .wk-body (and the notes list that trails it) is excluded from
-  // BELOW_GATE_SELECTOR on purpose — see the comment there. It can be
-  // several viewport-heights tall, and the shared observer only fires
-  // past a 0.06 intersection ratio, which an element that tall can fail
-  // to reach from a deep link or a restored scroll position. That would
-  // leave the text invisible until the reader scrolled far enough to
-  // satisfy the threshold.
+  // See WK_CASCADE_SELECTOR above for why a wiki entry reveals here
+  // rather than through the observer. Everything still hidden is sorted
+  // by where it actually sits on screen and revealed top to bottom.
   //
-  // So it gets no observer at all, just an immediate reveal on boot.
-  // Nothing about a wiki entry's prose wants scroll-triggering: it
-  // starts within the first viewport on every entry, so "reveal when
-  // scrolled to" and "reveal on load" are the same moment — and only
-  // one of them has a threshold that can silently go unmet.
-  //
-  // Runs on EVERY arrival, not just a continue-nav. On a continue-nav
-  // the CSS holds the rails and breadcrumb still and this is the fade
-  // the reader actually sees; on a first arrival it simply joins the
-  // rest of the page's entrance.
+  // Runs on EVERY arrival. On a continue-nav the CSS is already holding
+  // the rails and breadcrumb at rest, so they arrive here at opacity 1
+  // and are filtered out — the cascade then covers the article panel
+  // alone, and its first element starts at 0ms rather than inheriting a
+  // gap where the frozen ones would have been.
   // -------------------------------------------------------------------------
-  function revealArticleBody() {
-    var els = document.querySelectorAll('.wk-body, .wk-notes');
+  var WK_STEP = 60;   // ms between elements
+  var WK_CAP  = 700;  // ms ceiling, high enough to not flatten the tail
+
+  function setupWikiCascade() {
+    var els = Array.prototype.slice.call(
+      document.querySelectorAll(WK_CASCADE_SELECTOR)
+    );
     if (!els.length) return;
 
-    function show() {
+    // Whatever the .wk-continue rule is holding at rest is already
+    // visible and must not take a step in the cascade. Read from
+    // computed style rather than re-listing the frozen selectors here,
+    // so components.css stays the single source of truth for which
+    // parts of the frame hold still.
+    els = els.filter(function (el) {
+      return getComputedStyle(el).opacity !== '1';
+    });
+    if (!els.length) return;
+
+    if (REDUCED_MOTION) {
       els.forEach(function (el) { el.classList.add('is-visible'); });
+      return;
     }
 
-    if (REDUCED_MOTION) { show(); return; }
-    // Defer one frame so the hidden starting state has actually been
-    // painted before the class flip kicks off the transition — same
-    // reasoning as the stagger reveal above.
-    requestAnimationFrame(show);
+    els.sort(function (a, b) {
+      var diff = a.getBoundingClientRect().top - b.getBoundingClientRect().top;
+      if (diff) return diff;
+      // Level with each other (both rails and the breadcrumb share a
+      // top edge) — fall back to document order.
+      var rel = a.compareDocumentPosition(b);
+      return (rel & Node.DOCUMENT_POSITION_FOLLOWING) ? -1 : 1;
+    });
+
+    els.forEach(function (el, i) {
+      el.style.setProperty('--reveal-delay', Math.min(i * WK_STEP, WK_CAP) + 'ms');
+    });
+
+    // Defer one frame so the delays and the hidden starting state are
+    // committed before the class flip kicks off the transitions — same
+    // reasoning as the observer's own reveal above.
+    requestAnimationFrame(function () {
+      els.forEach(function (el) { el.classList.add('is-visible'); });
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -599,7 +646,7 @@
   // -------------------------------------------------------------------------
   function boot() {
     setupReveal();
-    revealArticleBody();
+    setupWikiCascade();
     setupBioRace();
     setupMenuStagger();
     setupHaptics();

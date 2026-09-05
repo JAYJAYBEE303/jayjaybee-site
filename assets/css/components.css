@@ -186,6 +186,12 @@ html.wk-continue .wk-layout :is(
   transition:
     opacity   var(--reveal-dur, 620ms) var(--ease),
     transform var(--reveal-dur, 620ms) var(--ease);
+  /* Same --reveal-delay hook as the shared hidden-state block above.
+     Without it setupWikiCascade() still sets the property here and
+     nothing consumes it, so the prose ignores its place in the
+     cascade and fades in level with whatever went first — which is
+     exactly the out-of-order entrance this cascade exists to fix. */
+  transition-delay: var(--reveal-delay, 0ms);
   will-change: opacity, transform;
 }
 .js :is(.wk-body, .wk-notes).is-visible {
@@ -193,13 +199,33 @@ html.wk-continue .wk-layout :is(
   transform: none;
   will-change: auto;
 }
-/* Belt-and-braces, matching the sitewide failsafe's own pattern: if
-   revealArticleBody() never runs (a JS error earlier in boot(), say),
-   the reader still gets the text — just without the fade — rather
-   than a blank article. Shorter than the sitewide 3s failsafe because
-   this path has no scroll- or gate-dependent trigger to wait out; if
-   the class hasn't landed within a beat of boot, it isn't coming. */
-.js :is(.wk-body, .wk-notes):not(.is-visible) {
+/* Belt-and-braces for the whole wiki entrance, matching the sitewide
+   failsafe's own pattern. Every element below is revealed by
+   setupWikiCascade() rather than by the scroll observer, and the
+   sitewide failsafe further down this file can't cover them: it is
+   scoped to .js:not(.has-reveal), and setupReveal() sets .has-reveal
+   on every page that has a footer to observe — which is all of them.
+   So if the cascade never runs (a JS error earlier in boot(), say),
+   nothing else would bring these back and the article would stay
+   blank. Shorter than the sitewide 3s because this path has no scroll-
+   or gate-dependent trigger to wait out: if the class hasn't landed
+   within a beat of boot, it isn't coming. It can't pre-empt a cascade
+   still in flight either: the stagger is transition-delay, so
+   .is-visible lands on every element in the same frame and this
+   selector stops matching long before the 800ms is up. */
+.js :is(
+  .wk-rail,
+  .wk-crumb,
+  .wk-art > h1,
+  .wk-art__lede,
+  .wk-art__meta,
+  .wk-draft,
+  .wk-info,
+  .wk-body,
+  .wk-notes,
+  .wk-back,
+  .wk-pager
+):not(.is-visible) {
   animation: failsafe-reveal 1ms linear 800ms forwards;
 }
 
