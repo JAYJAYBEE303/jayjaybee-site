@@ -1351,6 +1351,20 @@
   letter-spacing: var(--tr-mono);
 }
 
+/* Nested sub-list (a taxonomy's lettered items under a numbered category).
+   Selectors need every ancestor type named (.es-roman li ol li, not just
+   "li") so they out-specificity the bare .es-roman li rules above —
+   otherwise a nested <li> would inherit the outer roman counter/colour
+   instead of its own lower-alpha one. Same pattern as .es-art p:not()
+   further up this file. */
+.es-roman li ol { list-style: none; padding: 0; counter-reset: er-sub; margin-top: var(--space-3); }
+.es-roman li ol li { padding-left: var(--space-5); counter-increment: er-sub; }
+.es-roman li ol li + li { margin-top: var(--space-2); }
+.es-roman li ol li::before {
+  content: counter(er-sub, lower-alpha) ".";
+  color: var(--fg-quiet);
+}
+
 .es-close {
   margin-top: var(--space-6);
   padding-top: var(--space-4);
