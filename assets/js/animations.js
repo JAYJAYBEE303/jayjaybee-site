@@ -381,6 +381,40 @@
   }
 
   // -------------------------------------------------------------------------
+  // a.3 Wiki entry -> wiki entry — reveal .wk-body
+  //
+  // .wk-continue is set pre-paint in default.html when the referrer is
+  // another section of the same wiki. The CSS in components.css handles
+  // everything else for that case (freezing the rail and the article's
+  // own chrome at rest); this is the one element that still needs a JS
+  // hand, because it's the one thing that should still fade in.
+  //
+  // Deliberately NOT run through makeRevealObserver(): .wk-body is
+  // excluded from BELOW_GATE_SELECTOR on purpose (see the comment there)
+  // because it can be several viewport-heights tall, and gating anything
+  // that size behind a single IntersectionObserver threshold risks it
+  // silently never crossing that threshold — worst on a deep link or a
+  // restored scroll position landing mid-article. A continue-nav doesn't
+  // have that problem: it's always a forward click, which always lands
+  // scrolled to the top of the fresh page, so there's no "was this ever
+  // in the viewport" question left to answer. A plain, immediate reveal
+  // sidesteps the failure mode instead of risking it on a timer.
+  // -------------------------------------------------------------------------
+  function revealContinueBody() {
+    if (!document.documentElement.classList.contains('wk-continue')) return;
+    var body = document.querySelector('.wk-body');
+    if (!body) return;
+    if (REDUCED_MOTION) { body.classList.add('is-visible'); return; }
+    // Defer one frame so the hidden starting state (set by the
+    // .wk-continue CSS rule) has actually been painted before the class
+    // flip kicks off the transition — same reasoning as the stagger
+    // reveal below.
+    requestAnimationFrame(function () {
+      body.classList.add('is-visible');
+    });
+  }
+
+  // -------------------------------------------------------------------------
   // b. Dropdown menu — per-item stagger on open
   // -------------------------------------------------------------------------
   function setupMenuStagger() {
@@ -562,6 +596,7 @@
   // -------------------------------------------------------------------------
   function boot() {
     setupReveal();
+    revealContinueBody();
     setupBioRace();
     setupMenuStagger();
     setupHaptics();
