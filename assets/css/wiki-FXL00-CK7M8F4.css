@@ -1,0 +1,786 @@
+/* =========================================================================
+   jayjaybee.com — wiki.css
+   The /projects/wiki layer. Entry-page article shell only: rail, article
+   head, infobox, footnotes, backlinks, pager, launch button, right rail,
+   glossary popover.
+
+   Imported by global.css after components.css, so it is the last partial
+   in the cascade but still lands BEFORE global.css's own base rules
+   (@import must precede everything else). Where a rule here has to beat a
+   global.css utility — .mono-label's colour, the base `a` underline — it
+   raises specificity with an element or parent qualifier (`a.wl`,
+   `.wk-info > .wk-info__head`) rather than repeating the declarations.
+
+   Rules this file keeps to:
+     * No colour, type size, spacing step, radius, rule, duration, or
+       easing is written literally. Every value resolves to a token in
+       variables.css — change --accent once there and this follows.
+     * Typography that already exists as a utility is applied in the
+       MARKUP (.mono, .mono-label, .section-title, .work-lede), not
+       restated here.
+     * /projects/wiki/ is a redirect to /projects/ and carries no
+       styling at all, so this file covers entry pages and nothing
+       else. It was an index built from the site's own .work-*
+       components, and needed nothing from here either.
+
+   The six --wk-* properties below are the only new values in the file.
+   Each is a structural measure with no site-wide counterpart, and none
+   restates an existing token.
+   ========================================================================= */
+
+:root {
+  --wk-container: 88rem; /* three-column shell — wider than --container     */
+  --wk-measure: 68ch;   /* prose measure — wider than --measure-prose       */
+  --wk-rail-w: 14rem;   /* left index column                                */
+  --wk-rail-r-w: 14rem; /* right rail column                                */
+  --wk-info-w: 17rem;   /* floated infobox                                  */
+  --wk-peek-w: 20rem;   /* hover preview card                               */
+}
+
+/* =========================================================================
+   CONTAINER
+   The site's --container (72rem) is sized for one column of prose. This
+   page puts a 14rem rail either side of that column, so inside 72rem the
+   prose is left at roughly 28rem — unreadably narrow, and not what the
+   design system's wiki sheet specifies.
+
+   .page--wide is applied by _layouts/default.html when a layout declares
+   `page_wide` in its own front matter; _layouts/wiki-entry.html is the
+   only caller. The modifier lives here rather than in layout.css because
+   the wiki is the only thing that needs it, and .page's own width stays
+   the value every other page was designed around.
+
+   The top padding is reduced for the same reason. .page's own value is
+   tuned for a page that opens with a display-size heading, where a deep
+   gap reads as composition. A wiki entry opens with a mono breadcrumb at
+   --fs-mono, so the same gap reads as a void — 87px of nothing between
+   the nav rule and an 11px line of text. The rails start at the same
+   line, so there is nothing at the top of the page to fill it either.
+   ========================================================================= */
+
+.page--wide {
+  max-width: var(--wk-container);
+  padding-top: clamp(var(--space-6), 3vw, var(--space-8));
+}
+
+/* =========================================================================
+   PAGE SHELL
+   Sits inside <main class="page page--wide">, which supplies the side
+   gutters and — via the modifier declared above — the widened container
+   and the tightened top. Nothing here re-declares either.
+   ========================================================================= */
+
+.wk-layout {
+  display: grid;
+  grid-template-columns: var(--wk-rail-w) minmax(0, 1fr) var(--wk-rail-r-w);
+  gap: clamp(var(--space-6), 4vw, var(--space-8));
+  align-items: start;
+}
+
+/* 74rem is the one new breakpoint in this file: below it the third
+   column no longer leaves a readable measure for the prose. The right
+   rail drops out of the grid and becomes a row of its three blocks
+   above the article — hidden entirely would lose Entry status, which
+   needs no JS and is worth keeping at every width. */
+@media (max-width: 74rem) {
+  .wk-layout { grid-template-columns: var(--wk-rail-w) minmax(0, 1fr); }
+  /* Doubled class is deliberate, not a typo: the base .wk-rail rule
+     (position: sticky) is declared later in this file, further down in
+     the LEFT RAIL section, and both selectors are single classes tying
+     on specificity — so on source order alone the later base rule would
+     win and this override's `position: static` would never apply.
+     `.wk-rail.wk-rail--right` raises this to (0,2,0), which beats the
+     base rule regardless of where either sits in the file. Do not
+     simplify this back to `.wk-rail--right`. */
+  .wk-rail.wk-rail--right {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    position: static;
+    max-height: none;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(var(--wk-rail-w), 1fr));
+    gap: var(--space-5);
+    padding-bottom: var(--space-6);
+    margin-bottom: var(--space-6);
+    border-bottom: var(--border-rule);
+  }
+}
+
+/* 56rem is an existing site breakpoint (components.css) — reused rather
+   than introducing a new one. Below it neither rail is a column. */
+@media (max-width: 56rem) {
+  .wk-layout { grid-template-columns: minmax(0, 1fr); }
+  .wk-rail--right { grid-template-columns: minmax(0, 1fr); }
+  /* Same cascade question as the 74rem block above: grid-row: 1 there
+     is set on `.wk-rail.wk-rail--right` at (0,2,0), so a same-specificity
+     `.wk-rail--right` override here would lose regardless of source
+     order — the right rail would stay pinned above the article even
+     though the grid is single-column below this breakpoint, pushing
+     the article title below both rails on a phone. Matching the
+     doubled class raises this to (0,2,0) too, so this rule — coming
+     later in the file — wins on source order and the rail falls back
+     into normal document flow, after the article. Do not simplify
+     this back to `.wk-rail--right`. */
+  .wk-rail.wk-rail--right { grid-row: auto; }
+}
+
+/* =========================================================================
+   LEFT RAIL — entry index
+   ========================================================================= */
+
+.wk-rail {
+  position: sticky;
+  top: var(--space-5);
+  max-height: calc(100vh - var(--space-7));
+  overflow: auto;
+  padding-bottom: var(--space-5);
+}
+@media (max-width: 56rem) {
+  .wk-rail {
+    position: static;
+    max-height: none;
+    overflow: visible;
+    padding-bottom: var(--space-6);
+    margin-bottom: var(--space-6);
+    border-bottom: var(--border-rule);
+  }
+}
+
+.wk-rail__block + .wk-rail__block { margin-top: var(--space-6); }
+
+/* :empty is true whenever wiki.js never fills the filter mount — JS
+   is off, or buildFilter() bails because the app has only one entry.
+   The mount is already zero-height in that state, but the adjacent-
+   sibling rule above still fires on the group block that follows it:
+   `+` matches on DOM position, not on the display of the element it
+   follows, so display: none alone would leave a var(--space-6) gap
+   above the first group that exists only because the filter was
+   never injected. The second rule cancels that margin explicitly. */
+.wk-rail__block--filter:empty { display: none; }
+.wk-rail__block--filter:empty + .wk-rail__block { margin-top: 0; }
+
+/* Head of each rail block. Typography comes from .mono-label in markup;
+   this only lays it out and rules it off. */
+.wk-rail__h {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-bottom: var(--space-2);
+  border-bottom: var(--border-hairline);
+  margin-bottom: var(--space-2);
+}
+
+/* ---- entry index --------------------------------------------------------- */
+.wk-nav { display: flex; flex-direction: column; }
+.wk-nav a {
+  display: flex;
+  gap: var(--space-3);
+  align-items: baseline;
+  padding: var(--space-1) 0;
+  font-family: var(--font-sans);
+  font-size: var(--fs-ui);
+  line-height: var(--lh-ui);
+  color: var(--fg-muted);
+  text-decoration: none;
+  transition: color var(--dur-1) var(--ease);
+}
+.wk-nav a:hover { color: var(--fg); }
+.wk-nav a[aria-current="page"] { color: var(--accent); }
+.wk-nav__n {
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono);
+  color: var(--fg-faint);
+}
+.wk-nav a[aria-current="page"] .wk-nav__n { color: var(--accent); }
+
+/* ---- filter (injected by wiki.js) ---------------------------------------- */
+.wk-filter { position: relative; }
+.wk-filter input {
+  width: 100%;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-bottom: var(--border-hairline);
+  padding: var(--space-2) 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono);
+  color: var(--fg);
+  outline: none;
+  transition: border-color var(--dur-1) var(--ease);
+}
+.wk-filter input::placeholder {
+  color: var(--fg-faint);
+  letter-spacing: var(--tr-mono-caps);
+  text-transform: uppercase;
+}
+.wk-filter input:focus { border-bottom-color: var(--accent); }
+
+/* Set by wiki.js on a row or a group with no match left in it. */
+.wk-nav a[hidden],
+.wk-rail__group[hidden] { display: none; }
+
+.wk-rail__empty {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: var(--fs-small);
+  color: var(--fg-quiet);
+}
+
+/* =========================================================================
+   RIGHT RAIL — on this page, recently read, entry status
+   The sticky/overflow behaviour is shared with the left rail and lives on
+   the base .wk-rail rule above; nothing here restates it.
+   ========================================================================= */
+
+/* Both JS-built blocks stay hidden until wiki.js adds .is-built, so
+   neither leaves an empty ruled-off label hanging with JS disabled.
+   Entry status carries no such guard — it is compiled. */
+.wk-rail__block--toc:not(.is-built),
+.wk-rail__block--recent:not(.is-built) { display: none; }
+
+/* ---- on this page (built by wiki.js) ------------------------------------- */
+.wk-toc { display: flex; flex-direction: column; }
+.wk-toc a {
+  padding: var(--space-1) 0 var(--space-1) var(--space-3);
+  border-left: var(--border-hairline);
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  line-height: var(--lh-ui);
+  color: var(--fg-quiet);
+  text-decoration: none;
+  transition: color var(--dur-1) var(--ease),
+              border-color var(--dur-1) var(--ease);
+}
+.wk-toc a:hover { color: var(--fg); }
+.wk-toc a.is-sub { padding-left: var(--space-5); }
+.wk-toc a.is-active { color: var(--accent); border-left-color: var(--accent); }
+
+.wk-recent { display: flex; flex-direction: column; gap: var(--space-2); }
+.wk-recent a {
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  line-height: var(--lh-ui);
+  color: var(--fg-quiet);
+  text-decoration: none;
+  transition: color var(--dur-1) var(--ease);
+}
+.wk-recent a:hover { color: var(--accent); }
+.wk-recent a[aria-current="page"] { color: var(--fg); }
+
+.wk-stats { display: grid; gap: var(--space-1); color: var(--fg-quiet); }
+.wk-stats span { display: flex; justify-content: space-between; gap: var(--space-3); }
+.wk-stats b { font-weight: var(--fw-regular); color: var(--fg); }
+
+/* =========================================================================
+   ARTICLE
+   ========================================================================= */
+
+.wk-art { min-width: 0; }
+
+/* ---- breadcrumb -----------------------------------------------------------
+   `p.` because the element also carries .mono-label for its type, and
+   .mono-label lives in global.css AFTER the @imports — so a bare
+   .wk-crumb would lose the display battle to its inline-block. */
+p.wk-crumb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-4);
+}
+.wk-crumb a { color: var(--fg-quiet); text-decoration: none; }
+.wk-crumb a:hover { color: var(--accent); }
+.wk-crumb__sep { color: var(--fg-faint); }
+.wk-crumb__here { color: var(--fg); }
+
+/* ---- lede -----------------------------------------------------------------
+   Composed on top of the site's own .work-lede, which already carries the
+   serif family, --fs-lede, and --measure-prose. This adds only the two
+   things that make it a wiki lede rather than a work-list lede. */
+.wk-art__lede {
+  font-style: italic;
+  color: var(--fg-muted);
+  margin: var(--space-4) 0 0;
+}
+
+/* ---- meta strip ---------------------------------------------------------- */
+.wk-art__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  margin-top: var(--space-5);
+  padding: var(--space-3) 0;
+  border-top: var(--border-hairline);
+  border-bottom: var(--border-hairline);
+  color: var(--fg-quiet);
+}
+.wk-art__meta b {
+  font-weight: var(--fw-regular);
+  letter-spacing: var(--tr-mono-caps);
+  text-transform: uppercase;
+  color: var(--fg-faint);
+  margin-right: var(--space-2);
+}
+
+/* ---- draft flag -----------------------------------------------------------
+   Rendered when an entry declares `status: draft`. Deliberately loud: an
+   unfinished write-up should never read as a finished one. */
+.wk-draft {
+  display: flex;
+  gap: var(--space-3);
+  align-items: baseline;
+  margin-top: var(--space-5);
+  padding: var(--space-3) var(--space-4);
+  border: var(--border-rule);
+  border-color: var(--accent);
+  border-radius: var(--radius-1);
+  background: var(--bg-recessed);
+  color: var(--fg-muted);
+}
+.wk-draft__tag { color: var(--accent); white-space: nowrap; }
+
+/* ---- launch button --------------------------------------------------------
+   The one and only coupling between a wiki entry and its app. `a.` beats
+   global.css's base `a` underline and .mono-label's --fg-quiet without
+   restating either rule's other declarations.
+
+   Filled rather than outlined, matching .btn--primary in the buttons.css
+   proposal: --accent ground, --paper text, --accent-hover on hover, and that
+   base's 1px lift. The outlined treatment it replaces read as body prose and
+   was easy to walk past. Typography still comes from .mono-label on the
+   element, which is why no font is declared here. */
+a.wk-launch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+  padding: var(--space-3) var(--space-5);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-1);
+  background: var(--accent);
+  color: var(--paper);
+  text-decoration: none;
+  transition: color var(--dur-2) var(--ease),
+              background-color var(--dur-2) var(--ease),
+              border-color var(--dur-2) var(--ease),
+              transform var(--dur-2) var(--ease);
+}
+a.wk-launch:hover {
+  color: var(--paper);
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  transform: translateY(-1px);
+}
+a.wk-launch:active {
+  transform: translateY(0);
+  transition-duration: 60ms;
+}
+a.wk-launch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  a.wk-launch:hover,
+  a.wk-launch:active { transform: none; }
+}
+
+/* In the rail it is the first thing in the column, so it drops the
+   top margin the in-article version needs and spans the rail's full
+   width — a button narrower than the rail would read as a stray chip
+   rather than as the column's heading action. */
+a.wk-launch--rail {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin-top: 0;
+}
+
+/* =========================================================================
+   BODY PROSE
+   Serif at --fs-body over --wk-measure. Distinct from .prose, which is
+   --fs-lede over --measure-wide for single narrative paragraphs.
+
+   --wk-measure (68ch) rather than the site's --measure-prose (62ch): a
+   wiki entry is read at a desk against a three-column shell, not skimmed
+   down a single narrative column, and 62ch left the prose visibly narrow
+   inside the widened article column. 68ch stays inside the 45–75ch band
+   that measure guidance treats as comfortable, so this widens the line
+   without abandoning the rule. Every other page keeps 62ch.
+   ========================================================================= */
+
+.wk-body {
+  max-width: var(--wk-measure);
+  margin-top: var(--space-6);
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
+  line-height: var(--lh-prose);
+  color: var(--fg);
+  text-wrap: pretty;
+}
+/* The reset has to be `> *`, not `p`. `.wk-body p` is (0,1,1) and the flow
+   rule below is (0,1,0), so a `margin: 0` written against `p` outranks it and
+   every paragraph in the wiki computed margin-top: 0 — two paragraphs ran
+   together, and a paragraph after a list sat flush against its last item.
+   Resetting at the same specificity as the flow rule keeps the UA margins off
+   without out-ranking it, and the element rules further down this file
+   (h2, h3, ul, ol, blockquote, hr) are all (0,1,1) and still win. Matches the
+   design sheet, which resets nothing and relies on the flow rule alone. */
+.wk-body > * { margin: 0; }
+.wk-body > * + * { margin-top: var(--space-5); }
+
+/* h2 inherits family/weight/line-height/tracking from global.css's h2;
+   only the step down to subhead and the structure are set here. */
+.wk-body h2 {
+  font-size: var(--fs-subhead);
+  margin: var(--space-7) 0 0;
+  padding-bottom: var(--space-2);
+  border-bottom: var(--border-hairline);
+  scroll-margin-top: var(--space-6);
+}
+/* h3 is written as <h3 class="mono-label"> in the content, so all of its
+   type comes from that utility. Only spacing lives here — plus the
+   display reset, because .mono-label makes it inline-block. */
+.wk-body h3 {
+  display: block;
+  margin: var(--space-6) 0 0;
+  scroll-margin-top: var(--space-6);
+}
+
+.wk-body strong { font-weight: var(--fw-semibold); }
+
+/* Dash bullets and roman numerals. NOTE: the dash-bullet treatment is the
+   same pattern .role-points uses in layout.css. Values here are tokens,
+   not copies of literals, but the pattern is stated twice — a candidate
+   for a shared .list--dash once a third caller appears. */
+.wk-body ul { list-style: none; margin: var(--space-5) 0 0; padding: 0; }
+.wk-body ul li { position: relative; padding-left: var(--space-5); }
+.wk-body ul li + li { margin-top: var(--space-3); }
+.wk-body ul li::before {
+  content: "—";
+  position: absolute;
+  left: 0;
+  color: var(--fg-faint);
+}
+/* The dot variant. A dash list reads as a set of parallel qualifications
+   ("no standings endpoint, no teamsheet"); a dot list reads as a plain
+   inventory of things present. Same geometry, different mark — opted
+   into per list with `<ul class="list--dot">`, so the dash stays the
+   default and nothing existing changes. */
+.wk-body ul.list--dot li::before { content: "\2022"; }
+.wk-body ol { list-style: none; margin: var(--space-5) 0 0; padding: 0; counter-reset: wk; }
+.wk-body ol li { position: relative; padding-left: var(--space-6); counter-increment: wk; }
+.wk-body ol li + li { margin-top: var(--space-3); }
+.wk-body ol li::before {
+  content: counter(wk, upper-roman);
+  position: absolute;
+  left: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono);
+  color: var(--accent);
+}
+
+.wk-body blockquote {
+  margin: var(--space-6) 0;
+  padding-left: var(--space-5);
+  border-left: var(--border-rule);
+  border-left-color: var(--accent);
+  font-style: italic;
+  font-size: var(--fs-lede);
+  color: var(--fg-muted);
+}
+
+.wk-body code {
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono);
+  background: var(--bg-recessed);
+  border: var(--border-hairline);
+  border-radius: var(--radius-1);
+  padding: 0 var(--space-1);
+  color: var(--fg);
+}
+
+.wk-body hr { border: 0; border-top: var(--border-hairline); margin: var(--space-6) 0; }
+
+/* =========================================================================
+   INTERNAL LINKS + HOVER PREVIEW
+   [[slug|label]] compiles to a.wl at build time (see _includes/wiki-body.html).
+   ========================================================================= */
+
+a.wl {
+  color: var(--link);
+  text-decoration: none;
+  border-bottom: 1px dotted currentColor;
+  transition: color var(--dur-1) var(--ease);
+}
+a.wl:hover { color: var(--link-hover); border-bottom-style: solid; }
+
+/* Above article content and the nav dropdown (z 50), below the skip
+   link (z 100). No z-index token exists site-wide. */
+.wk-peek {
+  position: absolute;
+  z-index: 60;
+  width: var(--wk-peek-w);
+  padding: var(--space-4);
+  background: var(--bg);
+  border: var(--border-rule);
+  box-shadow: var(--shadow-2);
+  opacity: 0;
+  transform: translateY(var(--space-1));
+  pointer-events: none;
+  transition: opacity var(--dur-2) var(--ease),
+              transform var(--dur-2) var(--ease);
+}
+.wk-peek.is-on { opacity: 1; transform: translateY(0); }
+.wk-peek__kind { margin: 0; color: var(--accent); }
+.wk-peek__title {
+  margin: var(--space-2) 0 0;
+  font-family: var(--font-serif);
+  font-size: var(--fs-lede);
+  line-height: var(--lh-snug);
+  color: var(--fg);
+}
+.wk-peek__lede {
+  margin: var(--space-2) 0 0;
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
+  line-height: var(--lh-ui);
+  color: var(--fg-muted);
+}
+
+/* =========================================================================
+   INFOBOX
+   ========================================================================= */
+
+.wk-info {
+  float: right;
+  width: var(--wk-info-w);
+  margin: 0 0 var(--space-5) var(--space-6);
+  border: var(--border-hairline);
+  background: var(--bg-recessed);
+}
+/* 40rem is an existing site breakpoint. */
+@media (max-width: 40rem) {
+  .wk-info { float: none; width: auto; margin: 0 0 var(--space-5); }
+}
+/* Parent qualifier so the inverted head beats .mono-label's --fg-quiet
+   and its inline-block, which would stop the bar spanning the box. */
+.wk-info > .wk-info__head {
+  display: block;
+  margin: 0;
+  padding: var(--space-1) var(--space-3);
+  background: var(--fg);
+  color: var(--bg);
+}
+.wk-info dl { margin: 0; padding: var(--space-3) var(--space-4); }
+.wk-info dt { margin-top: var(--space-3); }
+.wk-info dt:first-child { margin-top: 0; }
+.wk-info dd {
+  margin: var(--space-1) 0 0;
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  line-height: var(--lh-ui);
+  color: var(--fg);
+}
+
+/* The `shape` variant: groups of terms rather than key/value rows. Padding
+   matches the dl above so both variants sit identically in the box. */
+.wk-info__shape { padding: var(--space-3) var(--space-4); }
+.wk-info__g { margin: var(--space-4) 0 0; }
+.wk-info__shape > .wk-info__g:first-child { margin-top: 0; }
+.wk-info__terms {
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  line-height: var(--lh-ui);
+  color: var(--fg);
+}
+.wk-info__terms li { margin-top: var(--space-1); }
+.wk-info__terms li:first-child { margin-top: 0; }
+
+/* =========================================================================
+   GLOSSARY TERMS + POPOVER
+   A term is a real <button> compiled by _includes/wiki-term.html. The
+   popover is a single element wiki.js appends to <body>, so its absolute
+   coordinates are page coordinates whatever the article's layout does.
+   ========================================================================= */
+
+.wk-info__sep { color: var(--fg-faint); padding: 0 var(--space-1); }
+.wk-info > .wk-info__hint {
+  display: block;
+  margin: 0;
+  padding: 0 var(--space-4) var(--space-3);
+  color: var(--fg-faint);
+}
+
+button.wk-term {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px dotted var(--fg-faint);
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: color var(--dur-1) var(--ease),
+              border-color var(--dur-1) var(--ease);
+}
+button.wk-term:hover { color: var(--accent); border-bottom-color: var(--accent); }
+button.wk-term[aria-expanded="true"] {
+  color: var(--accent);
+  border-bottom: 1px solid var(--accent);
+}
+button.wk-term:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Above the hover peek (z 60) — a term click is deliberate, a hover is
+   not, so the deliberate one wins. Still below the skip link (z 100). */
+.wk-pop {
+  position: absolute;
+  z-index: 70;
+  width: var(--wk-peek-w);
+  padding: var(--space-4);
+  background: var(--bg);
+  border: var(--border-rule);
+  box-shadow: var(--shadow-2);
+  display: none;
+}
+.wk-pop.is-on { display: block; }
+.wk-pop__kind {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: 0;
+  color: var(--accent);
+}
+.wk-pop__x {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  letter-spacing: 0;
+  color: var(--fg-faint);
+  cursor: pointer;
+}
+.wk-pop__x:hover { color: var(--accent); }
+.wk-pop__term {
+  margin: var(--space-2) 0 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-ui);
+  line-height: var(--lh-snug);
+  letter-spacing: var(--tr-mono);
+  color: var(--fg);
+}
+.wk-pop__body {
+  margin: var(--space-3) 0 0;
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
+  line-height: var(--lh-ui);
+  color: var(--fg-muted);
+  text-wrap: pretty;
+}
+.wk-pop__ref {
+  display: inline-block;
+  margin-top: var(--space-3);
+  color: var(--accent);
+  text-decoration: none;
+}
+.wk-pop__ref:hover { border-bottom: 1px solid var(--accent); }
+
+/* =========================================================================
+   FOOTNOTES — ((text)) compiles to sup.wk-fn + the notes list
+   ========================================================================= */
+
+sup.wk-fn {
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono);
+  line-height: var(--lh-flush);
+}
+sup.wk-fn a { color: var(--accent); text-decoration: none; padding: 0 var(--space-1); }
+
+.wk-notes {
+  margin-top: var(--space-7);
+  padding-top: var(--space-4);
+  border-top: var(--border-rule);
+}
+.wk-notes__h { margin: 0 0 var(--space-3); }
+.wk-notes ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  counter-reset: wknote;
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  line-height: var(--lh-ui);
+  color: var(--fg-muted);
+}
+.wk-notes li { position: relative; padding-left: var(--space-5); counter-increment: wknote; }
+.wk-notes li + li { margin-top: var(--space-2); }
+.wk-notes li::before {
+  content: counter(wknote);
+  position: absolute;
+  left: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono);
+  color: var(--accent);
+}
+.wk-notes li:target { color: var(--fg); }
+.wk-notes__back { color: var(--fg-faint); text-decoration: none; }
+.wk-notes__back:hover { color: var(--accent); }
+
+/* =========================================================================
+   BACKLINKS + PAGER
+   ========================================================================= */
+
+/* Label above list at every width. The bundle used a fixed-width label
+   column; there is no token for that width and no reason to invent one. */
+.wk-back {
+  margin-top: var(--space-7);
+  padding-top: var(--space-4);
+  border-top: var(--border-hairline);
+}
+.wk-back__h { margin: 0 0 var(--space-3); }
+.wk-back__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  font-family: var(--font-sans);
+  font-size: var(--fs-ui);
+}
+
+/* `nav.` for the same reason as p.wk-crumb — the element carries
+   .mono-label, whose inline-block would otherwise win. */
+nav.wk-pager {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-5);
+  margin-top: var(--space-7);
+  padding-top: var(--space-4);
+  border-top: var(--border-rule);
+}
+.wk-pager a {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  color: var(--fg-quiet);
+  text-decoration: none;
+}
+.wk-pager a:hover { color: var(--accent); }
+.wk-pager__t {
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
+  letter-spacing: var(--tr-body);
+  text-transform: none;
+  color: var(--fg);
+}
+.wk-pager a:hover .wk-pager__t { color: var(--accent); }
+.wk-pager a:last-child { text-align: right; align-items: flex-end; }

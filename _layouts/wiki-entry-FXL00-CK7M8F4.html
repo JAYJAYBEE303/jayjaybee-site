@@ -1,0 +1,302 @@
+---
+layout: default
+title_suffix: Wiki — Josh Bailey
+page_wide: true
+scroll_gate: false
+---
+{%- comment -%}
+=============================================================================
+  wiki-entry.html — the shell around one SECTION of a write-up, at
+  /projects/wiki/<app>/<section>/.
+
+  Nests inside _layouts/default.html, so the header, nav, search, footer,
+  theme toggle, paper grain, type scale and reveal animations all come
+  from the main site with nothing restated here.
+
+  `title_suffix` above is THIS LAYOUT's own front matter, not a
+  section's — Jekyll exposes it to the parent layout as `layout.*`, so
+  default.html's <title> can read it once here instead of every section
+  page restating `Wiki — Josh Bailey` in its own front matter. Matches
+  the qualified form _layouts/wiki-app.html builds directly for the app
+  page's <title>.
+
+  `page_wide` works the same way. The site's default container is sized
+  for a single column of prose; this layout puts two rails either side of
+  that column, which leaves the prose far too narrow inside it. The flag
+  widens the container for wiki entries only — every other page keeps the
+  prose width it was designed around.
+
+  `scroll_gate: false` too — a wiki section is straight into reference
+  content the moment it loads (crumb, title, lede), same as /projects/.
+  There's no hero to hold the body back for.
+
+  Front matter a section page declares:
+      layout:   wiki-entry          (required)
+      parent:   gaffer-iq           (required — the app's slug)
+      slug:     calculations        (globally unique across the wiki)
+      order:    80                  (sort position within the app)
+      group:    Matchups            (rail heading)
+      title:    Calculations
+      lede:     one italic sentence (optional)
+      shape:    list of {group, terms} for this section's own infobox
+                (optional — see _includes/wiki-infobox.html. Terms are
+                glossary keys; one with no entry renders as plain text)
+
+  revised and status are NOT declared per section. They are read from
+  the parent app, so twelve pages do not restate the same two values.
+  A section may still override either of them.
+
+  The meta strip used to carry an Author line, inherited the same way.
+  It said "Josh Bailey" on every page of a personal site — a field
+  that never varies is not metadata. It now reports read time, which
+  does vary and is the thing a reader actually wants before starting.
+
+  `kind` is still inherited the same way, but this layout no longer
+  shows it: every section of an app carries the same one, so the meta
+  strip repeated `Application` on all twelve pages and said nothing.
+  Nothing else reads it now either — /projects/wiki/ used to, and is a
+  redirect to /projects/ as of this change. `kind`, `group`, `summary`
+  and `author` are all in that position now: left in the app front
+  matter rather than deleted, because they are true and an index that
+  wants them again should not have to re-derive them.
+
+  Everything derived below — the rail, numbering, backlinks, pager,
+  Entry status — is read from the section pages themselves at build time.
+  There is no second manifest.
+
+  Two markup conventions are available in a section's body and are
+  compiled at build time: the double-square-bracket internal wiki link
+  and the double-parenthesis footnote. Both are documented, with literal
+  examples, in _includes/wiki-body.html.
+=============================================================================
+{%- endcomment -%}
+
+{%- comment -%} ---- this section's app, and its siblings ---- {%- endcomment -%}
+{%- assign wk_apps = site.pages | where_exp: "p", "p.layout == 'wiki-app'" | sort: "order" -%}
+{%- assign wk_app = wk_apps | where: "slug", page.parent | first -%}
+{%- assign wk_sections = site.pages | where_exp: "p", "p.layout == 'wiki-entry'" | where: "parent", page.parent | sort: "order" -%}
+{%- assign wk_first = wk_sections | first -%}
+
+{%- comment -%} ---- metadata, inherited from the app unless overridden ---- {%- endcomment -%}
+{%- assign wk_revised = page.revised | default: wk_app.revised -%}
+{%- assign wk_status = page.status | default: wk_app.status -%}
+
+{%- comment -%}
+  Words and read time come off ONE count so the meta strip can never
+  contradict itself. 200 wpm is the rate the essay page's own "~18 min"
+  is set at, so the two pages agree about what a minute of reading is.
+
+  The plus: 199 before the divide is a ceiling — Liquid's divided_by
+  floors on integers, and a 40-word stub should read "~1 min", not
+  "~0 min".
+{%- endcomment -%}
+{%- assign wk_words = page.content | strip_html | number_of_words -%}
+{%- assign wk_mins = wk_words | plus: 199 | divided_by: 200 -%}
+
+{%- comment -%} Position within the app, for the meta strip. {%- endcomment -%}
+{%- assign wk_idx = 0 -%}
+{%- for s in wk_sections -%}
+  {%- if s.url == page.url -%}{%- assign wk_idx = forloop.index0 -%}{%- endif -%}
+{%- endfor -%}
+
+{%- comment -%}
+  Every section in the wiki, in reading order: app by app, and within an
+  app by `order`. Sorting the flat list by `order` alone would interleave
+  two apps, which is why this is built app-first. The pager walks it, so
+  the last section of one write-up leads into the first of the next.
+{%- endcomment -%}
+{%- assign wk_all = "" | split: "" -%}
+{%- for a in wk_apps -%}
+  {%- assign wk_as = site.pages | where_exp: "p", "p.layout == 'wiki-entry'" | where: "parent", a.slug | sort: "order" -%}
+  {%- assign wk_all = wk_all | concat: wk_as -%}
+{%- endfor -%}
+{%- assign wk_g = 0 -%}
+{%- for s in wk_all -%}
+  {%- if s.url == page.url -%}{%- assign wk_g = forloop.index0 -%}{%- endif -%}
+{%- endfor -%}
+{%- assign wk_pi = wk_g | minus: 1 -%}
+{%- assign wk_ni = wk_g | plus: 1 -%}
+
+{%- comment -%}
+  Backlinks, derived from the [[slug|…]] convention itself rather than
+  from a declared list, so the two can never drift apart. A section
+  that is its app's front door (wk_idx == 0) ALSO inherits the app's
+  inbound links: [[app-slug|…]] is the only form wiki-body.html lets an
+  author write when linking to a write-up in general (see its own
+  comment), and it resolves to that write-up's first section — so this
+  is where a link written that way has to land.
+{%- endcomment -%}
+{%- comment -%}
+  Built with `capture` and a counter rather than by accumulating an
+  array: Liquid has no `push`, and `concat` needs an array on both
+  sides, so collecting page objects would mean building a
+  single-element array per hit. The markup and the count come out of
+  one pass instead.
+{%- endcomment -%}
+{%- capture wk_needle -%}[[{{ page.slug }}|{%- endcapture -%}
+{%- capture wk_needle_app -%}[[{{ wk_app.slug }}|{%- endcapture -%}
+{%- assign wk_backs_count = 0 -%}
+{%- capture wk_backs_html -%}
+  {%- for s in wk_all -%}
+    {%- assign wk_is_back = false -%}
+    {%- if s.content contains wk_needle -%}{%- assign wk_is_back = true -%}{%- endif -%}
+    {%- if wk_idx == 0 and s.content contains wk_needle_app -%}{%- assign wk_is_back = true -%}{%- endif -%}
+    {%- if s.url != page.url and wk_is_back -%}
+      {%- assign wk_backs_count = wk_backs_count | plus: 1 -%}
+      {%- comment -%} The backlinking section's OWN app, not the current page's — a cross-app backlink must show the source's kind, not the destination's. {%- endcomment -%}
+      {%- assign wk_bapp = wk_apps | where: "slug", s.parent | first -%}
+      {%- assign wk_bk = s.kind | default: wk_bapp.kind -%}
+      <a class="wl" href="{{ s.url }}" data-peek-kind="{{ wk_bk | escape }}" data-peek-title="{{ s.title | escape }}" data-peek-lede="{{ s.lede | escape }}">{{ s.title }}</a>
+    {%- endif -%}
+  {%- endfor -%}
+{%- endcapture -%}
+
+<section class="wk" aria-labelledby="wk-title">
+  <div class="wk-layout">
+
+    <!-- ===================================================================
+         Left rail — this app's sections, grouped and numbered. Scoped to
+         the app deliberately: the reader is navigating one write-up, and
+         the other write-ups are a click away on /projects/.
+         =================================================================== -->
+    <aside class="wk-rail wk-rail--left" aria-label="{{ wk_app.title }} sections">
+      {% include wiki-rail.html app=wk_app sections=wk_sections %}
+    </aside>
+
+    <!-- ===================================================================
+         Article
+         =================================================================== -->
+    <article class="wk-art">
+
+      {%- comment -%}
+        Projects / <app> / <section>. The Wiki hop between the first two
+        came out when /projects/wiki/ became a redirect to /projects/ —
+        it would have been two adjacent crumbs pointing at one page.
+      {%- endcomment -%}
+      <p class="wk-crumb mono-label">
+        <a href="/projects/">Projects</a>
+        <span class="wk-crumb__sep" aria-hidden="true">/</span>
+        <a href="{{ wk_first.url }}">{{ wk_app.title }}</a>
+        <span class="wk-crumb__sep" aria-hidden="true">/</span>
+        <span class="wk-crumb__here">{{ page.title }}</span>
+      </p>
+
+      <h1 id="wk-title" class="section-title">{{ page.title }}</h1>
+
+      {%- if page.lede %}
+      <p class="work-lede wk-art__lede">{{ page.lede }}</p>
+      {%- endif %}
+
+      <div class="wk-art__meta mono">
+        <span><b>Entry</b>{{ wk_idx | plus: 1 | prepend: '0' | slice: -2, 2 }} / {{ wk_sections.size | prepend: '0' | slice: -2, 2 }}</span>
+        <span><b>Revised</b>{{ wk_revised }}</span>
+        <span><b>Read time</b>~{{ wk_mins }} min</span>
+        <span><b>Words</b>{{ wk_words }}</span>
+      </div>
+
+      {%- if wk_status == 'draft' %}
+      <p class="wk-draft mono">
+        <span class="wk-draft__tag">Draft</span>
+        <span>This write-up is placeholder copy standing in for the finished
+        entry. The structure, links and metadata are real; the prose is not
+        final.</span>
+      </p>
+      {%- endif %}
+
+      {%- comment -%}
+        Every section carries an infobox, and it summarises THAT section:
+        a section declares its own `shape` (or `info`) in front matter and
+        that is what renders, headed by the section's own title.
+
+        The app's box is the fallback, and only on its first section. That
+        box describes the app's stack rather than any one section, so it
+        belongs on the write-up's front door and nowhere else — repeating
+        it on every section would say the same four groups twelve times.
+        A first section that declares its own `shape` overrides it.
+
+        The launch button is app-level too, but it is a destination rather
+        than reference material, so it lives in the right rail instead and
+        is present on every section. See the rail below.
+      {%- endcomment -%}
+      {%- if page.shape or page.info %}
+        {% include wiki-infobox.html app=page %}
+      {%- elsif wk_idx == 0 %}
+        {%- if wk_app.shape or wk_app.info %}
+        {% include wiki-infobox.html app=wk_app %}
+        {%- endif %}
+      {%- endif %}
+
+      {%- capture wk_raw %}{{ content }}{% endcapture -%}
+      {% include wiki-body.html html=wk_raw %}
+
+      {%- comment -%}
+        Backlinks, or nothing at all. This used to render a ruled-off
+        "Referenced by — nothing yet, an orphan entry" on any section
+        no other section had linked to, which is most of them: a heading,
+        a rule and a line of grey text to report an absence. The pager
+        below carries its own top margin and rule, so dropping the block
+        leaves the end of the article correctly spaced.
+      {%- endcomment -%}
+      {%- if wk_backs_count > 0 %}
+      <div class="wk-back">
+        <p class="wk-back__h mono-label">Referenced by</p>
+        <div class="wk-back__list">{{ wk_backs_html }}</div>
+      </div>
+      {%- endif %}
+
+      <nav class="wk-pager mono-label" aria-label="Wiki sections">
+        {%- if wk_g > 0 -%}
+          {%- assign wk_prev = wk_all[wk_pi] -%}
+          <a href="{{ wk_prev.url }}">Previous<span class="wk-pager__t">{{ wk_prev.title }}</span></a>
+        {%- else -%}<span></span>{%- endif -%}
+        {%- if wk_ni < wk_all.size -%}
+          {%- assign wk_next = wk_all[wk_ni] -%}
+          <a href="{{ wk_next.url }}">Next<span class="wk-pager__t">{{ wk_next.title }}</span></a>
+        {%- else -%}<span></span>{%- endif -%}
+      </nav>
+
+    </article>
+
+    <!-- ===================================================================
+         Right rail. On this page and Recently read are built by wiki.js
+         and stay hidden until it adds .is-built, so neither leaves an
+         empty ruled-off label hanging with JS disabled. Entry status is
+         compiled here and needs no JS at all.
+         =================================================================== -->
+    <aside class="wk-rail wk-rail--right" aria-label="About this section">
+
+      {%- comment -%}
+        The one deliberate coupling between a wiki entry and its app.
+        Nothing else on this page knows /projects/apps/ exists.
+
+        It sits at the head of the rail rather than in the article so it
+        is reachable from every section of the write-up, not only the
+        first — a reader who lands on Calculations from a search result
+        should not have to walk back to the front door to open the app.
+      {%- endcomment -%}
+      {%- if wk_app.app_url %}
+      <div class="wk-rail__block wk-rail__block--launch">
+        <a class="wk-launch wk-launch--rail mono-label" href="{{ wk_app.app_url }}">
+          Launch app <span aria-hidden="true">&#8599;</span>
+        </a>
+      </div>
+      {%- endif %}
+
+      <div class="wk-rail__block wk-rail__block--toc" id="wk-toc-block">
+        <p class="wk-rail__h"><span class="mono-label">On this page</span></p>
+        <nav class="wk-toc" id="wk-toc"></nav>
+      </div>
+
+      <div class="wk-rail__block wk-rail__block--recent" id="wk-recent-block">
+        <p class="wk-rail__h"><span class="mono-label">Recently read</span></p>
+        <div class="wk-recent" id="wk-recent"></div>
+      </div>
+
+      {% include wiki-status.html revised=wk_revised backs=wk_backs_count %}
+
+    </aside>
+
+  </div>
+</section>
+
+<script src="/assets/js/wiki.js?v=2" defer></script>

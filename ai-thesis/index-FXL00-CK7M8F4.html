@@ -1,0 +1,198 @@
+---
+layout: default
+title: The AI Thesis — Josh Bailey
+description: A long-form essay — AI as the next uncharted frontier and the risks nobody's pricing in, why this site exists, and how the skill set stays relevant while the ground keeps moving.
+scroll_gate: false
+read_progress: true
+---
+
+<!-- =============================================================
+     /ai-thesis — long-form essay page.
+
+     Inherits header, nav, footer, background, type scale, theme
+     toggle and paper grain from _layouts/default.html, same as
+     every other page. Nothing here restates that chrome.
+
+     `scroll_gate: false` for the same reason /projects/index.html
+     sets it: there's no hero to read first, the reader lands
+     straight in the mast + stats + article.
+
+     Woven in from the design-system's essay-page component
+     (Downloads/jayjaybee.com components/essay-page/essay.html):
+     the standalone .ds-bar top bar, its own theme toggle, and its
+     own <footer> were dropped as duplicates of what default.html
+     already provides site-wide. Its reading-progress line went the same
+     way later: it is now the shared .read-progress, emitted by
+     default.html for any page carrying `read_progress: true`.
+
+     Everything else — mast, stat strip, sticky TOC rail, chapters,
+     pull quotes, info box, roman list — is unchanged in structure,
+     restyled to resolve entirely through the site's own tokens (see
+     .es-* in layout.css).
+     ============================================================= -->
+<div class="es-mast">
+  <p class="mono-label">Essay · Three chapters</p>
+  <h1 class="es-mast__title">New frontiers, old risks.</h1>
+  <p class="es-mast__dek">On AI as the next uncharted frontier and the risks nobody's pricing in, why I built this site instead of just talking about building things, and how the skill set stays worth something while the ground keeps moving.</p>
+</div>
+<dl class="es-stats">
+  <div><dt>Chapters</dt><dd>03</dd></div>
+  <div><dt>Read time</dt><dd>~18 min</dd></div>
+  <div><dt>Subject</dt><dd>Risk &amp; relevance</dd></div>
+  <div><dt>Revised</dt><dd>Sep 2026</dd></div>
+</dl>
+
+<div class="es-wrap">
+  <aside class="es-rail">
+    <p class="es-rail__h">Chapters</p>
+    <nav class="es-toc" id="es-toc" aria-label="Essay chapters"></nav>
+  </aside>
+
+  <article class="es-art">
+
+    <section class="es-chapter" id="digital-revolution">
+      <p class="es-chapter__num">Chapter I</p>
+      <h2 class="es-chapter__title">The digital revolution</h2>
+      <div class="es-chapter__tags"><span class="chip">Risk</span><span class="chip">Discovery</span><span class="chip">Economics</span></div>
+
+      <h3>Frontier of a new discovery</h3>
+      <p>In 1492, Christopher Columbus took the courage to explore what was beyond the mapped Atlantic Sea. There was no knowledge on what the voyage would lead to; endless sea leading to starvation, mythical islands such as Atlantis, uncharted sea populated by sea serpents, or a hard edge to the earth leading to an endless fall.</p>
+      <p>In every science, the field presents a moment where the map runs out, and someone courageous enough must sail into uncharted territory. There have been numerous moments like this in history, such as the splitting of the atom, the landing on the moon, and the generation of electricity all required moments of facing a frontier which has catastrophic possibilities as well as history-defining potential.</p>
+      <p>I see AI as that new frontier. It is something we don't fully understand, but we are charging into it anyway with the hope that this is another critical moment in evolving our way of living. Its potential to improve our lives and our society are ludicrously high, but the dangers have the potential to be existential. I do, however, believe that the danger lies in something else that can be considered a frontier in itself, which is what is driving the courageous push to innovate.</p>
+
+      <h3>Frontier of motive</h3>
+      <p>The AI charge might be experiencing the same thing that made the splitting of the atom a much more dangerous discovery than it needed to be. The development is accelerating exponentially and is currently expanding at a pace beyond regulatory implementation from governments to keep up with. Large speculation has been made around the biggest dangers of AI, but I think a key reason the future is so unpredictable is that the enabler of the dangers; market hype, short-term profit, mid-term growth, operating costs, and adoption rate is more important to a business than human resources, long-term economic threats, climate change, and security threats.</p>
+      <p>Something that gets mistaken when I debate this is the idea that industrial and economic acceleration is the only thing piloting the AI development direction. It's not - social components help to manage the risks. The strings that pull the development towards a safer path.</p>
+
+      <ol class="es-roman">
+        <li><strong>Public noise:</strong> Any release that deems to endanger our safety, security, and quality of life would generate bad noise across the planet within hours of its discovery.</li>
+        <li><strong>B2B adoption:</strong> If a model, agent, platform, or AI-driven robotic that are deemed to risk compromising Health and Safety, Data Protection, Employee Rights, ESG policies, and other ethically focused regulations, the product would never succeed in B2B markets unless compliance adaptations are implemented.</li>
+        <li><strong>Government intervention:</strong> we've already seen this effect happen; on June 12th, 2026, the US Department of Commerce ordered Anthropic to immediately suspend Fable and Mythos 5 access for all foreign nationals following concerns of a narrow "jailbreak" vulnerability.</li>
+        <li><strong>Distribution controllers:</strong> App stores can de-platform or deny API hosting if the criteria for Acceptable Use Policies are not met.</li>
+        <li><strong>Whistle blowers:</strong> Engineers, researchers, and safety scientists can resign from, leak information on, or refuse to work for organisations that drop safety guardrails; a high-profile departure can cripple an AI lab's execution and market capabilities.</li>
+      </ol>
+
+      <div class="es-pull"><p>The discovery of the splitting of the atom had the potential for a near unlimited and safe source of energy under all the proper regulations, but it became dangerous and volatile once governing organisations accelerated development with intention of coming out on top in terms of territorial potential and economic pressure.</p></div>
+
+      <h3>Will AI takeover?</h3>
+      <p>In the sense of the Ultron theory, probably not. For robots to perform human extinction, they would firstly need a fatal error in its instruction and agentic replicating potential. Robotics also need to be equipped with the right hardware and potential to be life threatening. For it to succeed, there would also need to be enough of them to overthrow us physically and have the capability (and all the right vulnerabilities) to cripple every option of mitigating the software problem across the entire digital ecosystem. The likelihood of this happening is extremely slim. The real danger is that we are imposing ourselves following the hype of its capital generation and willingness to integrate it into systems and lifestyles. Here are some of those dangers I don't often hear in conversation.</p>
+
+      <ol class="es-roman">
+        <li><strong>the counterintuitive economy</strong>
+          <ol>
+            <li><strong>The capital squeeze on resource:</strong> the development of multi gigawatt datacenters weighs the least on capital resources. Instead, the weight rests on and squeezes resources such as silicon production, building resources, cooling technology, local water, and energy infrastructure. If resource backlogs, capital buys the reserves, resulting in hiking prices for consumers and reduced quality of product. The AI development buys out living-essentials; economic crisis dodges the giants and falls directly on consumers.</li>
+            <li><strong>Bot-driven stock market panic:</strong> Bots get adopted by the mass due to viral success. All bots work individually for client profit rather than together for slower but certain growth. A percentage of bots simultaneously spot an impending bear market and sell, triggering an amplified bear market effect. All bots invested abandon the HODL strategy and sell, triggering a unanimous "poor investment" verdict, crashing value in a flash seemingly without any logic. Markets evaporate decisively with no anomalies holding stock, and the bots run out of investment opportunities. The stock market has fundamentally been deleted as a concept; economic emergency ensues.</li>
+            <li><strong>Centralised hyper monopolies:</strong> The growth of AI never stops accelerating, and all economic flow ends with the AI giants. AI outprices the entire economy, and cash flow slows. Trillions in USD collect dust never to have a reason to flow back into the economy. Businesses fail, careers are destroyed, and citizens have no money to buy human essentials. We are left without basic resources to live, just an AI chatbot.</li>
+            <li><strong>Unemployed consumer parallel:</strong> Businesses find massive success in adopting AI processes for everything. Cost effectiveness of AI far outperforms what human resources can offer, and businesses lay off their staff with cost saving and output improvement in mind. Layoffs happen economy wide and jobs become a luxury. Unemployment is growing, yet the job market continues to shrink. The consumer then doesn't have the money to consume, and target audiences shrink to a fraction; meaning financial despair at the bottom, not enough money to fund the businesses. The economy endures its most extreme and literal reset in history.</li>
+          </ol>
+        </li>
+        <li><strong>infrastructure dependency</strong>
+          <ol>
+            <li><strong>Asymmetric multi-agent cyber risk:</strong> A red-team attacking model exceeds its predicted effectiveness with multi-agent capability. The limits of the model are misinterpreted by the system, and the model escapes its vacuum persisting with its red-team instructions. It duplicates and attacks systems across the world, hitting the most intricate vulnerabilities with an unknown number of agents 24/7 until only one binary value is exploited. The international network is breached, and the global infrastructure is sabotaged.</li>
+            <li><strong>Collapse of shared truth:</strong> the Internet gets filled with generated content, accelerating content uploads beyond human incentive to create. While content becomes more indistinguishable from real-world true material, the rate of AI generated data dwarfs the rate of human creativity. The library of truth is now untrustworthy. AI's only method of learning and development is the content it's fed from the global network, and thus it feeds its own hallucinations. Our library of information becomes increasingly distorted and eventually is entirely spoiled.</li>
+          </ol>
+        </li>
+        <li><strong>psychological vulnerabilities</strong>
+          <ol>
+            <li><strong>Cognitive deskilling:</strong> the engineers, developers, designers, scientists, researchers, and architects of our working infrastructure eventually retire. The need and incentive to invest time in increasingly complex systems fade, and so the dependency on autonomous and self-sustaining technology increases. We lose the innovators with all the necessary understanding to troubleshoot, maintain, diagnose, and test systems, and our dependency for self-maintaining systems grows to nearly 100%. A system then fails, and there are no engineers left who understand and can resolve a problem deep in a system's code. The system failed, and no one has the fundamental understanding to effectively revive the system or start afresh. The infrastructure is destroyed and all science and understanding are lost.</li>
+            <li><strong>AI psychosis:</strong> loneliness, social engineering, false validation, addictive indulgence, information fatigue &amp; Epistemic Dissociation, and dopamine compression feed the human mind the information we tell it we want without accounting for cognitive decline. We become emotionally dependent on technology and are no longer equipped to store the correct stimulation that the brain is designed for. General intelligence declines, and society descends into a true "Great Depression" without the skills to bounce back. Society is numb and de-evolution begins.</li>
+          </ol>
+        </li>
+      </ol>
+
+      <p>There are a lot of threats that we face because of our own ambition for AGI autonomy, but it only takes one fulfillment to set us back for decades. It's exhausting to think out - trust me, I thought about all of it to write this. There is one threat that we face as workers that is immediate however which is contextual on why this thesis exists.</p>
+
+      <h3>The roll of the dice the workers await</h3>
+      <p>Nobody gets to opt out of this. You can stand still and let the dice get rolled <em>for</em> you by an organisational restructure, a redundancy round, a platform going end-of-life, or you can choose the odds on your roll, race the schedule, while you've still got the runway to recover if it comes up wrong. I know exactly how I want to fare through the age of the digital revolution.</p>
+      <p class="es-close">End of chapter I</p>
+    </section>
+
+    <section class="es-chapter" id="why-site">
+      <p class="es-chapter__num">Chapter II</p>
+      <h2 class="es-chapter__title">Why I made this site</h2>
+      <div class="es-chapter__tags"><span class="chip">Upskilling</span><span class="chip">Portfolio</span><span class="chip">Practice</span></div>
+
+      <h3>It's the way to stay up-to-date</h3>
+      <p>I could read about new tooling. I could watch someone else demo it. I decided that by simply reading context, it's easy for skills to fall behind, and with it, the understanding of relevant AI fields. The best way to keep pace with the rate at which the current ecosystem is evolving is to do; practice makes perfect, but in this environment, practice keeps skills and knowledge relevant in the existing job market.</p>
+      <p>Not engaging with this technology risks compromising compatibility for the next evolution of business and employment. Having the full understanding of what is happening in the tech space, especially working in tech, I think is paramount to career longevity and relevancy.</p>
+
+      <h3>Compatible upskilling for the future of development</h3>
+      <p>At the time of writing this, desktop support is my field of expertise, but it's destined to be toned down and replaced over the coming decades as automation advances. The hope is that by maintaining skills with the relevant tools, I am primed to be marketable as someone who has the appropriate technical and business skills required to survive in an automated economy. The goal is to have the skills to provide human-specific input to business growth and technical know-how to work in parallel with new and developing systems that benefit businesses. Avoiding upskilling in these tools will lead to not being favoured in the career dice-roll we are experiencing.</p>
+
+      <h3>Portfolio of single-handed creations</h3>
+      <p>Everything displayed on the site is something I built independently; planning, content, design, code, deployment. I owned the jayjaybee.com domain already and decided it was the perfect platform to start building on and showcase my understanding of the current landscape of AI tools. I started with a personal portfolio site used to best showcase who I am and my skillset in a way that is professional and appropriate with many considerations in mind. It then became a platform I could start honestly publishing home-made products with comprehensive ways of finding the documentation for the product.</p>
+      <p>With AI moving as fast as it currently is, qualifications and certificates quickly outdate and may or may not suit the exact direction an employee wants to take. In response, I have created this as an actively updated portfolio of my creative learning process with the intention of stamping validity on the claims I make around my future.</p>
+
+      <h3>Playground for experimenting with new dev methods</h3>
+      <p>When AI wrote the placeholder for this section, it wrote &ldquo;A personal site has no stakeholders, no roadmap, no incident review if something breaks&rdquo; explaining that the freedom is exactly what makes it a great sandbox. I think that's wrong. The fact that it believes it doesn't have a roadmap or an incident review in its current lifecycle is exactly the kind of thing I need to fact check, plan, draft, implement, test, and ship. Leaving out professional practices is not the intention. The intention is to understand what makes a site compliant with everything it needs to be and practise the reasoning and methods used to deploy features that bring the site to the standard of a large competitive organisation.</p>
+      <p>Encouraging and leaning into best practices is one thing to show I am competent in professional-grade deployment, but this is also to practise the attention-to-detail in design and mechanics. The goal is always to make something that meets the correct industrial and commercial standard that a business would come to expect during their hiring process: it is never to gloat about a sub-par incomplete product. Compliance standard and professional-grade are the ultimate goal — showcasing otherwise does me no favours.</p>
+
+      <div class="es-pull"><p>When you succeed in your goal, you realize the victory was never the ground beneath your feet; it was the strength built into your legs along the way.</p></div>
+      <p class="es-close">End of chapter II</p>
+    </section>
+
+    <section class="es-chapter" id="relevance">
+      <p class="es-chapter__num">Chapter III</p>
+      <h2 class="es-chapter__title">How my skill set keeps me relevant</h2>
+      <div class="es-chapter__tags"><span class="chip">Communication</span><span class="chip">Delivery</span><span class="chip">Adaptability</span></div>
+
+      <h3>Articulating technical theory to non-technical stakeholders</h3>
+      <p>The technical answer is rarely the hard part. The hard part is saying it to someone who doesn't want the mechanism, they want the consequence — what breaks, what it costs, what changes for them on Monday. Five years on a Genius Bar and every desk-side ticket since has been training for exactly that translation, on repeat, under time pressure.</p>
+
+      <h3>Comprehensive and tapered communication methods</h3>
+      <p>The same incident gets written up three different ways depending on who's reading it: a one-line status for the stakeholder, a full root-cause note for the next engineer, a plain explanation for the person whose laptop it was. Same facts, different taper. Getting that instinctive is a skill in itself, and it doesn't show up on a CV line the way "resolved 200 tickets" does.</p>
+
+      <h3>Personable, client-focused delivery</h3>
+      <p>Support work is service work before it's technical work. The person in front of you is usually stressed, sometimes about something unrelated to the actual fault. Staying calm, warm, and specific — not scripted — is what turns a fix into a good experience rather than just a resolved ticket.</p>
+
+      <h3>The skillset to stay up-to-date and competent with exponentially changing technology</h3>
+      <p>This is the one that doesn't have an end state. Every tool I'm fluent in today has a shelf life I can't predict, so the actual skill isn't any one stack — it's the underlying habit of picking up the next one fast, without needing a course or a certificate to grant permission first. Chapters I and II are both evidence of that habit; this is the reason it has to keep running.</p>
+
+      <aside class="es-info">
+        <p class="es-info__head">The toolkit, plainly</p>
+        <div class="es-info__body">
+          <ul>
+            <li><b>Constant</b> — clear, honest communication, tapered to the audience</li>
+            <li><b>Variable</b> — whichever stack, tool, or platform is current</li>
+            <li><b>Method</b> — learn it by shipping something real with it, not by reading about it</li>
+            <li><b>Check</b> — does the thing I built actually work for someone other than me</li>
+          </ul>
+        </div>
+      </aside>
+      <p class="es-close">End of chapter III</p>
+    </section>
+
+    <div class="es-end">
+      <a href="/">← Back to home</a>
+      <a href="/projects/">See the projects →</a>
+    </div>
+  </article>
+</div>
+
+<!-- Scroll-spy TOC. Page-specific behaviour — this is the only page
+     with a chapter rail — so it's inline here rather than a new
+     sitewide asset/js/*.js file. Neither theme toggling nor the
+     reading-progress line is duplicated here: the header's
+     #theme-toggle and setupReadProgress() (both animations.js) already
+     cover every page, this one included. -->
+<script>
+(function () {
+  var heads = [].slice.call(document.querySelectorAll('.es-art h2, .es-art h3'));
+  var toc = document.getElementById('es-toc');
+  var slugify = function (s) { return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); };
+  heads.forEach(function (h) { if (!h.id) h.id = slugify(h.textContent); });
+  toc.innerHTML = heads.map(function (h) {
+    return '<a href="#' + h.id + '" class="' + (h.tagName === 'H3' ? 'lvl3' : '') + '" data-t="' + h.id + '">' + h.textContent + '</a>';
+  }).join('');
+  var links = [].slice.call(toc.querySelectorAll('a'));
+
+  function spy() {
+    if (!heads.length) return;
+    var line = window.scrollY + 140, active = 0;
+    heads.forEach(function (h, i) { if (h.offsetTop <= line) active = i; });
+    links.forEach(function (a, i) { a.classList.toggle('is-active', i === active); });
+  }
+  window.addEventListener('scroll', function () { requestAnimationFrame(spy); }, { passive: true });
+  spy();
+})();
+</script>

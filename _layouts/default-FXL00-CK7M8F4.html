@@ -1,0 +1,388 @@
+<!doctype html>
+<!-- =============================================================
+     jayjaybee.com — default layout
+     Every page with `layout: default` in its front matter is
+     wrapped in this scaffold at build time. Edit here to change
+     the header, footer, head metadata, or shared scripts across
+     the entire site.
+
+     Per-page front matter variables this template reads:
+       title       — used for <title>. Falls back to site.title. A
+                     layout may also declare `title_suffix` in its OWN
+                     front matter (not the page's) to qualify every page
+                     that uses it in one place — see _layouts/wiki-entry.html.
+       description — used for <meta description>. Falls back to
+                     page.lede, then to site.description (defined in
+                     _config.yml). The lede fallback exists because the
+                     wiki's 18 section pages carry a lede but no
+                     description of their own. Only the lede branch is
+                     escaped here — at least one lede in the wild
+                     contains literal double quotes, which would
+                     otherwise break out of the attribute. page.description
+                     and site.description are left exactly as they were
+                     (unescaped) so existing pages render byte-identical.
+     ============================================================= -->
+{%- comment -%}
+  `is-home` marks the front page for CSS alone. The header's fade-in is
+  an arrival — it belongs to the first page a reader lands on, not to
+  every navigation after it, where re-animating a nav that was already
+  on screen reads as slowness rather than polish. See the header opt-out
+  in components.css. Written into the class attribute rather than set by
+  the pre-paint script below so the header is never hidden for a frame
+  on a sub-page.
+{%- endcomment -%}
+<html lang="en" data-theme="auto" class="no-js{% if page.url == '/' %} is-home{% endif %}">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{%- if layout.title_suffix -%}{{ page.title }} — {{ layout.title_suffix }}{%- else -%}{{ page.title | default: site.title }}{%- endif -%}</title>
+  {%- assign page_desc = page.description -%}
+  {%- unless page_desc -%}{%- assign page_desc = page.lede | escape -%}{%- endunless -%}
+  {%- unless page_desc -%}{%- assign page_desc = site.description -%}{%- endunless -%}
+  <meta name="description" content="{{ page_desc }}" />
+
+  <!-- Pre-paint setup: theme preference + JS detection + scroll-gate.
+       Must run before first paint to avoid a flash of unstyled content
+       (wrong theme) or a flash of unanimated content (revealed before
+       hidden). The scroll-gate keeps below-hero content hidden until the
+       header divider exits the viewport. -->
+  <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem('theme');
+        if (saved === 'light' || saved === 'dark') {
+          document.documentElement.setAttribute('data-theme', saved);
+        } else {
+          document.documentElement.removeAttribute('data-theme');
+        }
+      } catch (e) {}
+
+      var root = document.documentElement;
+      root.classList.replace('no-js', 'js');
+
+      // Wiki entry -> wiki entry, within the SAME write-up: the rails
+      // and the breadcrumb are the frame the reader was just looking
+      // at, not new material — re-running their entrance fade on every
+      // click reads as the page reloading, not as content appearing.
+      // Checked here (referrer, before first paint) so the CSS override
+      // in components.css can hold them still from the first frame, no
+      // flash of hidden-then-shown. Only that frame skips its entrance;
+      // the article's own content still fades every time.
+      //
+      // Both paths are matched, and the write-up slug has to be the
+      // same in each. Landing here from a DIFFERENT write-up would give
+      // a left rail listing entirely different sections, so freezing it
+      // would swap its contents with no transition at all — worse than
+      // the fade. Everything else (a first arrival, /projects/,
+      // a direct link, off-site) sets nothing and gets the normal
+      // full-page entrance, which is what a first arrival should look
+      // like.
+      var WK_ENTRY = /^\/projects\/wiki\/([^/]+)\/[^/]+\/?$/;
+      try {
+        var ref = document.referrer;
+        if (ref) {
+          var refURL = new URL(ref);
+          var from = WK_ENTRY.exec(refURL.pathname);
+          var here = WK_ENTRY.exec(location.pathname);
+          if (refURL.origin === location.origin &&
+              from && here && from[1] === here[1]) {
+            root.classList.add('wk-continue');
+          }
+        }
+      } catch (e) {}
+
+      // Pages opt out of the gate with `scroll_gate: false` in front
+      // matter — a page's own, or (falling back, same as title_suffix
+      // and page_wide above) its LAYOUT's, so wiki-entry.html can set
+      // it once for every section instead of every section restating
+      // it. The gate exists to hold the body back until the reader has
+      // passed the hero — pages without a hero to read first (the
+      // projects wiki, wiki entries) don't want it. This only removes
+      // the extra hold-everything condition: the per-element reveal
+      // observer in animations.js still fades each item in as it
+      // scrolls into view.
+      var gate = {% if page.scroll_gate == false or layout.scroll_gate == false %}false{% else %}true{% endif %};
+
+      // Reduced-motion users: skip the gate entirely.
+      var reduce = window.matchMedia &&
+                   window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduce || !gate) return;
+
+      root.classList.add('is-gated');
+
+      function openGate () {
+        if (!root.classList.contains('is-gated')) return;
+        root.classList.remove('is-gated');
+        try { root.dispatchEvent(new Event('gateopen')); }
+        catch (e) {
+          var ev = document.createEvent('Event');
+          ev.initEvent('gateopen', false, false);
+          root.dispatchEvent(ev);
+        }
+      }
+
+      function setupGate () {
+        var header = document.querySelector('.site-header__inner');
+        if (!header) { openGate(); return; }
+        // Deep-link / restored scroll: header already past the top.
+        if (header.getBoundingClientRect().bottom <= 0) { openGate(); return; }
+        // Short page — a blank template, a stub, a page whose content
+        // fits the viewport. There is nothing to scroll, so the divider
+        // can never exit the top and the gate would never open, leaving
+        // the footer stuck at opacity 0 (the .is-gated rule in
+        // components.css also suppresses the 3s failsafe). Open now.
+        if (root.scrollHeight <= window.innerHeight + 8) { openGate(); return; }
+        if (!('IntersectionObserver' in window)) { openGate(); return; }
+
+        var io = new IntersectionObserver(function (entries) {
+          for (var i = 0; i < entries.length; i++) {
+            if (entries[i].boundingClientRect.bottom <= 0) {
+              io.disconnect();
+              openGate();
+              return;
+            }
+          }
+        }, { threshold: 0 });
+        io.observe(header);
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', setupGate, { once: true });
+      } else {
+        setupGate();
+      }
+    })();
+  </script>
+
+  <link rel="stylesheet" href="/assets/css/global.css?v=74" />
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  {%- comment -%}
+    Reading-progress hairline. Opt-in per page with `read_progress: true`
+    in front matter — a page's own, or (same fallback as scroll_gate
+    above) its LAYOUT's, so a layout can set it once for every page that
+    uses it. Only long pages earn one: a bar that fills in two scroll
+    ticks reports nothing the scrollbar didn't. Emitted server-side and
+    driven by setupReadProgress() in animations.js; styled as
+    .read-progress in components.css.
+  {%- endcomment -%}
+  {%- if page.read_progress == true or layout.read_progress == true -%}
+  <div class="read-progress" id="read-progress" aria-hidden="true"></div>
+  {%- endif -%}
+
+  <!-- ============================================================
+       Site navigation — large serif wordmark with brand mark on top,
+       a row of nav links + search beneath. The bottom of the inner
+       block carries the single hairline divider into the page body.
+
+       In-page anchors are rooted at / so the nav works from every
+       page: on the home page the browser just updates the hash and
+       smooth-scrolls; from a sub-page it navigates home and scrolls.
+       ============================================================ -->
+  <header class="site-header" role="banner">
+    <div class="site-header__inner">
+
+      <!-- Top row — wordmark on the left, theme toggle on the right.
+           Their right edge aligns with the search icon below via the
+           shared inner container padding. -->
+      <div class="site-header__top">
+        <a class="site-wordmark" href="/" aria-label="Josh Bailey — home">
+          <span class="site-wordmark__name">Josh&nbsp;Bailey</span>
+          <!-- Brand mark: the 8px accent square that punctuates the wordmark.
+               aria-hidden because it's purely visual. -->
+          <span class="site-wordmark__mark" aria-hidden="true"></span>
+        </a>
+
+        <!-- Theme toggle: small, unobtrusive. Cycles light → dark → system. -->
+        <button
+          id="theme-toggle"
+          class="theme-toggle mono"
+          type="button"
+          aria-label="Change colour theme"
+          aria-live="polite"
+        >
+          <span class="theme-toggle__current" data-theme-label>System</span>
+        </button>
+      </div>
+
+      <div class="site-header__row">
+        <nav class="site-nav" aria-label="Primary">
+          <ul class="site-nav__list" role="list">
+
+            <!-- Experiences — dropdown of roles, links into the home page -->
+            <li class="site-nav__item has-menu">
+              <button
+                type="button"
+                class="site-nav__link site-nav__trigger"
+                aria-expanded="false"
+                aria-haspopup="true"
+                aria-controls="menu-experiences"
+                data-menu-trigger="experiences"
+              >
+                Experiences
+                <span class="site-nav__caret" aria-hidden="true">▾</span>
+              </button>
+              <ul
+                id="menu-experiences"
+                class="site-nav__menu"
+                role="menu"
+                data-menu="experiences"
+                hidden
+              >
+                <li role="none"><a role="menuitem" class="site-nav__menu-link" href="/#exp-amf1">Aston Martin Aramco — Desktop Support Analyst</a></li>
+                <li role="none"><a role="menuitem" class="site-nav__menu-link" href="/#exp-partnership">Partnership Education — IT Engineer</a></li>
+                <li role="none"><a role="menuitem" class="site-nav__menu-link" href="/#exp-redbull">Red Bull Racing — IT Deployment Engineer</a></li>
+                <li role="none"><a role="menuitem" class="site-nav__menu-link" href="/#exp-apple">Apple — Technical Specialist</a></li>
+              </ul>
+            </li>
+
+            <li><a class="site-nav__link" href="/#about">About me</a></li>
+
+            <!-- Relative fragment, not "/#contact" — the footer this
+                 points at (id="contact") is in the shared layout, so
+                 it's on every page already. An absolute "/#contact"
+                 forced a detour home before jumping to it; "#contact"
+                 just scrolls the current page straight to its own
+                 footer, wherever that page is. -->
+            <li><a class="site-nav__link" href="#contact">Contact</a></li>
+
+            <li><a class="site-nav__link site-nav__link--accent" href="/files/CV.pdf" target="_blank" rel="noopener">CV</a></li>
+
+            <!-- Projects — the wiki hub at /projects. Was a dropdown listing
+                 each app directly; now a single link. The landing page lists
+                 the work and sends each row to its write-up under
+                 /projects/wiki/; only a write-up links out to its app. -->
+            <li><a class="site-nav__link" href="/projects/">Projects</a></li>
+            <li><a class="site-nav__link" href="/ai-thesis/">Ai thesis</a></li>
+
+          </ul>
+        </nav>
+
+        <!-- Site search — icon opens an expanding input that highlights
+             matches across the main content area. Hidden checkbox from
+             the design bundle is replaced with a real <button>; state is
+             carried by `.is-open` / `.has-results` classes on .search,
+             toggled by search.js. Sits at the far right of the nav row
+             via .site-header__row's space-between layout. -->
+        <div class="search" data-search>
+
+          <button
+            type="button"
+            class="search__icon"
+            aria-expanded="false"
+            aria-controls="site-search-input"
+            aria-label="Toggle search"
+            data-search-toggle
+          >
+            <svg class="icon-glass" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="10.5" cy="10.5" r="6.25"></circle>
+              <path d="M15.25 15.25 L20 20"></path>
+            </svg>
+            <svg class="icon-close" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 6 L18 18"></path>
+              <path d="M18 6 L6 18"></path>
+            </svg>
+          </button>
+
+          <!-- search__panel: transparent on desktop (display: contents),
+               collapses to zero height on mobile via grid 0fr/1fr trick. -->
+          <div class="search__panel">
+
+            <input
+              id="site-search-input"
+              type="text"
+              class="search__input"
+              placeholder="Looking for a specific quality?"
+              aria-label="Search the site"
+              autocomplete="off"
+              spellcheck="false"
+              data-search-input
+            >
+
+            <!-- Match-count + prev/next arrows. Populated by search.js
+                 after each search runs; hidden when the input is empty
+                 or before the first search. -->
+            <div class="search__count" data-search-count hidden>
+              <span class="search__count-text" data-search-count-text aria-live="polite">No mentions found</span>
+              <button type="button" class="search__nav" data-search-prev aria-label="Previous match" disabled>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6 L9 12 L15 18"></path></svg>
+              </button>
+              <button type="button" class="search__nav" data-search-next aria-label="Next match" disabled>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6 L15 12 L9 18"></path></svg>
+              </button>
+            </div>
+
+            <div class="search__chips" role="listbox" aria-label="Suggested searches">
+              <button type="button" class="chip" data-search-chip>Conflict Management</button>
+              <button type="button" class="chip" data-search-chip>Powershell</button>
+              <button type="button" class="chip" data-search-chip>JAMF</button>
+              <button type="button" class="chip" data-search-chip>Networking</button>
+              <button type="button" class="chip" data-search-chip>Leadership</button>
+            </div>
+
+          </div><!-- /.search__panel -->
+        </div>
+
+      </div>
+    </div>
+  </header>
+
+  <!-- Page-specific body. Each page's front matter + content is rendered
+       in here. The .page wrapper handles outer container + gutters.
+
+       A layout may declare `page_wide` in its OWN front matter to widen
+       that container — see _layouts/wiki-entry.html, whose three-column
+       shell does not fit the prose-width default. -->
+  <main id="main" class="page{% if layout.page_wide %} page--wide{% endif %}">
+    {{ content }}
+  </main>
+
+  <!-- ============================================================
+       Footer — contact + links + theme toggle. Subtle, not loud.
+       ============================================================ -->
+  <footer id="contact" class="site-footer" role="contentinfo">
+    <div class="footer-inner">
+
+      <div class="footer-block footer-block--portrait">
+        <span class="mono-label">Portrait</span>
+        <div class="footer-portrait" aria-hidden="true">
+          <img src="/assets/images/Portrait_Footer_new.JPEG" alt="" loading="lazy" decoding="async" />
+        </div>
+      </div>
+
+      <div class="footer-block footer-block--say">
+        <span class="mono-label">Say&nbsp;hello</span>
+        <p class="footer-line">
+          <a href="mailto:jjb303@hotmail.co.uk">jjb303@hotmail.co.uk</a>
+        </p>
+      </div>
+
+      <div class="footer-block footer-block--elsewhere">
+        <span class="mono-label">Elsewhere</span>
+        <ul class="footer-links" role="list">
+          <li><a href="https://www.linkedin.com/in/josh-b-238676100/" target="_blank" rel="noopener">LinkedIn&nbsp;<span aria-hidden="true">↗</span></a></li>
+          <li><a href="https://github.com/JAYJAYBEE303" rel="noopener">GitHub&nbsp;<span aria-hidden="true">↗</span></a></li>
+          <li><a href="/files/CV.pdf" target="_blank" rel="noopener">CV&nbsp;(PDF)</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-block footer-block--colophon">
+        <span class="mono-label">Colophon</span>
+        <p class="footer-line">
+          Set in Newsreader, Hanken Grotesk, and IBM Plex Mono. Built in Silverstone. Last touched September&nbsp;2026.
+        </p>
+      </div>
+
+    </div>
+
+    <div class="footer-rule">
+      <p class="footer-fineprint mono">© Josh Bailey · jayjaybee.com</p>
+    </div>
+  </footer>
+
+  <script src="/assets/js/animations.js?v=20" defer></script>
+  <script src="/assets/js/search.js?v=3" defer></script>
+</body>
+</html>

@@ -1,0 +1,53 @@
+---
+layout: null
+sitemap: false
+---
+{%- comment -%}
+=============================================================================
+  /projects/wiki/ — redirect to /projects/.
+
+  This was an index of write-ups, built from the site's own .work-*
+  components. It is gone because it was a second front door to the same
+  material: /projects/ already lists every project and already sends each
+  row to that project's write-up. Two pages listing the same two things,
+  one of them reachable only from a breadcrumb, is a fork in the path
+  with nothing at the end of it.
+
+  The path itself is kept and redirected rather than deleted. It was
+  linked from the wiki breadcrumb for the whole of the site's life so
+  far, so it is in browser histories and possibly in search results;
+  deleting it would turn those into 404s.
+
+  `layout: null` opts out of the `projects` scope in _config.yml, which
+  would otherwise wrap this in default.html and paint the full site
+  chrome on a page nobody is meant to see.
+
+  Three redirect mechanisms, for the same reason wiki-app.html emits
+  three: they fail in different situations. The refresh meta covers
+  no-JS, location.replace keeps the history entry clean so Back does not
+  bounce the reader straight forward again, and the real link covers
+  anything that honours neither. `noindex, follow` asks search engines to
+  drop this URL while still crediting /projects/. `sitemap: false` in
+  the front matter is the same instruction to jekyll-sitemap, which
+  GitHub Pages runs and the local build does not — it is inert here
+  and does the right thing there.
+
+  Nothing links here any more — the breadcrumb in wiki-entry.html now
+  goes Projects / <app> / <section>. This exists for old links only.
+=============================================================================
+{%- endcomment -%}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Projects — Josh Bailey</title>
+<link rel="canonical" href="{{ '/projects/' | absolute_url }}">
+<meta http-equiv="refresh" content="0; url=/projects/">
+<meta name="robots" content="noindex, follow">
+<script>location.replace("/projects/");</script>
+</head>
+<body>
+<p>Redirecting to <a href="/projects/">Projects</a>.</p>
+</body>
+</html>
