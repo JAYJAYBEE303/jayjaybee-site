@@ -1,0 +1,89 @@
+/*
+  Design tokens — F1 Live telemetry dashboard.
+
+  Reference point: a timing-tower / engineer's-dash aesthetic — graphite
+  panels, hairline dividers, tabular numerals for data — rather than a
+  generic SaaS card kit. Colour choices below are named for what they mean
+  in a telemetry read-out, not just "primary/secondary".
+
+  See /docs/STYLE_GUIDE.md for the reasoning behind each choice.
+*/
+
+:root {
+  /* ---- Colour: surfaces & text -------------------------------------- */
+  --color-bg: #0d1013;          /* cockpit-dark base, not flat black */
+  --color-surface: #161a1f;     /* panel background, one step up from bg */
+  --color-surface-raised: #1e232a; /* hovered/active panel */
+  --color-border: #2a3038;      /* hairline dividers between panels */
+  --color-border-strong: #3a424d;
+
+  --color-text: #e7eaee;        /* primary text, soft white not pure #fff */
+  --color-text-dim: #8b95a1;    /* secondary labels, captions */
+  --color-text-faint: #5b636e;  /* disabled / tertiary */
+
+  /* ---- Colour: brand accent ------------------------------------------
+     Amber reads as pit-lane / timing-tower signage rather than the
+     acid-green-on-black or terracotta-on-cream defaults. Used sparingly:
+     active nav state, focus rings, primary interactive accents only. */
+  --color-accent: #f2a63d;
+  --color-accent-strong: #ffbf5c;
+  --color-accent-bg: rgba(242, 166, 61, 0.12);
+
+  /* ---- Colour: telemetry data series ----------------------------------
+     These follow real motorsport-telemetry convention (throttle/brake
+     pedal traces are conventionally green/red; DRS/purple-sector
+     highlighting is a genuine F1 broadcast convention) — domain signal,
+     not decoration. Charts should map data channels to these, not to
+     --color-accent. */
+  --color-data-speed: #f2a63d;
+  --color-data-throttle: #3ddc84;
+  --color-data-brake: #ff5a5a;
+  --color-data-gear: #6fa8ff;
+  --color-data-rpm: #c792ea;
+  --color-data-fastest: #b26bff; /* purple-sector convention */
+
+  /* ---- Type -----------------------------------------------------------
+     Two families, distinct roles: Space Grotesk for UI chrome/headings
+     (geometric, technical), IBM Plex Mono for telemetry numerals (tabular
+     figures so digits don't jitter as values update). */
+  --font-ui: 'Space Grotesk', ui-sans-serif, 'Segoe UI', system-ui, sans-serif;
+  --font-data: 'IBM Plex Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
+
+  --font-size-xs: 0.75rem;   /* 12px — micro labels */
+  --font-size-sm: 0.875rem;  /* 14px — captions, nav */
+  --font-size-base: 1rem;    /* 16px — body */
+  --font-size-lg: 1.25rem;   /* 20px — section headings */
+  --font-size-xl: 1.75rem;   /* 28px — page headings */
+  --font-size-2xl: 2.5rem;   /* 40px — hero readouts */
+
+  --line-height-tight: 1.15;
+  --line-height-base: 1.5;
+
+  /* ---- Spacing (4px base step) ---------------------------------------- */
+  --space-1: 0.25rem;  /* 4px */
+  --space-2: 0.5rem;   /* 8px */
+  --space-3: 0.75rem;  /* 12px */
+  --space-4: 1rem;     /* 16px */
+  --space-6: 1.5rem;   /* 24px */
+  --space-8: 2rem;     /* 32px */
+  --space-12: 3rem;    /* 48px */
+  --space-16: 4rem;    /* 64px */
+
+  /* ---- Radii ------------------------------------------------------------
+     Small and sharp — instrument panels, not rounded SaaS cards. */
+  --radius-sm: 2px;
+  --radius-md: 4px;
+
+  /* ---- Shadow -----------------------------------------------------------
+     Panels are separated with borders (--color-border) by default; this
+     shadow is reserved for genuinely elevated/overlay surfaces only. */
+  --shadow-overlay: 0 8px 24px rgba(0, 0, 0, 0.45);
+
+  /* ---- Motion -----------------------------------------------------------
+     Durations/easings for later chart transitions and live-value ticks. */
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+}
