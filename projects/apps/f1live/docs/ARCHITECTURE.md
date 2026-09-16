@@ -49,12 +49,15 @@ src/
     TelemetryChart.jsx  Minimal per-channel sparkline.
   lib/          Data adapters, both producing the shared shape.
     telemetryShape.js    The shared TelemetryUpdate shape + factory.
-    historicalAdapter.js Replays a small demo lap on an interval.
+    historicalAdapter.js Fetches a real lap from public/data/ and replays
+                          it on a timer paced to the recording's own gaps.
     liveAdapter.js        Stub — real implementation targets Railway later.
   styles/       Design tokens + global CSS (see STYLE_GUIDE.md).
     tokens.css
     global.css
-docs/           This file, DATA_SHAPE.md, STYLE_GUIDE.md.
+docs/           This file, DATA_SHAPE.md, STYLE_GUIDE.md, ROADMAP.md.
+pipeline/       Standalone Python step (fastf1) that produces the JSON
+                historicalAdapter.js fetches — see pipeline/README.md.
 ```
 
 ## Routing

@@ -1,57 +1,80 @@
 import { createTelemetryUpdate } from './telemetryShape';
 
 /**
- * Small demo lap used for Chapter 0 scaffolding only — enough samples to
- * prove the adapter → component wiring works. Replace with a real
- * session/lap loader (CSV, FastF1 export, API fetch, etc.) in a later
- * chapter; the shape it must produce is fixed by telemetryShape.js.
+ * Default lap: 2023 Bahrain GP, Race, VER's fastest lap — see
+ * /pipeline/README.md for how this file was produced and
+ * /public/data/2023-bahrain-r-ver.meta.json for lap details.
  */
-const DEMO_LAP = [
-  { t: 0, speed: 92, throttle: 45, brake: 0, gear: 3, rpm: 9800, drs: false, dist: 0 },
-  { t: 500, speed: 138, throttle: 100, brake: 0, gear: 4, rpm: 11200, drs: false, dist: 24 },
-  { t: 1000, speed: 187, throttle: 100, brake: 0, gear: 5, rpm: 11900, drs: true, dist: 58 },
-  { t: 1500, speed: 221, throttle: 100, brake: 0, gear: 6, rpm: 12100, drs: true, dist: 102 },
-  { t: 2000, speed: 244, throttle: 60, brake: 0, gear: 7, rpm: 11400, drs: true, dist: 156 },
-  { t: 2500, speed: 198, throttle: 0, brake: 85, gear: 5, rpm: 9200, drs: false, dist: 208 },
-  { t: 3000, speed: 121, throttle: 0, brake: 100, gear: 3, rpm: 7600, drs: false, dist: 244 },
-  { t: 3500, speed: 96, throttle: 30, brake: 0, gear: 2, rpm: 8400, drs: false, dist: 268 },
-];
+const DEFAULT_SOURCE = '/data/2023-bahrain-r-ver.json';
 
 /**
- * Creates a TelemetryAdapter that replays a fixed historical lap on an
- * interval, standing in for "load a recorded session and step through it".
+ * Creates a TelemetryAdapter that fetches a recorded lap (a plain JSON
+ * array of TelemetryUpdate samples, produced by pipeline/fetch_session.py)
+ * and replays it on a timer, standing in for "live" delivery.
  *
- * @param {{ intervalMs?: number }} [options]
+ * Playback follows the real gaps between recorded samples rather than a
+ * fixed tick, scaled by `speedMultiplier` — so a lap replays at a
+ * consistent, recognisable pace instead of a uniform-but-wrong one. On
+ * reaching the end of the lap it loops back to the start.
+ *
+ * @param {{ source?: string, speedMultiplier?: number }} [options]
  * @returns {import('./telemetryShape').TelemetryAdapter}
  */
-export function createHistoricalAdapter({ intervalMs = 500 } = {}) {
-  let timerId = null;
-  let index = 0;
-  const startedAt = Date.now();
+export function createHistoricalAdapter({ source = DEFAULT_SOURCE, speedMultiplier = 4 } = {}) {
+  let cancelled = false;
+  let timeoutId = null;
+
+  async function run(callback) {
+    let samples;
+    try {
+      const response = await fetch(source);
+      if (!response.ok) {
+        throw new Error(`${response.status} ${response.statusText}`);
+      }
+      samples = await response.json();
+    } catch (err) {
+      console.error(`historicalAdapter: failed to load "${source}"`, err);
+      return;
+    }
+
+    if (cancelled || !Array.isArray(samples) || samples.length === 0) {
+      return;
+    }
+
+    let index = 0;
+
+    const step = () => {
+      if (cancelled) return;
+
+      const sample = samples[index];
+      callback(createTelemetryUpdate(sample));
+
+      const next = samples[index + 1];
+      if (next) {
+        const gap = Math.max(0, next.timestamp - sample.timestamp);
+        index += 1;
+        timeoutId = setTimeout(step, gap / speedMultiplier);
+      } else {
+        // End of lap — loop back to the start rather than stopping, so
+        // "replay" reads as a continuous simulated feed.
+        index = 0;
+        timeoutId = setTimeout(step, 1000 / speedMultiplier);
+      }
+    };
+
+    step();
+  }
 
   return {
     subscribe(callback) {
-      timerId = setInterval(() => {
-        const sample = DEMO_LAP[index % DEMO_LAP.length];
-        callback(
-          createTelemetryUpdate({
-            timestamp: startedAt + sample.t,
-            speed: sample.speed,
-            throttle: sample.throttle,
-            brake: sample.brake,
-            gear: sample.gear,
-            rpm: sample.rpm,
-            drs: sample.drs,
-            lapDistance: sample.dist,
-          }),
-        );
-        index += 1;
-      }, intervalMs);
+      cancelled = false;
+      run(callback);
     },
     unsubscribe() {
-      if (timerId !== null) {
-        clearInterval(timerId);
-        timerId = null;
+      cancelled = true;
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
       }
     },
   };

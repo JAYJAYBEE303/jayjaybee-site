@@ -5,15 +5,16 @@ import { TelemetryChart } from '../components/TelemetryChart';
 const MAX_SAMPLES = 40;
 
 /**
- * Replay mode — steps through a recorded lap via historicalAdapter.
- * Chapter 0: proves the adapter → shared-component wiring; lap selection,
- * scrubbing, and real session loading arrive later.
+ * Replay mode — steps through a real recorded lap (fetched by
+ * historicalAdapter from /public/data/, produced via pipeline/fetch_session.py)
+ * on a timer. Lap selection and scrubbing controls arrive later; for now
+ * historicalAdapter always replays its one default lap.
  */
 export default function Historical() {
   const [samples, setSamples] = useState([]);
 
   useEffect(() => {
-    const adapter = createHistoricalAdapter({ intervalMs: 500 });
+    const adapter = createHistoricalAdapter();
     adapter.subscribe((update) => {
       setSamples((prev) => [...prev, update].slice(-MAX_SAMPLES));
     });

@@ -7,9 +7,12 @@ full structure, [`docs/DATA_SHAPE.md`](docs/DATA_SHAPE.md) for the shared
 telemetry shape, and [`docs/STYLE_GUIDE.md`](docs/STYLE_GUIDE.md) for the
 design tokens.
 
-This is Chapter 0: scaffolding only. Live telemetry (`src/lib/liveAdapter.js`)
-is a stub pending a separate live backend (Railway), and the UI is
-deliberately minimal — the barebones interface comes in the next chapter.
+Replay mode replays a real recorded lap (pulled via
+[fastf1](https://docs.fastf1.dev/) — see [`pipeline/README.md`](pipeline/README.md))
+on a timer paced to match the recording. Live telemetry
+(`src/lib/liveAdapter.js`) is a stub pending a separate live backend
+(Railway); the UI is deliberately minimal — richer playback controls and
+a real UI pass come in later chapters.
 
 ## Develop
 

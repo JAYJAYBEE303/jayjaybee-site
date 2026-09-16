@@ -116,5 +116,27 @@ so a new stylesheet drops in without touching component logic.
 installed. Fetched and validated one real lap:
 `public/data/2023-bahrain-r-ver.json` (352 samples, VER's fastest lap,
 2023 Bahrain GP Race) + matching `.meta.json`. Passed
-`validate_output.mjs` with no errors. Phase B (swap the adapter fixture,
-lock the shape doc) is next.
+`validate_output.mjs` with no errors.
+
+## Phase B — status: done
+
+`historicalAdapter.js` no longer replays a hardcoded fixture — it
+`fetch()`es `public/data/2023-bahrain-r-ver.json` and steps through it on
+a timer paced to the *real* gaps between recorded samples (scaled by
+`speedMultiplier`, default 4x), looping back to the start at the end of
+the lap. `routes/Historical.jsx` needed only a one-line change (dropping
+the old `intervalMs` option) — everything else about the route/component
+wiring was untouched, which was the point of locking the adapter
+interface in Chapter 0.
+
+`telemetryShape.js` and `DATA_SHAPE.md` are marked **locked v1** — the
+shape is confirmed against real data end-to-end (fetch → validate →
+replay → chart), not just designed on paper. `liveAdapter.js` must match
+it exactly when it's built.
+
+Verification note: built under the `sentinel-safe` skill, so this was
+checked by reading/tracing the code (fetch → normalize → timer →
+callback → chart), not by running `npm run dev`/`build` locally. Worth a
+manual `npm run dev` check and a real Vercel deploy check (the
+`vercel.json` catch-all rewrite + a static `/data/*.json` file is a
+well-established combo, but hasn't been exercised in this repo yet).

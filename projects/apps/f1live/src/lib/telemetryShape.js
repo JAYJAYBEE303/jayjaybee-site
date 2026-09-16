@@ -1,5 +1,11 @@
 /**
- * Shared telemetry update shape.
+ * Shared telemetry update shape — LOCKED v1.
+ *
+ * Confirmed against a real fastf1 lap (pipeline/fetch_session.py,
+ * public/data/2023-bahrain-r-ver.json) — every field below is populated by
+ * real data, not just a guess at what telemetry "should" look like.
+ * liveAdapter's real implementation must produce this exact shape; changing
+ * a field here is a breaking change for both adapters, not a local edit.
  *
  * Both `historicalAdapter` and `liveAdapter` must produce objects matching
  * this shape so `components/` can render either mode without caring which
