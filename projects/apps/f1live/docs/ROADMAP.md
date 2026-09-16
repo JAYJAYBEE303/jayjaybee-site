@@ -99,8 +99,22 @@ so a new stylesheet drops in without touching component logic.
 
 ## Open decisions
 
-1. Brake/DRS normalization rules above — correct read of fastf1's docs, but
-   worth double-checking against the specific season pulled first.
+1. ~~Brake/DRS normalization rules above~~ — **resolved.** Verified against
+   2023 Bahrain GP real data: brake bool/analog detection works, and the
+   `{10,12,14}` DRS-open code set is confirmed correct. Note: those codes
+   are rare across a full race, so a single lap showing `drs: false`
+   throughout (especially for a race leader) is expected, not a bug — see
+   `pipeline/README.md`.
 2. Static JSON per lap vs. a tiny fetch API route — recommended static;
    revisit if multi-lap browsing is wanted sooner.
 3. Playback controls now or next chapter.
+
+## Phase A — status: done
+
+`pipeline/` scaffolded (`requirements.txt`, `fetch_session.py`,
+`validate_output.mjs`, `README.md`), venv created, `fastf1`/`pandas`
+installed. Fetched and validated one real lap:
+`public/data/2023-bahrain-r-ver.json` (352 samples, VER's fastest lap,
+2023 Bahrain GP Race) + matching `.meta.json`. Passed
+`validate_output.mjs` with no errors. Phase B (swap the adapter fixture,
+lock the shape doc) is next.

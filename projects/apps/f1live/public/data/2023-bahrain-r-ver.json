@@ -1,0 +1,3522 @@
+[
+  {
+    "timestamp": 1678032899704,
+    "speed": 285,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 11300,
+    "drs": false,
+    "lapDistance": 11.2
+  },
+  {
+    "timestamp": 1678032899984,
+    "speed": 287,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 11389,
+    "drs": false,
+    "lapDistance": 33.5
+  },
+  {
+    "timestamp": 1678032900224,
+    "speed": 288,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 11438,
+    "drs": false,
+    "lapDistance": 52.7
+  },
+  {
+    "timestamp": 1678032900384,
+    "speed": 290,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 11500,
+    "drs": false,
+    "lapDistance": 65.6
+  },
+  {
+    "timestamp": 1678032900744,
+    "speed": 291,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 11528,
+    "drs": false,
+    "lapDistance": 94.7
+  },
+  {
+    "timestamp": 1678032901104,
+    "speed": 293,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 10429,
+    "drs": false,
+    "lapDistance": 124.0
+  },
+  {
+    "timestamp": 1678032901264,
+    "speed": 294,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 8,
+    "rpm": 10505,
+    "drs": false,
+    "lapDistance": 137.0
+  },
+  {
+    "timestamp": 1678032901584,
+    "speed": 295,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 8,
+    "rpm": 10530,
+    "drs": false,
+    "lapDistance": 163.3
+  },
+  {
+    "timestamp": 1678032901984,
+    "speed": 297,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 8,
+    "rpm": 10580,
+    "drs": false,
+    "lapDistance": 196.3
+  },
+  {
+    "timestamp": 1678032902144,
+    "speed": 297,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 8,
+    "rpm": 10594,
+    "drs": false,
+    "lapDistance": 209.5
+  },
+  {
+    "timestamp": 1678032902344,
+    "speed": 298,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 8,
+    "rpm": 10621,
+    "drs": false,
+    "lapDistance": 226.0
+  },
+  {
+    "timestamp": 1678032902584,
+    "speed": 299,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 8,
+    "rpm": 10674,
+    "drs": false,
+    "lapDistance": 246.0
+  },
+  {
+    "timestamp": 1678032902984,
+    "speed": 301,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 8,
+    "rpm": 10689,
+    "drs": false,
+    "lapDistance": 279.4
+  },
+  {
+    "timestamp": 1678032903224,
+    "speed": 302,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 8,
+    "rpm": 10752,
+    "drs": false,
+    "lapDistance": 299.5
+  },
+  {
+    "timestamp": 1678032903544,
+    "speed": 302,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 8,
+    "rpm": 10778,
+    "drs": false,
+    "lapDistance": 326.4
+  },
+  {
+    "timestamp": 1678032903824,
+    "speed": 303,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 8,
+    "rpm": 10773,
+    "drs": false,
+    "lapDistance": 349.9
+  },
+  {
+    "timestamp": 1678032904104,
+    "speed": 304,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 8,
+    "rpm": 10815,
+    "drs": false,
+    "lapDistance": 373.6
+  },
+  {
+    "timestamp": 1678032904304,
+    "speed": 304,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 8,
+    "rpm": 10807,
+    "drs": false,
+    "lapDistance": 390.5
+  },
+  {
+    "timestamp": 1678032904464,
+    "speed": 305,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 8,
+    "rpm": 10816,
+    "drs": false,
+    "lapDistance": 404.0
+  },
+  {
+    "timestamp": 1678032904664,
+    "speed": 304,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 8,
+    "rpm": 10842,
+    "drs": false,
+    "lapDistance": 420.9
+  },
+  {
+    "timestamp": 1678032904905,
+    "speed": 305,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 8,
+    "rpm": 10900,
+    "drs": false,
+    "lapDistance": 441.3
+  },
+  {
+    "timestamp": 1678032905144,
+    "speed": 305,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 8,
+    "rpm": 10879,
+    "drs": false,
+    "lapDistance": 461.6
+  },
+  {
+    "timestamp": 1678032905504,
+    "speed": 306,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 8,
+    "rpm": 10823,
+    "drs": false,
+    "lapDistance": 492.2
+  },
+  {
+    "timestamp": 1678032905784,
+    "speed": 305,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 8,
+    "rpm": 10551,
+    "drs": false,
+    "lapDistance": 515.9
+  },
+  {
+    "timestamp": 1678032906024,
+    "speed": 299,
+    "throttle": 0,
+    "brake": 0,
+    "gear": 8,
+    "rpm": 10332,
+    "drs": false,
+    "lapDistance": 535.8
+  },
+  {
+    "timestamp": 1678032906304,
+    "speed": 290,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 8,
+    "rpm": 10097,
+    "drs": false,
+    "lapDistance": 558.4
+  },
+  {
+    "timestamp": 1678032906624,
+    "speed": 272,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 8,
+    "rpm": 9507,
+    "drs": false,
+    "lapDistance": 582.6
+  },
+  {
+    "timestamp": 1678032906864,
+    "speed": 246,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 8,
+    "rpm": 8659,
+    "drs": false,
+    "lapDistance": 599.0
+  },
+  {
+    "timestamp": 1678032907144,
+    "speed": 226,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 8,
+    "rpm": 8050,
+    "drs": false,
+    "lapDistance": 616.6
+  },
+  {
+    "timestamp": 1678032907424,
+    "speed": 199,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 7,
+    "rpm": 8030,
+    "drs": false,
+    "lapDistance": 632.0
+  },
+  {
+    "timestamp": 1678032907624,
+    "speed": 182,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 7,
+    "rpm": 8988,
+    "drs": false,
+    "lapDistance": 642.1
+  },
+  {
+    "timestamp": 1678032907984,
+    "speed": 152,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 7,
+    "rpm": 9679,
+    "drs": false,
+    "lapDistance": 657.3
+  },
+  {
+    "timestamp": 1678032908224,
+    "speed": 138,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 6,
+    "rpm": 9629,
+    "drs": false,
+    "lapDistance": 666.5
+  },
+  {
+    "timestamp": 1678032908384,
+    "speed": 124,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 5,
+    "rpm": 10049,
+    "drs": false,
+    "lapDistance": 672.1
+  },
+  {
+    "timestamp": 1678032908704,
+    "speed": 108,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 2,
+    "rpm": 9340,
+    "drs": false,
+    "lapDistance": 681.7
+  },
+  {
+    "timestamp": 1678032908984,
+    "speed": 96,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 2,
+    "rpm": 8104,
+    "drs": false,
+    "lapDistance": 689.1
+  },
+  {
+    "timestamp": 1678032909304,
+    "speed": 90,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 2,
+    "rpm": 7231,
+    "drs": false,
+    "lapDistance": 697.1
+  },
+  {
+    "timestamp": 1678032909544,
+    "speed": 83,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 2,
+    "rpm": 6811,
+    "drs": false,
+    "lapDistance": 702.7
+  },
+  {
+    "timestamp": 1678032909944,
+    "speed": 75,
+    "throttle": 0,
+    "brake": 0,
+    "gear": 2,
+    "rpm": 6240,
+    "drs": false,
+    "lapDistance": 711.0
+  },
+  {
+    "timestamp": 1678032910184,
+    "speed": 72,
+    "throttle": 0,
+    "brake": 0,
+    "gear": 2,
+    "rpm": 5973,
+    "drs": false,
+    "lapDistance": 715.8
+  },
+  {
+    "timestamp": 1678032910464,
+    "speed": 68,
+    "throttle": 0,
+    "brake": 0,
+    "gear": 2,
+    "rpm": 5771,
+    "drs": false,
+    "lapDistance": 721.1
+  },
+  {
+    "timestamp": 1678032910864,
+    "speed": 68,
+    "throttle": 17,
+    "brake": 0,
+    "gear": 2,
+    "rpm": 6335,
+    "drs": false,
+    "lapDistance": 728.6
+  },
+  {
+    "timestamp": 1678032911184,
+    "speed": 71,
+    "throttle": 22,
+    "brake": 0,
+    "gear": 2,
+    "rpm": 6704,
+    "drs": false,
+    "lapDistance": 734.9
+  },
+  {
+    "timestamp": 1678032911505,
+    "speed": 76,
+    "throttle": 29,
+    "brake": 0,
+    "gear": 2,
+    "rpm": 6901,
+    "drs": false,
+    "lapDistance": 741.7
+  },
+  {
+    "timestamp": 1678032911665,
+    "speed": 81,
+    "throttle": 36,
+    "brake": 0,
+    "gear": 2,
+    "rpm": 7524,
+    "drs": false,
+    "lapDistance": 745.3
+  },
+  {
+    "timestamp": 1678032911864,
+    "speed": 87,
+    "throttle": 41,
+    "brake": 0,
+    "gear": 2,
+    "rpm": 8134,
+    "drs": false,
+    "lapDistance": 750.1
+  },
+  {
+    "timestamp": 1678032912224,
+    "speed": 97,
+    "throttle": 61,
+    "brake": 0,
+    "gear": 2,
+    "rpm": 9038,
+    "drs": false,
+    "lapDistance": 759.8
+  },
+  {
+    "timestamp": 1678032912384,
+    "speed": 105,
+    "throttle": 64,
+    "brake": 0,
+    "gear": 2,
+    "rpm": 9526,
+    "drs": false,
+    "lapDistance": 764.5
+  },
+  {
+    "timestamp": 1678032912584,
+    "speed": 114,
+    "throttle": 75,
+    "brake": 0,
+    "gear": 2,
+    "rpm": 10501,
+    "drs": false,
+    "lapDistance": 770.8
+  },
+  {
+    "timestamp": 1678032912784,
+    "speed": 122,
+    "throttle": 78,
+    "brake": 0,
+    "gear": 2,
+    "rpm": 9849,
+    "drs": false,
+    "lapDistance": 777.6
+  },
+  {
+    "timestamp": 1678032912984,
+    "speed": 130,
+    "throttle": 76,
+    "brake": 0,
+    "gear": 3,
+    "rpm": 9784,
+    "drs": false,
+    "lapDistance": 784.8
+  },
+  {
+    "timestamp": 1678032913224,
+    "speed": 133,
+    "throttle": 70,
+    "brake": 0,
+    "gear": 3,
+    "rpm": 10077,
+    "drs": false,
+    "lapDistance": 793.7
+  },
+  {
+    "timestamp": 1678032913424,
+    "speed": 139,
+    "throttle": 69,
+    "brake": 0,
+    "gear": 3,
+    "rpm": 10378,
+    "drs": false,
+    "lapDistance": 801.4
+  },
+  {
+    "timestamp": 1678032913624,
+    "speed": 146,
+    "throttle": 65,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 9045,
+    "drs": false,
+    "lapDistance": 809.5
+  },
+  {
+    "timestamp": 1678032913864,
+    "speed": 151,
+    "throttle": 69,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 9299,
+    "drs": false,
+    "lapDistance": 819.6
+  },
+  {
+    "timestamp": 1678032914104,
+    "speed": 156,
+    "throttle": 72,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 9893,
+    "drs": false,
+    "lapDistance": 830.0
+  },
+  {
+    "timestamp": 1678032914424,
+    "speed": 164,
+    "throttle": 87,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 10285,
+    "drs": false,
+    "lapDistance": 844.6
+  },
+  {
+    "timestamp": 1678032914664,
+    "speed": 175,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 10972,
+    "drs": false,
+    "lapDistance": 856.2
+  },
+  {
+    "timestamp": 1678032914824,
+    "speed": 178,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 11129,
+    "drs": false,
+    "lapDistance": 864.1
+  },
+  {
+    "timestamp": 1678032915184,
+    "speed": 189,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 9961,
+    "drs": false,
+    "lapDistance": 883.0
+  },
+  {
+    "timestamp": 1678032915464,
+    "speed": 201,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 10330,
+    "drs": false,
+    "lapDistance": 898.7
+  },
+  {
+    "timestamp": 1678032915784,
+    "speed": 206,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 10910,
+    "drs": false,
+    "lapDistance": 917.0
+  },
+  {
+    "timestamp": 1678032916104,
+    "speed": 214,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 11186,
+    "drs": false,
+    "lapDistance": 936.0
+  },
+  {
+    "timestamp": 1678032916304,
+    "speed": 221,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 11430,
+    "drs": false,
+    "lapDistance": 948.3
+  },
+  {
+    "timestamp": 1678032916624,
+    "speed": 226,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 10820,
+    "drs": false,
+    "lapDistance": 968.4
+  },
+  {
+    "timestamp": 1678032916784,
+    "speed": 231,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 10420,
+    "drs": false,
+    "lapDistance": 978.6
+  },
+  {
+    "timestamp": 1678032917024,
+    "speed": 234,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 10628,
+    "drs": false,
+    "lapDistance": 994.2
+  },
+  {
+    "timestamp": 1678032917184,
+    "speed": 238,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 10759,
+    "drs": false,
+    "lapDistance": 1004.8
+  },
+  {
+    "timestamp": 1678032917384,
+    "speed": 241,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 10810,
+    "drs": false,
+    "lapDistance": 1018.2
+  },
+  {
+    "timestamp": 1678032917664,
+    "speed": 246,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 11081,
+    "drs": false,
+    "lapDistance": 1037.3
+  },
+  {
+    "timestamp": 1678032917904,
+    "speed": 249,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 11162,
+    "drs": false,
+    "lapDistance": 1053.9
+  },
+  {
+    "timestamp": 1678032918265,
+    "speed": 255,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 11380,
+    "drs": false,
+    "lapDistance": 1079.5
+  },
+  {
+    "timestamp": 1678032918544,
+    "speed": 257,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 11546,
+    "drs": false,
+    "lapDistance": 1099.4
+  },
+  {
+    "timestamp": 1678032918864,
+    "speed": 262,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 10418,
+    "drs": false,
+    "lapDistance": 1122.7
+  },
+  {
+    "timestamp": 1678032919104,
+    "speed": 264,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 10547,
+    "drs": false,
+    "lapDistance": 1140.3
+  },
+  {
+    "timestamp": 1678032919384,
+    "speed": 266,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 10645,
+    "drs": false,
+    "lapDistance": 1161.0
+  },
+  {
+    "timestamp": 1678032919584,
+    "speed": 269,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 10698,
+    "drs": false,
+    "lapDistance": 1176.0
+  },
+  {
+    "timestamp": 1678032919784,
+    "speed": 271,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 10781,
+    "drs": false,
+    "lapDistance": 1191.0
+  },
+  {
+    "timestamp": 1678032920144,
+    "speed": 274,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 10899,
+    "drs": false,
+    "lapDistance": 1218.4
+  },
+  {
+    "timestamp": 1678032920344,
+    "speed": 275,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 10934,
+    "drs": false,
+    "lapDistance": 1233.7
+  },
+  {
+    "timestamp": 1678032921344,
+    "speed": 282,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 11164,
+    "drs": false,
+    "lapDistance": 1312.0
+  },
+  {
+    "timestamp": 1678032921544,
+    "speed": 283,
+    "throttle": 98,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 11059,
+    "drs": false,
+    "lapDistance": 1327.7
+  },
+  {
+    "timestamp": 1678032921944,
+    "speed": 275,
+    "throttle": 0,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 10734,
+    "drs": false,
+    "lapDistance": 1358.3
+  },
+  {
+    "timestamp": 1678032922104,
+    "speed": 270,
+    "throttle": 0,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 10530,
+    "drs": false,
+    "lapDistance": 1370.3
+  },
+  {
+    "timestamp": 1678032922384,
+    "speed": 254,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 7,
+    "rpm": 9782,
+    "drs": false,
+    "lapDistance": 1390.1
+  },
+  {
+    "timestamp": 1678032922544,
+    "speed": 244,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 7,
+    "rpm": 9321,
+    "drs": false,
+    "lapDistance": 1400.9
+  },
+  {
+    "timestamp": 1678032922744,
+    "speed": 224,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 7,
+    "rpm": 9564,
+    "drs": false,
+    "lapDistance": 1413.3
+  },
+  {
+    "timestamp": 1678032922944,
+    "speed": 206,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 7,
+    "rpm": 9682,
+    "drs": false,
+    "lapDistance": 1424.8
+  },
+  {
+    "timestamp": 1678032923224,
+    "speed": 181,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 5,
+    "rpm": 9442,
+    "drs": false,
+    "lapDistance": 1438.9
+  },
+  {
+    "timestamp": 1678032923464,
+    "speed": 163,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 4,
+    "rpm": 9671,
+    "drs": false,
+    "lapDistance": 1449.7
+  },
+  {
+    "timestamp": 1678032923704,
+    "speed": 151,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 4,
+    "rpm": 8720,
+    "drs": false,
+    "lapDistance": 1459.8
+  },
+  {
+    "timestamp": 1678032924064,
+    "speed": 136,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 4,
+    "rpm": 7885,
+    "drs": false,
+    "lapDistance": 1473.4
+  },
+  {
+    "timestamp": 1678032924464,
+    "speed": 127,
+    "throttle": 0,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 7419,
+    "drs": false,
+    "lapDistance": 1487.5
+  },
+  {
+    "timestamp": 1678032924665,
+    "speed": 125,
+    "throttle": 0,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 7374,
+    "drs": false,
+    "lapDistance": 1494.5
+  },
+  {
+    "timestamp": 1678032924945,
+    "speed": 122,
+    "throttle": 0,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 7110,
+    "drs": false,
+    "lapDistance": 1504.0
+  },
+  {
+    "timestamp": 1678032925224,
+    "speed": 119,
+    "throttle": 3,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 7116,
+    "drs": false,
+    "lapDistance": 1513.2
+  },
+  {
+    "timestamp": 1678032925544,
+    "speed": 117,
+    "throttle": 29,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 7249,
+    "drs": false,
+    "lapDistance": 1523.6
+  },
+  {
+    "timestamp": 1678032925744,
+    "speed": 119,
+    "throttle": 29,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 7249,
+    "drs": false,
+    "lapDistance": 1530.2
+  },
+  {
+    "timestamp": 1678032926144,
+    "speed": 124,
+    "throttle": 44,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 7600,
+    "drs": false,
+    "lapDistance": 1544.0
+  },
+  {
+    "timestamp": 1678032926504,
+    "speed": 132,
+    "throttle": 65,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 8266,
+    "drs": false,
+    "lapDistance": 1557.2
+  },
+  {
+    "timestamp": 1678032926744,
+    "speed": 138,
+    "throttle": 72,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 8520,
+    "drs": false,
+    "lapDistance": 1566.4
+  },
+  {
+    "timestamp": 1678032926984,
+    "speed": 144,
+    "throttle": 72,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 8940,
+    "drs": false,
+    "lapDistance": 1576.0
+  },
+  {
+    "timestamp": 1678032927184,
+    "speed": 155,
+    "throttle": 91,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 9551,
+    "drs": false,
+    "lapDistance": 1584.6
+  },
+  {
+    "timestamp": 1678032927424,
+    "speed": 164,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 9931,
+    "drs": false,
+    "lapDistance": 1595.5
+  },
+  {
+    "timestamp": 1678032927664,
+    "speed": 178,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 10998,
+    "drs": false,
+    "lapDistance": 1607.4
+  },
+  {
+    "timestamp": 1678032928104,
+    "speed": 191,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 11729,
+    "drs": false,
+    "lapDistance": 1630.7
+  },
+  {
+    "timestamp": 1678032928304,
+    "speed": 194,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 11243,
+    "drs": false,
+    "lapDistance": 1641.5
+  },
+  {
+    "timestamp": 1678032928704,
+    "speed": 206,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 10842,
+    "drs": false,
+    "lapDistance": 1664.4
+  },
+  {
+    "timestamp": 1678032929024,
+    "speed": 218,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 11240,
+    "drs": false,
+    "lapDistance": 1683.8
+  },
+  {
+    "timestamp": 1678032929304,
+    "speed": 225,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 11523,
+    "drs": false,
+    "lapDistance": 1701.3
+  },
+  {
+    "timestamp": 1678032929464,
+    "speed": 229,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 11761,
+    "drs": false,
+    "lapDistance": 1711.5
+  },
+  {
+    "timestamp": 1678032929664,
+    "speed": 233,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 10781,
+    "drs": false,
+    "lapDistance": 1724.4
+  },
+  {
+    "timestamp": 1678032930064,
+    "speed": 240,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 10870,
+    "drs": false,
+    "lapDistance": 1751.1
+  },
+  {
+    "timestamp": 1678032930384,
+    "speed": 239,
+    "throttle": 15,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 10658,
+    "drs": false,
+    "lapDistance": 1772.3
+  },
+  {
+    "timestamp": 1678032930704,
+    "speed": 229,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 6,
+    "rpm": 10061,
+    "drs": false,
+    "lapDistance": 1792.7
+  },
+  {
+    "timestamp": 1678032930944,
+    "speed": 223,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 6,
+    "rpm": 9394,
+    "drs": false,
+    "lapDistance": 1807.5
+  },
+  {
+    "timestamp": 1678032931185,
+    "speed": 195,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 6,
+    "rpm": 9690,
+    "drs": false,
+    "lapDistance": 1820.6
+  },
+  {
+    "timestamp": 1678032931425,
+    "speed": 187,
+    "throttle": 0,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 9353,
+    "drs": false,
+    "lapDistance": 1833.1
+  },
+  {
+    "timestamp": 1678032931585,
+    "speed": 183,
+    "throttle": 0,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 9199,
+    "drs": false,
+    "lapDistance": 1841.2
+  },
+  {
+    "timestamp": 1678032931745,
+    "speed": 181,
+    "throttle": 0,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 9018,
+    "drs": false,
+    "lapDistance": 1849.2
+  },
+  {
+    "timestamp": 1678032932024,
+    "speed": 177,
+    "throttle": 27,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 8757,
+    "drs": false,
+    "lapDistance": 1863.0
+  },
+  {
+    "timestamp": 1678032932304,
+    "speed": 174,
+    "throttle": 44,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 9072,
+    "drs": false,
+    "lapDistance": 1876.5
+  },
+  {
+    "timestamp": 1678032932544,
+    "speed": 176,
+    "throttle": 59,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 9310,
+    "drs": false,
+    "lapDistance": 1888.2
+  },
+  {
+    "timestamp": 1678032932864,
+    "speed": 182,
+    "throttle": 74,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 9358,
+    "drs": false,
+    "lapDistance": 1904.4
+  },
+  {
+    "timestamp": 1678032933064,
+    "speed": 185,
+    "throttle": 73,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 9616,
+    "drs": false,
+    "lapDistance": 1914.7
+  },
+  {
+    "timestamp": 1678032933224,
+    "speed": 187,
+    "throttle": 82,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 9756,
+    "drs": false,
+    "lapDistance": 1923.0
+  },
+  {
+    "timestamp": 1678032933424,
+    "speed": 192,
+    "throttle": 83,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 9940,
+    "drs": false,
+    "lapDistance": 1933.7
+  },
+  {
+    "timestamp": 1678032933624,
+    "speed": 196,
+    "throttle": 53,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 9884,
+    "drs": false,
+    "lapDistance": 1944.6
+  },
+  {
+    "timestamp": 1678032933904,
+    "speed": 197,
+    "throttle": 48,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 10029,
+    "drs": false,
+    "lapDistance": 1959.9
+  },
+  {
+    "timestamp": 1678032934184,
+    "speed": 194,
+    "throttle": 44,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 9983,
+    "drs": false,
+    "lapDistance": 1975.0
+  },
+  {
+    "timestamp": 1678032934384,
+    "speed": 196,
+    "throttle": 54,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 10158,
+    "drs": false,
+    "lapDistance": 1985.9
+  },
+  {
+    "timestamp": 1678032934584,
+    "speed": 197,
+    "throttle": 73,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 10268,
+    "drs": false,
+    "lapDistance": 1996.8
+  },
+  {
+    "timestamp": 1678032934944,
+    "speed": 203,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 10689,
+    "drs": false,
+    "lapDistance": 2017.1
+  },
+  {
+    "timestamp": 1678032935824,
+    "speed": 225,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 11685,
+    "drs": false,
+    "lapDistance": 2072.1
+  },
+  {
+    "timestamp": 1678032936304,
+    "speed": 234,
+    "throttle": 92,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 11442,
+    "drs": false,
+    "lapDistance": 2103.3
+  },
+  {
+    "timestamp": 1678032936464,
+    "speed": 224,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 5,
+    "rpm": 11372,
+    "drs": false,
+    "lapDistance": 2113.3
+  },
+  {
+    "timestamp": 1678032936784,
+    "speed": 202,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 5,
+    "rpm": 10127,
+    "drs": false,
+    "lapDistance": 2131.2
+  },
+  {
+    "timestamp": 1678032936984,
+    "speed": 187,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 5,
+    "rpm": 9458,
+    "drs": false,
+    "lapDistance": 2141.6
+  },
+  {
+    "timestamp": 1678032937144,
+    "speed": 181,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 5,
+    "rpm": 10125,
+    "drs": false,
+    "lapDistance": 2149.6
+  },
+  {
+    "timestamp": 1678032937384,
+    "speed": 160,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 4,
+    "rpm": 10695,
+    "drs": false,
+    "lapDistance": 2160.3
+  },
+  {
+    "timestamp": 1678032937745,
+    "speed": 147,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 3,
+    "rpm": 9963,
+    "drs": false,
+    "lapDistance": 2175.1
+  },
+  {
+    "timestamp": 1678032937945,
+    "speed": 130,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 3,
+    "rpm": 9123,
+    "drs": false,
+    "lapDistance": 2182.3
+  },
+  {
+    "timestamp": 1678032938105,
+    "speed": 118,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 3,
+    "rpm": 8323,
+    "drs": false,
+    "lapDistance": 2187.5
+  },
+  {
+    "timestamp": 1678032938345,
+    "speed": 110,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 3,
+    "rpm": 7367,
+    "drs": false,
+    "lapDistance": 2194.9
+  },
+  {
+    "timestamp": 1678032938545,
+    "speed": 102,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 3,
+    "rpm": 7037,
+    "drs": false,
+    "lapDistance": 2200.5
+  },
+  {
+    "timestamp": 1678032938904,
+    "speed": 92,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 3,
+    "rpm": 6374,
+    "drs": false,
+    "lapDistance": 2209.7
+  },
+  {
+    "timestamp": 1678032939144,
+    "speed": 88,
+    "throttle": 0,
+    "brake": 0,
+    "gear": 3,
+    "rpm": 5993,
+    "drs": false,
+    "lapDistance": 2215.6
+  },
+  {
+    "timestamp": 1678032939344,
+    "speed": 84,
+    "throttle": 0,
+    "brake": 0,
+    "gear": 3,
+    "rpm": 5690,
+    "drs": false,
+    "lapDistance": 2220.2
+  },
+  {
+    "timestamp": 1678032939784,
+    "speed": 77,
+    "throttle": 0,
+    "brake": 0,
+    "gear": 3,
+    "rpm": 5350,
+    "drs": false,
+    "lapDistance": 2229.6
+  },
+  {
+    "timestamp": 1678032940024,
+    "speed": 76,
+    "throttle": 16,
+    "brake": 0,
+    "gear": 3,
+    "rpm": 6088,
+    "drs": false,
+    "lapDistance": 2234.7
+  },
+  {
+    "timestamp": 1678032940304,
+    "speed": 78,
+    "throttle": 16,
+    "brake": 0,
+    "gear": 3,
+    "rpm": 5918,
+    "drs": false,
+    "lapDistance": 2240.8
+  },
+  {
+    "timestamp": 1678032940584,
+    "speed": 81,
+    "throttle": 23,
+    "brake": 0,
+    "gear": 3,
+    "rpm": 6132,
+    "drs": false,
+    "lapDistance": 2247.1
+  },
+  {
+    "timestamp": 1678032940784,
+    "speed": 84,
+    "throttle": 29,
+    "brake": 0,
+    "gear": 3,
+    "rpm": 6383,
+    "drs": false,
+    "lapDistance": 2251.7
+  },
+  {
+    "timestamp": 1678032941144,
+    "speed": 88,
+    "throttle": 39,
+    "brake": 0,
+    "gear": 3,
+    "rpm": 6881,
+    "drs": false,
+    "lapDistance": 2260.5
+  },
+  {
+    "timestamp": 1678032941424,
+    "speed": 95,
+    "throttle": 50,
+    "brake": 0,
+    "gear": 3,
+    "rpm": 7191,
+    "drs": false,
+    "lapDistance": 2267.9
+  },
+  {
+    "timestamp": 1678032941784,
+    "speed": 107,
+    "throttle": 61,
+    "brake": 0,
+    "gear": 3,
+    "rpm": 7876,
+    "drs": false,
+    "lapDistance": 2278.6
+  },
+  {
+    "timestamp": 1678032942104,
+    "speed": 119,
+    "throttle": 74,
+    "brake": 0,
+    "gear": 3,
+    "rpm": 9021,
+    "drs": false,
+    "lapDistance": 2289.2
+  },
+  {
+    "timestamp": 1678032942464,
+    "speed": 137,
+    "throttle": 92,
+    "brake": 0,
+    "gear": 3,
+    "rpm": 10343,
+    "drs": false,
+    "lapDistance": 2302.9
+  },
+  {
+    "timestamp": 1678032942744,
+    "speed": 142,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 3,
+    "rpm": 11109,
+    "drs": false,
+    "lapDistance": 2313.9
+  },
+  {
+    "timestamp": 1678032942984,
+    "speed": 156,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 3,
+    "rpm": 11333,
+    "drs": false,
+    "lapDistance": 2324.3
+  },
+  {
+    "timestamp": 1678032943304,
+    "speed": 174,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 3,
+    "rpm": 10733,
+    "drs": false,
+    "lapDistance": 2339.8
+  },
+  {
+    "timestamp": 1678032943504,
+    "speed": 182,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 10968,
+    "drs": false,
+    "lapDistance": 2349.9
+  },
+  {
+    "timestamp": 1678032943664,
+    "speed": 189,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 11458,
+    "drs": false,
+    "lapDistance": 2358.3
+  },
+  {
+    "timestamp": 1678032943864,
+    "speed": 189,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 11567,
+    "drs": false,
+    "lapDistance": 2368.8
+  },
+  {
+    "timestamp": 1678032944224,
+    "speed": 202,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 10648,
+    "drs": false,
+    "lapDistance": 2389.0
+  },
+  {
+    "timestamp": 1678032944545,
+    "speed": 213,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 11064,
+    "drs": false,
+    "lapDistance": 2408.0
+  },
+  {
+    "timestamp": 1678032944785,
+    "speed": 221,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 11363,
+    "drs": false,
+    "lapDistance": 2422.8
+  },
+  {
+    "timestamp": 1678032944985,
+    "speed": 226,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 11563,
+    "drs": false,
+    "lapDistance": 2435.3
+  },
+  {
+    "timestamp": 1678032945145,
+    "speed": 229,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 11858,
+    "drs": false,
+    "lapDistance": 2445.5
+  },
+  {
+    "timestamp": 1678032945344,
+    "speed": 230,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 11718,
+    "drs": false,
+    "lapDistance": 2458.2
+  },
+  {
+    "timestamp": 1678032945544,
+    "speed": 236,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 10731,
+    "drs": false,
+    "lapDistance": 2471.3
+  },
+  {
+    "timestamp": 1678032945824,
+    "speed": 242,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 10935,
+    "drs": false,
+    "lapDistance": 2490.1
+  },
+  {
+    "timestamp": 1678032946104,
+    "speed": 248,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 10899,
+    "drs": false,
+    "lapDistance": 2509.4
+  },
+  {
+    "timestamp": 1678032946504,
+    "speed": 238,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 6,
+    "rpm": 10427,
+    "drs": false,
+    "lapDistance": 2535.9
+  },
+  {
+    "timestamp": 1678032946744,
+    "speed": 233,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 6,
+    "rpm": 10018,
+    "drs": false,
+    "lapDistance": 2551.4
+  },
+  {
+    "timestamp": 1678032946944,
+    "speed": 224,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 6,
+    "rpm": 9620,
+    "drs": false,
+    "lapDistance": 2563.8
+  },
+  {
+    "timestamp": 1678032947144,
+    "speed": 213,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 6,
+    "rpm": 10343,
+    "drs": false,
+    "lapDistance": 2575.7
+  },
+  {
+    "timestamp": 1678032947384,
+    "speed": 198,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 5,
+    "rpm": 10843,
+    "drs": false,
+    "lapDistance": 2588.9
+  },
+  {
+    "timestamp": 1678032947624,
+    "speed": 185,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 4,
+    "rpm": 10902,
+    "drs": false,
+    "lapDistance": 2601.2
+  },
+  {
+    "timestamp": 1678032947784,
+    "speed": 175,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 4,
+    "rpm": 10885,
+    "drs": false,
+    "lapDistance": 2609.0
+  },
+  {
+    "timestamp": 1678032947944,
+    "speed": 170,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 4,
+    "rpm": 11521,
+    "drs": false,
+    "lapDistance": 2616.5
+  },
+  {
+    "timestamp": 1678032948184,
+    "speed": 154,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 3,
+    "rpm": 10913,
+    "drs": false,
+    "lapDistance": 2626.8
+  },
+  {
+    "timestamp": 1678032948464,
+    "speed": 139,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 3,
+    "rpm": 9946,
+    "drs": false,
+    "lapDistance": 2637.6
+  },
+  {
+    "timestamp": 1678032948624,
+    "speed": 135,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 3,
+    "rpm": 9896,
+    "drs": false,
+    "lapDistance": 2643.6
+  },
+  {
+    "timestamp": 1678032948784,
+    "speed": 130,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 3,
+    "rpm": 8776,
+    "drs": false,
+    "lapDistance": 2649.4
+  },
+  {
+    "timestamp": 1678032949064,
+    "speed": 112,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 3,
+    "rpm": 9409,
+    "drs": false,
+    "lapDistance": 2658.1
+  },
+  {
+    "timestamp": 1678032949304,
+    "speed": 103,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 2,
+    "rpm": 8728,
+    "drs": false,
+    "lapDistance": 2665.0
+  },
+  {
+    "timestamp": 1678032949544,
+    "speed": 100,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 2,
+    "rpm": 7854,
+    "drs": false,
+    "lapDistance": 2671.6
+  },
+  {
+    "timestamp": 1678032949744,
+    "speed": 90,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 2,
+    "rpm": 7412,
+    "drs": false,
+    "lapDistance": 2676.6
+  },
+  {
+    "timestamp": 1678032949904,
+    "speed": 84,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 2,
+    "rpm": 7058,
+    "drs": false,
+    "lapDistance": 2680.4
+  },
+  {
+    "timestamp": 1678032950264,
+    "speed": 79,
+    "throttle": 0,
+    "brake": 0,
+    "gear": 2,
+    "rpm": 6696,
+    "drs": false,
+    "lapDistance": 2688.3
+  },
+  {
+    "timestamp": 1678032950544,
+    "speed": 76,
+    "throttle": 0,
+    "brake": 0,
+    "gear": 2,
+    "rpm": 6400,
+    "drs": false,
+    "lapDistance": 2694.2
+  },
+  {
+    "timestamp": 1678032950744,
+    "speed": 75,
+    "throttle": 12,
+    "brake": 0,
+    "gear": 2,
+    "rpm": 6442,
+    "drs": false,
+    "lapDistance": 2698.4
+  },
+  {
+    "timestamp": 1678032950945,
+    "speed": 72,
+    "throttle": 21,
+    "brake": 0,
+    "gear": 3,
+    "rpm": 5692,
+    "drs": false,
+    "lapDistance": 2702.4
+  },
+  {
+    "timestamp": 1678032951225,
+    "speed": 75,
+    "throttle": 23,
+    "brake": 0,
+    "gear": 3,
+    "rpm": 5700,
+    "drs": false,
+    "lapDistance": 2708.2
+  },
+  {
+    "timestamp": 1678032951545,
+    "speed": 77,
+    "throttle": 30,
+    "brake": 0,
+    "gear": 3,
+    "rpm": 5964,
+    "drs": false,
+    "lapDistance": 2715.1
+  },
+  {
+    "timestamp": 1678032951825,
+    "speed": 83,
+    "throttle": 44,
+    "brake": 0,
+    "gear": 3,
+    "rpm": 6377,
+    "drs": false,
+    "lapDistance": 2721.5
+  },
+  {
+    "timestamp": 1678032951985,
+    "speed": 90,
+    "throttle": 44,
+    "brake": 0,
+    "gear": 3,
+    "rpm": 6657,
+    "drs": false,
+    "lapDistance": 2725.5
+  },
+  {
+    "timestamp": 1678032952344,
+    "speed": 100,
+    "throttle": 67,
+    "brake": 0,
+    "gear": 3,
+    "rpm": 7800,
+    "drs": false,
+    "lapDistance": 2735.5
+  },
+  {
+    "timestamp": 1678032952664,
+    "speed": 117,
+    "throttle": 78,
+    "brake": 0,
+    "gear": 3,
+    "rpm": 8673,
+    "drs": false,
+    "lapDistance": 2745.9
+  },
+  {
+    "timestamp": 1678032953064,
+    "speed": 136,
+    "throttle": 89,
+    "brake": 0,
+    "gear": 3,
+    "rpm": 9829,
+    "drs": false,
+    "lapDistance": 2761.0
+  },
+  {
+    "timestamp": 1678032953304,
+    "speed": 146,
+    "throttle": 95,
+    "brake": 0,
+    "gear": 3,
+    "rpm": 11100,
+    "drs": false,
+    "lapDistance": 2770.7
+  },
+  {
+    "timestamp": 1678032953664,
+    "speed": 165,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 3,
+    "rpm": 10442,
+    "drs": false,
+    "lapDistance": 2787.2
+  },
+  {
+    "timestamp": 1678032954064,
+    "speed": 182,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 11116,
+    "drs": false,
+    "lapDistance": 2807.4
+  },
+  {
+    "timestamp": 1678032954304,
+    "speed": 185,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 11459,
+    "drs": false,
+    "lapDistance": 2819.8
+  },
+  {
+    "timestamp": 1678032954544,
+    "speed": 196,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 11707,
+    "drs": false,
+    "lapDistance": 2832.8
+  },
+  {
+    "timestamp": 1678032954824,
+    "speed": 202,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 10676,
+    "drs": false,
+    "lapDistance": 2848.6
+  },
+  {
+    "timestamp": 1678032955144,
+    "speed": 214,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 11054,
+    "drs": false,
+    "lapDistance": 2867.6
+  },
+  {
+    "timestamp": 1678032955384,
+    "speed": 222,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 11420,
+    "drs": false,
+    "lapDistance": 2882.4
+  },
+  {
+    "timestamp": 1678032955584,
+    "speed": 227,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 11617,
+    "drs": false,
+    "lapDistance": 2895.0
+  },
+  {
+    "timestamp": 1678032955784,
+    "speed": 231,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 11429,
+    "drs": false,
+    "lapDistance": 2907.8
+  },
+  {
+    "timestamp": 1678032956024,
+    "speed": 235,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 10675,
+    "drs": false,
+    "lapDistance": 2923.5
+  },
+  {
+    "timestamp": 1678032956384,
+    "speed": 241,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 10909,
+    "drs": false,
+    "lapDistance": 2947.6
+  },
+  {
+    "timestamp": 1678032956904,
+    "speed": 251,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 11246,
+    "drs": false,
+    "lapDistance": 2983.8
+  },
+  {
+    "timestamp": 1678032957264,
+    "speed": 257,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 11447,
+    "drs": false,
+    "lapDistance": 3009.5
+  },
+  {
+    "timestamp": 1678032957585,
+    "speed": 260,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 11608,
+    "drs": false,
+    "lapDistance": 3032.7
+  },
+  {
+    "timestamp": 1678032957865,
+    "speed": 264,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 10540,
+    "drs": false,
+    "lapDistance": 3053.3
+  },
+  {
+    "timestamp": 1678032958105,
+    "speed": 265,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 10609,
+    "drs": false,
+    "lapDistance": 3070.9
+  },
+  {
+    "timestamp": 1678032958425,
+    "speed": 269,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 10722,
+    "drs": false,
+    "lapDistance": 3094.8
+  },
+  {
+    "timestamp": 1678032958744,
+    "speed": 272,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 10870,
+    "drs": false,
+    "lapDistance": 3118.9
+  },
+  {
+    "timestamp": 1678032958904,
+    "speed": 273,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 10884,
+    "drs": false,
+    "lapDistance": 3131.1
+  },
+  {
+    "timestamp": 1678032959144,
+    "speed": 275,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 11008,
+    "drs": false,
+    "lapDistance": 3149.4
+  },
+  {
+    "timestamp": 1678032959544,
+    "speed": 278,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 11078,
+    "drs": false,
+    "lapDistance": 3180.3
+  },
+  {
+    "timestamp": 1678032959744,
+    "speed": 280,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 11123,
+    "drs": false,
+    "lapDistance": 3195.9
+  },
+  {
+    "timestamp": 1678032960024,
+    "speed": 282,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 11157,
+    "drs": false,
+    "lapDistance": 3217.8
+  },
+  {
+    "timestamp": 1678032960184,
+    "speed": 283,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 11152,
+    "drs": false,
+    "lapDistance": 3230.4
+  },
+  {
+    "timestamp": 1678032960384,
+    "speed": 284,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 11202,
+    "drs": false,
+    "lapDistance": 3246.1
+  },
+  {
+    "timestamp": 1678032960624,
+    "speed": 281,
+    "throttle": 0,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 11107,
+    "drs": false,
+    "lapDistance": 3264.9
+  },
+  {
+    "timestamp": 1678032960904,
+    "speed": 273,
+    "throttle": 0,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 10538,
+    "drs": false,
+    "lapDistance": 3286.1
+  },
+  {
+    "timestamp": 1678032961144,
+    "speed": 266,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 7,
+    "rpm": 10205,
+    "drs": false,
+    "lapDistance": 3303.8
+  },
+  {
+    "timestamp": 1678032961384,
+    "speed": 244,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 7,
+    "rpm": 9544,
+    "drs": false,
+    "lapDistance": 3320.1
+  },
+  {
+    "timestamp": 1678032961544,
+    "speed": 236,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 7,
+    "rpm": 10095,
+    "drs": false,
+    "lapDistance": 3330.6
+  },
+  {
+    "timestamp": 1678032961784,
+    "speed": 219,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 7,
+    "rpm": 10520,
+    "drs": false,
+    "lapDistance": 3345.2
+  },
+  {
+    "timestamp": 1678032961944,
+    "speed": 204,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 6,
+    "rpm": 10541,
+    "drs": false,
+    "lapDistance": 3354.3
+  },
+  {
+    "timestamp": 1678032962264,
+    "speed": 180,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 5,
+    "rpm": 10618,
+    "drs": false,
+    "lapDistance": 3370.3
+  },
+  {
+    "timestamp": 1678032962464,
+    "speed": 173,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 4,
+    "rpm": 10165,
+    "drs": false,
+    "lapDistance": 3379.9
+  },
+  {
+    "timestamp": 1678032962824,
+    "speed": 168,
+    "throttle": 0,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 9718,
+    "drs": false,
+    "lapDistance": 3396.7
+  },
+  {
+    "timestamp": 1678032963064,
+    "speed": 164,
+    "throttle": 0,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 9528,
+    "drs": false,
+    "lapDistance": 3407.6
+  },
+  {
+    "timestamp": 1678032963224,
+    "speed": 161,
+    "throttle": 0,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 9303,
+    "drs": false,
+    "lapDistance": 3414.8
+  },
+  {
+    "timestamp": 1678032963424,
+    "speed": 158,
+    "throttle": 1,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 9186,
+    "drs": false,
+    "lapDistance": 3423.5
+  },
+  {
+    "timestamp": 1678032963744,
+    "speed": 151,
+    "throttle": 35,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 9122,
+    "drs": false,
+    "lapDistance": 3437.0
+  },
+  {
+    "timestamp": 1678032963904,
+    "speed": 151,
+    "throttle": 44,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 9152,
+    "drs": false,
+    "lapDistance": 3443.7
+  },
+  {
+    "timestamp": 1678032964105,
+    "speed": 153,
+    "throttle": 48,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 9388,
+    "drs": false,
+    "lapDistance": 3452.2
+  },
+  {
+    "timestamp": 1678032964305,
+    "speed": 156,
+    "throttle": 55,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 9551,
+    "drs": false,
+    "lapDistance": 3460.9
+  },
+  {
+    "timestamp": 1678032964545,
+    "speed": 158,
+    "throttle": 69,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 9871,
+    "drs": false,
+    "lapDistance": 3471.4
+  },
+  {
+    "timestamp": 1678032964785,
+    "speed": 164,
+    "throttle": 74,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 10145,
+    "drs": false,
+    "lapDistance": 3482.4
+  },
+  {
+    "timestamp": 1678032965065,
+    "speed": 171,
+    "throttle": 83,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 10615,
+    "drs": false,
+    "lapDistance": 3495.7
+  },
+  {
+    "timestamp": 1678032965305,
+    "speed": 176,
+    "throttle": 84,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 10812,
+    "drs": false,
+    "lapDistance": 3507.4
+  },
+  {
+    "timestamp": 1678032965544,
+    "speed": 181,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 10068,
+    "drs": false,
+    "lapDistance": 3519.4
+  },
+  {
+    "timestamp": 1678032965824,
+    "speed": 190,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 9989,
+    "drs": false,
+    "lapDistance": 3534.2
+  },
+  {
+    "timestamp": 1678032966224,
+    "speed": 201,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 10515,
+    "drs": false,
+    "lapDistance": 3556.5
+  },
+  {
+    "timestamp": 1678032966544,
+    "speed": 209,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 10720,
+    "drs": false,
+    "lapDistance": 3575.1
+  },
+  {
+    "timestamp": 1678032966824,
+    "speed": 217,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 11260,
+    "drs": false,
+    "lapDistance": 3592.0
+  },
+  {
+    "timestamp": 1678032967064,
+    "speed": 224,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 11489,
+    "drs": false,
+    "lapDistance": 3606.9
+  },
+  {
+    "timestamp": 1678032967224,
+    "speed": 226,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 11660,
+    "drs": false,
+    "lapDistance": 3616.9
+  },
+  {
+    "timestamp": 1678032967664,
+    "speed": 237,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 10680,
+    "drs": false,
+    "lapDistance": 3645.9
+  },
+  {
+    "timestamp": 1678032967904,
+    "speed": 238,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 10830,
+    "drs": false,
+    "lapDistance": 3661.8
+  },
+  {
+    "timestamp": 1678032968264,
+    "speed": 246,
+    "throttle": 98,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 11068,
+    "drs": false,
+    "lapDistance": 3686.4
+  },
+  {
+    "timestamp": 1678032968464,
+    "speed": 247,
+    "throttle": 72,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 10899,
+    "drs": false,
+    "lapDistance": 3700.1
+  },
+  {
+    "timestamp": 1678032968744,
+    "speed": 246,
+    "throttle": 65,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 10742,
+    "drs": false,
+    "lapDistance": 3719.2
+  },
+  {
+    "timestamp": 1678032969064,
+    "speed": 244,
+    "throttle": 64,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 10921,
+    "drs": false,
+    "lapDistance": 3740.9
+  },
+  {
+    "timestamp": 1678032969224,
+    "speed": 243,
+    "throttle": 64,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 10759,
+    "drs": false,
+    "lapDistance": 3751.7
+  },
+  {
+    "timestamp": 1678032969544,
+    "speed": 241,
+    "throttle": 63,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 10709,
+    "drs": false,
+    "lapDistance": 3773.1
+  },
+  {
+    "timestamp": 1678032969784,
+    "speed": 238,
+    "throttle": 64,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 10535,
+    "drs": false,
+    "lapDistance": 3789.0
+  },
+  {
+    "timestamp": 1678032970184,
+    "speed": 236,
+    "throttle": 74,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 10662,
+    "drs": false,
+    "lapDistance": 3815.2
+  },
+  {
+    "timestamp": 1678032970624,
+    "speed": 237,
+    "throttle": 80,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 10651,
+    "drs": false,
+    "lapDistance": 3844.2
+  },
+  {
+    "timestamp": 1678032970945,
+    "speed": 238,
+    "throttle": 84,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 10773,
+    "drs": false,
+    "lapDistance": 3865.4
+  },
+  {
+    "timestamp": 1678032971225,
+    "speed": 240,
+    "throttle": 87,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 10806,
+    "drs": false,
+    "lapDistance": 3884.1
+  },
+  {
+    "timestamp": 1678032971425,
+    "speed": 241,
+    "throttle": 88,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 10897,
+    "drs": false,
+    "lapDistance": 3897.5
+  },
+  {
+    "timestamp": 1678032971665,
+    "speed": 243,
+    "throttle": 90,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 10919,
+    "drs": false,
+    "lapDistance": 3913.7
+  },
+  {
+    "timestamp": 1678032972105,
+    "speed": 246,
+    "throttle": 74,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 10868,
+    "drs": false,
+    "lapDistance": 3943.7
+  },
+  {
+    "timestamp": 1678032972384,
+    "speed": 243,
+    "throttle": 51,
+    "brake": 100,
+    "gear": 6,
+    "rpm": 10714,
+    "drs": false,
+    "lapDistance": 3962.6
+  },
+  {
+    "timestamp": 1678032972704,
+    "speed": 224,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 6,
+    "rpm": 10094,
+    "drs": false,
+    "lapDistance": 3982.5
+  },
+  {
+    "timestamp": 1678032973824,
+    "speed": 160,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 4,
+    "rpm": 9332,
+    "drs": false,
+    "lapDistance": 4032.3
+  },
+  {
+    "timestamp": 1678032974064,
+    "speed": 152,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 4,
+    "rpm": 9041,
+    "drs": false,
+    "lapDistance": 4042.4
+  },
+  {
+    "timestamp": 1678032974264,
+    "speed": 149,
+    "throttle": 0,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 8650,
+    "drs": false,
+    "lapDistance": 4050.7
+  },
+  {
+    "timestamp": 1678032974704,
+    "speed": 142,
+    "throttle": 0,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 8282,
+    "drs": false,
+    "lapDistance": 4068.0
+  },
+  {
+    "timestamp": 1678032974864,
+    "speed": 138,
+    "throttle": 7,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 8185,
+    "drs": false,
+    "lapDistance": 4074.2
+  },
+  {
+    "timestamp": 1678032975064,
+    "speed": 139,
+    "throttle": 45,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 8546,
+    "drs": false,
+    "lapDistance": 4081.9
+  },
+  {
+    "timestamp": 1678032975344,
+    "speed": 141,
+    "throttle": 46,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 8625,
+    "drs": false,
+    "lapDistance": 4092.9
+  },
+  {
+    "timestamp": 1678032975704,
+    "speed": 147,
+    "throttle": 55,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 8913,
+    "drs": false,
+    "lapDistance": 4107.6
+  },
+  {
+    "timestamp": 1678032976144,
+    "speed": 156,
+    "throttle": 80,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 9667,
+    "drs": false,
+    "lapDistance": 4126.6
+  },
+  {
+    "timestamp": 1678032976584,
+    "speed": 168,
+    "throttle": 92,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 10726,
+    "drs": false,
+    "lapDistance": 4147.2
+  },
+  {
+    "timestamp": 1678032976944,
+    "speed": 183,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 11304,
+    "drs": false,
+    "lapDistance": 4165.5
+  },
+  {
+    "timestamp": 1678032977104,
+    "speed": 191,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 11667,
+    "drs": false,
+    "lapDistance": 4173.9
+  },
+  {
+    "timestamp": 1678032977265,
+    "speed": 194,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 11527,
+    "drs": false,
+    "lapDistance": 4182.6
+  },
+  {
+    "timestamp": 1678032977545,
+    "speed": 204,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 10658,
+    "drs": false,
+    "lapDistance": 4198.5
+  },
+  {
+    "timestamp": 1678032977785,
+    "speed": 212,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 10981,
+    "drs": false,
+    "lapDistance": 4212.6
+  },
+  {
+    "timestamp": 1678032978025,
+    "speed": 218,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 11239,
+    "drs": false,
+    "lapDistance": 4227.2
+  },
+  {
+    "timestamp": 1678032978185,
+    "speed": 223,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 11485,
+    "drs": false,
+    "lapDistance": 4237.1
+  },
+  {
+    "timestamp": 1678032978345,
+    "speed": 226,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 11662,
+    "drs": false,
+    "lapDistance": 4247.1
+  },
+  {
+    "timestamp": 1678032978545,
+    "speed": 230,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 10962,
+    "drs": false,
+    "lapDistance": 4259.9
+  },
+  {
+    "timestamp": 1678032978865,
+    "speed": 239,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 10690,
+    "drs": false,
+    "lapDistance": 4281.1
+  },
+  {
+    "timestamp": 1678032979224,
+    "speed": 245,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 11047,
+    "drs": false,
+    "lapDistance": 4305.6
+  },
+  {
+    "timestamp": 1678032979464,
+    "speed": 251,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 11265,
+    "drs": false,
+    "lapDistance": 4322.3
+  },
+  {
+    "timestamp": 1678032979704,
+    "speed": 254,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 11355,
+    "drs": false,
+    "lapDistance": 4339.2
+  },
+  {
+    "timestamp": 1678032979984,
+    "speed": 259,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 11604,
+    "drs": false,
+    "lapDistance": 4359.4
+  },
+  {
+    "timestamp": 1678032980304,
+    "speed": 263,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 10606,
+    "drs": false,
+    "lapDistance": 4382.8
+  },
+  {
+    "timestamp": 1678032980464,
+    "speed": 265,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 10548,
+    "drs": false,
+    "lapDistance": 4394.5
+  },
+  {
+    "timestamp": 1678032980744,
+    "speed": 267,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 10655,
+    "drs": false,
+    "lapDistance": 4415.3
+  },
+  {
+    "timestamp": 1678032980984,
+    "speed": 271,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 10805,
+    "drs": false,
+    "lapDistance": 4433.4
+  },
+  {
+    "timestamp": 1678032981144,
+    "speed": 272,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 10839,
+    "drs": false,
+    "lapDistance": 4445.5
+  },
+  {
+    "timestamp": 1678032981384,
+    "speed": 276,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 10941,
+    "drs": false,
+    "lapDistance": 4463.9
+  },
+  {
+    "timestamp": 1678032981704,
+    "speed": 278,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 11043,
+    "drs": false,
+    "lapDistance": 4488.6
+  },
+  {
+    "timestamp": 1678032981944,
+    "speed": 281,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 11164,
+    "drs": false,
+    "lapDistance": 4507.3
+  },
+  {
+    "timestamp": 1678032982144,
+    "speed": 282,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 11159,
+    "drs": false,
+    "lapDistance": 4523.0
+  },
+  {
+    "timestamp": 1678032982504,
+    "speed": 285,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 11327,
+    "drs": false,
+    "lapDistance": 4551.5
+  },
+  {
+    "timestamp": 1678032982824,
+    "speed": 286,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 11417,
+    "drs": false,
+    "lapDistance": 4576.9
+  },
+  {
+    "timestamp": 1678032983144,
+    "speed": 289,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 11407,
+    "drs": false,
+    "lapDistance": 4602.6
+  },
+  {
+    "timestamp": 1678032983304,
+    "speed": 290,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 11450,
+    "drs": false,
+    "lapDistance": 4615.5
+  },
+  {
+    "timestamp": 1678032983544,
+    "speed": 291,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 11476,
+    "drs": false,
+    "lapDistance": 4634.9
+  },
+  {
+    "timestamp": 1678032983744,
+    "speed": 292,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 11506,
+    "drs": false,
+    "lapDistance": 4651.1
+  },
+  {
+    "timestamp": 1678032984785,
+    "speed": 284,
+    "throttle": 0,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 10894,
+    "drs": false,
+    "lapDistance": 4733.2
+  },
+  {
+    "timestamp": 1678032984985,
+    "speed": 271,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 7,
+    "rpm": 10550,
+    "drs": false,
+    "lapDistance": 4748.3
+  },
+  {
+    "timestamp": 1678032985185,
+    "speed": 254,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 7,
+    "rpm": 9956,
+    "drs": false,
+    "lapDistance": 4762.4
+  },
+  {
+    "timestamp": 1678032985425,
+    "speed": 235,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 7,
+    "rpm": 9145,
+    "drs": false,
+    "lapDistance": 4778.0
+  },
+  {
+    "timestamp": 1678032985784,
+    "speed": 199,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 7,
+    "rpm": 9452,
+    "drs": false,
+    "lapDistance": 4797.9
+  },
+  {
+    "timestamp": 1678032985984,
+    "speed": 182,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 6,
+    "rpm": 9683,
+    "drs": false,
+    "lapDistance": 4808.0
+  },
+  {
+    "timestamp": 1678032986264,
+    "speed": 163,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 4,
+    "rpm": 10012,
+    "drs": false,
+    "lapDistance": 4820.7
+  },
+  {
+    "timestamp": 1678032986504,
+    "speed": 150,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 4,
+    "rpm": 8916,
+    "drs": false,
+    "lapDistance": 4830.7
+  },
+  {
+    "timestamp": 1678032986704,
+    "speed": 142,
+    "throttle": 0,
+    "brake": 100,
+    "gear": 4,
+    "rpm": 8246,
+    "drs": false,
+    "lapDistance": 4838.6
+  },
+  {
+    "timestamp": 1678032987144,
+    "speed": 131,
+    "throttle": 0,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 7572,
+    "drs": false,
+    "lapDistance": 4854.6
+  },
+  {
+    "timestamp": 1678032987384,
+    "speed": 125,
+    "throttle": 0,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 7336,
+    "drs": false,
+    "lapDistance": 4862.9
+  },
+  {
+    "timestamp": 1678032987704,
+    "speed": 122,
+    "throttle": 0,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 7098,
+    "drs": false,
+    "lapDistance": 4873.8
+  },
+  {
+    "timestamp": 1678032988904,
+    "speed": 133,
+    "throttle": 67,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 8370,
+    "drs": false,
+    "lapDistance": 4918.1
+  },
+  {
+    "timestamp": 1678032989144,
+    "speed": 139,
+    "throttle": 82,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 8906,
+    "drs": false,
+    "lapDistance": 4927.4
+  },
+  {
+    "timestamp": 1678032989304,
+    "speed": 148,
+    "throttle": 85,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 9465,
+    "drs": false,
+    "lapDistance": 4933.9
+  },
+  {
+    "timestamp": 1678032989464,
+    "speed": 155,
+    "throttle": 96,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 9717,
+    "drs": false,
+    "lapDistance": 4940.8
+  },
+  {
+    "timestamp": 1678032989744,
+    "speed": 164,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 10396,
+    "drs": false,
+    "lapDistance": 4953.6
+  },
+  {
+    "timestamp": 1678032990184,
+    "speed": 185,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 11417,
+    "drs": false,
+    "lapDistance": 4976.2
+  },
+  {
+    "timestamp": 1678032990344,
+    "speed": 189,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 4,
+    "rpm": 11612,
+    "drs": false,
+    "lapDistance": 4984.6
+  },
+  {
+    "timestamp": 1678032990705,
+    "speed": 203,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 10477,
+    "drs": false,
+    "lapDistance": 5004.9
+  },
+  {
+    "timestamp": 1678032991065,
+    "speed": 215,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 11117,
+    "drs": false,
+    "lapDistance": 5026.4
+  },
+  {
+    "timestamp": 1678032991265,
+    "speed": 221,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 11344,
+    "drs": false,
+    "lapDistance": 5038.7
+  },
+  {
+    "timestamp": 1678032991505,
+    "speed": 221,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 11625,
+    "drs": false,
+    "lapDistance": 5053.5
+  },
+  {
+    "timestamp": 1678032991665,
+    "speed": 230,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 5,
+    "rpm": 10785,
+    "drs": false,
+    "lapDistance": 5063.7
+  },
+  {
+    "timestamp": 1678032991905,
+    "speed": 235,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 10601,
+    "drs": false,
+    "lapDistance": 5079.3
+  },
+  {
+    "timestamp": 1678032992304,
+    "speed": 235,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 10801,
+    "drs": false,
+    "lapDistance": 5105.4
+  },
+  {
+    "timestamp": 1678032992544,
+    "speed": 235,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 10801,
+    "drs": false,
+    "lapDistance": 5121.1
+  },
+  {
+    "timestamp": 1678032992944,
+    "speed": 243,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 11055,
+    "drs": false,
+    "lapDistance": 5148.1
+  },
+  {
+    "timestamp": 1678032993344,
+    "speed": 251,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 11055,
+    "drs": false,
+    "lapDistance": 5175.9
+  },
+  {
+    "timestamp": 1678032993504,
+    "speed": 260,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 10915,
+    "drs": false,
+    "lapDistance": 5187.5
+  },
+  {
+    "timestamp": 1678032993704,
+    "speed": 265,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 6,
+    "rpm": 10572,
+    "drs": false,
+    "lapDistance": 5202.2
+  },
+  {
+    "timestamp": 1678032993944,
+    "speed": 268,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 10717,
+    "drs": false,
+    "lapDistance": 5220.1
+  },
+  {
+    "timestamp": 1678032994184,
+    "speed": 272,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 10830,
+    "drs": false,
+    "lapDistance": 5238.2
+  },
+  {
+    "timestamp": 1678032994424,
+    "speed": 274,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 10938,
+    "drs": false,
+    "lapDistance": 5256.5
+  },
+  {
+    "timestamp": 1678032994624,
+    "speed": 276,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 10932,
+    "drs": false,
+    "lapDistance": 5271.8
+  },
+  {
+    "timestamp": 1678032994904,
+    "speed": 279,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 11045,
+    "drs": false,
+    "lapDistance": 5293.5
+  },
+  {
+    "timestamp": 1678032995184,
+    "speed": 281,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 11146,
+    "drs": false,
+    "lapDistance": 5315.4
+  },
+  {
+    "timestamp": 1678032995344,
+    "speed": 282,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 11167,
+    "drs": false,
+    "lapDistance": 5327.9
+  },
+  {
+    "timestamp": 1678032995504,
+    "speed": 284,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 11208,
+    "drs": false,
+    "lapDistance": 5340.5
+  },
+  {
+    "timestamp": 1678032995704,
+    "speed": 285,
+    "throttle": 100,
+    "brake": 0,
+    "gear": 7,
+    "rpm": 11213,
+    "drs": false,
+    "lapDistance": 5356.4
+  }
+]
