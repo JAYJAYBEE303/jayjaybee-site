@@ -1,11 +1,15 @@
 /**
- * Shared telemetry update shape — LOCKED v1.
+ * Shared telemetry update shape — LOCKED v1.1 (additive since v1).
  *
  * Confirmed against a real fastf1 lap (pipeline/fetch_session.py,
  * public/data/2023-bahrain-r-ver.json) — every field below is populated by
  * real data, not just a guess at what telemetry "should" look like.
  * liveAdapter's real implementation must produce this exact shape; changing
  * a field here is a breaking change for both adapters, not a local edit.
+ * v1 -> v1.1 added `sector`, `x`, `y` for the sector indicator and track
+ * map — safe as a same-session addition because liveAdapter is still an
+ * unimplemented stub with no real consumer yet; this would need an actual
+ * version negotiation once live has real traffic depending on the shape.
  *
  * Both `historicalAdapter` and `liveAdapter` must produce objects matching
  * this shape so `components/` can render either mode without caring which
@@ -20,6 +24,9 @@
  * @property {number}  rpm         Engine speed in rpm.
  * @property {boolean} drs         Whether DRS is currently open.
  * @property {number}  lapDistance Metres travelled along the current lap.
+ * @property {1|2|3}   sector      Current track sector (1, 2, or 3).
+ * @property {number}  x           Track-relative X position, metres.
+ * @property {number}  y           Track-relative Y position, metres.
  */
 
 /**
@@ -41,6 +48,9 @@ export function createTelemetryUpdate(fields = {}) {
     rpm: fields.rpm ?? 0,
     drs: fields.drs ?? false,
     lapDistance: fields.lapDistance ?? 0,
+    sector: fields.sector ?? 1,
+    x: fields.x ?? 0,
+    y: fields.y ?? 0,
   };
 }
 

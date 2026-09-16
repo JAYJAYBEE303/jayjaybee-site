@@ -19,6 +19,9 @@ const REQUIRED_FIELDS = {
   rpm: (v) => typeof v === 'number' && v >= 0 && v <= 20000,
   drs: (v) => typeof v === 'boolean',
   lapDistance: (v) => typeof v === 'number' && v >= 0,
+  sector: (v) => v === 1 || v === 2 || v === 3,
+  x: (v) => typeof v === 'number' && Number.isFinite(v),
+  y: (v) => typeof v === 'number' && Number.isFinite(v),
 };
 
 function validate(samples) {

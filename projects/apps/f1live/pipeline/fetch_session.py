@@ -1,6 +1,6 @@
 """
-Pull one lap of car telemetry via fastf1 and normalize it to the shared
-TelemetryUpdate shape (see ../src/lib/telemetryShape.js and
+Pull one lap of car+position telemetry via fastf1 and normalize it to the
+shared TelemetryUpdate shape (see ../src/lib/telemetryShape.js and
 ../docs/DATA_SHAPE.md). Writes a plain JSON array of samples that
 historicalAdapter.js can fetch()/replay directly — no wrapper object,
 no extra keys, so it's a drop-in for the existing fixture-replay loop.
@@ -12,12 +12,23 @@ Usage:
     python fetch_session.py --year 2023 --gp Bahrain --session R \
         --driver VER --lap fastest
 
-Field mapping notes (see docs/ROADMAP.md Phase A3 for the "why"):
+Field mapping notes (see docs/ROADMAP.md Phase A3 and docs/DATA_SHAPE.md
+for the "why" on each of these):
   - Brake:  fastf1 gives a bool in older seasons, an analog 0-100 in
             newer ones. Both are normalized to 0-100 here.
   - DRS:    fastf1 is an enum (0,1,2,8,10,12,14,...), not a boolean.
-            Only 10/12/14 mean "open" -- see docs/DATA_SHAPE.md.
-  - Distance: fastf1's add_distance() already gives meters -> lapDistance.
+            Only 10/12/14 mean "open".
+  - X/Y:    lap.get_telemetry() (not get_car_data()) merges car data with
+            position data by interpolating over a shared time index, so
+            every sample carries a matching (x, y) alongside speed/etc.
+            Units are metres in fastf1's local track-relative frame — not
+            GPS lat/lon, but real physical scale, fine for drawing a
+            to-scale track outline.
+  - sector: not a raw fastf1 channel. Derived per-sample by comparing the
+            sample's timestamp against the lap's official sector-time
+            boundaries (LapStartDate + cumulative Sector1Time/Sector2Time),
+            so it lines up with the same sector splits timing screens show.
+  - Distance: get_telemetry() adds this (and RelativeDistance) already.
   - Date:   used as the timestamp source (absolute wall-clock, ms epoch).
 """
 
@@ -55,21 +66,62 @@ def to_epoch_ms(series: pd.Series) -> pd.Series:
     return (series.astype("int64") // 1_000_000).astype("int64")
 
 
-def build_samples(car_data: pd.DataFrame) -> list[dict]:
-    """Transform one lap's car_data into a list of TelemetryUpdate dicts."""
+def compute_sectors(dates: pd.Series, lap) -> pd.Series:
+    """
+    Map each sample's Date to a sector number (1, 2, or 3) using the lap's
+    own official sector-time boundaries, so this lines up with the same
+    splits a timing screen would show — not a guess from track distance.
+    """
+    lap_start = lap["LapStartDate"]
+    sector1_end = lap_start + lap["Sector1Time"]
+    sector2_end = sector1_end + lap["Sector2Time"]
+
+    def sector_for(date):
+        if pd.isna(date):
+            return 1
+        if date < sector1_end:
+            return 1
+        if date < sector2_end:
+            return 2
+        return 3
+
+    return dates.apply(sector_for)
+
+
+def build_samples(telemetry: pd.DataFrame, lap) -> list[dict]:
+    """Transform one lap's merged car+position telemetry into a list of
+    TelemetryUpdate dicts."""
+    # get_telemetry() can leave a few NaN rows at the interpolation edges;
+    # drop them rather than ship a sample with missing fields.
+    telemetry = telemetry.dropna(
+        subset=["Date", "Speed", "Throttle", "Brake", "nGear", "RPM", "DRS", "Distance", "X", "Y"]
+    ).reset_index(drop=True)
+
     frame = pd.DataFrame(
         {
-            "timestamp": to_epoch_ms(car_data["Date"]),
-            "speed": car_data["Speed"].round().astype(int),
-            "throttle": car_data["Throttle"].clip(0, 100).round().astype(int),
-            "brake": normalize_brake(car_data["Brake"]),
-            "gear": car_data["nGear"].astype(int),
-            "rpm": car_data["RPM"].astype(int),
-            "drs": normalize_drs(car_data["DRS"]),
-            "lapDistance": car_data["Distance"].round(1),
+            "timestamp": to_epoch_ms(telemetry["Date"]),
+            "speed": telemetry["Speed"].round().astype(int),
+            "throttle": telemetry["Throttle"].clip(0, 100).round().astype(int),
+            "brake": normalize_brake(telemetry["Brake"]),
+            "gear": telemetry["nGear"].astype(int),
+            "rpm": telemetry["RPM"].astype(int),
+            "drs": normalize_drs(telemetry["DRS"]),
+            "lapDistance": telemetry["Distance"].round(1),
+            "sector": compute_sectors(telemetry["Date"], lap).astype(int),
+            "x": telemetry["X"].round(1),
+            "y": telemetry["Y"].round(1),
         }
     )
     return json.loads(frame.to_json(orient="records"))
+
+
+def format_laptime(lap_time) -> str | None:
+    """Format a pandas Timedelta as 'M:SS.mmm' instead of '0 days 00:01:36.236000'."""
+    if pd.isna(lap_time):
+        return None
+    total_seconds = lap_time.total_seconds()
+    minutes, seconds = divmod(total_seconds, 60)
+    return f"{int(minutes)}:{seconds:06.3f}"
 
 
 def fetch_lap(year: int, gp: str, session_code: str, driver: str, lap_selector: str):
@@ -92,8 +144,8 @@ def fetch_lap(year: int, gp: str, session_code: str, driver: str, lap_selector: 
             raise SystemExit(f"Lap {lap_number} not found for driver '{driver}'")
         lap = matched.iloc[0]
 
-    car_data = lap.get_car_data().add_distance()
-    samples = build_samples(car_data)
+    telemetry = lap.get_telemetry()
+    samples = build_samples(telemetry, lap)
 
     meta = {
         "year": year,
@@ -102,19 +154,13 @@ def fetch_lap(year: int, gp: str, session_code: str, driver: str, lap_selector: 
         "driver": driver,
         "lapNumber": int(lap["LapNumber"]),
         "lapTime": format_laptime(lap["LapTime"]),
+        "sector1Time": format_laptime(lap["Sector1Time"]),
+        "sector2Time": format_laptime(lap["Sector2Time"]),
+        "sector3Time": format_laptime(lap["Sector3Time"]),
         "compound": lap.get("Compound"),
         "sampleCount": len(samples),
     }
     return samples, meta
-
-
-def format_laptime(lap_time) -> str | None:
-    """Format a pandas Timedelta as 'M:SS.mmm' instead of '0 days 00:01:36.236000'."""
-    if pd.isna(lap_time):
-        return None
-    total_seconds = lap_time.total_seconds()
-    minutes, seconds = divmod(total_seconds, 60)
-    return f"{int(minutes)}:{seconds:06.3f}"
 
 
 def slugify(year: int, gp: str, session_code: str, driver: str) -> str:

@@ -47,6 +47,8 @@ src/
   components/   Shared UI — charts, layout — used by both routes.
     AppShell.jsx      Page frame: header nav (Replay / Live) + <Outlet />.
     TelemetryChart.jsx  Minimal per-channel sparkline.
+    TrackMap.jsx        Top-down (x, y) track outline + moving car dot.
+    SectorIndicator.jsx Highlights the current sample's sector (1/2/3).
   lib/          Data adapters, both producing the shared shape.
     telemetryShape.js    The shared TelemetryUpdate shape + factory.
     historicalAdapter.js Fetches a real lap from public/data/ and replays

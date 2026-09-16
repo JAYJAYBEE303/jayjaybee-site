@@ -1,9 +1,13 @@
 # Shared data shape
 
-**Status: locked v1.** Confirmed against a real fastf1 lap (see
-[Provenance](#provenance) below) — the shape isn't speculative anymore.
-`liveAdapter`'s real implementation must match it exactly; a field change
-here is a breaking change for both adapters, not a local edit.
+**Status: locked v1.1** (additive since v1 — added `sector`, `x`, `y`).
+Confirmed against a real fastf1 lap (see [Provenance](#provenance) below) —
+the shape isn't speculative anymore. `liveAdapter`'s real implementation
+must match it exactly; a field change here is a breaking change for both
+adapters, not a local edit. The v1 → v1.1 addition was safe as a
+same-session change only because `liveAdapter` is still an unimplemented
+stub with no real consumer yet — a shape change after live has real
+traffic would need actual version negotiation, not just an edit here.
 
 Every telemetry update flowing through the app — whether replayed from a
 recorded lap or streamed live — is a plain object matching `TelemetryUpdate`,
@@ -22,7 +26,10 @@ defined once in [`src/lib/telemetryShape.js`](../src/lib/telemetryShape.js).
 | `gear`        | `number`  | -1 (reverse), 0 (neutral), 1–8           | |
 | `rpm`         | `number`  | engine rpm                               | Expansion beyond the original field list — kept because throttle/brake alone don't tell you engine load, and it's a standard channel in real telemetry tools (fastf1's `RPM` car-data column). |
 | `drs`         | `boolean` | open (`true`) / closed (`false`)         | Expansion beyond the original field list. fastf1's raw `DRS` channel is a status-code enum (0,1,2,8,10,12,14,...), not a boolean — `pipeline/fetch_session.py` maps only `{10,12,14}` to `true`. Those codes are genuinely rare across a full session, so a lap showing `drs: false` throughout (especially a race leader's, who rarely has a car ahead within a second) is expected, not a mapping bug. |
-| `lapDistance` | `number`  | metres along the current lap             | 0 at the start/finish line, up to the track's lap length. fastf1's `add_distance()` gives this directly. |
+| `lapDistance` | `number`  | metres along the current lap             | 0 at the start/finish line, up to the track's lap length. |
+| `sector`      | `1 \| 2 \| 3` | current track sector                 | Not a raw fastf1 channel — `pipeline/fetch_session.py` derives it per-sample by comparing the sample's timestamp against the lap's official `LapStartDate` + cumulative `Sector1Time`/`Sector2Time` boundaries, so it lines up with the same splits a timing screen would show. |
+| `x`           | `number`  | metres, track-relative                   | Car's local X position from fastf1's position data (via `lap.get_telemetry()`, which interpolates car data and position data onto one shared time index). Not GPS lat/lon — an arbitrary per-circuit origin — but real physical scale, enough to draw a to-scale track outline. |
+| `y`           | `number`  | metres, track-relative                   | Same as `x`. |
 
 Use `createTelemetryUpdate(fields)` from `telemetryShape.js` to construct
 one rather than hand-building the object literal — it fills in defaults for
@@ -43,7 +50,9 @@ designed in the abstract:
    through `createTelemetryUpdate()`.
 4. `TelemetryChart`/`AppShell` render it with no mode-specific branching.
 
-Default lap: 2023 Bahrain GP, Race, VER's fastest lap — 352 samples, see
+Default lap: 2023 Bahrain GP, Race, VER's fastest lap — 726 samples (via
+`lap.get_telemetry()`, which merges+interpolates car data and position
+data onto one shared time index — denser than car data alone), see
 `public/data/2023-bahrain-r-ver.meta.json`.
 
 ## Adapter contract

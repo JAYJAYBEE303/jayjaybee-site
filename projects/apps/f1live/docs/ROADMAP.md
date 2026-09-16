@@ -97,6 +97,27 @@ so a new stylesheet drops in without touching component logic.
 | 4 | historicalAdapter.js → fetch real JSON | B3 |
 | 5 | lock telemetryShape.js + DATA_SHAPE.md | liveAdapter (later chapter) |
 
+## Phase C — sectors + track map — status: done
+
+Extended the locked shape (v1 → v1.1, additive) with `sector`, `x`, `y`:
+
+- `fetch_session.py` switched from `lap.get_car_data().add_distance()` to
+  `lap.get_telemetry()`, which merges car data with position data by
+  interpolating over a shared time index — gives `x`/`y` per sample "for
+  free" and roughly doubles sample density (352 → 726 for the default lap).
+- `sector` is derived per-sample (not a raw fastf1 channel) from the lap's
+  `LapStartDate` + cumulative `Sector1Time`/`Sector2Time` boundaries —
+  verified the resulting sector sample-count ratios match the real
+  sector-time ratios closely.
+- New shared components: `TrackMap.jsx` (top-down x/y outline + moving
+  dot, accumulates its own path client-side and resets it when
+  `lapDistance` drops — i.e. on lap loop) and `SectorIndicator.jsx` (just
+  highlights `sector`, no client-side computation).
+- Verified end-to-end with one-shot Node scripts against the real data:
+  zero false "loop" resets mid-lap, zero NaN/Infinity in the map's
+  coordinate math, start/end points nearly coincide (confirms the track
+  outline actually closes).
+
 ## Open decisions
 
 1. ~~Brake/DRS normalization rules above~~ — **resolved.** Verified against
