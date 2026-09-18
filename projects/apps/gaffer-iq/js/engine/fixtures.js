@@ -401,6 +401,76 @@ export function calcVenueEffect(homeTeam, awayTeam, ctx) {
   };
 }
 
+/**
+ * Pure symmetric-diff modifier: each side's OWN venue-dependence — how much
+ * its scoring differs between home and away — expressed as a percentage of
+ * the maximum reachable score (60, i.e. full points from 20 matches), then
+ * averaged across both sides of the fixture. Split out from
+ * calcVenueStrengthModifier below so this arithmetic can be exercised
+ * directly against known score inputs without going through calcHomeAwaySplit.
+ *
+ * MODEL: unlike calcVenueEffect (league-normalised, weighted by
+ * W_VENUE_EFFECT), this modifier is a plain, unweighted average of two raw
+ * percentages — deliberately simpler, so no single side's split can push the
+ * fixture past a 50-point swing on its own without the other side agreeing.
+ *
+ * @param {number} homeTeamHomeScore  home team's own home-venue score, /60
+ * @param {number} homeTeamAwayScore  home team's own away-venue score, /60
+ * @param {number} awayTeamHomeScore  away team's own home-venue score, /60
+ * @param {number} awayTeamAwayScore  away team's own away-venue score, /60
+ * @returns {{homeStrength: number, awayStrength: number, modifier: number}}
+ *   homeStrength + awayStrength always sum to exactly 100 — the clamp runs
+ *   BEFORE homeStrength is rounded, and awayStrength is then derived as
+ *   100 − homeStrength rather than rounded independently, so the two can
+ *   never drift apart at the 0/100 boundary.
+ */
+function calcVenueStrengthSplit(homeTeamHomeScore, homeTeamAwayScore, awayTeamHomeScore, awayTeamAwayScore) {
+  const homeTeamDiffPct = Math.abs(homeTeamHomeScore - homeTeamAwayScore) / 60 * 100;
+  const awayTeamDiffPct = Math.abs(awayTeamHomeScore - awayTeamAwayScore) / 60 * 100;
+
+  const modifier = clamp(0, 50, (homeTeamDiffPct + awayTeamDiffPct) / 2);
+
+  const homeStrength = Math.round(50 + modifier);
+  const awayStrength = 100 - homeStrength;
+
+  return { homeStrength, awayStrength, modifier };
+}
+
+/**
+ * Fixture-level home/away strength split, mirrored around a neutral 50/50
+ * baseline. Replaces calcVenueEffect (above) as the model behind the
+ * matchup page's Home vs Away strength read — same two-team shape, but a
+ * plain symmetric-diff modifier instead of a league-normalised, weighted one.
+ *
+ * calcHomeAwaySplit reads points-per-game over its own rolling window
+ * (VENUE_ROLLING_GAMES, not this model's 20) — × 20 is the closest existing
+ * read to "score out of 60 from the last 20 matches at that venue".
+ *
+ * @param {Team} homeTeam
+ * @param {Team} awayTeam
+ * @param {object} ctx
+ * @returns {{homeStrength: number, awayStrength: number, modifier: number,
+ *            estimated: boolean, homeBase: object, awayBase: object}}
+ */
+export function calcVenueStrengthModifier(homeTeam, awayTeam, ctx) {
+  const homeBase = calcHomeAwaySplit(homeTeam, ctx);
+  const awayBase = calcHomeAwaySplit(awayTeam, ctx);
+
+  const split = calcVenueStrengthSplit(
+    homeBase.homePPG * 20, homeBase.awayPPG * 20,
+    awayBase.homePPG * 20, awayBase.awayPPG * 20,
+  );
+
+  return {
+    ...split,
+    // Always false — same reasoning as calcVenueEffect's estimated field
+    // above: calcHomeAwaySplit never flags estimated, it just reads neutral.
+    estimated: homeBase.estimated || awayBase.estimated,
+    homeBase,
+    awayBase,
+  };
+}
+
 // ─── §4  Fixture history (head-to-head) ──────────────────────────────────────
 
 /**

@@ -35,8 +35,12 @@ const METRIC_LABELS = {
   baseDifficulty: 'Base FPL Difficulty',
   counterMatchup: 'Counter-Matchup',
   teamForm:       'Team Form',
-  homeAway:       'Home/Away Split',
   history:        'H2H History',
+  // homeAway:    'Home/Away Split',   // removed — see WEIGHTS in config.js.
+  //   FPL's own FDR already factors home/away, so this metric double-counted
+  //   venue on top of Base FPL Difficulty. Freed weight moved to
+  //   Counter-Matchup. METRIC_ORDER derives from these keys, so dropping the
+  //   label drops the row.
   // styleClash:  'Style Clash',   // removed — see WEIGHTS in config.js.
   //   METRIC_ORDER derives from these keys, so dropping the label drops the row.
 };
@@ -45,7 +49,7 @@ const METRIC_LABELS = {
 // Read as "which is more worth reading first", and only ever consulted when
 // WEIGHTS cannot separate two rows.
 const METRIC_TIEBREAK = [
-  'baseDifficulty', 'counterMatchup', 'teamForm', 'history', 'homeAway',
+  'baseDifficulty', 'counterMatchup', 'teamForm', 'history',
 ];
 
 // Heaviest metric first. DERIVED from WEIGHTS rather than written out, so a
@@ -112,14 +116,17 @@ const METRIC_MEANINGS = {
   history:
     'Head to head history. Calculated by the percentage of the total possible '
     + `points won over the last ${H2H_MEETING_WINDOW} meetings.`,
-  // One text for both venues: the sentence describes the DIFFERENCE between
-  // the two sides' home/away records, which reads the same way from either
-  // card. The popup's title still says "Home Advantage" or "Away
-  // Disadvantage", so which side is being described stays clear.
-  homeAway:
-    "The home/away winrate difference compared with the opposite team's. This "
-    + "metric is low weight as it's not a defining factor unless a matchup is "
-    + 'relatively close.',
+  // homeAway removed — see WEIGHTS in config.js. Kept commented (not deleted)
+  // so restoring the metric only means uncommenting this, the METRIC_LABELS/
+  // METRIC_TIEBREAK entries above, and buildMetricInfo/buildBreakdownRows below.
+  // // One text for both venues: the sentence describes the DIFFERENCE between
+  // // the two sides' home/away records, which reads the same way from either
+  // // card. The popup's title still says "Home Advantage" or "Away
+  // // Disadvantage", so which side is being described stays clear.
+  // homeAway:
+  //   "The home/away winrate difference compared with the opposite team's. This "
+  //   + "metric is low weight as it's not a defining factor unless a matchup is "
+  //   + 'relatively close.',
 };
 
 // Attacking pairing labels. Covers both the role-mode keys (stVsCb/wmVsFb/
@@ -1162,9 +1169,9 @@ function buildMetricInfo(key, venue) {
   // grid, so a missing cell would pull every later row's columns out of phase.
   if (!text) return '<span class="breakdown-row__info"></span>';
 
-  const label = key === 'homeAway'
-    ? (venue === 'Home' ? 'Home Advantage' : 'Away Disadvantage')
-    : METRIC_LABELS[key];
+  // key === 'homeAway' branch removed along with the metric — homeAway never
+  // appears in METRIC_ORDER now, see WEIGHTS in config.js.
+  const label = METRIC_LABELS[key];
 
   return `
     <details class="breakdown-row__info">
@@ -1215,12 +1222,10 @@ function buildBreakdownRows(breakdown, venue, settled = true) {
       ? ' title="Shows the OPPONENT\'s strength — a high number means a tougher opponent for this team. The bar colour reflects how good this fixture is for this team, same as every other row."'
       : key === 'counterMatchup'
       ? ` title="${esc(counterMatchupTooltip(m))}"`
-      : key === 'homeAway'
-      ? ` title="${esc(homeAwayTooltip(m, venue))}"`
       : '';
-    const label = key === 'homeAway'
-      ? (venue === 'Home' ? 'Home Advantage' : 'Away Disadvantage')
-      : METRIC_LABELS[key];
+    // key === 'homeAway' branch removed along with the metric — see WEIGHTS
+    // in config.js.
+    const label = METRIC_LABELS[key];
 
     // The counter cell is ALWAYS emitted, empty when the metric doesn't ramp or
     // has finished ramping: .breakdown-row is one grid and omitting a cell
@@ -1263,29 +1268,33 @@ function buildBreakdownRows(breakdown, venue, settled = true) {
   return `<div class="breakdown-rows">${rows}</div>`;
 }
 
-/**
- * Tooltip for the Home Advantage / Away Disadvantage breakdown row. Names the
- * actual PPG split behind the number, since the displayed value is now a
- * fixture-level effect (both teams' venue sensitivity combined) rather than a
- * standalone read of this team alone — see engine/fixtures.js calcVenueEffect.
- *
- * @param {object} m       breakdown.homeAway
- * @param {'Home'|'Away'} venue
- * @returns {string}       plain text; the caller escapes it.
- */
-function homeAwayTooltip(m, venue) {
-  if (m.estimated) {
-    return 'Not enough games at one or both venues this season for either team '
-      + 'to read a reliable home/away split, so this sits at a neutral 50 and '
-      + 'does not affect the score.';
-  }
-  const own = venue === 'Home'
-    ? `This team: ${m.homePPG.toFixed(2)} PPG at home vs ${m.awayPPG.toFixed(2)} PPG away.`
-    : `This team: ${m.awayPPG.toFixed(2)} PPG away vs ${m.homePPG.toFixed(2)} PPG at home.`;
-  return `${own} Combined with the opponent's own split, whichever team shows the bigger `
-    + `home/away gap swings this row — home always gets a boost, away always a matching `
-    + `penalty, sized by how much venue has mattered for these two teams this season.`;
-}
+// homeAway was removed from WEIGHTS (see config.js), so this tooltip has no
+// row to attach to. Kept commented rather than deleted: restoring the metric
+// means uncommenting this, its METRIC_LABELS entry and the branches in
+// buildMetricInfo/buildBreakdownRows.
+// /**
+//  * Tooltip for the Home Advantage / Away Disadvantage breakdown row. Names the
+//  * actual PPG split behind the number, since the displayed value is now a
+//  * fixture-level effect (both teams' venue sensitivity combined) rather than a
+//  * standalone read of this team alone — see engine/fixtures.js calcVenueEffect.
+//  *
+//  * @param {object} m       breakdown.homeAway
+//  * @param {'Home'|'Away'} venue
+//  * @returns {string}       plain text; the caller escapes it.
+//  */
+// function homeAwayTooltip(m, venue) {
+//   if (m.estimated) {
+//     return 'Not enough games at one or both venues this season for either team '
+//       + 'to read a reliable home/away split, so this sits at a neutral 50 and '
+//       + 'does not affect the score.';
+//   }
+//   const own = venue === 'Home'
+//     ? `This team: ${m.homePPG.toFixed(2)} PPG at home vs ${m.awayPPG.toFixed(2)} PPG away.`
+//     : `This team: ${m.awayPPG.toFixed(2)} PPG away vs ${m.homePPG.toFixed(2)} PPG at home.`;
+//   return `${own} Combined with the opponent's own split, whichever team shows the bigger `
+//     + `home/away gap swings this row — home always gets a boost, away always a matching `
+//     + `penalty, sized by how much venue has mattered for these two teams this season.`;
+// }
 
 // Plain-English name for each style rule, keyed by the rule's two axes. Kept
 // beside the renderer rather than in config.js for the same reason

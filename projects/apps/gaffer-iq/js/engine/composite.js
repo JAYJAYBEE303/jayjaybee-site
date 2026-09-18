@@ -18,8 +18,12 @@ import {
   PLAYTIME_PRIOR_MIN, PLAYTIME_PRIOR_MAX, PLAYTIME_BODY_SHARE,
 } from '../config.js';
 import { clamp, invert } from '../util.js';
+// calcVenueStrengthModifier is no longer imported — homeAway was removed
+// from WEIGHTS (config.js explains why). buildRollingVenueStatsByTeamId
+// stays: ctx still builds it for calcVenueStrengthModifier to consume again
+// if this metric is restored.
 import {
-  calcBaseDifficulty, calcVenueEffect, calcFixtureHistory,
+  calcBaseDifficulty, calcFixtureHistory,
   buildRollingVenueStatsByTeamId,
 } from './fixtures.js';
 import {
@@ -269,8 +273,9 @@ export function bandFromValue(value) {
 // deliberately absent: it is the reading the resilience is measured RELATIVE TO,
 // not one of the things that can pile up against it. Kept here rather than in
 // config.js because it is structural (which metrics are secondary), not a
-// tunable — same call as ROLE_ATTACK_GROUPS in counter.js.
-const STACK_METRICS = ['counterMatchup', 'teamForm', 'history', 'homeAway'];
+// tunable — same call as ROLE_ATTACK_GROUPS in counter.js. homeAway is also
+// absent — removed from the composite entirely, see WEIGHTS in config.js.
+const STACK_METRICS = ['counterMatchup', 'teamForm', 'history'];
 
 /**
  * How much of a sub-metric's weight it has actually earned, 0–1.
@@ -392,24 +397,24 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
   // when FPL's granular strength fields aren't published yet (see fixtures.js).
   const fdrForTeam = isHome ? fixture.fplDifficulty?.home : fixture.fplDifficulty?.away;
   const base    = calcBaseDifficulty(team, opponent, isHome, fdrForTeam);
-  // §3 (Phase 4): venue effect is fixture-level, not single-team — both sides'
-  // venue sensitivity feed a shared home boost / away penalty (calcVenueEffect,
-  // engine/fixtures.js). `venue` here is `team`'s own 0-100 read of that shared
-  // effect (50 + boost when team is home, 50 + penalty when away), reshaped to
-  // the same {value, estimated, gamesAtVenue} contract every other sub-metric
-  // and STACK_METRICS/confidence below already expect.
-  const venueEffect = isHome
-    ? calcVenueEffect(team, opponent, ctx)
-    : calcVenueEffect(opponent, team, ctx);
-  const venue = {
-    value:        clamp(0, 100, 50 + (isHome ? venueEffect.homeBoost : venueEffect.awayPenalty)),
-    estimated:    venueEffect.estimated,
-    gamesAtVenue: isHome ? venueEffect.homeBase.homeGames : venueEffect.awayBase.awayGames,
-    // Transparency fields (ARCHITECTURE.md §12 rule 6) — this team's own
-    // standalone venue-sensitivity read, not the combined fixture effect.
-    ownSplit: isHome ? venueEffect.homeBase : venueEffect.awayBase,
-    combinedMagnitude: venueEffect.combinedMagnitude,
-  };
+  // homeAway REMOVED from the composite (see WEIGHTS, config.js) — FPL's own
+  // FDR already factors home/away into its rating, so this metric
+  // double-counted venue on top of baseDifficulty. calcVenueEffect's
+  // league-normalised, weighted model was swapped for calcVenueStrengthModifier's
+  // plain symmetric-diff model (engine/fixtures.js); the metric itself stays
+  // unwired. Restoring this means uncommenting this block, the
+  // mVenue/confidence/rawWeightedSum/stacking/breakdown sites below, the
+  // WEIGHTS entry, and matchup.js's METRIC_LABELS.homeAway.
+  // const homeTeam = isHome ? team : opponent;
+  // const awayTeam = isHome ? opponent : team;
+  // const venueStrength = calcVenueStrengthModifier(homeTeam, awayTeam, ctx);
+  // const venue = {
+  //   value:        isHome ? venueStrength.homeStrength : venueStrength.awayStrength,
+  //   estimated:    venueStrength.estimated,
+  //   gamesAtVenue: isHome ? venueStrength.homeBase.homeGames : venueStrength.awayBase.awayGames,
+  //   ownSplit: isHome ? venueStrength.homeBase : venueStrength.awayBase,
+  //   modifier: venueStrength.modifier,
+  // };
   const form    = calcTeamForm(team, ctx);
   // Counter-Matchup blends BOTH pairings so a team's own defensive quality
   // against this opponent's attack earns direct credit on its own composite,
@@ -432,15 +437,14 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
   const mCounter = metricMaturity(counter);
   const mForm    = metricMaturity(form);
   const mHistory = metricMaturity(history);
-  const mVenue   = metricMaturity(venue);
+  // const mVenue = metricMaturity(venue);                // homeAway removed
   // const mStyle = metricMaturity(style);                // styleClash removed
 
   const confidence =
       WEIGHTS.baseDifficulty * mBase
     + WEIGHTS.counterMatchup * mCounter
     + WEIGHTS.teamForm       * mForm
-    + WEIGHTS.history        * mHistory
-    + WEIGHTS.homeAway       * mVenue;
+    + WEIGHTS.history        * mHistory;
 
   // Weighted blend — every sub-metric is already 0–100, higher = better for `team`.
   // WEIGHTS sums to 1.00 (config.js / FEATURE_ENGINE.md §8.1).
@@ -466,8 +470,8 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
       term(WEIGHTS.baseDifficulty, mBase,    invert(base.value))
     + term(WEIGHTS.counterMatchup, mCounter, counter.value)
     + term(WEIGHTS.teamForm,       mForm,    form.value)
-    + term(WEIGHTS.history,        mHistory, history.value)
-    + term(WEIGHTS.homeAway,       mVenue,   venue.value);
+    + term(WEIGHTS.history,        mHistory, history.value);
+    // + term(WEIGHTS.homeAway, mVenue, venue.value);   // homeAway removed
   const linearValue = confidence > 0 ? rawWeightedSum / confidence : 50;
 
   // §8.6 conditional term. Built from the same sub-metric shapes the breakdown
@@ -477,7 +481,7 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
     counterMatchup: { value: counter.value, weight: WEIGHTS.counterMatchup, estimated: counter.estimated, maturity: mCounter },
     teamForm:       { value: form.value,    weight: WEIGHTS.teamForm,       estimated: form.estimated, maturity: mForm },
     history:        { value: history.value, weight: WEIGHTS.history,        estimated: history.estimated },
-    homeAway:       { value: venue.value,   weight: WEIGHTS.homeAway,       estimated: venue.estimated },
+    // homeAway removed — see WEIGHTS in config.js.
   });
 
   const value = clamp(0, 100, linearValue - stack.penalty);
@@ -543,20 +547,21 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
         meetings:   history.meetings,
         pointsForA: history.pointsForA,
       },
-      homeAway: {
-        value:        venue.value,
-        weight:       WEIGHTS.homeAway,
-        estimated:    venue.estimated,
-        gamesAtVenue: venue.gamesAtVenue,
-        // §3 (Phase 4) — this team's own home/away PPG split, and the shared
-        // fixture-level magnitude it was blended with, so the UI can explain
-        // WHY this venue reading is what it is (ARCHITECTURE.md §12 rule 6).
-        homePPG:           venue.ownSplit.homePPG,
-        awayPPG:           venue.ownSplit.awayPPG,
-        rawSplit:          venue.ownSplit.rawSplit,
-        sign:              venue.ownSplit.sign,
-        combinedMagnitude: venue.combinedMagnitude,
-      },
+      // homeAway: removed from the breakdown along with its weight. Restoring
+      // it means uncommenting the venue/mVenue/confidence/rawWeightedSum/
+      // stacking sites above, this block, its WEIGHTS entry, its
+      // STACK_METRICS entry, and matchup.js's METRIC_LABELS.homeAway.
+      // homeAway: {
+      //   value:        venue.value,
+      //   weight:       WEIGHTS.homeAway,
+      //   estimated:    venue.estimated,
+      //   gamesAtVenue: venue.gamesAtVenue,
+      //   homePPG:           venue.ownSplit.homePPG,
+      //   awayPPG:           venue.ownSplit.awayPPG,
+      //   rawSplit:          venue.ownSplit.rawSplit,
+      //   sign:              venue.ownSplit.sign,
+      //   combinedMagnitude: venue.combinedMagnitude,
+      // },
       // styleClash: removed from the breakdown along with its weight. Restoring
       // it means uncommenting the four sites above, this block, its WEIGHTS
       // entry and its STACK_METRICS entry — engine/style.js itself is untouched.

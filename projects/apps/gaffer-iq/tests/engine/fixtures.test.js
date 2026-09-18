@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 
 import {
   groupPerGwSlots, pendingFixturesForTeam, summariseGwIrregularities,
+  calcVenueStrengthModifier,
 } from '../../js/engine/fixtures.js';
 
 // ─── groupPerGwSlots ─────────────────────────────────────────────────────────
@@ -133,4 +134,42 @@ test('summariseGwIrregularities skips ordinary gameweeks inside a mixed window',
 test('summariseGwIrregularities returns nothing without teams or a valid start', () => {
   assert.deepEqual(summariseGwIrregularities({ fixtures: [], teams: [] }, 1, 6), []);
   assert.deepEqual(summariseGwIrregularities({ fixtures: [], teams: [{ id: 1 }] }, null, 6), []);
+});
+
+// ─── calcVenueStrengthModifier ───────────────────────────────────────────────
+
+function mockVenueCtx(homeStats, awayStats) {
+  return {
+    playedFixtures: [],
+    teamsById: { 1: { id: 1 }, 2: { id: 2 } },
+    rollingVenueStatsByTeamId: {
+      1: { ...homeStats, homeGames: 20, awayGames: 20 },
+      2: { ...awayStats, homeGames: 20, awayGames: 20 },
+    },
+  };
+}
+
+test('calcVenueStrengthModifier mirrors a 50/50 baseline by the average of both sides\' venue splits', () => {
+  // home 52/60 vs away 47/60 (diff 8%), opponent home 23/60 vs away 11/60 (diff 20%) -> modifier 14.
+  const ctx = mockVenueCtx({ homePPG: 52 / 20, awayPPG: 47 / 20 }, { homePPG: 23 / 20, awayPPG: 11 / 20 });
+  const result = calcVenueStrengthModifier({ id: 1 }, { id: 2 }, ctx);
+  assert.equal(result.homeStrength, 64);
+  assert.equal(result.awayStrength, 36);
+  assert.equal(result.homeStrength + result.awayStrength, 100);
+});
+
+test('calcVenueStrengthModifier clamps the modifier at 50 rather than pushing past the 0/100 boundary', () => {
+  // home 47/60 vs away 22/60 (diff ~41.67%), opponent home 31/60 vs away 9/60 (diff ~36.67%) -> modifier ~39.17.
+  const ctx = mockVenueCtx({ homePPG: 47 / 20, awayPPG: 22 / 20 }, { homePPG: 31 / 20, awayPPG: 9 / 20 });
+  const result = calcVenueStrengthModifier({ id: 1 }, { id: 2 }, ctx);
+  assert.equal(result.homeStrength, 89);
+  assert.equal(result.awayStrength, 11);
+});
+
+test('calcVenueStrengthModifier stays symmetric with an uneven split between the two sides', () => {
+  // home 47/60 vs away 29/60 (diff 30%), opponent home 36/60 vs away 32/60 (diff ~6.67%) -> modifier ~18.33.
+  const ctx = mockVenueCtx({ homePPG: 47 / 20, awayPPG: 29 / 20 }, { homePPG: 36 / 20, awayPPG: 32 / 20 });
+  const result = calcVenueStrengthModifier({ id: 1 }, { id: 2 }, ctx);
+  assert.equal(result.homeStrength, 68);
+  assert.equal(result.awayStrength, 32);
 });

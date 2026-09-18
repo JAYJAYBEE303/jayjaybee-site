@@ -676,12 +676,23 @@ export const CHANNEL_PERSONNEL_MAX = 1.20;
 // priors in-season, so it captures what the biggest metric structurally cannot;
 // baseDifficulty because it is the only metric that is never estimated.
 // Still sums to 1.00. See FEATURE_ENGINE.md §6 and §8.1.
+// MODEL: homeAway REMOVED (0.05 → counterMatchup). FPL's own base FDR already
+// factors venue into its rating (e.g. Man City away at Brentford reads as a
+// harder fixture than Man City at home against the same opponent), so scoring
+// home/away a second time as its own sub-metric double-counted the same signal
+// baseDifficulty already carries — inflating its pull on the composite beyond
+// what one real signal should have. The freed weight went to counterMatchup
+// rather than being split, since it's the metric that makes this score differ
+// from FPL's own FDR at all (§8.1 above). engine/fixtures.js's calcVenueEffect
+// stays in the tree, unwired — restoring this means uncommenting the line
+// below, the venue/mVenue/confidence/rawWeightedSum/stacking/breakdown call
+// sites in engine/composite.js, and METRIC_LABELS.homeAway in matchup.js.
 export const WEIGHTS = {
   baseDifficulty: 0.40,   // FPL's own 1–5 FDR — always available, the dependable floor
-  counterMatchup: 0.25,   // attacking AND defending pairings blended (§7.2)
+  counterMatchup: 0.30,   // attacking AND defending pairings blended (§7.2)
   teamForm:       0.20,   // recent trajectory, opponent-quality adjusted
   history:        0.10,   // H2H nudge — small on purpose, see the note above
-  homeAway:       0.05,   // venue performance this season
+  // homeAway:    0.05,   // REMOVED — double-counted venue already in baseDifficulty. See MODEL note above.
   // styleClash:  0.10,   // REMOVED — see reasons 1–3 above. engine/style.js and
   //                      // its STYLE_RULES stay in the tree, unwired, so this is
   //                      // one weight and a handful of call sites to restore.
