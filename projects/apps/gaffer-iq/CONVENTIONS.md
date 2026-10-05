@@ -11,7 +11,7 @@ Read `ARCHITECTURE.md` first for the file structure and layering rules this docu
 - **Vanilla JavaScript, ES2022+, native ES modules.** Every `.js` file uses `import`/`export`. No CommonJS (`require`), no global namespace object, no IIFE module pattern, no `<script>`-per-file.
 - **No transpilation.** Write only syntax that ships in modern evergreen browsers. If a feature needs a polyfill, don't use it.
 - **`'use strict'` is implicit** in ES modules; do not add the pragma manually.
-- **No runtime frontend dependencies.** `package.json` exists for Vercel/Node detection and dev tooling only. Adding an npm package to the *frontend* requires an explicit decision recorded in `ARCHITECTURE.md`.
+- **No runtime frontend dependencies.** `package.json` exists for Vercel/Node detection and dev tooling only. Adding an npm package to the *frontend* requires an explicit decision recorded in `ARCHITECTURE.md`. The one such decision so far is GSAP, dynamically imported by the landing page only (`ARCHITECTURE.md` §4).
 - **Indentation:** 2 spaces. **Quotes:** single quotes for JS strings, double quotes only to avoid escaping. **Semicolons:** always. **Line length:** soft cap 100 columns.
 
 ---
@@ -22,7 +22,7 @@ Read `ARCHITECTURE.md` first for the file structure and layering rules this docu
 |---|---|---|
 | JS files | `kebab-case.js`, lowercase, descriptive noun | `composite.js`, `counter.js` |
 | Multi-word JS files | `kebab-case` | `counter-matchup.js` *(avoid abbreviating to the point of ambiguity)* |
-| CSS files | `kebab-case.css`, by role | `base.css`, `layout.css`, `components.css` |
+| CSS files | `kebab-case.css`, by role | `base.css`, `layout.css`, `components.css`, `landing.css`, `matchup.css`, `fixtures.css`, `ranker.css`, `dashboard.css`, `planner.css` |
 | Markdown docs | `SCREAMING_SNAKE_CASE.md` | `ARCHITECTURE.md` |
 | The serverless function | `fpl.js` inside `/api/` | `/api/fpl.js` |
 
@@ -118,7 +118,7 @@ One scale, seven tiers, every 0–100 integer (`FEATURE_ENGINE.md` §8.4). `engi
 ### 5.3 Design tokens
 - All colours, spacing, radii, font sizes, and the band colours are CSS custom properties declared in `:root` in `base.css`. Components reference `var(--…)` only. No raw hex or px-spacing literals in `components.css`/`layout.css` except inside `:root`.
 - Token naming: `--color-…`, `--space-…`, `--radius-…`, `--font-…`, `--band-…`, `--shadow-…`. e.g. `--band-brutal`, `--space-2`, `--color-bg`, `--shadow-float`.
-- **Fonts are system stacks, with exactly one exception.** `--font-sans` and `--font-mono` load nothing over the network. `--font-display` (Anton, via Google Fonts in `index.html`) exists solely for the landing hero headline and must not spread to any other element — a second consumer means either self-hosting it or dropping it. It is a single-weight face: reference it with `font-weight: 400`, never a bolder value, or the browser synthesises a fake bold.
+- **Fonts are system stacks, with exactly one exception.** `--font-sans` and `--font-mono` load nothing over the network. `--font-display` (Anton, self-hosted in `assets/fonts/`, `@font-face` in `base.css`) is the display face of the redesigned pages (landing, matchup); pages not yet redesigned stay on system fonts. It is a single-weight face: reference it with `font-weight: 400`, never a bolder value, or the browser synthesises a fake bold.
 - `--shadow-…` was added with the landing page (`base.css`, "Elevation"). Two raw `box-shadow` recipes predate it inline in `components.css` (`.dash-search-results`, `.squad-import-panel`) and are deliberately left as-is — retrofitting them is a separate change needing its own visual review. New elevation goes through a token.
 - No inline styles in HTML and no `style.foo =` in JS except for genuinely dynamic values (e.g. a computed bar width). Toggle classes, don't write style strings.
 - `--band-…` is two layers. **Primitives** name a hue and nothing else (`--band-green`, `--band-yellow`, `--band-dark-red`, each with a `-bg` tint); **semantics** name a meaning and point at a primitive (`--band-great`, `--band-excellent`). Components read semantics; the non-rating cases in §5.2 read primitives. The split is what lets a scale be re-pointed in a scope at all — a scoped `--band-good: var(--band-great)` would resolve against the scope's own values and go circular. It is also what made the five-tier → seven-tier move a handful of lines in `:root` rather than a sweep of every component.
@@ -150,7 +150,7 @@ Skeletons carry no information: mark them `aria-hidden="true"` and put `aria-bus
 The `.skeleton` block lives at the **bottom** of `components.css` and must stay there; see the note above it for why.
 
 ### 5.5 Layout
-- Flexbox/Grid only. No float layouts. No CSS frameworks (no Tailwind, no Bootstrap). Hand-written CSS, organised by the three files in `ARCHITECTURE.md` §3.
+- Flexbox/Grid only. No float layouts. No CSS frameworks (no Tailwind, no Bootstrap). Hand-written CSS, organised by the files in `ARCHITECTURE.md` §3. `landing.css` is self-contained: every rule nests under `.landing`, and the landing-only values it needs (gutters, the scoreboard's depth/feel, two scoped band re-points) are declared on that section rather than in `:root`. `matchup.css` follows the same pattern under `.mx`; the Full Season strip sits outside `.mx` on purpose and keeps its `components.css` styling. `fixtures.css` does the same under `.fc`, and plays its entrance motion only under `[data-anim]`, which the module sets on a render the reader caused and clears on a data repaint. `ranker.css` follows suit under `.rk`, `dashboard.css` under `.db`, and `planner.css` under `.pl`.
 - Mobile is not a Phase 1 target (personal desktop tool), but do not actively prevent it — use relative units and avoid fixed pixel widths on containers.
 
 ---

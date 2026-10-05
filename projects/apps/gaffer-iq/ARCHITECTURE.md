@@ -87,7 +87,13 @@ jayjaybee-site/                   ← repo root (not Gaffer IQ's concern)
         ├── css/
         │   ├── base.css
         │   ├── layout.css
-        │   └── components.css
+        │   ├── components.css
+        │   ├── landing.css
+        │   ├── matchup.css
+        │   ├── fixtures.css
+        │   ├── ranker.css
+        │   ├── dashboard.css
+        │   └── planner.css
         └── js/
             ├── main.js
             ├── config.js
@@ -134,7 +140,13 @@ gaffer-iq/                          (= projects/gaffer-iq/ in the repo)
 ├── css/
 │   ├── base.css                # Reset, CSS variables (design tokens), typography.
 │   ├── layout.css              # App shell, grid, nav.
-│   └── components.css          # Reusable component styles (cards, tables, badges, pills).
+│   ├── components.css          # Reusable component styles (cards, tables, badges, pills).
+│   ├── landing.css             # Landing page only, every rule nested under `.landing`.
+│   ├── matchup.css             # Matchup Analyser only, every rule nested under `.mx`.
+│   ├── fixtures.css            # Fixtures only, every rule nested under `.fc`.
+│   ├── ranker.css              # Player Ranker only, every rule nested under `.rk`.
+│   ├── dashboard.css           # GW Dashboard only, every rule nested under `.db`.
+│   └── planner.css             # Transfer Planner only, every rule nested under `.pl`.
 │
 └── js/
     ├── main.js                 # ENTRY POINT (ESM). Imports modules, reads URL hash to
@@ -163,16 +175,21 @@ gaffer-iq/                          (= projects/gaffer-iq/ in the repo)
     │
     └── modules/                # The feature views. These OWN the DOM; engine never does.
         ├── landing.js          # Landing page — the front page at the bare URL.
-        │                       #   Presentational; owns the scroll-reveal system
-        │                       #   and the `is-landing` body class only.
-        ├── matchup.js          # Matchup Analyser.
+        │                       #   Presentational: sample split-flap scoreboard,
+        │                       #   intro/exit timeline (GSAP, see §4), live GW tag.
+        ├── matchup.js          # Matchup Analyser: command bar + fixture/team drawers,
+        │                       #   score tape, breakdown, counter donuts, 10-GW outlook.
         ├── fullSeason.js       # Full Season strip on the Matchup page: GW1–38 ribbon, chip
         │                       #   rail, expand/collapse choreography (FEATURE_ENGINE §15).
-        ├── fixtures.js         # Fixtures: GW grid, league table, team schedule, H2H.
-        ├── ranker.js           # Player Ranker.
-        ├── dashboard.js        # GW Decision Dashboard.
-        ├── planner.js          # Transfer Planner: state, wiring, squad rail, import panel.
-        └── planner-boards.js   # Transfer Planner: verdict banner + lens board HTML (no state).
+        ├── fixtures.js         # Fixtures: matchday clock + match report drawer, league
+        │                       #   table, club season ribbon, H2H meeting chart.
+        ├── ranker.js           # Player Ranker: Top pick / head to head / fixture run,
+        │                       #   paged ranked list, filters drawer.
+        ├── dashboard.js        # GW Decision Dashboard: squad board / team sheet, captain,
+        │                       #   breakdown and risk panels.
+        ├── planner.js          # Transfer Planner: verdict tape, the run, move tray, squad drawer, import.
+        ├── planner-boards.js   # Transfer Planner: lens boards + verdict copy (no state).
+        └── planner-run.js      # Transfer Planner: the run's week-by-week transfer rules (pure).
 ```
 
 **`pickStartingXI` (`engine/lineup.js`) is shared between the Dashboard and the Planner** — it used to be defined only inside `modules/dashboard.js` and was lifted out so both modules agree on what "your starting XI" means. The Planner's five transfer lanes are measured as the *change* in this selection's total expected points, so a disagreement between the two on XI selection would silently corrupt every lane. See `FEATURE_ENGINE.md` §14.1.
@@ -193,6 +210,8 @@ Because there is no build step, modules are loaded as **native ES modules**, and
 - `main.js` is the bootstrap. Its responsibilities, and *only* these: import the four modules, kick off the initial data load via `api.js`/`store`, read the URL hash to decide which module view is active, wire up the nav, and subscribe to `store` events (`data:ready`, `data:error`). It contains **no analytical logic** and **no per-module rendering** — it delegates to the modules.
 - Use `import`/`export` (ESM) throughout. No global `window.GafferIQ` namespace, no IIFE pattern, no `<script>` tag per file. One entry module, dependency graph resolved by the browser.
 - This works on Vercel and locally with any static file server. It does **not** work from `file://` (ESM + CORS), so local dev uses `npx serve` or `vercel dev` (documented in README).
+
+**One external runtime import: GSAP (landing only).** `js/modules/landing.js` loads GSAP 3.12.5 with a dynamic `import()` from jsDelivr for the landing page's intro and exit timelines — the design it was built from depends on it. Dynamic, not static, so it never enters `main.js`'s graph: a blocked or slow CDN costs only the intro (the module waits at most 1.5s, then runs without it), and nothing outside the landing depends on it. Self-hosted assets live in `assets/` (the Anton display font, declared in `base.css`).
 
 > **Phase 0 scaffolding note:** `main.js` is the very first JS file to create, before any module. It is listed at the top of the `js/` tree in §3. Nothing renders until it exists, because it is the only thing `index.html` loads.
 
@@ -523,7 +542,7 @@ All four modules consume the **same** engine output (composite scores + breakdow
 
 Relationships, concretely:
 - **Matchup Analyser** is the "view source" for a single fixture. Other modules link into it ("why is this score what it is?").
-- **Fixtures** is the schedule-level companion to the Matchup Analyser: the GW grid (kickoff times, results, per-fixture events and lineups), the league table with its European/relegation zones, one team's results/upcoming split, and the full H2H history for a pairing. It carries no scoring of its own — it is the "what and when" view that the Matchup Analyser then explains. All four views run on live data, and they cross-link: a club name in the Table or in a fixture row opens By team on that club, and an opponent in By team — or the head-to-head block inside any fixture, played or upcoming — opens Head-to-head on that pairing.
+- **Fixtures** is the schedule-level companion to the Matchup Analyser: the Matchday clock (kickoff times, results, and a match report drawer per fixture with its events and lineups), the league table with its European/relegation zones, one team's season as a results/to-come ribbon, and the full H2H history for a pairing. It carries no scoring of its own — the Gaffer IQ chips on its tiles and ribbon are `composite.scoreFixture` read as-is — it is the "what and when" view that the Matchup Analyser then explains. All four views run on live data, and they cross-link: a club name in the Table opens By team on that club, and a ribbon fixture in By team — or the head-to-head block inside any match report, played or upcoming — opens Head-to-head on that pairing.
 - **Player Ranker** = player form × that player's fixture composite over the horizon → a ranked projected-value list. It is the bridge between team-level fixture scores and player-level decisions.
 - **GW Dashboard** is horizon-locked to `GW1` by design (it's about *this* week's decisions: captaincy, starting XI, bench order, risk flags). It consumes the ranker's projections and the live endpoint.
 - **Transfer Planner** is the most horizon-aware module: it takes your current squad (entered manually or imported via the FPL picks endpoint), the ranker's projections over the chosen horizon, and budget/free-transfer constraints, and enumerates every legal swap (`engine/transfers.js`). Each swap is scored not by the ranker's within-position composite but by the change it makes to `pickStartingXI`'s total expected points (`engine/lineup.js`) — the same axis fix `expectedPoints` already gave captaincy (§10.2 above) — on five independent lanes (Now, Future Prep, Funds & Flexibility, Ceiling, Structure Fix). `engine/strategy.js` normalises the five and issues one weekly verdict: act on the strongest lane, or roll the transfer. See `FEATURE_ENGINE.md` §14 for the full model.

@@ -13,6 +13,15 @@
    explicit display property (e.g. display:flex on .ranker-loading). */
 [hidden] { display: none !important; }
 
+/* Anton — the redesign's display face (--font-display below), self-hosted.
+   The app's only web font. */
+@font-face {
+  font-family: 'Anton';
+  src: url('../assets/fonts/Anton-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-display: swap;
+}
+
 :root {
   /* --- Colour palette ---------------------------------------------------- */
   --color-bg:             #0d1117;
@@ -202,13 +211,19 @@
   /* --- Typography -------------------------------------------------------- */
   --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'Cascadia Code', 'Fira Code', Consolas, monospace;
-  /* Display face for the landing hero headline, and nothing else. The app
-     proper is system-fonts-only by design; this is the single deliberate
-     exception, loaded from Google Fonts in index.html. Anton ships one weight
-     (400) and is already heavy — never stack a font-weight on top of it, or
-     the browser synthesises a bold and the letterforms smear. Falls back to
-     --font-sans's stack if the request fails. */
-  --font-display: 'Anton', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* Display face for the redesigned pages (landing, matchup). Everything
+     else is system fonts; this is the single deliberate exception,
+     self-hosted (assets/fonts/, @font-face above). Anton ships one
+     weight (400) and is already heavy — never stack a font-weight on top of
+     it, or the browser synthesises a bold and the letterforms smear. The
+     fallbacks are condensed faces, so a failed load keeps the scoreboard's
+     proportions. */
+  --font-display: 'Anton', Impact, 'Arial Narrow Bold', sans-serif;
+
+  /* Landing page gutters. Here rather than in landing.css because layout.css
+     lines the shared app header up with the landing's top row. */
+  --landing-pad:     clamp(16px, 3vw, 56px);
+  --landing-top-pad: clamp(12px, 2.2dvh, 24px);
   --font-size-xs:  0.75rem;
   --font-size-sm:  0.875rem;
   --font-size-md:  1rem;
@@ -216,11 +231,6 @@
   --font-size-xl:  1.5rem;
   --font-size-2xl: 2rem;
   --font-size-3xl: 2.25rem;
-  /* Landing hero only. Fluid rather than a fixed rung because it is the one
-     piece of type on the site that has to span phone to ultrawide. Set larger
-     than the sans figure it replaced: Anton is a condensed face, so the same
-     nominal size reads noticeably smaller across a line. */
-  --font-size-hero: clamp(3rem, 7vw, 5.5rem);
 
   /* --- Border radius ----------------------------------------------------- */
   --radius-sm: 4px;
