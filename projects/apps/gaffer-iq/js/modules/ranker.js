@@ -924,7 +924,7 @@ function INFO() {
   };
 }
 
-/** Big Anton numeral; the outline layer takes the enclosing [data-band] hue. */
+/** Big score numeral; the outline layer takes the enclosing [data-band] hue. */
 function bigHTML(v, key, label, slot, delay = 0, outline = true) {
   const txt = fmtMetric(v, key);
   return `<span class="big" role="img" aria-label="${esc(label)}" data-cu="${v ?? ''}" data-key="${key}" data-slot="${slot}" data-delay="${delay}">`
