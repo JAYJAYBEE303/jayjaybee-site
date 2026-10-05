@@ -70,7 +70,7 @@ const ML = [['Base difficulty', 'Base'], ['Counter-matchup', 'Counter'], ['Team 
 const NB = ' ';
 const DIG = '0123456789';
 const ALPHA = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-const EXIT_TARGETS = '.top,.ticker,#rig,#hang,.lights,.headline .ln>span,.intro > *,.modules,.mod,.foot';
+const EXIT_TARGETS = '.top,.ticker,#rig,#hang,#cast,.lights,.headline .ln>span,.intro > *,.modules,.mod,.foot';
 
 const RM = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const FINE = window.matchMedia('(hover:hover) and (pointer:fine)').matches;
@@ -520,10 +520,15 @@ function exit() {
   const x = exitTl = gsap.timeline({ defaults: { ease: 'power3.in' } });
   x.to(q('.foot'), { opacity: 0, duration: .16 }, 0)
     .to(q('.mod'), { opacity: 0, y: 8, duration: .18, stagger: .03 }, 0)
+    // The panel behind the tiles has its own fill and border — fade it too,
+    // or it lingers as an empty box after everything else has gone.
+    .to(q('.modules'), { opacity: 0, duration: .2 }, .12)
     .to(q('.intro > *'), { y: 10, opacity: 0, duration: .2, stagger: .04 }, .02)
     .to(q('.headline .ln>span'), { yPercent: 105, duration: .3, stagger: .06 }, .06)
     .to(q('#hang'), { y: -28, duration: .42, ease: 'back.in(1.6)' }, .1)
     .to(q('#rig'), { opacity: 0, duration: .2, ease: 'none' }, .34)
+    // The board's floor shadow goes with the board.
+    .to(q('#cast'), { opacity: 0, duration: .24, ease: 'none' }, .2)
     .to(q('.ticker'), { xPercent: 100, duration: .4, ease: 'expo.in' }, .12)
     .to(q('.lights'), { opacity: 0, duration: .3, ease: 'none' }, .26)
     .to(q('.top'), { opacity: 0, duration: .2 }, .36);
