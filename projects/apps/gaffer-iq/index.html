@@ -195,18 +195,16 @@
                Container only; the module fills it. Untouched by the Matchup
                redesign; it sits below the Horizon outlook at the foot of the
                page, and .matchup-shell still gives it the full window width. -->
-          <section class="season-strip" aria-label="Full season outlook">
-            <header class="season-strip__head">
-              <h2 class="season-strip__title">Full Season</h2>
-            </header>
-            <div class="season-strip__body">
-              <div class="season-scroller">
-                <div class="season-track">
-                  <div class="season-ribbon" aria-label="Gameweeks 1 to 38"></div>
-                  <div class="season-rail" aria-label="Chip windows"></div>
-                </div>
+          <section class="season-strip" id="fullseason" aria-labelledby="season-strip-t">
+            <div class="season-strip__wrap">
+              <header class="season-strip__head">
+                <span class="season-strip__lbl">Season</span>
+                <h2 class="season-strip__title" id="season-strip-t">Full season</h2>
+                <span class="season-strip__meta">League-wide: each tile is one of the week’s top three matchups, coloured by the favoured side’s band</span>
+              </header>
+              <div class="season-strip__body">
+                <p class="season-strip__nojs">Gaffer IQ needs JavaScript to score fixtures and draw the full season. Enable it and reload.</p>
               </div>
-              <div class="season-key"></div>
             </div>
           </section>
         </div>
