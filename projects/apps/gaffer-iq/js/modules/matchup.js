@@ -1466,15 +1466,15 @@ function teamDrawerHTML(ctx) {
     if (prevGw !== null && crossesChipReset(prevGw, f.gw)) {
       rows.push(`<p class="dsep" role="separator" aria-label="Chips reset after Gameweek ${CHIP_RESET_AFTER_GW}" title="FPL chips reset after Gameweek ${CHIP_RESET_AFTER_GW}">Chips reset</p>`);
     }
-    rows.push(`<button type="button" class="dtm" data-fixture-id="${f.id}" data-team-id="${team.id}" aria-current="${f.id === _selectedFixtureId}"`
+    rows.push(`<button type="button" class="dtm dtm--fx" data-fixture-id="${f.id}" data-team-id="${team.id}" aria-current="${f.id === _selectedFixtureId}"`
       + ` aria-label="${esc(`${team.name} v ${opp.name}, ${isHome ? 'Home' : 'Away'}, Gameweek ${f.gw}`)}">`
-      + `${crest(opp, 24)}<span>v ${esc(opp.name)}</span><span class="dtm__o"><i>${isHome ? 'H' : 'A'}</i></span>`
+      + `${crest(opp, 24)}<span class="dtm__n"><i>v</i> ${esc(opp.name)}</span><span class="dtm__o"><i>${isHome ? 'H' : 'A'}</i></span>`
       + `<span class="dtm__gw">GW${f.gw}</span>${fixtureChip(team, f, ctx)}</button>`);
     prevGw = f.gw;
   }
-  return `<div class="drawer__h">
+  return `<div class="drawer__h drawer__h--team">
       <button type="button" class="step" data-tstep="-1" aria-label="Previous team">‹</button>
-      <h2 id="mx-drawer-t">${crest(team, 24)}${esc(team.name)}</h2>
+      <h2 id="mx-drawer-t">${crest(team, 24)}<span class="drawer__t">${esc(team.name)}</span></h2>
       <button type="button" class="step" data-tstep="1" aria-label="Next team">›</button>
       <button type="button" class="btn" data-teams>All teams</button>
       <button type="button" class="btn" data-close>Close</button>

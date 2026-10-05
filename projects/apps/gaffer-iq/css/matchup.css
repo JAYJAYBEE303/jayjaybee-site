@@ -185,8 +185,30 @@
   .dtm__o i { font-style: normal; }
   .dtm__gw { font: 700 11px/1 var(--font-sans); color: var(--color-muted); font-variant-numeric: tabular-nums; min-width: 40px; text-align: right; }
   /* The FPL chip reset, between the two gameweeks that straddle it. */
-  .dsep { display: flex; align-items: center; gap: 8px; margin: 6px 10px; font: 700 10px/1 var(--font-sans); letter-spacing: .1em; text-transform: uppercase; color: var(--color-muted); }
+  .dsep { display: flex; align-items: center; gap: var(--space-2); margin: var(--space-1) var(--space-3); font: 700 10px/1 var(--font-sans); letter-spacing: .1em; text-transform: uppercase; color: var(--color-muted); }
   .dsep::before, .dsep::after { content: ""; flex: 1; height: 1px; background: var(--color-border); }
+
+  /* Team-fixtures rows: one 32px line — crest · v opponent · H/A · GW · score. Fixed
+     columns keep H/A, GW and the chip aligned down the list; only the name flexes. */
+  .dtm--fx { grid-template-columns: 24px minmax(0, 1fr) 20px 32px 34px; gap: var(--space-2); padding: var(--space-1) var(--space-3); }
+  .dtm--fx:focus-visible { outline-offset: -2px; }
+  .dtm--fx[aria-current=true] { box-shadow: inset 2px 0 0 var(--color-accent); }
+  .dtm__n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dtm__n i { font-style: normal; font-weight: 400; color: var(--color-muted); }
+  /* H/A: a small outlined pill, so the name and score carry the weight. */
+  .dtm--fx .dtm__o { justify-self: center; }
+  .dtm--fx .dtm__o i { display: inline-grid; place-items: center; min-width: 20px; height: 18px; border-radius: var(--radius-sm); box-shadow: inset 0 0 0 1px var(--color-border); font: 700 10px/1 var(--font-sans); letter-spacing: .04em; }
+  .dtm--fx .dtm__gw { min-width: 0; font-size: 12px; }
+  .dtm--fx .chip { justify-self: end; }
+  /* Team header: tighter, and a long team name truncates instead of wrapping. */
+  .drawer__h--team { gap: var(--space-2); padding: var(--space-3); }
+  .drawer__t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  @media (pointer: coarse) { .dtm--fx { padding-block: var(--space-2); } }
+  /* Phone: arrows + name on row one, All teams / Close on row two, so the name keeps its room. */
+  @media (max-width: 480px) {
+    .drawer__h--team { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; }
+    .drawer__h--team [data-teams] { grid-column: 1 / 3; justify-self: start; }
+  }
 
   /* ─── "read it as" ──────────────────────────────────────────────────── */
   .frame { display: grid; grid-template-columns: 190px repeat(3, minmax(0, 1fr)); padding: var(--space-4) 0; border-bottom: 1px solid var(--color-border-subtle); }
