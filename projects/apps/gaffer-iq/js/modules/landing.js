@@ -32,7 +32,7 @@ import { bandFromValue } from '../engine/composite.js';
 const MODULE_KEY = 'landing';
 const GSAP_URL = 'https://cdn.jsdelivr.net/npm/gsap@3.12.5/index.js';
 
-/** How long the intro waits for GSAP and for Anton before starting anyway. */
+/** How long the intro waits for GSAP and for the headline's team font before starting anyway. */
 const GSAP_WAIT_MS = 1500;
 const FONT_WAIT_MS = 700;
 
@@ -568,9 +568,11 @@ async function start() {
   gsap = await loadGsap();
   if (!gsap) { unpre(); show(0, 'intro'); cycle(); return; }
 
-  // Wait for Anton (capped) so the headline can't reflow and shove the board mid-intro.
+  // Wait for the headline's team font (capped) so it can't reflow and shove the board mid-intro.
+  // The family is read from --font-team (assets/fonts.css) so its name lives in one place.
   if (document.fonts && document.fonts.load) {
-    await Promise.race([document.fonts.load('400 1em Anton').catch(noop), new Promise(r => setTimeout(r, FONT_WAIT_MS))]);
+    const team = getComputedStyle(document.documentElement).getPropertyValue('--font-team').trim();
+    await Promise.race([document.fonts.load(`400 1em ${team}`).catch(noop), new Promise(r => setTimeout(r, FONT_WAIT_MS))]);
   }
   measure();
   intro();
