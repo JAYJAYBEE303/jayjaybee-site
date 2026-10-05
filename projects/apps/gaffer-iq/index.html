@@ -5,20 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gaffer IQ</title>
 
-  <!-- Anton — the landing hero headline only (--font-display, base.css). The
-       app is otherwise system-fonts-only; this is the single web font, and the
-       only external asset request the page makes. display=swap so the headline
-       renders in the fallback stack immediately rather than sitting invisible
-       if Google Fonts is slow or blocked. The preconnects open the two
-       connections (stylesheet host, then font-file host) before the CSS is
-       parsed, which is most of the round-trip cost. -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&display=swap">
+  <!-- Anton — the redesign's display face (--font-display, base.css),
+       self-hosted. The app is otherwise system-fonts-only. Preloaded because
+       the landing intro waits on it (capped) so the headline can't reflow
+       mid-animation. -->
+  <link rel="preload" href="assets/fonts/Anton-Regular.ttf" as="font" type="font/ttf" crossorigin>
 
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/layout.css">
   <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/landing.css">
+  <link rel="stylesheet" href="css/matchup.css">
+  <link rel="stylesheet" href="css/fixtures.css">
+  <link rel="stylesheet" href="css/ranker.css">
+  <link rel="stylesheet" href="css/dashboard.css">
+  <link rel="stylesheet" href="css/planner.css">
   <!-- Shared "back to jayjaybee.com" link (jayjaybee.com/projects/ pages only) -->
   <link rel="stylesheet" href="../../../assets/css/back-to-jayjaybee.css">
 </head>
@@ -59,161 +60,141 @@
         <button class="app-error-banner__retry" id="app-error-retry" type="button">Retry</button>
       </div>
 
-      <!-- LANDING — the front page at /projects/apps/gaffer-iq/ (js/modules/landing.js).
+      <!-- LANDING — the front page at /projects/apps/gaffer-iq/ ("Matchnight
+           Scoreboard"; styles css/landing.css, behaviour js/modules/landing.js).
            A module view like any other, so hash routing, deep links and the
            render-when-visible contract are unchanged; main.js just defaults to
-           this one instead of matchup when there is no hash. Presentational:
-           every number below is a worked example, not live data. The only
-           value the module rewrites is the gameweek in the eyebrow. -->
+           this one when there is no hash. Presentational: every fixture and
+           number on the scoreboard is a sample, not live data. The only value
+           the module rewrites is the gameweek in the ticker tag. -->
       <section class="module-view landing is-active" data-module="landing"
                aria-label="Gaffer IQ">
-        <div class="landing__inner">
-
-          <div class="landing__backdrop" aria-hidden="true">
-            <div class="landing__glow"></div>
-            <div class="landing__grid"></div>
+        <div class="page">
+          <div class="lights" aria-hidden="true">
+            <div class="floor"><svg viewBox="0 0 1050 680"><rect x="2" y="2" width="1046" height="676"/><line x1="525" y1="0" x2="525" y2="680"/><circle cx="525" cy="340" r="92"/><rect x="2" y="138" width="165" height="404"/><rect x="883" y="138" width="165" height="404"/><rect x="2" y="248" width="55" height="184"/><rect x="993" y="248" width="55" height="184"/></svg></div>
+            <div class="beam beam--l2"></div><div class="beam beam--l1"></div>
+            <div class="beam beam--r2"></div><div class="beam beam--r1"></div>
+            <div class="bank bank--l" id="bank-l"></div>
+            <div class="bank bank--r" id="bank-r"></div>
+            <div class="vignette"></div>
           </div>
 
-          <div class="landing__intro">
-            <p class="landing__eyebrow landing-reveal">
-              <span class="landing__eyebrow-dot" aria-hidden="true"></span>
-              <span data-landing-gw>Live for the current gameweek</span>
-            </p>
+          <header class="top">
+            <a class="wordmark" href="./">Gaffer IQ</a>
+            <p class="top__meta">Fixture analysis for FPL</p>
+          </header>
 
-            <h1 class="landing__title landing-reveal">
-              Your FPL sixth sense<br>
-              <span class="landing__title-accent">minus the guessing</span>
-            </h1>
-
-            <p class="landing__subhead landing-reveal">
-              A proper difficulty score for FPL — form, style clash, and confidence,
-              not a guess out of 5. Updated every gameweek, not set once at the start
-              of the season.
-            </p>
+          <div class="ticker" id="ticker" role="region" aria-label="Sample fixtures — choose one to put it on the scoreboard">
+            <span class="ticker__tag" data-landing-gw>Sample fixtures</span>
+            <div class="ticker__view"><div class="ticker__track" id="track"></div></div>
+            <button class="ticker__pause" id="pause" type="button" aria-pressed="false">Pause</button>
           </div>
 
-          <div class="landing__cluster landing-reveal">
-
-            <article class="landing-card landing-card--matchup">
-              <div class="landing-card__head">
-                <span class="landing-card__teams">
-                  Arsenal <span class="landing-card__vs">vs</span> Man City
-                </span>
-                <span class="landing-card__meta">GW14 · Away</span>
-              </div>
-              <div class="landing-card__body">
-                <div class="landing-pill landing-pill--brutal">
-                  <span class="landing-pill__value">12</span>
-                  <span class="landing-pill__band">Brutal</span>
-                </div>
-                <div class="landing-metrics">
-                  <div class="landing-metric">
-                    <span class="landing-metric__label">Away form</span>
-                    <span class="landing-metric__track">
-                      <span class="landing-metric__fill landing-metric__fill--28"></span>
-                    </span>
-                  </div>
-                  <div class="landing-metric">
-                    <span class="landing-metric__label">Style clash</span>
-                    <span class="landing-metric__track">
-                      <span class="landing-metric__fill landing-metric__fill--18"></span>
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </article>
-
-            <article class="landing-card landing-card--score">
-              <div class="landing-card__row">
-                <div class="landing-pill landing-pill--great">
-                  <span class="landing-pill__value">86</span>
-                </div>
-                <div>
-                  <div class="landing-card__name">Hull</div>
-                  <div class="landing-card__sub">vs Man Utd</div>
-                </div>
-              </div>
-            </article>
-
-            <article class="landing-card landing-card--player">
-              <div class="landing-card__split">
-                <span class="landing-card__name">Dominik Szoboszlai</span>
-                <span class="landing-chip landing-chip--good">68</span>
-              </div>
-              <div class="landing-progress">
-                <span class="landing-progress__fill landing-progress__fill--68"></span>
-              </div>
-            </article>
-
-            <article class="landing-card landing-card--estimated">
-              <div class="landing-card__row">
-                <span class="landing-chip landing-chip--estimated">~44</span>
-                <span class="landing-card__caption">estimated</span>
-              </div>
-            </article>
-
-            <article class="landing-card landing-card--position">
-              <span class="landing-chip landing-chip--mid">MID</span>
-              <div class="landing-card__meta-line">4-3-3 · 90'</div>
-            </article>
-
-            <!-- Two nested elements: the outer one centres, the inner one
-                 animates. A running CSS animation replaces the whole transform
-                 property, so a single element cannot do both. -->
-            <div class="landing__cta">
-              <div class="landing__cta-float">
-                <a class="landing__cta-btn" href="#matchup">Get started →</a>
+          <!-- A div, not <main>: it already sits inside the app's <main>. -->
+          <div class="main">
+            <div class="rigwrap">
+              <div class="cast" id="cast" aria-hidden="true"><i id="castI"></i></div>
+              <div class="rig" id="rig">
+                <div class="hang" id="hang"><div class="obj" id="obj"><div class="tilt" id="tilt">
+                  <span class="cable cable--l" aria-hidden="true"></span><span class="cable cable--r" aria-hidden="true"></span>
+                  <section class="board" id="board" tabindex="0" aria-labelledby="board-title" aria-describedby="readout board-hint">
+                    <span class="back" aria-hidden="true"></span><span class="side side--t" aria-hidden="true"></span><span class="side side--b" aria-hidden="true"></span><span class="side side--l" aria-hidden="true"></span><span class="side side--r" aria-hidden="true"></span>
+                    <div class="screen">
+                      <h2 class="sr-only" id="board-title">Sample scoreboard</h2>
+                      <div class="board__meta">
+                        <span class="l0"><span class="lampi" id="lamp"><i></i>Sample</span><span class="l">Now showing <b id="nowfx">NEW v BRE</b></span></span>
+                        <span class="r"><span>Composite / 100</span><button class="bbtn" type="button" id="next">Next <span aria-hidden="true">›</span></button><button class="bbtn" type="button" id="snd" aria-pressed="false">Sound off</button></span>
+                      </div>
+                      <div class="board__main" aria-hidden="true">
+                        <div class="team" id="home" data-band="great"><span class="flaps f-md" id="hcode"></span><span class="team__score"><span class="flaps f-lg" id="hscore"></span><span class="chip is-off" id="hband" data-band="great">Great</span></span></div>
+                        <span class="board__v">v</span>
+                        <div class="team team--away" id="away" data-band="tough"><span class="team__score"><span class="flaps f-lg" id="ascore"></span><span class="chip is-off" id="aband" data-band="tough">Tough</span></span><span class="flaps f-md" id="acode"></span></div>
+                      </div>
+                      <ol class="board__metrics" id="metrics" aria-hidden="true"></ol>
+                      <p class="sr-only" id="readout"></p>
+                      <p class="sr-only" id="board-hint">Press Enter for the next sample fixture.</p>
+                      <p class="sr-only" id="announce" aria-live="polite"></p>
+                      <div class="board__foot"><span>Official FDR for <span id="fdrteam">NEW</span> <b class="flaps f-xs" id="fdr" aria-hidden="true"></b></span><span>Illustrative values, not a prediction.</span></div>
+                    </div>
+                    <span class="lit" id="lit" aria-hidden="true"></span>
+                    <span class="bezel" aria-hidden="true"><span class="edge" id="edge"></span><span class="bezel__row"><span class="fix"></span><span></span><span class="plate">Gaffer IQ · Match centre</span><span class="vent"></span><span class="fix"></span></span></span>
+                    <span class="glass" aria-hidden="true"><i class="sheen" id="sheen"></i><i class="spec" id="spec"></i></span>
+                  </section>
+                </div></div></div>
               </div>
             </div>
 
+            <h1 class="headline" id="hl"><span class="ln l1"><span>The FPL scores a fixture <span class="strike">1–5<span class="strike__bar" aria-hidden="true"><i id="bar"></i></span></span>.</span></span> <span class="ln l2"><span>Gaffer-IQ gives you the reason.</span></span></h1>
+
+            <div class="lower">
+              <div class="intro">
+                <p class="sub">Every Premier League fixture, broken into six metrics — base difficulty, counter-matchup, form, home/away, style clash and head-to-head — then one <span class="nowrap">0–100</span> score for each side.</p>
+                <div class="actions">
+                  <span class="magnet"><a class="btn btn--primary" href="#matchup">Get started</a></span>
+                  <button class="btn btn--ghost" type="button" id="how-open" aria-haspopup="dialog">See how the score works</button>
+                </div>
+              </div>
+              <nav class="modules" aria-label="Modules">
+                <a class="mod" href="#matchup"><span class="mod__read" aria-hidden="true">72·41</span><span class="mod__name">Matchup Analyser</span><span class="mod__hint">One fixture, both sides, all six metrics.</span></a>
+                <a class="mod" href="#ranker"><span class="mod__read" aria-hidden="true">#1</span><span class="mod__name">Player Ranker</span><span class="mod__hint">Players ranked by projected value.</span></a>
+                <a class="mod" href="#dashboard"><span class="mod__read" aria-hidden="true">(C)</span><span class="mod__name">GW Dashboard</span><span class="mod__hint">Captain, bench and transfer calls.</span></a>
+                <a class="mod" href="#planner"><span class="mod__read" aria-hidden="true">+6</span><span class="mod__name">Transfer Planner</span><span class="mod__hint">Your moves across the next six gameweeks.</span></a>
+              </nav>
+            </div>
           </div>
+
+          <footer class="foot">
+            <p>Unofficial. Not affiliated with the Premier League or FPL.</p>
+            <p class="foot__aux">All figures on this page are samples.</p>
+          </footer>
         </div>
+
+        <dialog id="how" aria-labelledby="how-title">
+          <div class="dlg">
+            <h2 id="how-title">How the score works</h2>
+            <p>Each side of a fixture gets six sub-scores from 0 to 100. The composite blends them into one number — higher means a kinder fixture for that side.</p>
+            <ol>
+              <li><b>Base difficulty</b> — the opponent's overall strength, the starting point.</li>
+              <li><b>Counter-matchup</b> — this side's attack against that defence, and the reverse.</li>
+              <li><b>Team form</b> — recent results and underlying numbers, weighted to the last few games.</li>
+              <li><b>Home/away split</b> — how each side actually performs at this venue type.</li>
+              <li><b>Style clash</b> — whether the two styles of play suit or stifle each other.</li>
+              <li><b>Head-to-head</b> — recent meetings between the two clubs.</li>
+            </ol>
+            <p>The model isn't yet calibrated against live results — treat the score as structured context, not a forecast.</p>
+            <button class="dlg__close" type="button" id="how-close">Close</button>
+          </div>
+        </dialog>
       </section>
 
+      <!-- MATCHUP ANALYSER (js/modules/matchup.js, styles css/matchup.css).
+           The .mx block is the redesign — containers only, the module fills
+           them. The Full Season strip below it is a SIBLING, outside .mx, so
+           none of the redesign's styles can reach it: it renders exactly as it
+           always has, just positioned at the foot of the page. -->
       <section class="module-view" data-module="matchup" aria-label="Matchup Analyser">
-        <div class="matchup-shell">
-          <!-- Row 1 — the three columns. A wrapper of its own rather than
-               three items in the shell's grid: the season strip below has to
-               span the full width, and .team-nav is sticky, which Chrome
-               constrains to the whole GRID rather than to the item's own row
-               — so a full-width second grid row would have the pinned team
-               panel slide down over the strip. Two boxes stacked, and the
-               strip is simply out of the sticky element's reach. -->
-          <div class="matchup-shell__main">
-            <aside class="gw-nav" aria-label="Gameweek navigator"></aside>
-            <div class="matchup-grid">
-              <!-- Two placeholder cards, replaced wholesale by renderMatchup().
-                   They are here rather than left to the module so the first paint
-                   already has the shape of the answer: the module graph is large
-                   enough that the browser paints before main.js runs, and a bare
-                   line of text was what filled that gap. Kept deliberately dumb —
-                   no score row, no breakdown — since the module owns every state
-                   after this one. -->
-              <article class="matchup-card matchup-card--neutral" aria-busy="true">
-                <div class="skeleton-lines" role="status" aria-label="Loading FPL data">
-                  <span class="skeleton skeleton--text"></span>
-                  <span class="skeleton skeleton--text"></span>
-                  <span class="skeleton skeleton--text"></span>
-                  <span class="skeleton skeleton--text"></span>
-                </div>
-              </article>
-              <article class="matchup-card matchup-card--neutral" aria-hidden="true">
-                <div class="skeleton-lines">
-                  <span class="skeleton skeleton--text"></span>
-                  <span class="skeleton skeleton--text"></span>
-                  <span class="skeleton skeleton--text"></span>
-                  <span class="skeleton skeleton--text"></span>
-                </div>
-              </article>
-            </div>
-            <aside class="team-nav" aria-label="Team fixture navigator"></aside>
-          </div>
+        <div class="mx">
+          <div class="cmd" role="region" aria-label="Fixture and team"><div class="wrap cmd__in" id="mx-cmd"></div></div>
+          <div class="wrap" id="mx-top"></div>
+          <!-- First-paint placeholder, replaced wholesale by the module: the
+               module graph is large enough that the browser paints first. -->
+          <section class="tape" id="mx-tape" aria-label="Verdict" aria-busy="true">
+            <div class="side"><div class="side__info"><span class="sk mx-sk-name"></span></div><div class="score"><span class="sk mx-sk-score"></span></div></div>
+            <div class="axis"></div>
+            <div class="side side--a"><div class="side__info"><span class="sk mx-sk-name"></span></div><div class="score"><span class="sk mx-sk-score"></span></div></div>
+          </section>
+          <div class="wrap" id="mx-main"></div>
+          <div class="drawer" id="mx-drawer" role="dialog" aria-modal="true" aria-labelledby="mx-drawer-t"></div>
+          <div class="scrim" id="mx-scrim"></div>
+          <div class="pop" id="mx-pop" role="dialog" aria-labelledby="mx-pop-t"></div>
+          <div class="tip" id="mx-tip" role="tooltip"></div>
+        </div>
 
+        <div class="matchup-shell">
           <!-- FULL SEASON — GW1-38 planning strip (js/modules/fullSeason.js).
-               Container only; the module fills it. A sibling of the three-
-               column row above rather than a cell inside it, so the ribbon
-               runs the full window width — see .matchup-shell in
-               components.css. -->
+               Container only; the module fills it. Untouched by the Matchup
+               redesign; it sits below the Horizon outlook at the foot of the
+               page, and .matchup-shell still gives it the full window width. -->
           <section class="season-strip" aria-label="Full season outlook">
             <header class="season-strip__head">
               <h2 class="season-strip__title">Full Season</h2>
@@ -231,365 +212,319 @@
         </div>
       </section>
 
-      <!-- FIXTURES — structural blueprint (js/modules/fixtures.js).
-           Containers only: the three panes are filled with placeholder
-           skeletons by the module, exactly where real data will go. -->
+      <!-- FIXTURES — design export FINAL - Fixtures.dc.html (css/fixtures.css).
+           The mode tabs are static; js/modules/fixtures.js fills #fc-panel
+           for the active mode and #fc-drawer with a fixture's match report. -->
       <section class="module-view" data-module="fixtures" aria-label="Fixtures">
-
-        <div class="fx-controls">
-
-          <div class="fx-modes" role="group" aria-label="Fixtures view">
-            <button class="fx-modes__btn is-active" data-fx-mode="gameweek"
-                    type="button" aria-pressed="true">Gameweek</button>
-            <button class="fx-modes__btn" data-fx-mode="table"
-                    type="button" aria-pressed="false">Table</button>
-            <button class="fx-modes__btn" data-fx-mode="team"
-                    type="button" aria-pressed="false">By team</button>
-            <button class="fx-modes__btn" data-fx-mode="h2h"
-                    type="button" aria-pressed="false">Head-to-head</button>
-          </div>
-
-          <!-- One picker per mode; the module toggles `hidden` so only the
-               active mode's controls are present. -->
-          <div class="fx-picker" data-fx-picker="gameweek">
-            <button class="fx-step" data-fx-gw="prev" type="button"
-                    aria-label="Previous gameweek">‹</button>
-            <span class="fx-step__label" id="fx-gw-label">Gameweek —</span>
-            <button class="fx-step" data-fx-gw="next" type="button"
-                    aria-label="Next gameweek">›</button>
-            <button class="fx-step__now" data-fx-gw="now" type="button">This GW</button>
-          </div>
-
-          <div class="fx-picker" data-fx-picker="table" hidden>
-            <span class="fx-label" id="fx-scope-label">Split</span>
-            <div class="fx-scope" role="group" aria-labelledby="fx-scope-label">
-              <button class="fx-scope__btn is-active" data-fx-scope="overall"
-                      type="button" aria-pressed="true">Overall</button>
-              <button class="fx-scope__btn" data-fx-scope="home"
-                      type="button" aria-pressed="false">Home</button>
-              <button class="fx-scope__btn" data-fx-scope="away"
-                      type="button" aria-pressed="false">Away</button>
+        <div class="fc">
+          <div class="modes">
+            <div class="modes__in" role="tablist" aria-label="Fixtures view">
+              <button type="button" role="tab" class="mode" id="fc-tab-gameweek" data-mode="gameweek" aria-controls="fc-panel" aria-selected="true" tabindex="0"><span class="mode__k" aria-hidden="true">GW</span>Matchday</button>
+              <button type="button" role="tab" class="mode" id="fc-tab-table" data-mode="table" aria-controls="fc-panel" aria-selected="false" tabindex="-1"><span class="mode__k" aria-hidden="true">Now</span>Table</button>
+              <button type="button" role="tab" class="mode" id="fc-tab-team" data-mode="team" aria-controls="fc-panel" aria-selected="false" tabindex="-1"><span class="mode__k" aria-hidden="true">Season</span>By team</button>
+              <button type="button" role="tab" class="mode" id="fc-tab-h2h" data-mode="h2h" aria-controls="fc-panel" aria-selected="false" tabindex="-1"><span class="mode__k" aria-hidden="true">History</span>Head-to-head</button>
             </div>
           </div>
-
-          <div class="fx-picker" data-fx-picker="team" hidden>
-            <label class="fx-label" for="fx-team-select">Team</label>
-            <select class="fx-select" id="fx-team-select"></select>
-          </div>
-
-          <div class="fx-picker" data-fx-picker="h2h" hidden>
-            <label class="fx-label" for="fx-h2h-a">Head-to-head</label>
-            <select class="fx-select" id="fx-h2h-a"></select>
-            <button class="fx-swap" id="fx-h2h-swap" type="button"
-                    aria-label="Swap the two teams">⇄</button>
-            <select class="fx-select" id="fx-h2h-b"></select>
-          </div>
-
+          <div class="panel" id="fc-panel" role="tabpanel" aria-labelledby="fc-tab-gameweek"></div>
+          <div class="scrim" id="fc-scrim" hidden></div>
+          <div class="drawer" id="fc-drawer" role="dialog" aria-modal="true" aria-labelledby="fc-drawer-title" hidden></div>
         </div>
-
-        <div class="fx-panes">
-          <div class="fx-pane is-active" data-fx-pane="gameweek"></div>
-          <div class="fx-pane" data-fx-pane="table"></div>
-          <div class="fx-pane" data-fx-pane="team"></div>
-          <div class="fx-pane" data-fx-pane="h2h"></div>
-        </div>
-
       </section>
 
+      <!-- PLAYER RANKER — design export FINAL - Ranker.dc.html (css/ranker.css).
+           The command bar, list header and filters drawer are static;
+           js/modules/ranker.js fills #rk-top (Top pick / Head to head /
+           Fixture run), #rk-head + #rk-rows (the ranked list) and #rk-info. -->
       <section class="module-view" data-module="ranker" aria-label="Player Ranker">
-
-        <!-- Two-column shell: filters panel (left) + table (right) — mirrors
-             .dash-shell / .planner-shell's 300px-sidebar + 1fr-main pattern. -->
-        <div class="ranker-shell">
-
-          <aside class="ranker-filters" aria-label="Ranker filters">
-            <!-- Start deselected: no pill active means no filter on this axis
-                 (see ranker.js's _activePosSet/_activeMinSecSet) — click a
-                 position to narrow to just it, instead of deselecting the
-                 other three.
-
-                 One button per row rather than a wrapping strip: the sidebar
-                 is sized to its widest child now (see .ranker-shell), and four
-                 pills side by side were the only thing making that wider than
-                 the dropdowns. Each group carries its own heading so the two
-                 filter axes stay legible once they're stacked. -->
-            <div class="ranker-filter-group" role="group" aria-labelledby="ranker-pos-heading">
-              <h3 class="ranker-filters__heading" id="ranker-pos-heading">Position</h3>
-              <button class="ranker-pos-btn" data-pos="GKP" type="button">GKP</button>
-              <button class="ranker-pos-btn" data-pos="DEF" type="button">DEF</button>
-              <button class="ranker-pos-btn" data-pos="MID" type="button">MID</button>
-              <button class="ranker-pos-btn" data-pos="FWD" type="button">FWD</button>
-            </div>
-
-            <div class="ranker-filter-group ranker-filter-group--divided"
-                 role="group" aria-labelledby="ranker-playtime-heading">
-              <h3 class="ranker-filters__heading" id="ranker-playtime-heading">Playtime</h3>
-              <button class="ranker-minsec-btn" data-minsec="Nailed"   type="button">Nailed</button>
-              <button class="ranker-minsec-btn" data-minsec="Likely"   type="button">Likely</button>
-              <button class="ranker-minsec-btn" data-minsec="Rotation" type="button">Rotation</button>
-              <button class="ranker-minsec-btn" data-minsec="Risk"     type="button">Risk</button>
-            </div>
-
-            <div class="ranker-controls__select-wrap">
-              <label class="ranker-controls__label" for="ranker-price">Price</label>
-              <select class="ranker-select" id="ranker-price">
-                <option value="all">All Prices</option>
-              </select>
-            </div>
-
-            <div class="ranker-controls__select-wrap">
-              <label class="ranker-controls__label" for="ranker-team">Team</label>
-              <select class="ranker-select" id="ranker-team">
-                <option value="all">All teams</option>
-              </select>
-            </div>
-
-            <!-- Avg Pts/GW source toggle: explicit switch, not automatic —
-                 see FEATURE_ENGINE.md §10.1. "Last Season" triggers a chunked
-                 background load of every player's summary (bounded, staggered,
-                 not a single bulk request — see SUMMARY_FETCH_CHUNK_SIZE). -->
-            <div class="ranker-avgpts-wrap">
-              <label class="ranker-controls__label" for="ranker-avgpts-toggle">Avg Pts/GW source</label>
-              <button class="ranker-avgpts-toggle" id="ranker-avgpts-toggle"
-                      type="button" aria-pressed="false">This Season</button>
-            </div>
-          </aside>
-
-          <div class="ranker-main">
-            <div class="ranker-loading" id="ranker-loading">
-              <span class="ranker-loading__text">Computing rankings…</span>
-            </div>
-
-            <div class="ranker-table-wrap">
-              <table class="ranker-table">
-                <thead id="ranker-thead"></thead>
-                <tbody id="ranker-tbody">
-                  <!-- colspan must track ranker.js's colCount() (15). -->
-                  <tr><td class="ranker-table__empty" colspan="15">
-                    <span class="skeleton skeleton--text"
-                          role="status" aria-label="Loading FPL data"></span>
-                  </td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-        </div>
-
-      </section>
-
-      <section class="module-view" data-module="dashboard" aria-label="GW Dashboard">
-
-        <!-- Controls bar: player search + position pills + squad tally -->
-        <div class="dash-controls">
-          <div class="dash-search-wrap">
-            <label class="dash-search-label" for="dash-search-input">Add player</label>
-            <div class="dash-search-combo">
-              <input class="dash-search-input" id="dash-search-input"
-                     type="text" placeholder="Search by name…"
-                     autocomplete="off"
-                     aria-autocomplete="list" aria-controls="dash-search-results">
-              <ul class="dash-search-results" id="dash-search-results"
-                  role="listbox"></ul>
-            </div>
-          </div>
-
-          <div class="dash-pos-filter" role="group" aria-label="Filter search by position">
-            <button class="dash-pos-btn is-active" data-pos="GKP" type="button">GKP</button>
-            <button class="dash-pos-btn is-active" data-pos="DEF" type="button">DEF</button>
-            <button class="dash-pos-btn is-active" data-pos="MID" type="button">MID</button>
-            <button class="dash-pos-btn is-active" data-pos="FWD" type="button">FWD</button>
-          </div>
-
-          <!-- Squad import (Phase 4-1) -->
-          <div class="squad-import-wrap" id="dash-import-wrap">
-            <div class="squad-import-row">
-              <button class="squad-import-btn" id="dash-import-btn" type="button"
-                      title="Import your FPL squad by Team ID">Import FPL squad</button>
-              <!-- Team ID help — pure <details> disclosure, same affordance as the
-                   matchup page's pairing "i" buttons. No JS wiring needed. -->
-              <details class="squad-import-help" id="dash-import-help">
-                <summary class="squad-import-help__btn"
-                         title="Where do I find my FPL Team ID?"
-                         aria-label="Where do I find my FPL Team ID?">?</summary>
-                <div class="squad-import-help__panel">
-                  <p class="squad-import-help__title">Finding your FPL Team ID</p>
-                  <ol class="squad-import-help__steps">
-                    <li>Sign in at <strong>fantasy.premierleague.com</strong> and open
-                        <strong>My Team</strong>.</li>
-                    <li>Open DevTools — right-click the page and choose
-                        <strong>Inspect</strong>, or press <kbd>F12</kbd>
-                        (<kbd>⌥</kbd><kbd>⌘</kbd><kbd>I</kbd> on Mac).</li>
-                    <li>Switch to the <strong>Network</strong> tab.</li>
-                    <li>Reload the page (<kbd>F5</kbd>) with DevTools still open.</li>
-                    <li>Find the request named <code>my-team/1234567/</code> — that
-                        number is your Team ID.</li>
-                  </ol>
-                  <p class="squad-import-help__aside">
-                    Quicker route: from the <strong>Points</strong> or
-                    <strong>Transfers</strong> page the address bar reads
-                    <code>/entry/<strong>1234567</strong>/event/5</code> — same number.
-                  </p>
-                </div>
-              </details>
-            </div>
-            <div class="squad-import-panel" id="dash-import-panel" hidden>
-              <label class="squad-import-label" for="dash-import-id">FPL Team ID</label>
-              <div class="squad-import-panel__row">
-                <input class="squad-import-input" id="dash-import-id"
-                       type="number" min="1" placeholder="e.g. 1234567"
-                       autocomplete="off">
-                <button class="squad-import-go" id="dash-import-go" type="button">Import</button>
-                <button class="squad-import-cancel" id="dash-import-cancel" type="button">Cancel</button>
+        <div class="rk">
+          <div class="cmd" id="rk-cmd" role="region" aria-label="Ranking controls">
+            <div class="cmd__in wrap">
+              <div class="seg seg--view" role="group" aria-label="Top section">
+                <span class="seg__ind" aria-hidden="true"></span>
+                <button type="button" data-view="pick" aria-pressed="true" title="Top section: Top pick (V cycles)">Top pick</button>
+                <button type="button" data-view="h2h" aria-pressed="false" title="Top section: Head to head (V cycles)">Head to head</button>
+                <button type="button" data-view="run" aria-pressed="false" title="Top section: Fixture run (V cycles)">Fixture run</button>
               </div>
-              <p class="squad-import-status" id="dash-import-status" aria-live="polite"></p>
-              <p class="squad-import-info"  id="dash-import-info"></p>
+              <label class="rankby">
+                <span class="lbl">Ranked by</span>
+                <select id="rk-sort"></select>
+              </label>
+              <button type="button" class="sq" id="rk-dir"></button>
+              <div class="seg" role="group" aria-label="Position">
+                <button type="button" data-pos="all" aria-pressed="true">ALL</button>
+                <button type="button" data-pos="GKP" aria-pressed="false" title="Shortcut: 1">GKP<span class="n"></span></button>
+                <button type="button" data-pos="DEF" aria-pressed="false" title="Shortcut: 2">DEF<span class="n"></span></button>
+                <button type="button" data-pos="MID" aria-pressed="false" title="Shortcut: 3">MID<span class="n"></span></button>
+                <button type="button" data-pos="FWD" aria-pressed="false" title="Shortcut: 4">FWD<span class="n"></span></button>
+              </div>
+              <button type="button" class="fbtn" id="rk-filters-btn" aria-haspopup="dialog" aria-expanded="false" aria-controls="rk-drawer">
+                Filters<span class="fbtn__n" hidden></span><span class="fbtn__a" aria-hidden="true">▸</span>
+              </button>
+              <button type="button" class="clr" data-clear hidden>Clear</button>
+              <span class="grow"></span>
+              <span class="hints"><kbd>J</kbd><kbd>K</kbd> move <kbd>1–4</kbd> position <kbd>F</kbd> filters <kbd>V</kbd> view</span>
             </div>
           </div>
 
-          <p class="dash-squad-tally" id="dash-squad-tally">0 / 15 players selected</p>
-        </div>
-
-        <!-- Two-column shell: squad panel (left) + decisions panel (right) -->
-        <div class="dash-shell">
-
-          <aside class="dash-squad-panel" aria-label="My squad">
-            <div id="dash-squad-slots"></div>
-          </aside>
-
-          <section class="dash-decisions" id="dash-decisions" aria-label="GW recommendations">
-            <p class="dash-decisions__hint">Add 15 players to see GW recommendations.</p>
+          <section class="top" id="rk-top-sec" aria-label="Top pick">
+            <svg class="pitch" aria-hidden="true" viewBox="0 0 1440 400" preserveAspectRatio="xMidYMid slice">
+              <line x1="720" y1="0" x2="720" y2="400"/><circle cx="720" cy="200" r="110"/>
+              <rect x="-1" y="60" width="150" height="280"/><rect x="1291" y="60" width="150" height="280"/>
+            </svg>
+            <div class="top__in wrap" id="rk-top"></div>
           </section>
 
-        </div>
-
-      </section>
-
-      <section class="module-view" data-module="planner" aria-label="Transfer Planner">
-
-        <!-- Controls bar: search + position filter + budget + free transfers + hit toggle -->
-        <div class="planner-controls">
-
-          <div class="dash-search-wrap">
-            <label class="dash-search-label" for="planner-search-input">Add player</label>
-            <div class="dash-search-combo">
-              <input class="dash-search-input" id="planner-search-input"
-                     type="text" placeholder="Search by name…"
-                     autocomplete="off"
-                     aria-autocomplete="list" aria-controls="planner-search-results">
-              <ul class="dash-search-results" id="planner-search-results"
-                  role="listbox"></ul>
-            </div>
-          </div>
-
-          <div class="dash-pos-filter" role="group" aria-label="Filter search by position">
-            <button class="planner-pos-btn is-active" data-pos="GKP" type="button">GKP</button>
-            <button class="planner-pos-btn is-active" data-pos="DEF" type="button">DEF</button>
-            <button class="planner-pos-btn is-active" data-pos="MID" type="button">MID</button>
-            <button class="planner-pos-btn is-active" data-pos="FWD" type="button">FWD</button>
-          </div>
-
-          <div class="planner-budget-wrap">
-            <label class="planner-label" for="planner-budget">Budget (£m)</label>
-            <input class="planner-budget-input" id="planner-budget"
-                   type="number" min="0" max="200" step="0.1" value="0"
-                   placeholder="0.0">
-          </div>
-
-          <div class="planner-ft-wrap">
-            <span class="planner-label" id="planner-ft-label">Free transfers</span>
-            <div class="planner-ft-btns" role="group" aria-labelledby="planner-ft-label">
-              <button class="planner-ft-btn is-active" data-ft="1" type="button">1</button>
-              <button class="planner-ft-btn" data-ft="2" type="button">2</button>
-            </div>
-          </div>
-
-          <div class="planner-hit-wrap">
-            <label class="planner-label" for="planner-hit-toggle">Allow hit (−4 pts)</label>
-            <button class="planner-hit-toggle" id="planner-hit-toggle"
-                    type="button" aria-pressed="false">Off</button>
-          </div>
-
-          <!-- Squad import (Phase 4-1) -->
-          <div class="squad-import-wrap" id="planner-import-wrap">
-            <div class="squad-import-row">
-              <button class="squad-import-btn" id="planner-import-btn" type="button"
-                      title="Import your FPL squad by Team ID">Import FPL squad</button>
-              <!-- Team ID help — pure <details> disclosure, same affordance as the
-                   matchup page's pairing "i" buttons. No JS wiring needed. -->
-              <details class="squad-import-help" id="planner-import-help">
-                <summary class="squad-import-help__btn"
-                         title="Where do I find my FPL Team ID?"
-                         aria-label="Where do I find my FPL Team ID?">?</summary>
-                <div class="squad-import-help__panel">
-                  <p class="squad-import-help__title">Finding your FPL Team ID</p>
-                  <ol class="squad-import-help__steps">
-                    <li>Sign in at <strong>fantasy.premierleague.com</strong> and open
-                        <strong>My Team</strong>.</li>
-                    <li>Open DevTools — right-click the page and choose
-                        <strong>Inspect</strong>, or press <kbd>F12</kbd>
-                        (<kbd>⌥</kbd><kbd>⌘</kbd><kbd>I</kbd> on Mac).</li>
-                    <li>Switch to the <strong>Network</strong> tab.</li>
-                    <li>Reload the page (<kbd>F5</kbd>) with DevTools still open.</li>
-                    <li>Find the request named <code>my-team/1234567/</code> — that
-                        number is your Team ID.</li>
-                  </ol>
-                  <p class="squad-import-help__aside">
-                    Quicker route: from the <strong>Points</strong> or
-                    <strong>Transfers</strong> page the address bar reads
-                    <code>/entry/<strong>1234567</strong>/event/5</code> — same number.
-                  </p>
-                </div>
-              </details>
-            </div>
-            <div class="squad-import-panel" id="planner-import-panel" hidden>
-              <label class="squad-import-label" for="planner-import-id">FPL Team ID</label>
-              <div class="squad-import-panel__row">
-                <input class="squad-import-input" id="planner-import-id"
-                       type="number" min="1" placeholder="e.g. 1234567"
-                       autocomplete="off">
-                <button class="squad-import-go" id="planner-import-go" type="button">Import</button>
-                <button class="squad-import-cancel" id="planner-import-cancel" type="button">Cancel</button>
+          <section class="list wrap" aria-labelledby="rk-list-t">
+            <header class="list__hd">
+              <span class="lbl">Ranked</span>
+              <h2 id="rk-list-t">All players</h2>
+              <div class="cols" role="group" aria-label="Columns">
+                <button type="button" data-cols="outlook" aria-pressed="true">Outlook</button>
+                <button type="button" data-cols="price" aria-pressed="true">Price</button>
+                <button type="button" data-cols="points" aria-pressed="true">Points</button>
+                <button type="button" data-cols="transfers" aria-pressed="true">Transfers</button>
               </div>
-              <p class="squad-import-status" id="planner-import-status" aria-live="polite"></p>
-              <p class="squad-import-info"  id="planner-import-info"></p>
+              <span class="list__meta" id="rk-meta" role="status"></span>
+            </header>
+            <p class="msg" id="rk-msg" role="status" aria-live="polite"></p>
+            <div id="rk-head"></div>
+            <ol class="rows" id="rk-rows" aria-label="Ranked players"></ol>
+            <button type="button" class="more" id="rk-more" hidden></button>
+            <p class="note">Value, Avg and £/pt are coloured by rank against the whole game — gold is the best in position. Next and the GW strip use the 0–100 band scale. Dashed = estimated, hatched = blank GW, grouped = double GW, amber dot = kickoff TBC. Each column’s “i” explains it.</p>
+          </section>
+
+          <div class="scrim" id="rk-scrim" hidden></div>
+          <div class="dr" id="rk-drawer" role="dialog" aria-modal="true" aria-labelledby="rk-drawer-t" hidden>
+            <div class="dr__hd">
+              <h2 id="rk-drawer-t">Filters</h2>
+              <button type="button" class="btn" data-close-filters>Close <kbd>ESC</kbd></button>
+            </div>
+            <div class="dr__body">
+              <div class="dr__grp" role="group" aria-labelledby="rk-pt-t">
+                <span class="lbl" id="rk-pt-t">Playtime</span>
+                <div class="dr__two">
+                  <button type="button" class="opt" data-pt="Nailed" aria-pressed="false">Nailed<span class="n"></span></button>
+                  <button type="button" class="opt" data-pt="Likely" aria-pressed="false">Likely<span class="n"></span></button>
+                  <button type="button" class="opt" data-pt="Rotation" aria-pressed="false">Rotation<span class="n"></span></button>
+                  <button type="button" class="opt" data-pt="Risk" aria-pressed="false">Risk<span class="n"></span></button>
+                </div>
+              </div>
+              <div class="dr__grp">
+                <label class="lbl" for="rk-price">Price</label>
+                <select id="rk-price"><option value="all">All prices</option></select>
+              </div>
+              <div class="dr__grp">
+                <label class="lbl" for="rk-team">Team</label>
+                <select id="rk-team"><option value="all">All teams</option></select>
+              </div>
+              <!-- Avg Pts/GW source: explicit switch, not automatic — see
+                   FEATURE_ENGINE.md §10.1. "Last season" triggers a chunked
+                   background load of every player's summary (bounded,
+                   staggered — see SUMMARY_FETCH_CHUNK_SIZE). -->
+              <div class="dr__grp" role="group" aria-labelledby="rk-src-t">
+                <span class="lbl" id="rk-src-t">Avg pts/GW source</span>
+                <div class="dr__two">
+                  <button type="button" class="opt opt--sans" data-src="current" aria-pressed="true">This season</button>
+                  <button type="button" class="opt opt--sans" data-src="lastSeason" aria-pressed="false">Last season</button>
+                </div>
+                <span class="dr__note" id="rk-ls" aria-live="polite"></span>
+              </div>
+            </div>
+            <div class="dr__ft">
+              <span class="num" id="rk-dr-count"></span>
+              <button type="button" data-clear aria-disabled="true">Clear all</button>
+            </div>
+          </div>
+          <div class="pop" id="rk-info" role="dialog" aria-labelledby="rk-info-t" hidden></div>
+        </div>
+      </section>
+
+      <!-- GW DASHBOARD — design export FINAL - Dashboard.dc.html (css/dashboard.css).
+           The command bar, import/help rows and panel frames are static;
+           js/modules/dashboard.js fills the board (#db-board) and the three
+           aside panels (#db-cap, #db-why, #db-risk). -->
+      <section class="module-view" data-module="dashboard" aria-label="GW Dashboard">
+        <div class="db">
+          <div class="cmd" id="db-cmd" role="region" aria-label="Gameweek and squad controls">
+            <div class="cmd__in wrap">
+              <span class="gwtag" id="db-gw">GW</span>
+              <span class="gwmeta" id="db-gw-meta"></span>
+              <span class="stale" id="db-stale" role="status" hidden>⚠ Data may be delayed</span>
+              <span class="tally" id="db-tally" title="0 / 15 players selected">
+                <b>SQUAD 0/15</b><span class="tally__bar" aria-hidden="true"><span></span></span>
+              </span>
+              <span class="grow"></span>
+              <div class="seg" role="group" aria-label="Positions to search">
+                <button type="button" data-pos="GKP" aria-pressed="true" aria-label="Include goalkeepers">GKP</button>
+                <button type="button" data-pos="DEF" aria-pressed="true" aria-label="Include defenders">DEF</button>
+                <button type="button" data-pos="MID" aria-pressed="true" aria-label="Include midfielders">MID</button>
+                <button type="button" data-pos="FWD" aria-pressed="true" aria-label="Include forwards">FWD</button>
+              </div>
+              <div class="search">
+                <input id="db-search" role="combobox" aria-label="Search players to add"
+                       aria-expanded="false" aria-controls="db-results" aria-autocomplete="list"
+                       autocomplete="off" placeholder="Search players to add…">
+                <kbd aria-hidden="true">/</kbd>
+                <ul class="results" id="db-results" role="listbox" aria-label="Search results" hidden></ul>
+              </div>
+              <button type="button" class="btn" id="db-import-btn" aria-expanded="false" aria-controls="db-imp">Import <kbd aria-hidden="true">I</kbd></button>
+              <button type="button" class="ib" id="db-help-btn" aria-expanded="false" aria-controls="db-help" aria-label="Finding your FPL Team ID">i</button>
+              <span class="hints"><kbd>J</kbd><kbd>K</kbd> select</span>
+            </div>
+            <div class="drop" id="db-imp" hidden>
+              <div class="drop__in wrap">
+                <label class="lbl" for="db-imp-id">FPL Team ID</label>
+                <input id="db-imp-id" type="text" inputmode="numeric" autocomplete="off" placeholder="e.g. 1234567" aria-describedby="db-imp-st">
+                <button type="button" class="btn btn--go" id="db-imp-go">Import</button>
+                <button type="button" class="btn btn--sm" id="db-imp-cancel">Cancel</button>
+                <span class="imp-st" id="db-imp-st" role="status"></span>
+                <span class="imp-info" id="db-imp-info"></span>
+              </div>
+            </div>
+            <div class="drop" id="db-help" hidden>
+              <div class="drop__in drop__in--help wrap">
+                <span class="drop__t">Finding your FPL Team ID</span>
+                <span class="drop__step"><b>1</b> Sign in at fantasy.premierleague.com.</span>
+                <span class="drop__step"><b>2</b> Open the Points tab.</span>
+                <span class="drop__step"><b>3</b> Read the address bar — it ends /entry/1234567/event/5.</span>
+                <span class="drop__step"><b>4</b> The number after /entry/ is your Team ID.</span>
+                <span class="drop__step"><b>5</b> Paste it here and press Import.</span>
+              </div>
             </div>
           </div>
 
-          <p class="dash-squad-tally" id="planner-squad-tally">0 / 15 players selected</p>
+          <div class="main wrap">
+            <div class="grid">
+              <section class="board" id="db-board-sec" aria-labelledby="db-board-t">
+                <header class="board__hd">
+                  <span class="lbl">Detail</span>
+                  <h2 id="db-board-t">Squad board</h2>
+                  <div class="seg seg--view" role="group" aria-label="Squad view">
+                    <span class="seg__ind" aria-hidden="true"></span>
+                    <button type="button" data-view="board" aria-pressed="true" title="Board view (T switches)">Board</button>
+                    <button type="button" data-view="sheet" aria-pressed="false" title="Team sheet view (T switches)">Team sheet</button>
+                  </div>
+                  <kbd aria-hidden="true" title="T switches view">T</kbd>
+                  <span class="board__meta" id="db-board-meta"></span>
+                </header>
+                <div class="board__body" id="db-board"></div>
+                <p class="note" id="db-note"></p>
+              </section>
 
+              <aside class="aside" aria-label="Decisions">
+                <section class="card card--cap" aria-labelledby="db-cap-t">
+                  <header><span class="lbl">Verdict</span><h2 id="db-cap-t">Captain</h2></header>
+                  <div id="db-cap"></div>
+                </section>
+                <section class="card" aria-labelledby="db-why-t">
+                  <header><span class="lbl">Why</span><h2 id="db-why-t">Breakdown</h2><span id="db-why-hint"></span></header>
+                  <div id="db-why" role="status" aria-live="polite"></div>
+                </section>
+                <section class="card" aria-labelledby="db-risk-t">
+                  <header><span class="lbl">Detail</span><h2 id="db-risk-t">Risks</h2><span id="db-risk-meta"></span></header>
+                  <div id="db-risk"></div>
+                </section>
+              </aside>
+            </div>
+          </div>
         </div>
+      </section>
 
-        <!-- Verdict banner: the week's call, above everything else -->
-        <div class="planner-verdict-slot" id="planner-verdict"></div>
+      <!-- TRANSFER PLANNER — design export FINAL - Planner.dc.html (css/planner.css).
+           The run settings, tray header and squad drawer frame are static;
+           js/modules/planner.js fills the verdict hero (#pl-hero), the six
+           weeks of the run (#pl-weeks), the move tray (#pl-tray) and the
+           squad drawer's lists. The run's rules live in planner-run.js. -->
+      <section class="module-view" data-module="planner" aria-label="Transfer Planner">
+        <div class="pl">
+          <section class="hero" aria-label="This week’s call">
+            <div class="hero__in wrap" id="pl-hero"></div>
+          </section>
 
-        <!-- Rail (squad) + five lens boards -->
-        <div class="planner-shell">
+          <div id="pl-run-wrap" hidden>
+            <div class="cmd" id="pl-cmd" role="region" aria-label="Run settings">
+              <div class="cmd__in wrap">
+                <span class="run-t">The run <span class="muted" id="pl-run-range"></span></span>
+                <div class="bank" role="group" aria-label="Bank">
+                  <label class="lbl" for="pl-bank">Bank £m</label>
+                  <button type="button" data-bank="-1" aria-label="Bank down £0.1m">−</button>
+                  <input id="pl-bank" type="number" inputmode="decimal" min="0" max="100" step="0.1" value="0.0">
+                  <button type="button" data-bank="1" aria-label="Bank up £0.1m">+</button>
+                </div>
+                <div class="ftg" role="radiogroup" aria-label="Free transfers going into the first week" id="pl-ft-grp">
+                  <span class="lbl">FT now</span>
+                  <div class="seg">
+                    <button type="button" role="radio" data-ft="1" aria-checked="true">1</button>
+                    <button type="button" role="radio" data-ft="2" aria-checked="false">2</button>
+                  </div>
+                </div>
+                <button type="button" class="tog" id="pl-hit" aria-pressed="false">Hits off</button>
+                <button type="button" class="tog tog--plain" id="pl-squad-btn" aria-haspopup="dialog">Squad 0/15</button>
+                <span class="grow"></span>
+                <span class="save-st" id="pl-save-st" role="status">Saved</span>
+                <button type="button" class="btn btn--go" id="pl-save" disabled>Save run</button>
+              </div>
+            </div>
 
-          <aside class="dash-squad-panel dash-squad-panel--rail" aria-label="My squad">
-            <div id="planner-squad-slots"></div>
-          </aside>
-
-          <div class="planner-right-col">
-            <div id="planner-boards" aria-label="Transfer recommendations"></div>
-
-            <section class="planner-recommendations" id="planner-recommendations"
-                     aria-label="Two-transfer combination">
-              <p class="planner-hint">Add 15 players to see transfer recommendations.</p>
+            <section class="run wrap" aria-label="Gameweek run">
+              <div class="run__hd">
+                <span class="muted">Pick a week, then add moves to it. Shift moves and chips between weeks with ‹ ›.</span>
+                <span class="totals" id="pl-totals"></span>
+              </div>
+              <div class="weeks" role="list" id="pl-weeks"></div>
+              <div class="issues" id="pl-issues" role="alert" hidden></div>
+              <div class="unplaced" id="pl-unplaced" hidden></div>
+              <div class="run__ft"><button type="button" class="clr" id="pl-clear" hidden>Clear the run</button></div>
             </section>
 
-            <section class="planner-chips" id="planner-chips"
-                     aria-label="Chip timing recommendations">
-              <p class="planner-hint">Computing chip timing recommendations…</p>
+            <section class="tray wrap" aria-labelledby="pl-tray-t">
+              <header>
+                <span class="lbl">Moves</span>
+                <h2 id="pl-tray-t">Add to GW</h2>
+                <div class="lens" role="radiogroup" aria-label="Lens" id="pl-lens"></div>
+                <span class="tray__unit" id="pl-unit"></span>
+              </header>
+              <div id="pl-tray"></div>
             </section>
           </div>
 
+          <div class="scrim" id="pl-scrim" hidden></div>
+          <div class="dr" id="pl-drawer" role="dialog" aria-modal="true" aria-labelledby="pl-sq-t" hidden>
+            <div class="dr__hd">
+              <h2 id="pl-sq-t">Squad <small id="pl-sq-count"></small></h2>
+              <button type="button" class="btn" data-close-squad>Close</button>
+            </div>
+            <div class="dr__body">
+              <div class="dr__grp" id="pl-add-grp">
+                <label class="lbl" for="pl-search">Add a player</label>
+                <input id="pl-search" type="text" autocomplete="off" placeholder="Name or club" aria-describedby="pl-search-n">
+                <span class="dr__note" id="pl-search-n" role="status">Type two letters to search.</span>
+                <ul class="res" id="pl-results"></ul>
+              </div>
+              <form class="dr__grp" id="pl-imp-form">
+                <label class="lbl" for="pl-imp-id">Import by FPL Team ID</label>
+                <span class="dr__imp">
+                  <input id="pl-imp-id" type="text" inputmode="numeric" autocomplete="off" placeholder="e.g. 1234567" aria-describedby="pl-imp-st">
+                  <button type="submit" class="btn">Import</button>
+                </span>
+                <span class="imp-st" id="pl-imp-st" role="status">Your Team ID is the number in your FPL points-page URL.</span>
+                <span class="dr__note" id="pl-imp-info"></span>
+              </form>
+              <div id="pl-squad"></div>
+            </div>
+          </div>
+
+          <div class="toast" id="pl-toast" role="status" aria-live="polite"></div>
+          <div class="scrim scrim--dlg" id="pl-dlg-scrim" hidden></div>
+          <div class="dlg" id="pl-dlg" role="alertdialog" aria-modal="true" aria-labelledby="pl-dlg-t" aria-describedby="pl-dlg-b" hidden>
+            <h2 id="pl-dlg-t"></h2>
+            <p id="pl-dlg-b"></p>
+            <div>
+              <button type="button" class="btn" data-dlg-cancel>Cancel</button>
+              <button type="button" class="btn btn--danger" data-dlg-ok></button>
+            </div>
+          </div>
         </div>
-
-      </section>
-
-      <section class="module-view" data-module="calibration" aria-label="Model Calibration">
-        <p class="calib-empty">Loading calibration data…</p>
       </section>
 
     </main>

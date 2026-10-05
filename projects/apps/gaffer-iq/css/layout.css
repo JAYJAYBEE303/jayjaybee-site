@@ -131,14 +131,36 @@
    chrome and left in place, transparent, carrying only the injected link.
 
    position: fixed rather than sticky so the bar leaves the flex flow entirely
-   and the landing keeps the full viewport height it centres against. */
+   and the landing keeps the full viewport height it lays out against. The bar
+   matches the landing's own top row (.top in landing.css) so the link sits on
+   that row's right-hand end, in the slot the tagline otherwise fills, and lets
+   clicks through everywhere but the link itself. */
 body:has(.landing.is-active) .app-nav {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
+  justify-content: flex-end;
+  height: auto;
+  padding: var(--landing-top-pad) var(--landing-pad);
   background: transparent;
   border-bottom: none;
+  pointer-events: none;
+}
+
+/* The link borrows .module-nav__item, whose phone rules make it a stretched
+   bottom-tab cell; undo that here. */
+body:has(.landing.is-active) .app-nav .jjb-back-link {
+  flex: none;
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  border: none;
+  pointer-events: auto;
+}
+
+body:has(.jjb-back-link) .landing .top__meta {
+  visibility: hidden;
 }
 
 body:has(.landing.is-active) .app-nav__brand,
@@ -147,18 +169,58 @@ body:has(.landing.is-active) .module-nav {
 }
 
 /* Drop .app-main's centred 1400px column and its padding so the landing can
-   own the full viewport. The landing section re-establishes its own 1280px
-   max-width internally. */
+   own the full viewport. The landing re-establishes its own 1240px column
+   internally. */
 body:has(.landing.is-active) .app-main {
   max-width: none;
   padding: 0;
 }
 
-/* The FPL error banner is app chrome too. Data still loads behind the landing
-   and the banner still populates — it is only visually suppressed here, and
-   reappears intact the moment the visitor enters a module. */
-body:has(.landing.is-active) .app-error-banner {
+/* The FPL error banner and the schedule bar are app chrome too. Data still
+   loads behind the landing and both still populate — they are only visually
+   suppressed here, and reappear intact the moment the visitor enters a module.
+   The landing is a fixed-height, non-scrolling page, so anything stacked above
+   it would push its footer off screen. */
+body:has(.landing.is-active) .app-error-banner,
+body:has(.landing.is-active) .schedule-bar {
   display: none;
+}
+
+/* Matchup: full-bleed, so its command bar and score tape run edge to edge
+   (css/matchup.css). Bottom padding stays so the Full Season strip keeps its
+   gap to the page end; that strip's own .matchup-shell does the same 100vw
+   escape it always has. */
+body:has([data-module="matchup"].is-active) .app-main {
+  max-width: none;
+  padding: 0 0 var(--space-6);
+}
+
+/* Fixtures, Ranker, Dashboard and Planner: full-bleed too, so their mode tabs / command bar run
+   edge to edge. Each page re-establishes its own centred column
+   (css/fixtures.css, css/ranker.css, css/dashboard.css, css/planner.css). */
+body:has([data-module="fixtures"].is-active) .app-main,
+body:has([data-module="ranker"].is-active) .app-main,
+body:has([data-module="dashboard"].is-active) .app-main,
+body:has([data-module="planner"].is-active) .app-main {
+  max-width: none;
+  padding: 0;
+}
+
+@media (max-width: 768px) {
+  /* Keep clear of the fixed bottom tab bar (see the 768px block below). */
+  body:has([data-module="fixtures"].is-active) .app-main,
+  body:has([data-module="ranker"].is-active) .app-main,
+  body:has([data-module="dashboard"].is-active) .app-main,
+  body:has([data-module="planner"].is-active) .app-main {
+    padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (max-width: 640px) {
+  body:has(.landing.is-active) .app-nav {
+    /* 10px, the landing's own phone .top padding */
+    padding: calc(var(--space-2) + var(--space-1) / 2) var(--landing-pad);
+  }
 }
 
 /* ─── Error banner ───────────────────────────────────────────────────────── */

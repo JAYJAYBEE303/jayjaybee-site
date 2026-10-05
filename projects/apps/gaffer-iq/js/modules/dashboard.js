@@ -5,6 +5,9 @@
  * Reads from store; delegates all scoring to engine/composite.js exclusively.
  * No analytical logic lives here — scorePlayer(player, getHorizon(), ctx)
  * is the sole engine call, over the SAME global horizon the Planner reads.
+ * Layout: design export FINAL - Dashboard.dc.html (styles css/dashboard.css) —
+ * a command bar (gameweek, squad tally, search, import), the squad board /
+ * team sheet, and Captain, Breakdown and Risks panels.
  * See ROADMAP.md Phase 2C.
  *
  * Live points (Phase 3C-5):
@@ -21,7 +24,10 @@
  */
 
 import { store }       from '../store.js';
-import { HORIZONS, SQUAD_LIMITS, SQUAD_TOTAL } from '../config.js';
+import {
+  HORIZONS, SQUAD_LIMITS, SQUAD_TOTAL,
+  RANK_ELITE_COUNT_BY_POS, RANK_STRONG_COUNT_BY_POS, RANK_TOP_PERCENTILE, RANK_BOTTOM_PERCENTILE,
+} from '../config.js';
 import { buildScoreContext, scorePlayer, rankPlayers, attachRankTiers, bandFromValue } from '../engine/composite.js';
 import { groupPerGwSlots }              from '../engine/fixtures.js';
 import { pickStartingXI }               from '../engine/lineup.js';
@@ -43,7 +49,7 @@ import { fetchAndMapSquad, loadSavedTeamId, saveTeamId, resolveImportGw } from '
  * The cost is real and was accepted deliberately: the Starting XI and the
  * captain pick are now chosen on a multi-gameweek average, so a player who
  * BLANKS in the upcoming gameweek can still be picked to start it. Read
- * buildFixtureContextLabel's line in a breakdown panel to see which fixtures
+ * buildFixtureContextLabel's line in the Breakdown panel to see which fixtures
  * a given score actually covers.
  *
  * A function, not a const: it re-reads the store each call, so restoring the
@@ -61,6 +67,28 @@ const MIN_SEC_RISK = 0.65;
 
 /** Live poll interval — 60 s per ROADMAP.md §2C / ARCHITECTURE.md §6. */
 const LIVE_POLL_INTERVAL_MS = 60_000;
+
+// ─── Display constants ───────────────────────────────────────────────────────
+
+const POSITIONS = ['GKP', 'DEF', 'MID', 'FWD'];
+const POS_NAME  = { GKP: 'Goalkeepers', DEF: 'Defenders', MID: 'Midfielders', FWD: 'Forwards' };
+const BAND_LABEL = {
+  excellent: 'Excellent', great: 'Great', good: 'Good', neutral: 'Neutral',
+  tough: 'Tough', brutal: 'Brutal', extreme: 'Extreme',
+};
+/** Rank tier as a short label — same wording and config counts as the Ranker's. */
+const TIER_SHORT = {
+  positionBest:     pos => `Best ${pos}`,
+  positionElite:    pos => `Top ${RANK_ELITE_COUNT_BY_POS[pos]} ${pos}`,
+  positionStrong:   pos => `Top ${RANK_STRONG_COUNT_BY_POS[pos]} ${pos}`,
+  topPercentile:    () => `Top ${Math.round(RANK_TOP_PERCENTILE * 100)}%`,
+  midPercentile:    () => `Middle ${Math.round((1 - RANK_TOP_PERCENTILE - RANK_BOTTOM_PERCENTILE) * 100)}%`,
+  bottomPercentile: () => `Bottom ${Math.round(RANK_BOTTOM_PERCENTILE * 100)}%`,
+};
+const GW_STATE_LABEL = { live: 'Live', 'pre-deadline': 'Pre-deadline', finished: 'Finished', 'off-season': 'Off season' };
+const VIEW_KEY = 'gq-dash-view';
+/** Read per call, not at import: the unit tests import this module under Node. */
+const reducedMotion = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 
 // ─── Module-level state ───────────────────────────────────────────────────────
 //
@@ -83,12 +111,12 @@ let _importInFlight = false;
 let _scores = new Map();
 
 /**
- * Map<playerId, 'positionElite'|'positionStrong'|'bottomPercentile'|null> — EVERY player's standing
- * against the full pool (FEATURE_ENGINE.md §13), not just the squad. null
- * until computed. Deliberately NOT rebuilt on every squad edit: the ranking
- * depends only on ctx/horizon, not on squad membership, so recomputing it on
- * every add/remove would re-score ~700 players per click for no reason.
- * Rebuilt once per data:ready (see onDataReady) and reused across squad edits.
+ * Map<playerId, rankTier|null> — EVERY player's standing against the full
+ * pool (FEATURE_ENGINE.md §13), not just the squad. null until computed.
+ * Deliberately NOT rebuilt on every squad edit: the ranking depends only on
+ * ctx/horizon, not on squad membership, so recomputing it on every add/remove
+ * would re-score ~700 players per click for no reason. Rebuilt once per
+ * data:ready (see onDataReady) and reused across squad edits.
  */
 let _rankTierByPlayerId = null;
 
@@ -119,17 +147,35 @@ let _livePoints = null;
  */
 let _liveStale  = false;
 
+/** When the live points last refreshed successfully — shown in the GW meta. */
+let _liveUpdatedAt = null;
+
 /** setInterval handle while live polling is active; null otherwise. */
 let _pollTimer  = null;
+
+// ─── Presentation state ──────────────────────────────────────────────────────
+
+let _view      = 'board';   // 'board' | 'sheet'
+let _viewBusy  = false;
+let _openId    = null;      // player shown in the Breakdown panel
+let _sIdx      = 0;         // active search result
+let _results   = [];        // search results as last rendered: [{ id, disabled }]
+let _order     = [];        // J/K order: players as the current view lists them
+let _animNext  = true;      // play entrances on the next settled render
+let _capLast   = { id: null, ep: 0 };
+let _raf       = 0;
 
 // ─── DOM refs (populated in wireDom, called from onDataReady) ────────────────
 
 let _root          = null;
+let _cmd           = null;
 let _searchInput   = null;
 let _searchResults = null;
-let _squadSlots    = null;
-let _decisions     = null;
-let _tally         = null;
+let _board         = null;
+let _boardSec      = null;
+let _cap           = null;
+let _why           = null;
+let _risk          = null;
 
 // Import panel refs (Phase 4-1)
 let _importBtn     = null;
@@ -137,9 +183,10 @@ let _importPanel   = null;
 let _importIdInput = null;
 let _importStatus  = null;
 let _importInfo    = null;
-/** The "Where do I find my Team ID?" <details>. Both dropdowns hang off
- *  the same wrap and overlay the same space, so only one may be open. */
+/** The "Where do I find my Team ID?" row. Import and help share the slot
+ *  under the command bar, so only one may be open. */
 let _importHelp    = null;
+let _helpBtn       = null;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -152,38 +199,23 @@ function esc(str) {
     .replace(/"/g,  '&quot;');
 }
 
-/** rankTier (composite.js → calcRankTier) → the .score-chip--rank-* modifier
- *  suffix, or '' when the player isn't in any standout tier (keeps their
- *  existing band colour). Mirrors the identical helper in modules/ranker.js.
- *  See FEATURE_ENGINE.md §13. */
-function rankTierClass(rankTier) {
-  if (rankTier === 'positionBest')     return ' score-chip--rank-gold';
-  if (rankTier === 'positionElite')    return ' score-chip--rank-green';
-  if (rankTier === 'positionStrong')   return ' score-chip--rank-light-green';
-  if (rankTier === 'topPercentile')    return ' score-chip--rank-neutral';
-  if (rankTier === 'bottomPercentile') return ' score-chip--rank-red';
-  if (rankTier === 'midPercentile')    return ' score-chip--rank-yellow';
-  return '';
-}
-
 /**
  * True when a scorePlayer result has at least one estimated sub-metric.
  * scorePlayer does not expose a single confidence number, so we check the
- * breakdown directly. Used to add score-chip--estimated where appropriate.
+ * breakdown directly. Drives the dashed "estimated" chip treatment.
  */
 function isScoreEstimated(score) {
   return Boolean(score?.breakdown?.form?.estimated || score?.breakdown?.counter?.estimated);
 }
 
-// ─── Score breakdown disclosure (Phase 6) ─────────────────────────────────────
+// ─── Score breakdown (Phase 6) ────────────────────────────────────────────────
 
 /**
  * scorePlayer's breakdown is { form, fixture, counter } (FEATURE_ENGINE.md §10)
  * — a different shape from scoreFixture's { baseDifficulty, counterMatchup,
- * teamForm, homeAway, history } breakdown that matchup.js's
- * buildBreakdownRows renders. Same visual pattern (bar + value + weight%),
- * different schema — so the row markup is duplicated here in miniature
- * rather than importing matchup.js's private (unexported) helper.
+ * teamForm, homeAway, history } breakdown. ARCHITECTURE.md §8: every displayed
+ * score must be explainable via its breakdown — the Breakdown panel and the
+ * board's Form · Fix · Ctr bars render these three.
  */
 const BREAKDOWN_ORDER  = ['form', 'fixture', 'counter'];
 const BREAKDOWN_LABELS = { form: 'Form', fixture: 'Fixture', counter: 'Counter' };
@@ -216,81 +248,6 @@ export function buildFixtureContextLabel(score, horizon = null) {
     .join(', ');
   const marker = slot.isDouble ? ' (double)' : '';
   return `GW${slot.gw}${marker} vs ${fixtures}${window}`;
-}
-
-/**
- * Build the three breakdown rows (Form / Fixture / Counter) for a
- * scorePlayer breakdown. Same row markup/classes as matchup.js's
- * buildBreakdownRows (bar + value + weight% + est marker) for visual
- * consistency across the app — see components.css .breakdown-row*.
- */
-function buildScoreBreakdownRows(breakdown) {
-  return BREAKDOWN_ORDER.map(key => {
-    const m = breakdown?.[key];
-    if (!m) return '';
-    const val         = Math.round(m.value);
-    const pct         = Math.round(m.weight * 100);
-    const band        = bandFromValue(val);
-    const estMark     = m.estimated
-      ? '<span class="breakdown-row__est" title="Estimated — limited data">~</span>'
-      : '';
-    const rowClass    = m.estimated ? ' breakdown-row--estimated' : '';
-    const barEstClass = m.estimated ? ' breakdown-row__bar--estimated' : '';
-
-    return `
-      <div class="breakdown-row${rowClass}">
-        <span class="breakdown-row__label">${esc(BREAKDOWN_LABELS[key])}</span>
-        <div class="breakdown-row__bar-wrap">
-          <div class="breakdown-row__bar breakdown-row__bar--${band}${barEstClass}" style="width:${val}%"></div>
-        </div>
-        <span class="breakdown-row__value">${val}</span>
-        <span class="breakdown-row__weight">${pct}%</span>
-        ${estMark}
-      </div>
-    `.trim();
-  }).join('');
-}
-
-/**
- * Wrap a score chip in a <details> disclosure that reveals its form/fixture/
- * counter breakdown on click — same collapsible pattern as matchup.js's
- * Individual Duels section. The chip itself is the <summary>, so clicking
- * the chip is what reveals the breakdown (ARCHITECTURE.md §8: every
- * displayed score must be explainable via its breakdown).
- *
- * @param {Player} player
- * @param {object} score   scorePlayer result
- * @param {string|null} [rankTier]  from _rankTierByPlayerId — this player's
- *   standing against the FULL pool (FEATURE_ENGINE.md §13), not just the squad
- * @returns {string} HTML — '' if score is missing (not yet scored)
- */
-function buildBreakdownDetails(player, score, rankTier = null) {
-  if (!score) return '';
-
-  // A player's score is scored over the HORIZON, so it reads every opponent in
-  // that window rather than one fixture — there is no two-team subset to wait
-  // on the way the Matchup Analyser has. The gate is therefore the whole
-  // Understat prefetch: until it settles, this chip is a number that will move
-  // on its own, so show that it is still arriving instead. The disclosure
-  // stays closed-but-present; its breakdown is real once opened.
-  if (!store.isTeamXgSettled()) {
-    return `<span class="score-chip skeleton" aria-hidden="true"
-                  title="Still calculating — waiting on league-wide counter-matchup data">00</span>`;
-  }
-
-  const estClass = isScoreEstimated(score) ? ' score-chip--estimated' : '';
-  const chip     = `<span class="score-chip score-chip--${esc(score.band)}${estClass}${rankTierClass(rankTier)}">${Math.round(score.value)}</span>`;
-  const context  = buildFixtureContextLabel(score, getHorizon());
-
-  return `
-    <details class="dash-breakdown">
-      <summary class="dash-breakdown__summary" aria-label="Show score breakdown for ${esc(player.name)}">${chip}</summary>
-      <div class="dash-breakdown__panel">
-        <div class="dash-breakdown__panel-title">${esc(player.name)} — ${esc(context)}</div>
-        ${buildScoreBreakdownRows(score.breakdown)}
-      </div>
-    </details>
-  `.trim();
 }
 
 function buildCtx() {
@@ -364,13 +321,14 @@ async function fetchAndCacheLivePoints() {
     }
     _livePoints = map;
     _liveStale  = false;
+    _liveUpdatedAt = new Date();
   } catch (err) {
     // Non-fatal: preserve last known data and flag stale. CONVENTIONS.md §9.
     _liveStale = true;
     console.warn('[dashboard] Live points fetch failed — showing stale data:', err.message ?? err);
   }
 
-  renderDecisions();
+  render();
 }
 
 /**
@@ -522,80 +480,233 @@ const FLAG_LABELS = {
   availability: 'Availability Doubt',
 };
 
-function buildFlagChips(flags) {
-  return flags.map(f =>
-    `<span class="dash-flag dash-flag--${esc(f)}">${esc(FLAG_LABELS[f] ?? f)}</span>`
-  ).join('');
-}
-
-// ─── Live points HTML builders (Phase 3C-5) ───────────────────────────────────
+// ─── Decisions model ──────────────────────────────────────────────────────────
 
 /**
- * Build a live-points display span for a player row.
- * Returns '' if _livePoints has not yet been fetched.
+ * Everything the page shows, worked out once per render from the store and
+ * the engine results already in _scores. Selection only — every number here
+ * is an engine output read as-is.
  *
- * @param {number}  playerId
- * @param {boolean} isCaptain  captain's points are doubled in FPL
- * @returns {string}  HTML string or ''
+ * phase:
+ *   'loading'  — no data yet
+ *   'partial'  — fewer than 15 players: no XI, no captain
+ *   'settling' — the Understat prefetch hasn't settled. The captain, the XI and
+ *                the bench are all a RANKING of the squad by a score that is
+ *                still settling; rendering now would name a captain and then
+ *                silently name a different one when the last payload landed,
+ *                which is the one thing a recommendation panel must not do.
+ *   'ready'
  */
-function buildLivePtsHtml(playerId, isCaptain) {
-  if (!_livePoints) return '';
-  const pts = _livePoints.get(playerId) ?? 0;
-  const staleClass = _liveStale ? ' dash-live-pts--stale' : '';
-  if (isCaptain) {
-    return `<span class="dash-live-pts dash-live-pts--captain${staleClass}" title="Captain: raw points shown; FPL doubles them">`
-         + `Live: ${pts}pts (×2 = ${pts * 2}pts)`
-         + `</span>`;
-  }
-  return `<span class="dash-live-pts${staleClass}">Live: ${pts}pts</span>`;
+function buildModel() {
+  const squad = store.getSquad().filter(id => store.getPlayer(id));
+  const settled = store.isTeamXgSettled();
+  const entries = squad
+    .map(id => ({ player: store.getPlayer(id), score: _scores.get(id) }))
+    .filter(e => e.score);
+
+  const phase = !_dataReady ? 'loading'
+    : squad.length < SQUAD_TOTAL ? 'partial'
+    : (!settled || entries.length < SQUAD_TOTAL) ? 'settling'
+    : 'ready';
+
+  const m = { squad, settled, phase, entries, xi: [], bench: [], captain: null, ladder: [], role: new Map(), formation: '' };
+  if (phase !== 'ready') return m;
+
+  const { xi, bench } = pickStartingXI(entries);
+
+  // Captaincy picks the highest real points-scale projection (expectedPoints),
+  // NOT the 0-100 composite `score.value` — that composite is a normalised
+  // quality score meant for within-position comparisons and does not scale
+  // with a position's actual scoring ceiling, so it can rank a merely-solid
+  // defender above a genuinely higher-scoring midfielder/forward. See
+  // calcExpectedPoints in engine/composite.js and FEATURE_ENGINE.md §10.2.
+  const captainEntry = xi.reduce(
+    (best, e) => (!best || e.score.expectedPoints.value > best.score.expectedPoints.value ? e : best),
+    null,
+  );
+
+  m.xi = xi;
+  m.bench = bench;
+  m.captain = captainEntry;
+  // The captaincy ladder: the XI by that same projection, best first.
+  m.ladder = xi.slice().sort((a, b) => b.score.expectedPoints.value - a.score.expectedPoints.value);
+  xi.forEach(e => m.role.set(e.player.id, e.player.id === captainEntry?.player.id ? 'C' : 'XI'));
+  bench.forEach((e, i) => m.role.set(e.player.id, `B${i + 1}`));
+  const n = pos => xi.filter(e => e.player.position === pos).length;
+  m.formation = `${n('DEF')}-${n('MID')}-${n('FWD')}`;
+  return m;
 }
 
-// ─── GW state badge ───────────────────────────────────────────────────────────
+// ─── Build: HTML fragments ────────────────────────────────────────────────────
 
-/**
- * Build the GW state badge shown at the top of the decisions panel.
- * @param {'live'|'pre-deadline'|'finished'|'off-season'} gwState
- * @returns {string}  HTML string
- */
-function renderGwStateBadge(gwState) {
-  const BADGE = {
-    live:           `<span class="gw-state-badge gw-state-badge--live">GW LIVE 🟢</span>`,
-    'pre-deadline': `<span class="gw-state-badge gw-state-badge--pre">PRE-DEADLINE ⏳</span>`,
-    finished:       `<span class="gw-state-badge gw-state-badge--done">GW FINISHED ✓</span>`,
-    'off-season':   `<span class="gw-state-badge gw-state-badge--done">OFF SEASON</span>`,
-  };
-  // Only show the stale note when we have some data but it failed to refresh.
-  const staleNote = (gwState === 'live' && _liveStale && _livePoints !== null)
-    ? `<span class="gw-state-badge__stale">· data may be delayed</span>`
+function chipHTML(band, text, { size = '', est = false, title = '' } = {}) {
+  return `<span class="chip${size ? ` chip--${size}` : ''}${est ? ' is-est' : ''}"`
+    + `${band ? ` data-band="${band}"` : ''}${title ? ` title="${esc(title)}"` : ''}>${text}</span>`;
+}
+
+function pendingChipHTML(size = '') {
+  return `<span class="chip${size ? ` chip--${size}` : ''} is-pending" aria-hidden="true"`
+    + ` title="Still calculating — waiting on league-wide counter-matchup data">00</span>`;
+}
+
+function crestHTML(team, size = '') {
+  return team?.badgeUrl
+    ? `<img class="crest${size ? ` crest--${size}` : ''}" src="${esc(team.badgeUrl)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">`
     : '';
-  return `<div class="dash-gw-state">${BADGE[gwState] ?? ''}${staleNote}</div>`;
 }
 
-// ─── Search results visibility helpers ───────────────────────────────────────
-
-function showResults() {
-  if (!_searchResults) return;
-  _searchResults.classList.add('is-open');
+function statusHTML(player) {
+  if (player.status === 'available') return '';
+  return `<span class="stat${player.status === 'doubtful' ? ' stat--d' : ''}" title="${esc(player.statusNote || player.status)}">!</span>`;
 }
 
-function hideResults() {
-  if (!_searchResults) return;
-  _searchResults.classList.remove('is-open');
+function tierShort(rankTier, pos) {
+  return TIER_SHORT[rankTier]?.(pos) ?? '';
+}
+
+function price(player) {
+  return (typeof player.price === 'number' && !isNaN(player.price)) ? `£${player.price.toFixed(1)}m` : '£?.?m';
+}
+
+/** The score chip, or its placeholder while the score is still settling. */
+function scoreChipHTML(player, score, settled, size = '') {
+  if (!score || !settled) return pendingChipHTML(size);
+  const v = Math.round(score.value);
+  const est = isScoreEstimated(score);
+  const tier = tierShort(_rankTierByPlayerId?.get(player.id), player.position);
+  return chipHTML(score.band, String(v), { size, est,
+    title: `${v} ${BAND_LABEL[score.band] ?? ''}${tier ? ` · ${tier} in the game` : ''}${est ? ' · estimated — limited data' : ''}` });
+}
+
+/** The nearest gameweek's opponents, short: "MCI A + LIV H" / "Blank". */
+function nextShort(score, full = false) {
+  const slot = groupPerGwSlots(score?.perGw ?? [])[0];
+  if (!slot) return '—';
+  if (slot.isBlank) return 'Blank';
+  const teamByShort = full ? new Map(store.getTeams().map(t => [t.shortName, t.name])) : null;
+  return slot.fixtures
+    .map(f => (full ? `${teamByShort.get(f.opponent) ?? f.opponent ?? '?'} (${f.venue ?? '?'})` : `${f.opponent ?? '?'} ${f.venue ?? ''}`))
+    .join(full ? ', ' : ' + ');
+}
+
+/** One bar per breakdown component, the board's mini Form · Fix · Ctr. */
+function ffcHTML(score, settled) {
+  if (!score || !settled) return '<span class="ffc wd" aria-hidden="true"></span>';
+  return `<span class="ffc wd">${BREAKDOWN_ORDER.map(k => {
+    const c = score.breakdown?.[k];
+    if (!c) return '<span></span>';
+    const v = Math.round(c.value), band = bandFromValue(v);
+    return `<span data-band="${band}" title="${BREAKDOWN_LABELS[k]} ${v} ${BAND_LABEL[band] ?? ''}, weight ${Math.round(c.weight * 100)}%${c.estimated ? ', estimated' : ''}">`
+      + `<b>${c.estimated ? '~' : ''}${v}</b><span class="mbar" aria-hidden="true"><span class="${c.estimated ? 'is-est' : ''}" style="width:${v}%"></span></span></span>`;
+  }).join('')}</span>`;
+}
+
+/** Per-gameweek fixture strip: one slot per GW, a double's two cells side by side. */
+function stripHTML(score, settled) {
+  if (!score || !settled) return '<span class="strip wd" aria-hidden="true"></span>';
+  const slots = groupPerGwSlots(score.perGw);
+  return `<span class="strip wd" role="list" aria-label="${esc(horizonRange())}">${slots.map(slot => {
+    if (slot.isBlank) {
+      return `<span role="listitem"><span class="cell cell--blank" title="GW${slot.gw} · Blank gameweek">–</span></span>`;
+    }
+    return `<span role="listitem">${slot.fixtures.map(f => {
+      const v = Math.round(f.value);
+      const title = `GW${slot.gw} · ${f.opponent ?? '?'} (${f.venue ?? '?'}) ${v} ${BAND_LABEL[f.band] ?? ''}`
+        + `${slot.isDouble ? ' · double' : ''}${f.provisional ? ' · estimated' : ''}${f.provisionalKickoff ? ' · kickoff TBC' : ''}`;
+      return `<span class="cell${f.provisional ? ' is-est' : ''}" data-band="${esc(f.band)}" title="${esc(title)}" aria-label="${esc(title)}">${v}</span>`;
+    }).join('')}</span>`;
+  }).join('')}</span>`;
+}
+
+/** Live points for one player: raw, ×2 for the captain (FPL doubles them). */
+function liveOf(playerId, isCap) {
+  if (!_livePoints) return null;
+  const pts = _livePoints.get(playerId) ?? 0;
+  return { pts, shown: isCap ? pts * 2 : pts,
+    full: isCap ? `Live: ${pts}pts (×2 = ${pts * 2}pts)` : `Live: ${pts}pts` };
+}
+
+/** The gameweek window the scores cover, as "GW8–12". */
+function horizonRange() {
+  const h = getHorizon();
+  const start = store.getUpcomingGw() ?? store.getCurrentGw() ?? 1;
+  return h.gws > 1 ? `GW${start}–${start + h.gws - 1}` : `GW${start}`;
+}
+
+function boardCols(showLive) {
+  return _boardSec?.classList.contains('is-wide')
+    ? `40px minmax(120px,1.3fr) minmax(84px,.9fr) 40px 104px 150px 40px 36px${showLive ? ' 40px' : ''} 44px 28px`
+    : '36px minmax(0,1fr) 40px 36px 28px';
+}
+
+// ─── Render: command bar ─────────────────────────────────────────────────────
+
+function renderCmd() {
+  if (!_root) return;
+  const squad = store.getSquad();
+  const tally = _root.querySelector('#db-tally');
+  tally.title = `${squad.length} / ${SQUAD_TOTAL} players selected`;
+  tally.querySelector('b').textContent = `SQUAD ${squad.length}/${SQUAD_TOTAL}`;
+  tally.querySelector('.tally__bar > span').style.transform = `scaleX(${squad.length / SQUAD_TOTAL})`;
+
+  const tag = _root.querySelector('#db-gw');
+  const meta = _root.querySelector('#db-gw-meta');
+  const stale = _root.querySelector('#db-stale');
+  if (!_dataReady) {
+    tag.textContent = 'GW';
+    tag.dataset.state = '';
+    meta.textContent = 'Loading…';
+    stale.hidden = true;
+    return;
+  }
+  // The badge is a fact about the gameweek, not a product of any score, so it
+  // shows whenever data is ready.
+  const state = getGwState();
+  const gw = store.getCurrentGw();
+  tag.dataset.state = state;
+  tag.textContent = state === 'off-season' ? 'Off season' : `GW${gw} · ${GW_STATE_LABEL[state]}`;
+  meta.textContent = gwMeta(state, gw);
+  // Only show the stale note when we have some data but it failed to refresh.
+  stale.hidden = !(state === 'live' && _liveStale && _livePoints !== null);
+}
+
+function gwMeta(state, gw) {
+  const hm = d => d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  if (state === 'off-season') return 'No current gameweek';
+  if (state === 'finished') {
+    const n = store.getFixtures().filter(f => f.gw === gw).length;
+    return `All ${n} matches played`;
+  }
+  if (state === 'live') {
+    if (!_liveUpdatedAt) return 'Refreshes every 60s';
+    return _liveStale ? `Last update ${hm(_liveUpdatedAt)} · retrying every 60s` : `Updated ${hm(_liveUpdatedAt)} · refreshes every 60s`;
+  }
+  const deadline = store.getEvents().find(e => e.id === gw)?.deadline;
+  if (!deadline) return '';
+  const d = new Date(deadline);
+  return `Deadline ${d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })} · ${hm(d)}`;
 }
 
 // ─── Render: search results dropdown ─────────────────────────────────────────
 
+function showResults() {
+  if (!_searchResults) return;
+  _searchResults.hidden = false;
+  _searchInput?.setAttribute('aria-expanded', 'true');
+}
+
+function hideResults() {
+  if (!_searchResults) return;
+  _searchResults.hidden = true;
+  _searchInput?.setAttribute('aria-expanded', 'false');
+  _searchInput?.removeAttribute('aria-activedescendant');
+}
+
 function renderSearchResults() {
-  if (!_searchResults) {
-    console.warn('[dashboard] renderSearchResults: _searchResults is null — check #dash-search-results in HTML');
-    return;
-  }
-  if (!_searchInput) {
-    console.warn('[dashboard] renderSearchResults: _searchInput is null — check #dash-search-input in HTML');
-    return;
-  }
+  if (!_searchResults || !_searchInput) return;
 
   const query = _searchInput.value.trim().toLowerCase();
+  _results = [];
 
   if (query.length < 2) {
     _searchResults.innerHTML = '';
@@ -605,8 +716,7 @@ function renderSearchResults() {
 
   const allPlayers = store.getPlayers();
   if (allPlayers.length === 0) {
-    _searchResults.innerHTML =
-      `<li class="dash-search-results__empty">Player data not yet loaded — please wait a moment.</li>`;
+    _searchResults.innerHTML = '<li class="empty">Player data not yet loaded — please wait a moment.</li>';
     showResults();
     return;
   }
@@ -628,318 +738,349 @@ function renderSearchResults() {
   }
 
   if (results.length === 0) {
-    _searchResults.innerHTML =
-      `<li class="dash-search-results__empty">No players found.</li>`;
+    _searchResults.innerHTML = '<li class="empty">No players found.</li>';
     showResults();
     return;
   }
 
-  try {
-    _searchResults.innerHTML = results.map(p => {
-      const team         = store.getTeam(p.teamId);
-      const inSquad      = isInSquad(p.id);
-      const posSlotsFull = squadCountByPos(p.position) >= SQUAD_LIMITS[p.position];
-      const squadFull    = store.getSquad().length >= SQUAD_TOTAL;
-      const disabled     = inSquad || posSlotsFull || squadFull;
-      const reason       = inSquad      ? 'Already in squad'
-                         : posSlotsFull ? `${p.position} slots full`
-                         : squadFull    ? 'Squad full'
-                         : '';
-      const price = (typeof p.price === 'number' && !isNaN(p.price))
-        ? p.price.toFixed(1) : '?.?';
-
-      return `
-        <li class="dash-search-results__item${disabled ? ' dash-search-results__item--disabled' : ''}"
-            data-player-id="${p.id}"
-            role="option"
-            aria-disabled="${disabled}"
-            title="${disabled ? esc(reason) : esc(p.fullName ?? p.name ?? '')}">
-          <span class="dash-search-results__name">${esc(p.name ?? '?')}</span>
-          <span class="dash-search-results__meta">${team ? esc(team.shortName) : '—'} · ${esc(p.position ?? '?')} · £${price}m</span>
-        </li>
-      `.trim();
-    }).join('');
-  } catch (err) {
-    console.error('[dashboard] renderSearchResults: innerHTML build threw —', err);
-    hideResults();
-    return;
-  }
-
+  if (_sIdx >= results.length) _sIdx = 0;
+  _searchResults.innerHTML = results.map((p, i) => {
+    const team         = store.getTeam(p.teamId);
+    const inSquad      = isInSquad(p.id);
+    const posSlotsFull = squadCountByPos(p.position) >= SQUAD_LIMITS[p.position];
+    const squadFull    = store.getSquad().length >= SQUAD_TOTAL;
+    const disabled     = inSquad || posSlotsFull || squadFull;
+    const reason       = inSquad      ? 'Already in squad'
+                       : posSlotsFull ? `${p.position} slots full`
+                       : squadFull    ? 'Squad full'
+                       : '';
+    _results.push({ id: p.id, disabled });
+    return `<li id="db-opt-${p.id}" role="option" data-player-id="${p.id}" aria-selected="${i === _sIdx}" aria-disabled="${disabled}"`
+      + ` title="${disabled ? esc(reason) : esc(p.fullName || p.name || '')}">`
+      + `<span class="pos--${esc(p.position)}">${esc(p.position)}</span>`
+      + `<span><b>${esc(p.name ?? '?')}</b><small>${team ? esc(team.shortName) : '—'} · ${esc(p.position ?? '?')} · ${price(p)}</small></span>`
+      + `<span>${esc(reason)}</span></li>`;
+  }).join('');
+  _searchInput.setAttribute('aria-activedescendant', `db-opt-${results[_sIdx].id}`);
   showResults();
 }
 
-// ─── Render: squad slots ──────────────────────────────────────────────────────
+// ─── Render: board ───────────────────────────────────────────────────────────
 
-function renderSquadPanel() {
-  const squad = store.getSquad();
-  if (_tally) {
-    _tally.textContent = `${squad.length} / ${SQUAD_TOTAL} players selected`;
-  }
-
-  if (!_squadSlots) return;
-
-  const html = Object.entries(SQUAD_LIMITS).map(([pos, max]) => {
-    const playersInPos = squad
-      .map(id => store.getPlayer(id))
-      .filter(p => p?.position === pos);
-
-    const slots = [];
-
-    for (const player of playersInPos) {
-      const score = _scores.get(player.id);
-      const team  = store.getTeam(player.teamId);
-      const price = (typeof player.price === 'number' && !isNaN(player.price))
-        ? player.price.toFixed(1) : '?.?';
-      slots.push(`
-        <div class="dash-squad-slot dash-squad-slot--filled">
-          <span class="dash-squad-slot__name">${esc(player.name)}</span>
-          <span class="dash-squad-slot__team">${team ? esc(team.shortName) : '—'}</span>
-          <span class="dash-squad-slot__price">£${price}m</span>
-          ${buildBreakdownDetails(player, score, _rankTierByPlayerId?.get(player.id))}
-          <button class="dash-squad-slot__remove"
-                  data-remove-id="${player.id}"
-                  type="button"
-                  aria-label="Remove ${esc(player.name)}">×</button>
-        </div>
-      `.trim());
-    }
-
-    const emptyCount = max - playersInPos.length;
-    for (let i = 0; i < emptyCount; i++) {
-      slots.push(`<div class="dash-squad-slot dash-squad-slot--empty">Empty slot</div>`);
-    }
-
-    return `
-      <div class="dash-squad-group">
-        <div class="dash-squad-group__header">
-          <span>${esc(pos)}</span>
-          <span>${playersInPos.length} / ${max}</span>
-        </div>
-        ${slots.join('')}
-      </div>
-    `.trim();
-  }).join('');
-
-  _squadSlots.innerHTML = html;
-}
-
-// ─── Render: decisions panel ──────────────────────────────────────────────────
-
-function renderDecisions() {
-  if (!_decisions) return;
-
-  const squad = store.getSquad();
-
-  // GW badge is shown whenever data is ready — it's always informative.
-  const gwState   = _dataReady ? getGwState() : null;
-  const badgeHtml = gwState ? renderGwStateBadge(gwState) : '';
-
-  if (squad.length < SQUAD_TOTAL) {
-    const remaining = SQUAD_TOTAL - squad.length;
-    _decisions.innerHTML = [
-      badgeHtml,
-      `<p class="dash-decisions__hint">
-        Add ${remaining} more player${remaining === 1 ? '' : 's'} to see GW recommendations.
-      </p>`,
-    ].join('');
-    return;
-  }
-
-  if (!_dataReady) {
-    _decisions.innerHTML = `<p class="dash-decisions__hint">Loading player data…</p>`;
-    return;
-  }
-
-  // The captain, the XI and the bench are all a RANKING of the squad by a
-  // score that is still settling — pickStartingXI and the captaincy reduce
-  // below both choose by it. Rendering now would name a captain and then
-  // silently name a different one when the last Understat payload landed,
-  // which is the one thing a recommendation panel must not do. The GW badge
-  // stays: it is a fact about the gameweek, not a product of any score.
-  if (!store.isTeamXgSettled()) {
-    _decisions.innerHTML = [
-      badgeHtml,
-      `<div class="skeleton-lines" aria-busy="true"
-            title="Still calculating — waiting on league-wide counter-matchup data">
-        <span class="skeleton skeleton--text"></span>
-        <span class="skeleton skeleton--text"></span>
-        <span class="skeleton skeleton--text"></span>
-      </div>`,
-    ].join('');
-    return;
-  }
-
-  const scoredSquad = squad
-    .map(id => ({ player: store.getPlayer(id), score: _scores.get(id) }))
-    .filter(e => e.player && e.score);
-
-  if (scoredSquad.length < SQUAD_TOTAL) {
-    _decisions.innerHTML = [
-      badgeHtml,
-      `<p class="dash-decisions__hint">Computing scores…</p>`,
-    ].join('');
-    return;
-  }
-
-  const { xi, bench } = pickStartingXI(scoredSquad);
-
-  // Captaincy picks the highest real points-scale projection (expectedPoints),
-  // NOT the 0-100 composite `score.value` — that composite is a normalised
-  // quality score meant for within-position comparisons and does not scale
-  // with a position's actual scoring ceiling, so it can rank a merely-solid
-  // defender above a genuinely higher-scoring midfielder/forward. See
-  // calcExpectedPoints in engine/composite.js and FEATURE_ENGINE.md §10.2.
-  const captainEntry = xi.reduce(
-    (best, e) => (!best || e.score.expectedPoints.value > best.score.expectedPoints.value ? e : best),
-    null,
-  );
-  const captainId = captainEntry?.player.id ?? null;
-
-  _decisions.innerHTML = [
-    badgeHtml,
-    renderCaptainBlock(captainEntry),
-    renderXIBlock(xi, captainId),
-    renderBenchBlock(bench),
-  ].join('');
-}
-
-// ─── Render: captain block ────────────────────────────────────────────────────
-
-function renderCaptainBlock(entry) {
-  if (!entry) return '';
-  const { player, score } = entry;
+function rowHTML(e, m, i, showLive) {
+  const { player, score } = e;
   const team = store.getTeam(player.teamId);
-  const flags = getRiskFlags(player, score);
-  const statusMark = player.status !== 'available'
-    ? `<span class="ranker-status-badge" title="${esc(player.statusNote || player.status)}">!</span>`
-    : '';
+  const ready = m.phase === 'ready';
+  const role = ready ? m.role.get(player.id) : '';
+  const roleTitle = !ready ? 'Waiting on scores' : role === 'C' ? 'Captain' : role === 'XI' ? 'Starting XI' : role ? `Bench ${role.slice(1)}` : '';
+  const flags = score && m.settled ? getRiskFlags(player, score) : [];
+  const flagText = flags.map(f => FLAG_LABELS[f]).join(' · ');
+  const ms = score?.breakdown?.form?.minutesSecurity;
+  const live = showLive ? liveOf(player.id, role === 'C') : null;
+  const name = player.fullName || player.name;
+  const nf = score && m.settled ? Math.round(score.nextFixtureScore.value) : null;
+  const nfBand = nf != null ? bandFromValue(nf) : null;
+  const aria = `${name}, ${team?.name ?? ''}, ${player.position}, ${price(player)}`
+    + (score && m.settled ? `, score ${Math.round(score.value)} ${BAND_LABEL[score.band] ?? ''}` : ', still calculating')
+    + (flags.length ? `, flags: ${flagText}` : '');
 
-  const price = (typeof player.price === 'number' && !isNaN(player.price))
-    ? player.price.toFixed(1) : '?.?';
-
-  const flagsHtml = flags.length
-    ? `<div class="dash-player-row__flags" style="margin-top:var(--space-2)">${buildFlagChips(flags)}</div>`
-    : '';
-
-  // Live pts for captain: show raw and doubled value.
-  const captainLiveHtml = buildLivePtsHtml(player.id, true);
-
-  // Real points-scale projection driving the pick itself — see the reasoning
-  // in renderDecisions() for why this (not score.value) selects the captain.
-  const predictedHtml = score.expectedPoints
-    ? `<span class="dash-captain__predicted" title="Projected FPL points for the upcoming game, fixture- and playing-time-adjusted">Predicted ${score.expectedPoints.value.toFixed(1)} pts</span>`
-    : '';
-
-  return `
-    <div class="dash-captain">
-      <div class="dash-captain__header">
-        <span class="dash-captain__badge" aria-label="Captain">C</span>
-        <div>
-          <div class="dash-captain__title">Captain Pick</div>
-          <div class="dash-captain__name">
-            ${esc(player.name)}${statusMark}
-            <span class="dash-captain__price">£${price}m</span>
-            ${team ? `<span class="dash-captain__team">${esc(team.shortName)}</span>` : ''}
-            ${predictedHtml}
-          </div>
-        </div>
-        <div class="dash-captain__score-wrap">
-          ${buildBreakdownDetails(player, score, _rankTierByPlayerId?.get(player.id))}
-          ${captainLiveHtml}
-        </div>
-      </div>
-      ${flagsHtml}
-    </div>
-  `.trim();
+  return `<div class="row${_openId === player.id ? ' is-open' : ''}" data-row-id="${player.id}" style="--d:${Math.min(i, 20) * 16}ms">`
+    + `<span class="role" data-role="${role.startsWith('B') ? 'B' : role}" title="${roleTitle}">${role || '·'}</span>`
+    + `<button type="button" class="who" data-rowbtn aria-pressed="${_openId === player.id}" aria-label="${esc(aria)}. Show detail.">`
+    + `<span><span class="ell">${esc(name)}</span>${statusHTML(player)}</span>`
+    + `<span>${crestHTML(team)}${team ? esc(team.shortName) : '—'} · ${price(player)}</span></button>`
+    + `<span class="nx wd">${nf != null ? chipHTML(nfBand, String(nf), { size: 'sm', est: score.nextFixtureScore.estimated,
+        title: `Next fixture ${nf} ${BAND_LABEL[nfBand] ?? ''} — fixture + counter-matchup, excluding form` }) : pendingChipHTML('sm')}`
+    + `<span class="ell">${esc(nextShort(score))}</span></span>`
+    + scoreChipHTML(player, score, m.settled)
+    + ffcHTML(score, m.settled)
+    + stripHTML(score, m.settled)
+    + `<span class="ms r wd${ms != null && ms < MIN_SEC_RISK ? ' is-low' : ''}" title="Minutes security">${ms != null ? `${Math.round(ms * 100)}%` : '–'}</span>`
+    + `<span class="ep r" title="Predicted points for GW${store.getUpcomingGw() ?? ''}">${score && m.settled ? score.expectedPoints.value.toFixed(1) : '–'}</span>`
+    + (showLive ? `<span class="live r wd${_liveStale ? ' is-stale' : ''}" title="${esc(live?.full ?? '')}">${live?.shown ?? ''}</span>` : '')
+    + `<span class="flags wd" title="${esc(flagText)}" aria-label="${esc(flagText || 'No flags')}">${flags.length ? `⚠ ${flags.length}` : ''}</span>`
+    + `<button type="button" class="rm" data-remove-id="${player.id}" aria-label="Remove ${esc(name)}">×</button>`
+    + '</div>';
 }
 
-// ─── Render: player row (shared by XI and bench) ──────────────────────────────
+function boardHTML(m, showLive) {
+  if (m.phase === 'loading') {
+    return [62, 48, 70, 55, 66, 40, 58, 72, 50, 64].map(w => `<div class="sk-row" aria-hidden="true"><span class="sk" style="--w:${w}%"></span></div>`).join('')
+      + '<p class="wait" role="status">Loading player data…</p>';
+  }
+  const cols = boardCols(showLive);
+  let html = '';
+  if (_boardSec.classList.contains('is-wide')) {
+    html += `<div class="head" style="--cols:${cols}"><span>Role</span><span>Player</span><span>Next</span><span>Score</span>`
+      + `<span>Form · Fix · Ctr</span><span>${horizonRange()}</span><span class="r">Mins</span><span class="r">Pred</span>`
+      + `${showLive ? '<span class="r">Live</span>' : ''}<span>Flags</span><span></span></div>`;
+  }
+  if (m.squad.length === 0) {
+    const remaining = SQUAD_TOTAL;
+    html += `<div class="state" role="status"><b>No squad yet</b><span>Add ${remaining} more players to see GW recommendations. Search above, or import by Team ID.</span></div>`;
+  }
+  let i = 0;
+  _order = [];
+  html += POSITIONS.map(pos => {
+    // Within a position, best first once scores have settled; until then the
+    // squad's own order, so rows never reshuffle under the reader.
+    const group = m.squad.map(id => ({ player: store.getPlayer(id), score: _scores.get(id) }))
+      .filter(e => e.player.position === pos);
+    if (m.settled) group.sort((a, b) => (b.score?.value ?? 0) - (a.score?.value ?? 0));
+    const max = SQUAD_LIMITS[pos];
+    group.forEach(e => _order.push(e.player.id));
+    return `<div role="group" aria-label="${POS_NAME[pos]} ${group.length} of ${max}">`
+      + `<div class="grp__hd"><b class="pos--${pos}">${pos}</b><span>${group.length} / ${max}</span></div>`
+      + `<div style="--cols:${cols}">${group.map(e => rowHTML(e, m, i++, showLive)).join('')}</div>`
+      + Array.from({ length: Math.max(0, max - group.length) }, () => `<div class="empty-slot" aria-label="Empty ${pos} slot">Empty slot</div>`).join('')
+      + '</div>';
+  }).join('');
+  if (m.phase === 'settling') {
+    html += '<p class="wait" role="status">Still calculating — waiting on league-wide counter-matchup data.</p>';
+  }
+  return html;
+}
+
+// ─── Render: team sheet ──────────────────────────────────────────────────────
+
+function tokenHTML(e, m, showLive, delay) {
+  const { player, score } = e;
+  const team = store.getTeam(player.teamId);
+  const isCap = m.role.get(player.id) === 'C';
+  const flags = getRiskFlags(player, score);
+  const live = showLive ? liveOf(player.id, isCap) : null;
+  const svg = team?.badgeUrl ? String(team.badgeUrl).replace('/badges/70/', '/badges/').replace(/\.png$/, '.svg') : '';
+  return `<button type="button" role="listitem" class="tok${isCap ? ' is-cap' : ''}${_openId === player.id ? ' is-open' : ''}" data-row-id="${player.id}"`
+    + ` aria-pressed="${_openId === player.id}" aria-label="${esc(player.fullName || player.name)}${isCap ? ', captain' : ''}. Show detail." style="--d:${delay}ms">`
+    + (svg ? `<span class="tok__mark" aria-hidden="true"><span style="background-image:url('${esc(svg)}')"></span></span>` : '')
+    + (isCap ? '<span class="tok__c" aria-hidden="true">C</span>' : '')
+    + (flags.length ? `<span class="tok__w" aria-hidden="true" title="${esc(flags.map(f => FLAG_LABELS[f]).join(' · '))}">⚠</span>` : '')
+    + `<span class="tok__pos pos--${player.position}">${player.position}</span>`
+    + `<span class="tok__name">${esc(player.name)}</span>`
+    + `<span class="tok__sub">${team ? esc(team.shortName) : '—'} · v ${esc(nextShort(score))}</span>`
+    + `<span class="tok__nums">${scoreChipHTML(player, score, true)}<span title="Predicted points">${score.expectedPoints.value.toFixed(1)}</span>`
+    + `${live ? `<small class="${_liveStale ? 'live is-stale' : ''}" title="${esc(live.full)}">· ${live.pts} pts</small>` : ''}</span></button>`;
+}
+
+function sheetHTML(m, showLive) {
+  if (m.phase !== 'ready') {
+    const settling = m.phase === 'settling' || m.phase === 'loading';
+    const left = SQUAD_TOTAL - m.squad.length;
+    return `<div class="state" role="status"><b>${settling ? 'Still calculating' : `${m.squad.length} / ${SQUAD_TOTAL} players selected`}</b>`
+      + `<span>${settling ? 'The XI is picked once every score has settled.' : `Add ${left} more player${left === 1 ? '' : 's'} to see GW recommendations.`}</span>`
+      + '<button type="button" class="btn btn--sm" data-view="board">Show the board</button></div>';
+  }
+  const posOrder = { GKP: 0, DEF: 1, MID: 2, FWD: 3 };
+  const xi = m.xi.slice().sort((a, b) => posOrder[a.player.position] - posOrder[b.player.position] || b.score.value - a.score.value);
+  _order = xi.map(e => e.player.id).concat(m.bench.map(e => e.player.id));
+  const lines = POSITIONS.map((pos, li) => {
+    const players = xi.filter(e => e.player.position === pos);
+    return `<div class="line" role="group" aria-label="${POS_NAME[pos]}">${players.map((e, ti) => tokenHTML(e, m, showLive, 200 + li * 110 + ti * 45)).join('')}</div>`;
+  }).join('');
+  const bench = m.bench.map((e, i) => {
+    const { player, score } = e;
+    const team = store.getTeam(player.teamId);
+    const flagged = getRiskFlags(player, score).length > 0;
+    return `<li><button type="button" class="bn${_openId === player.id ? ' is-open' : ''}" data-row-id="${player.id}" aria-pressed="${_openId === player.id}"`
+      + ` aria-label="Bench ${i + 1}: ${esc(player.fullName || player.name)}. Show detail." style="--d:${640 + i * 50}ms">`
+      + `<span>${i + 1}</span><span><b>${esc(player.fullName || player.name)}${flagged ? ' <span class="warn">⚠</span>' : ''}</b>`
+      + `<small><b class="pos--${player.position}">${player.position}</b>${crestHTML(team)}${team ? esc(team.shortName) : '—'} · v ${esc(nextShort(score))}</small></span>`
+      + `${scoreChipHTML(player, score, true)}</button></li>`;
+  }).join('');
+  const line = d => `pathLength="1" style="--d:${d}ms"`;
+  return '<div class="sheet">'
+    + '<div class="pitch"><div class="pitch__lines" aria-hidden="true">'
+    + '<svg viewBox="0 0 600 1000" preserveAspectRatio="none">'
+    + `<rect x="1" y="1" width="598" height="998" ${line(0)}/><line x1="0" y1="500" x2="600" y2="500" ${line(140)}/>`
+    + `<rect x="130" y="0" width="340" height="150" ${line(220)}/><rect x="225" y="0" width="150" height="50" ${line(300)}/>`
+    + `<rect x="130" y="850" width="340" height="150" ${line(220)}/><rect x="225" y="950" width="150" height="50" ${line(300)}/>`
+    + '</svg><span class="pitch__ring"></span></div>'
+    + `<div class="lines" role="list" aria-label="Starting XI, ${m.formation}, goalkeeper at the top">${lines}</div></div>`
+    + '<div class="bench"><span class="bench__t"><span class="lbl lbl--sm">Bench</span><b>Priority order</b></span>'
+    + `<ol aria-label="Bench in priority order">${bench}</ol></div></div>`;
+}
+
+// ─── Render: aside ───────────────────────────────────────────────────────────
+
+function captainHTML(m, showLive) {
+  if (m.phase === 'partial') {
+    const left = SQUAD_TOTAL - m.squad.length;
+    return `<p role="status">Add ${left} more player${left === 1 ? '' : 's'} to see GW recommendations.</p>`;
+  }
+  if (m.phase !== 'ready' || !m.captain) {
+    return '<div class="sk-stack" aria-hidden="true"><span class="sk" style="--w:70%"></span><span class="sk" style="--w:100%;height:10px"></span><span class="sk" style="--w:80%;height:10px"></span></div>';
+  }
+  const { player, score } = m.captain;
+  const team = store.getTeam(player.teamId);
+  const run = m.ladder[1];
+  const gap = run ? score.expectedPoints.value - run.score.expectedPoints.value : 0;
+  const edge = !run ? 'Only option in the XI' : gap < 0.05 ? `Level with ${run.player.name}` : `${gap.toFixed(1)} pts clear of ${run.player.name}`;
+  const live = showLive ? liveOf(player.id, true) : null;
+  const max = m.ladder[0]?.score.expectedPoints.value || 1;
+  const ep = score.expectedPoints.value;
+  return '<div class="cap"><div class="cap__l">'
+    + `<span class="cap__name">${esc(player.name)}${statusHTML(player)}</span>`
+    + `<span class="cap__sub">${crestHTML(team, 18)}${esc(team?.name ?? '')} · v ${esc(nextShort(score, true))}</span>`
+    + `<span class="cap__edge"><span class="tag">Edge</span>${esc(edge)}</span>`
+    + (live ? `<span class="cap__live${_liveStale ? ' live is-stale' : ''}">${esc(live.full)}</span>` : '')
+    + '</div>'
+    + `<div class="cap__r" data-band="${score.band}"><span class="lbl lbl--sm">Pred pts</span>`
+    + `<span class="big" role="img" aria-label="Predicted ${ep.toFixed(1)} pts" data-ep="${ep}">`
+    + `<span class="big__o" aria-hidden="true">${ep.toFixed(1)}</span><span aria-hidden="true">${ep.toFixed(1)}</span></span></div></div>`
+    + '<ol class="ladder" aria-label="Captain options by predicted points">'
+    + m.ladder.slice(0, 5).map((e, i) => `<li><span>${i + 1}</span><span>${crestHTML(store.getTeam(e.player.teamId))}<span class="ell">${esc(e.player.name)}</span></span>`
+      + `<span class="lbar" aria-hidden="true"><span style="width:${Math.round(e.score.expectedPoints.value / max * 100)}%"></span></span>`
+      + `<span>${e.score.expectedPoints.value.toFixed(1)}</span></li>`).join('')
+    + '</ol>';
+}
+
+function whyHTML(m) {
+  const id = _openId != null && m.squad.includes(_openId) ? _openId : null;
+  if (id == null || m.phase === 'loading') return '<p>Select a player on the board.</p>';
+  const player = store.getPlayer(id);
+  const score = _scores.get(id);
+  const team = store.getTeam(player.teamId);
+  if (!score || !m.settled) return `<p>${esc(player.fullName || player.name)} — still calculating, waiting on league-wide counter-matchup data.</p>`;
+  const role = m.phase === 'ready' ? m.role.get(id) : '';
+  const roleTitle = !role ? '—' : role === 'C' ? 'Captain' : role === 'XI' ? 'Starting' : `Bench ${role.slice(1)}`;
+  const flags = getRiskFlags(player, score);
+  const ms = score.breakdown?.form?.minutesSecurity ?? 0;
+  const tier = tierShort(_rankTierByPlayerId?.get(id), player.position);
+  return '<div class="why">'
+    + `<div class="why__top">${scoreChipHTML(player, score, true, 'lg')}${crestHTML(team, 24)}`
+    + `<span><b>${esc(player.fullName || player.name)}</b><small>${BAND_LABEL[score.band] ?? ''}${tier ? ` · ${tier}` : ''}</small></span></div>`
+    + `<span class="why__ctx">${esc(buildFixtureContextLabel(score, getHorizon()))}</span>`
+    + BREAKDOWN_ORDER.map(k => {
+      const c = score.breakdown?.[k];
+      if (!c) return '';
+      const v = Math.round(c.value), band = bandFromValue(v), w = Math.round(c.weight * 100);
+      return `<div class="bd" role="group" data-band="${band}" aria-label="${BREAKDOWN_LABELS[k]} ${v} ${BAND_LABEL[band] ?? ''}, weight ${w}%${c.estimated ? ', estimated' : ''}">`
+        + `<span>${BREAKDOWN_LABELS[k]}</span><span class="mbar" aria-hidden="true"><span class="${c.estimated ? 'is-est' : ''}" style="width:${v}%"></span></span>`
+        + `<b title="${c.estimated ? 'Estimated — limited data' : ''}">${c.estimated ? '~' : ''}${v}</b><span>${w}%</span></div>`;
+    }).join('')
+    + '<div class="why__facts">'
+    + `<span><span class="lbl lbl--sm">Pred</span><b>${score.expectedPoints.value.toFixed(1)} pts</b></span>`
+    + `<span><span class="lbl lbl--sm">Mins</span><b>${Math.round(ms * 100)}%${ms < MIN_SEC_RISK ? ' · low' : ''}</b></span>`
+    + `<span><span class="lbl lbl--sm">Role</span><b>${roleTitle}</b></span></div>`
+    + (flags.length ? `<span class="why__flags"><span class="warn" aria-hidden="true">⚠ </span>${esc(flags.map(f => FLAG_LABELS[f]).join(' · '))}`
+      + `${player.status !== 'available' && player.statusNote ? ` — ${esc(player.statusNote)}` : ''}</span>` : '')
+    + '</div>';
+}
+
+function risksHTML(m) {
+  if (m.phase === 'loading' || m.squad.length === 0) return '';
+  if (!m.settled) return '<p>Waiting on scores.</p>';
+  const by = {};
+  for (const id of m.squad) {
+    const score = _scores.get(id);
+    if (!score) continue;
+    for (const f of getRiskFlags(store.getPlayer(id), score)) (by[f] ??= []).push(id);
+  }
+  const keys = ['availability', 'rotation', 'confidence', 'fixture'].filter(f => by[f]);
+  if (!keys.length) return '<p>No flags in this squad.</p>';
+  return keys.map(f => `<div class="risk"><span><span class="warn" aria-hidden="true">⚠</span>${FLAG_LABELS[f]}<small>${by[f].length}</small></span>`
+    + by[f].map(id => {
+      const p = store.getPlayer(id), s = _scores.get(id);
+      const note = f === 'availability' ? (p.statusNote || p.status)
+        : f === 'rotation' ? `${Math.round((s.breakdown?.form?.minutesSecurity ?? 0) * 100)}% mins share`
+        : f === 'confidence' ? 'Limited data'
+        : `${Math.round(s.value)} ${BAND_LABEL[s.band] ?? ''}`;
+      return `<button type="button" data-row-id="${id}"><span>${m.role.get(id) ?? '—'}</span>`
+        + `<span>${crestHTML(store.getTeam(p.teamId))}<span class="ell">${esc(p.fullName || p.name)}</span></span><span>${esc(note)}</span></button>`;
+    }).join('') + '</div>').join('');
+}
+
+// ─── Render ───────────────────────────────────────────────────────────────────
 
 /**
- * Render one player row for the Starting XI or Bench list.
- * When live points are available (_livePoints !== null), a live-pts span is
- * appended alongside the projected score chip.
- *
- * @param {{player: Player, score: object}} entry
- * @param {number|null} captainId  the captain's player id (XI only; null for bench)
+ * Paint the whole page from the store and _scores.
+ * @param {boolean} [animate]  play the entrances (a render the reader caused);
+ *   the live poll and other data repaints pass nothing.
  */
-function renderPlayerRow(entry, captainId) {
-  const { player, score } = entry;
-  const team      = store.getTeam(player.teamId);
-  const isCaptain = player.id === captainId;
-  const flags     = getRiskFlags(player, score);
-  const statusMark = player.status !== 'available'
-    ? `<span class="ranker-status-badge" title="${esc(player.statusNote || player.status)}">!</span>`
-    : '';
+function render(animate = false) {
+  if (!_root) return;
+  renderCmd();
 
-  // Live points: captain's points are doubled in FPL — show both raw and ×2.
-  const liveHtml = buildLivePtsHtml(player.id, isCaptain);
-  const price = (typeof player.price === 'number' && !isNaN(player.price))
-    ? player.price.toFixed(1) : '?.?';
+  const m = buildModel();
+  const showLive = _livePoints !== null && _dataReady;
+  _boardSec.classList.toggle('is-wide', _boardSec.clientWidth === 0 || _boardSec.clientWidth >= 790);
+  _boardSec.setAttribute('aria-busy', String(m.phase === 'loading' || m.phase === 'settling'));
 
-  return `
-    <div class="dash-player-row${isCaptain ? ' dash-player-row--captain' : ''}">
-      <span class="dash-player-row__pos-badge">
-        <span class="ranker-pos-badge ranker-pos-badge--${player.position.toLowerCase()}">${esc(player.position)}</span>
-      </span>
-      <span class="dash-player-row__name">
-        ${esc(player.name)}${statusMark}${isCaptain ? '<span class="dash-player-row__captain-mark">&nbsp;(C)</span>' : ''}
-      </span>
-      <span class="dash-player-row__team">${team ? esc(team.shortName) : '—'}</span>
-      <span class="dash-player-row__price">£${price}m</span>
-      <span class="dash-player-row__score">
-        ${buildBreakdownDetails(player, score, _rankTierByPlayerId?.get(player.id))}
-        ${liveHtml}
-      </span>
-      ${flags.length ? `<span class="dash-player-row__flags">${buildFlagChips(flags)}</span>` : ''}
-    </div>
-  `.trim();
+  _root.querySelector('.seg--view').style.setProperty('--i', _view === 'sheet' ? 1 : 0);
+  _root.querySelectorAll('.seg--view [data-view]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === _view)));
+  _root.querySelector('#db-board-t').textContent = _view === 'sheet' ? 'Team sheet' : 'Squad board';
+  _root.querySelector('#db-board-meta').textContent = m.squad.length
+    ? `${m.squad.length} / ${SQUAD_TOTAL} players selected${m.formation ? ` · XI ${m.formation}` : ''}`
+    : 'Empty';
+  _root.querySelector('#db-note').textContent = `C = captain, XI = starting, B1–B4 = bench order. Score colour = band over ${getHorizon().label}; `
+    + `dashed = estimated, ~ = limited data, hatched = blank GW. Pred = projected points for GW${store.getUpcomingGw() ?? store.getCurrentGw() ?? ''}.`;
+
+  // Entrances play on reader-caused renders, and once when the first settled
+  // board appears — never on a live-poll repaint.
+  const anim = (animate || (_animNext && m.phase === 'ready')) && !reducedMotion();
+  if (m.phase === 'ready') _animNext = false;
+  _board.removeAttribute('data-anim');
+  _board.innerHTML = _view === 'sheet' ? sheetHTML(m, showLive) : boardHTML(m, showLive);
+  if (anim) { void _board.offsetWidth; _board.setAttribute('data-anim', ''); }
+
+  _cap.innerHTML = captainHTML(m, showLive);
+  _why.innerHTML = whyHTML(m);
+  _root.querySelector('#db-why-hint').textContent = _order.length ? 'J / K to step' : '';
+  const risks = risksHTML(m);
+  _risk.innerHTML = risks;
+  const flagCount = (risks.match(/data-row-id=/g) ?? []).length;
+  _root.querySelector('#db-risk-meta').textContent = flagCount ? `${flagCount} flags` : '';
+
+  countUpCaptain(m);
 }
 
-// ─── Render: Starting XI block ────────────────────────────────────────────────
-
-function renderXIBlock(xi, captainId) {
-  const posOrder = { GKP: 0, DEF: 1, MID: 2, FWD: 3 };
-  const sorted = xi.slice().sort((a, b) => {
-    const pd = posOrder[a.player.position] - posOrder[b.player.position];
-    return pd !== 0 ? pd : b.score.value - a.score.value;
-  });
-
-  // Update the "Score" column header label when live data is present.
-  const scoreColLabel = _livePoints ? 'Proj / Live' : 'Score';
-
-  return `
-    <div class="dash-xi">
-      <div class="dash-xi__header">
-        <span>Starting XI</span>
-        <span>${esc(scoreColLabel)}</span>
-      </div>
-      ${sorted.map(e => renderPlayerRow(e, captainId)).join('')}
-    </div>
-  `.trim();
+/** The captain's Pred pts numeral counts up when the pick or its figure changes. */
+function countUpCaptain(m) {
+  cancelAnimationFrame(_raf);
+  const el = _cap.querySelector('[data-ep]');
+  if (!el) return;
+  const to = Number(el.dataset.ep);
+  const id = m.captain?.player.id;
+  const from = _capLast.id === id ? _capLast.ep : 0;
+  _capLast = { id, ep: to };
+  if (reducedMotion() || from === to) return;
+  const t0 = performance.now();
+  const tick = now => {
+    const q = Math.min(1, Math.max(0, (now - t0 - 120) / 900));
+    const v = from + (to - from) * (1 - (1 - q) ** 2);
+    for (const s of el.children) s.textContent = v.toFixed(1);
+    if (q < 1) _raf = requestAnimationFrame(tick);
+  };
+  for (const s of el.children) s.textContent = from.toFixed(1);
+  _raf = requestAnimationFrame(tick);
 }
 
-// ─── Render: Bench block ──────────────────────────────────────────────────────
+function setView(v) {
+  if (v === _view || _viewBusy) return;
+  try { localStorage.setItem(VIEW_KEY, v); } catch { /* per-viewer convenience only */ }
+  if (reducedMotion()) { _view = v; render(true); return; }
+  _viewBusy = true;
+  _root.querySelector('.seg--view').style.setProperty('--i', v === 'sheet' ? 1 : 0);
+  _board.classList.add('is-leaving');
+  setTimeout(() => {
+    _board.classList.remove('is-leaving');
+    _viewBusy = false;
+    _view = v;
+    render(true);
+  }, 190);
+}
 
-function renderBenchBlock(bench) {
-  if (!bench || bench.length === 0) return '';
-  return `
-    <div class="dash-bench">
-      <div class="dash-bench__header">
-        <span>Bench (priority order)</span>
-        <span>Score</span>
-      </div>
-      ${bench.map(e => renderPlayerRow(e, null)).join('')}
-    </div>
-  `.trim();
+function select(id) {
+  _openId = _openId === id ? null : id;
+  render();
 }
 
 // ─── After squad change ───────────────────────────────────────────────────────
 
 function afterSquadChange() {
+  if (_openId != null && !isInSquad(_openId)) _openId = null;
   scoreSquad();
-  renderSquadPanel();
-  renderDecisions();
+  render();
   if (_searchInput) _searchInput.value = '';
   hideResults();
 }
@@ -947,6 +1088,7 @@ function afterSquadChange() {
 // ─── Event handlers ───────────────────────────────────────────────────────────
 
 function onSearchInput() {
+  _sIdx = 0;
   renderSearchResults();
 }
 
@@ -959,7 +1101,15 @@ function onSearchBlur() {
 }
 
 function onSearchKeydown(e) {
-  if (e.key === 'Escape') {
+  const n = _results.length;
+  if (e.key === 'ArrowDown' && n) { e.preventDefault(); _sIdx = (_sIdx + 1) % n; renderSearchResults(); }
+  else if (e.key === 'ArrowUp' && n) { e.preventDefault(); _sIdx = (_sIdx - 1 + n) % n; renderSearchResults(); }
+  else if (e.key === 'Enter' && n) {
+    e.preventDefault();
+    const r = _results[_sIdx];
+    if (r && !r.disabled) addPlayer(r.id);
+  } else if (e.key === 'Escape') {
+    e.stopPropagation();
     hideResults();
     _searchInput?.blur();
   }
@@ -968,17 +1118,59 @@ function onSearchKeydown(e) {
 function onResultsMousedown(e) {
   const item = e.target.closest('[data-player-id]');
   if (!item) return;
-  if (item.classList.contains('dash-search-results__item--disabled')) return;
+  if (item.getAttribute('aria-disabled') === 'true') return;
   const id = Number(item.dataset.playerId);
   if (!id) return;
   e.preventDefault();
   addPlayer(id);
 }
 
-function onSquadSlotsClick(e) {
-  const btn = e.target.closest('[data-remove-id]');
-  if (!btn) return;
-  removePlayer(Number(btn.dataset.removeId));
+function onClick(e) {
+  const t = e.target;
+  let el;
+  if ((el = t.closest('[data-remove-id]'))) { e.stopPropagation(); removePlayer(Number(el.dataset.removeId)); return; }
+  if ((el = t.closest('.cmd [data-pos]'))) {
+    const pos = el.dataset.pos;
+    if (_searchPosSet.has(pos)) {
+      if (_searchPosSet.size > 1) _searchPosSet.delete(pos);
+    } else {
+      _searchPosSet.add(pos);
+    }
+    _root.querySelectorAll('.cmd [data-pos]').forEach(b => b.setAttribute('aria-pressed', String(_searchPosSet.has(b.dataset.pos))));
+    _sIdx = 0;
+    if (!_searchResults.hidden) renderSearchResults();
+    return;
+  }
+  if ((el = t.closest('[data-view]'))) { setView(el.dataset.view); return; }
+  if (t.closest('#db-import-btn')) { _importPanel.hidden ? openImportPanel() : closeImportPanel(); return; }
+  if (t.closest('#db-help-btn')) { toggleHelp(); return; }
+  if (t.closest('#db-imp-cancel')) { closeImportPanel(); _importBtn.focus(); return; }
+  if (t.closest('#db-imp-go')) { handleImport(); return; }
+  if ((el = t.closest('[data-row-id]'))) select(Number(el.dataset.rowId));
+}
+
+function onKeydown(e) {
+  if (store.getActiveModule() !== 'dashboard') return;
+  if (e.key === 'Escape') {
+    if (!_importPanel.hidden || !_importHelp.hidden) { closeImportPanel(); closeHelp(); }
+    else if (_openId != null) { _openId = null; render(); }
+    return;
+  }
+  const tag = e.target?.tagName;
+  if (e.metaKey || e.ctrlKey || e.altKey || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || !_dataReady) return;
+  const k = e.key;
+  if (k === '/') { e.preventDefault(); _searchInput.focus(); }
+  else if (k === 'i' || k === 'I') { e.preventDefault(); _importPanel.hidden ? openImportPanel() : closeImportPanel(); }
+  else if (k === 't' || k === 'T') { e.preventDefault(); setView(_view === 'sheet' ? 'board' : 'sheet'); }
+  else if ((k === 'j' || k === 'k') && _order.length) {
+    e.preventDefault();
+    const cur = _order.indexOf(_openId);
+    const n = cur < 0 ? 0 : (cur + (k === 'j' ? 1 : -1) + _order.length) % _order.length;
+    _openId = _order[n];
+    render();
+    const row = _board.querySelector(`[data-row-id="${_openId}"]`);
+    (row?.tagName === 'BUTTON' ? row : row?.querySelector('[data-rowbtn]'))?.focus();
+  }
 }
 
 /**
@@ -987,6 +1179,15 @@ function onSquadSlotsClick(e) {
  */
 function onHashChange() {
   reconcileLivePoll();
+}
+
+let _resizeRaf = 0;
+function onResize() {
+  cancelAnimationFrame(_resizeRaf);
+  _resizeRaf = requestAnimationFrame(() => {
+    if (store.getActiveModule() !== 'dashboard' || !_boardSec.clientWidth) return;
+    if ((_boardSec.clientWidth >= 790) !== _boardSec.classList.contains('is-wide')) render();
+  });
 }
 
 // ─── Squad import helpers (Phase 4-1) ────────────────────────────────────────
@@ -1040,19 +1241,25 @@ function renderImportInfo(entryInfo) {
 function showImportStatus(msg, type) {
   if (!_importStatus) return;
   _importStatus.textContent = msg;
-  _importStatus.className = `squad-import-status squad-import-status--${type}`;
+  _importStatus.dataset.type = type;
+  _importStatus.setAttribute('role', type === 'error' ? 'alert' : 'status');
+  const go = _root?.querySelector('#db-imp-go');
+  if (go) {
+    go.textContent = type === 'loading' ? 'Importing…' : 'Import';
+    go.setAttribute('aria-busy', String(type === 'loading'));
+  }
 }
 
 /**
- * Toggle the import panel's visibility.
+ * Open the import panel.
  * Pre-fills the ID input from localStorage and clears any prior status.
  */
 function openImportPanel() {
   if (!_importPanel) return;
-  // The help panel occupies the same overlay slot — collapse it first.
-  if (_importHelp) _importHelp.open = false;
+  // The help row occupies the same slot — collapse it first.
+  closeHelp();
   _importPanel.hidden = false;
-  _importBtn?.classList.add('is-open');
+  _importBtn?.setAttribute('aria-expanded', 'true');
   if (_importIdInput) {
     const saved = loadSavedTeamId();
     if (saved && !_importIdInput.value) _importIdInput.value = String(saved);
@@ -1065,8 +1272,22 @@ function openImportPanel() {
 function closeImportPanel() {
   if (!_importPanel) return;
   _importPanel.hidden = true;
-  _importBtn?.classList.remove('is-open');
+  _importBtn?.setAttribute('aria-expanded', 'false');
   showImportStatus('', 'idle');
+}
+
+function toggleHelp() {
+  if (!_importHelp.hidden) { closeHelp(); return; }
+  // Reciprocal of the guard in openImportPanel — opening help hides the form.
+  closeImportPanel();
+  _importHelp.hidden = false;
+  _helpBtn.setAttribute('aria-expanded', 'true');
+}
+
+function closeHelp() {
+  if (!_importHelp) return;
+  _importHelp.hidden = true;
+  _helpBtn?.setAttribute('aria-expanded', 'false');
 }
 
 /** Run the import: validate input, fetch, replace squad. */
@@ -1119,87 +1340,63 @@ async function handleImport() {
 }
 
 /**
- * Cache all DOM refs and attach all event listeners. Called once from
- * onDataReady() — guaranteed to run after the browser has fully parsed the
- * document. The _domWired guard prevents double-wiring.
+ * Cache all DOM refs and attach all event listeners. Called from
+ * initDashboard() and again from onDataReady(); the _domWired guard
+ * prevents double-wiring.
  */
 function wireDom() {
   if (_domWired) return;
 
-  _root          = document.querySelector('[data-module="dashboard"]');
-  _searchInput   = document.getElementById('dash-search-input');
-  _searchResults = document.getElementById('dash-search-results');
-  _squadSlots    = document.getElementById('dash-squad-slots');
-  _decisions     = document.getElementById('dash-decisions');
-  _tally         = document.getElementById('dash-squad-tally');
-
+  _root          = document.querySelector('[data-module="dashboard"] .db');
   if (!_root) {
     console.warn('[dashboard] data-module="dashboard" section not found in DOM');
     return;
   }
-  if (!_searchInput) {
-    console.warn('[dashboard] #dash-search-input not found in DOM');
-    return;
-  }
+  _cmd           = _root.querySelector('#db-cmd');
+  _searchInput   = _root.querySelector('#db-search');
+  _searchResults = _root.querySelector('#db-results');
+  _board         = _root.querySelector('#db-board');
+  _boardSec      = _root.querySelector('#db-board-sec');
+  _cap           = _root.querySelector('#db-cap');
+  _why           = _root.querySelector('#db-why');
+  _risk          = _root.querySelector('#db-risk');
+  _importBtn     = _root.querySelector('#db-import-btn');
+  _importPanel   = _root.querySelector('#db-imp');
+  _importIdInput = _root.querySelector('#db-imp-id');
+  _importStatus  = _root.querySelector('#db-imp-st');
+  _importInfo    = _root.querySelector('#db-imp-info');
+  _importHelp    = _root.querySelector('#db-help');
+  _helpBtn       = _root.querySelector('#db-help-btn');
+
+  try { if (localStorage.getItem(VIEW_KEY) === 'sheet') _view = 'sheet'; } catch { /* per-viewer convenience only */ }
 
   // ── Search events ────────────────────────────────────────────────────────
   _searchInput.addEventListener('input',   onSearchInput);
   _searchInput.addEventListener('focus',   onSearchFocus);
   _searchInput.addEventListener('blur',    onSearchBlur);
   _searchInput.addEventListener('keydown', onSearchKeydown);
+  _searchResults.addEventListener('mousedown', onResultsMousedown);
 
-  _searchResults?.addEventListener('mousedown', onResultsMousedown);
-
-  // ── Position filter pills ────────────────────────────────────────────────
-  _root.querySelectorAll('.dash-pos-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const pos = btn.dataset.pos;
-      if (_searchPosSet.has(pos)) {
-        if (_searchPosSet.size > 1) {
-          _searchPosSet.delete(pos);
-          btn.classList.remove('is-active');
-        }
-      } else {
-        _searchPosSet.add(pos);
-        btn.classList.add('is-active');
-      }
-      if (_searchResults?.classList.contains('is-open')) renderSearchResults();
-    });
+  // ── Everything else is delegated ─────────────────────────────────────────
+  _root.addEventListener('click', onClick);
+  document.addEventListener('keydown', onKeydown);
+  window.addEventListener('resize', onResize);
+  _importIdInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') handleImport();
+    if (e.key === 'Escape') { e.stopPropagation(); closeImportPanel(); _importBtn.focus(); }
   });
 
-  // ── Squad slots — click delegation for remove buttons ────────────────────
-  _squadSlots?.addEventListener('click', onSquadSlotsClick);
+  // The aside sticks under the command bar, which wraps at some widths —
+  // track its real height rather than assuming one.
+  new ResizeObserver(() => _root.style.setProperty('--db-cmd-h', `${_cmd.offsetHeight}px`)).observe(_cmd);
 
   // ── Live poll lifecycle — start/stop on navigation ───────────────────────
   window.addEventListener('hashchange', onHashChange);
 
-  // ── Squad import (Phase 4-1) ─────────────────────────────────────────────
-  _importBtn     = document.getElementById('dash-import-btn');
-  _importPanel   = document.getElementById('dash-import-panel');
-  _importIdInput = document.getElementById('dash-import-id');
-  _importStatus  = document.getElementById('dash-import-status');
-  _importInfo    = document.getElementById('dash-import-info');
-
-  _importHelp    = document.getElementById('dash-import-help');
-
-  _importBtn?.addEventListener('click', openImportPanel);
-  // Reciprocal of the guard in openImportPanel — opening help hides the form.
-  _importHelp?.addEventListener('toggle', () => {
-    if (_importHelp.open) closeImportPanel();
-  });
-  document.getElementById('dash-import-cancel')?.addEventListener('click', closeImportPanel);
-  document.getElementById('dash-import-go')?.addEventListener('click', handleImport);
-  _importIdInput?.addEventListener('keydown', e => {
-    if (e.key === 'Enter') handleImport();
-    if (e.key === 'Escape') closeImportPanel();
-  });
-
   // ── Render the initial shell — squad is already hydrated by store.js ─────
-  renderSquadPanel();
-  renderDecisions();
+  render();
 
   _domWired = true;
-  console.log('[dashboard] DOM wired — search input listener attached');
 }
 
 /**
@@ -1215,6 +1412,7 @@ function onDataReady() {
   stopLivePoll();
   _livePoints = null;
   _liveStale  = false;
+  _liveUpdatedAt = null;
 
   // Force a fresh full-pool rank computation for the new data (see ensureRankTiers).
   _rankTierByPlayerId = null;
@@ -1234,8 +1432,7 @@ function onDataReady() {
   _pendingRender = false;
 
   scoreSquad();
-  renderSquadPanel();
-  renderDecisions();
+  render();
 
   // Start live polling if we're already on the dashboard and the GW is live.
   reconcileLivePoll();
@@ -1252,11 +1449,16 @@ function onDataReady() {
  * both places is safe and removes the ordering dependency.
  */
 function onRouteChanged(module) {
-  if (module !== 'dashboard' || !_pendingRender) return;
+  if (module !== 'dashboard') {
+    closeImportPanel();
+    closeHelp();
+    return;
+  }
+  _animNext = true;
+  if (!_pendingRender) { render(); return; }
   _pendingRender = false;
   scoreSquad();
-  renderSquadPanel();
-  renderDecisions();
+  render();
   reconcileLivePoll();
 }
 
@@ -1266,18 +1468,21 @@ function onRouteChanged(module) {
  * Initialise the GW Decision Dashboard module. Called once from main.js on
  * bootstrap, before loadInitialData(). Registers the data:ready subscription
  * so the module is ready to receive the event whenever the fetch completes.
- * All DOM wiring is deferred to wireDom(), called from onDataReady(), so that
- * getElementById calls are guaranteed to find live elements.
+ * main.js runs after the document is parsed, so wireDom() can run here and
+ * the board shows its loading state before the first data:ready.
  *
  * Also subscribes to 'squad:updated' so a squad built or imported on the
  * Planner — or anywhere else — re-scores and re-renders here too, with no
- * rebuild step. afterSquadChange() itself no-ops safely via renderSquadPanel's/
- * renderDecisions' null DOM-ref guards if this module hasn't wired yet.
+ * rebuild step. afterSquadChange() itself no-ops safely via render()'s null
+ * DOM-ref guard if this module hasn't wired yet.
  */
 export function initDashboard() {
   store.subscribe('data:ready', onDataReady);
   store.subscribe('route:changed', onRouteChanged);
   store.subscribe('squad:updated', afterSquadChange);
+
+  // Wire now so the loading state shows before the first data:ready.
+  wireDom();
 
   // If the store is already hydrated from sessionStorage, data:ready won't
   // fire again — wire the DOM and render immediately.
