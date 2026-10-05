@@ -535,8 +535,8 @@
 
 .season-strip__title {
   margin: 0;
-  font: 400 22px/1 var(--font-display);
-  letter-spacing: .03em;
+  font: 600 22px/1 var(--font-head);
+  letter-spacing: .05em;
   text-transform: uppercase;
 }
 
@@ -845,8 +845,8 @@
 
 .season-state__t {
   margin: 0;
-  font: 400 20px/1.05 var(--font-display);
-  letter-spacing: .02em;
+  font: 600 20px/1.05 var(--font-head);
+  letter-spacing: .05em;
   text-transform: uppercase;
   color: var(--color-text);
 }
@@ -976,8 +976,8 @@
   display: flex;
   align-items: baseline;
   gap: var(--space-2);
-  font: 400 22px/1 var(--font-display);
-  letter-spacing: .02em;
+  font: 600 22px/1 var(--font-head);
+  letter-spacing: .05em;
   text-transform: uppercase;
 }
 .season-pop__t small {
