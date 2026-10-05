@@ -110,7 +110,7 @@
 
   /* Score numeral; the outline layer sits behind in the tier/band hue. */
   .big { position: relative; display: inline-block; isolation: isolate; white-space: nowrap; font: 700 var(--fs, 56px)/.82 var(--font-score); letter-spacing: 0; font-variant-numeric: tabular-nums; }
-  .big__o { position: absolute; top: .05em; left: .05em; z-index: -1; color: transparent; -webkit-text-stroke: 2px var(--b); }
+  .big__o { position: absolute; top: .05em; left: .05em; z-index: -1; color: var(--b); filter: url(#gq-outline); }
 
   /* fixture strip — one slot per gameweek */
   .strip { --cw: 30px; --ch: 22px; --cf: .65rem; display: flex; gap: 2px; align-items: flex-start; }

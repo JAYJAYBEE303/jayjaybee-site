@@ -25,6 +25,11 @@
   <link rel="stylesheet" href="../../../assets/css/back-to-jayjaybee.css">
 </head>
 <body>
+  <!-- Outline for the big score numerals' back layer (.num__o, .big__o): dilate the filled
+       glyph and cut the glyph out, so the ring follows the letterform's silhouette.
+       -webkit-text-stroke strokes every contour, and the score face's overlapping
+       contours show through as stray lines. -->
+  <svg aria-hidden="true" width="0" height="0" style="position:absolute;width:0;height:0;overflow:hidden"><filter id="gq-outline" x="-5%" y="-5%" width="110%" height="110%" color-interpolation-filters="sRGB"><feMorphology in="SourceGraphic" operator="dilate" radius="2" result="d"></feMorphology><feComposite in="d" in2="SourceGraphic" operator="out"></feComposite></filter></svg>
   <noscript>Gaffer IQ requires JavaScript.</noscript>
 
   <div class="app-shell">

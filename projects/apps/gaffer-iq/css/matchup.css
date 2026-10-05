@@ -252,9 +252,9 @@
   .numw { position: relative; isolation: isolate; display: block; font-size: clamp(110px, 13.75vw, 210px); }
   .numw .num { position: relative; display: block; font-size: 1em; }
   .side--h .numw .num { text-align: right; }
-  .numw .num__o { position: absolute; width: 100%; white-space: nowrap; top: .05em; left: .05em; z-index: -1; color: transparent; -webkit-text-stroke: 2px var(--b); pointer-events: none; }
+  .numw .num__o { position: absolute; width: 100%; white-space: nowrap; top: .05em; left: .05em; z-index: -1; color: var(--b); filter: url(#gq-outline); pointer-events: none; }
   .side--a .numw .num__o { left: -.05em; }
-  .numw.is-est .num__o { -webkit-text-stroke-color: var(--color-estimated); }
+  .numw.is-est .num__o { color: var(--color-estimated); }
   .numw .sk-t { width: 1.08em; height: .82em; }
   .slab { display: flex; align-items: center; gap: 10px; }
   .slab::before { content: ""; width: 56px; height: 6px; background: var(--b); transform: skewX(-30deg); }
