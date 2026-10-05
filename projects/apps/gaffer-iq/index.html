@@ -5,11 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gaffer IQ</title>
 
-  <!-- Anton — the redesign's display face (--font-display, base.css),
-       self-hosted. The app is otherwise system-fonts-only. Preloaded because
-       the landing intro waits on it (capped) so the headline can't reflow
-       mid-animation. -->
-  <link rel="preload" href="assets/fonts/Anton-Regular.ttf" as="font" type="font/ttf" crossorigin>
+  <!-- Display fonts — three self-hosted roles (--font-head, --font-team,
+       --font-score), declared with their metric overrides in assets/fonts.css.
+       The team face's latin file is preloaded because the landing intro waits
+       on it (capped) so the headline can't reflow mid-animation. -->
+  <link rel="preload" href="assets/fonts/bebas-neue-400-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="assets/fonts.css">
 
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/layout.css">
