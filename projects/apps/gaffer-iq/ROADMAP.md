@@ -5,7 +5,7 @@
 > Guiding sequencing principle: **get real data flowing end-to-end before building any analytics, and get one full vertical slice working before going wide.** Do not build all four modules half-way. Build one module fully, prove the pipeline, then expand.
 
 ---
-
+---
 ## Phase 0 — Scaffold (half a day; do this first, it's not optional)
 
 Before any feature work, stand up the skeleton exactly as `ARCHITECTURE.md` §3 specifies.
