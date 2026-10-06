@@ -6,7 +6,7 @@
 
 # Jekyll build output (GitHub Pages rebuilds on push; local builds stay local)
 .jekyll-cache/
-.jekyll-metadata
+.jekyll-metadata 
 Gemfile.lock
 vendor/
 
