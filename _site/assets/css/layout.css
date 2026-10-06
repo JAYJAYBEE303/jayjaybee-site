@@ -1,0 +1,1421 @@
+/* =========================================================================
+   jayjaybee.com — layout.css
+   Structural rules: page shell, header, nav, footer, and the section
+   shapes used on the home page (lede, narrative, roles, work, about).
+
+   Static visual properties only — colours, sizes, gutters, grids,
+   hover state changes. Motion (transitions, animations, reveal system,
+   transform-based hover lifts) lives in components.css.
+   ========================================================================= */
+
+/* =========================================================================
+   SITE HEADER / NAV
+   Editorial nameplate layout: a large serif wordmark with an accent
+   brand mark sits on top; a row of sans-serif nav links plus the
+   site search sits below. The hairline runs along the bottom edge of
+   the inner block, dividing header from page body.
+   No logo, no hamburger — the link row wraps on narrow widths.
+   ========================================================================= */
+.site-header {
+  width: 100%;
+}
+.site-header__inner {
+  max-width: var(--container);
+  margin: 0 auto;
+  padding: clamp(var(--space-5), 4vw, var(--space-7))
+           clamp(var(--space-5), 5vw, var(--space-8))
+           var(--space-5);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-5);
+  border-bottom: var(--border-hairline);
+}
+
+/* Wordmark — large serif, ink, no underline. The brand mark (an
+   8px accent square) sits next to it, baselined with the cap height. */
+.site-wordmark {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 14px;
+  font-family: var(--font-serif);
+  font-weight: var(--fw-regular);
+  font-size: clamp(2.5rem, 4vw + 1rem, 4rem);
+  line-height: 1;
+  letter-spacing: -0.025em;
+  color: var(--fg);
+  text-decoration: none;
+}
+.site-wordmark:hover { color: var(--accent); }
+.site-wordmark__name {
+  font-family: var(--font-serif);
+  font-weight: var(--fw-regular);
+  font-size: inherit;
+  line-height: 1;
+  letter-spacing: inherit;
+  color: inherit;
+}
+.site-wordmark__mark {
+  width: 8px;
+  height: 8px;
+  background: var(--accent);
+  align-self: center;
+  /* Optical nudge — without it the dot sits slightly above the visual
+     midpoint of the wordmark's lowercase x-height. */
+  transform: translateY(2px);
+  flex: 0 0 auto;
+}
+
+/* Top row — wordmark on the left, theme toggle on the right.
+   Vertically centred so the toggle pill sits aligned with the
+   wordmark mass. */
+.site-header__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-5);
+}
+
+/* Nav row — links left, search right. position: relative keeps the
+   dropdown panels (anchored to their triggers) inside this stacking
+   context. */
+.site-header__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-6);
+  position: relative;
+  flex-wrap: wrap;
+}
+
+/* Link row — sans, ink, no underline. Accent link is the one exception. */
+.site-nav__list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: clamp(var(--space-4), 2.5vw, var(--space-7));
+}
+.site-nav__link {
+  font-family: var(--font-sans);
+  font-size: var(--fs-ui);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--tr-ui);
+  color: var(--fg);
+  text-decoration: none;
+}
+.site-nav__link:hover {
+  color: var(--accent);
+}
+.site-nav__link--accent {
+  color: var(--accent);
+  font-weight: var(--fw-bold);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.25em;
+  text-decoration-color: currentColor;
+}
+.site-nav__link--accent:hover {
+  color: var(--accent-hover);
+}
+
+/* Dropdown triggers — buttons styled as nav links */
+.site-nav__item.has-menu { position: relative; }
+.site-nav__trigger {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35em;
+}
+.site-nav__caret {
+  font-size: 0.7em;
+  line-height: 1;
+  color: var(--fg-quiet);
+  transform: translateY(-0.1em);
+}
+.site-nav__trigger:hover .site-nav__caret { color: currentColor; }
+.site-nav__trigger[aria-expanded="true"] .site-nav__caret {
+  transform: translateY(-0.1em) rotate(180deg);
+}
+
+/* Dropdown panel — hairline-bordered card, anchored under the trigger */
+.site-nav__menu {
+  position: absolute;
+  top: calc(100% + var(--space-3));
+  left: 0;
+  z-index: 50;
+  min-width: max-content;
+  max-width: 22rem;
+  margin: 0;
+  padding: var(--space-2);
+  background: var(--bg);
+  border: var(--border-hairline);
+  border-radius: var(--radius-2);
+  box-shadow: var(--shadow-2), var(--shadow-1);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.site-nav__menu[hidden] { display: none; }
+.site-nav__menu--right { left: auto; right: 0; }
+
+.site-nav__menu-link {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-sans);
+  font-size: var(--fs-ui);
+  font-weight: var(--fw-regular);
+  line-height: var(--lh-ui);
+  color: var(--fg);
+  text-decoration: none;
+  border-radius: var(--radius-1);
+  white-space: nowrap;
+}
+.site-nav__menu-link:hover,
+.site-nav__menu-link:focus-visible {
+  background: var(--bg-recessed);
+  color: var(--accent);
+  outline: none;
+}
+
+@media (max-width: 36rem) {
+  /* Tighten internal gap on small screens — the wordmark is already
+     dominating; keep the nav row close. */
+  .site-header__inner { gap: var(--space-3); }
+  .site-nav__list     { gap: var(--space-5); }
+  /* Anchor the right-aligned menu back to the left so it doesn't
+     clip off the viewport on narrow screens. */
+  .site-nav__menu--right { left: 0; right: auto; }
+}
+
+/* =========================================================================
+   PAGE SHELL + RHYTHM
+   --container is the outer max, but content uses --measure-* widths.
+   Sections are separated by space, not dividers.
+   ========================================================================= */
+.page {
+  max-width: var(--container);
+  margin: 0 auto;
+  padding: clamp(var(--space-7), 6vw, var(--space-10))
+           clamp(var(--space-5), 5vw, var(--space-8))
+           var(--space-6);
+}
+
+/* Vertical rhythm between major sections */
+.page > section + section {
+  margin-top: clamp(var(--space-9), 9vw, var(--section-gap-l));
+}
+
+/* Section headers — small mono eyebrow above a serif title */
+.section-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: var(--space-7);
+}
+.section-title {
+  font-family: var(--font-serif);
+  font-weight: var(--fw-regular);
+  font-size: var(--fs-headline);
+  line-height: var(--lh-snug);
+  letter-spacing: var(--tr-headline);
+}
+
+/* Display variant — for a section title that IS the page's opening
+   heading, on pages with no separate .lede-block above it. Borrows the
+   lede's type tokens so it reads at hero scale. Keep in sync with
+   .lede-line below, including its narrow-viewport clamp. */
+.section-title--display {
+  font-size: var(--fs-display);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--tr-display);
+  text-wrap: balance;
+}
+@media (max-width: 30rem) {
+  .section-title--display {
+    font-size: clamp(2rem, 8.5vw, 3.25rem);
+  }
+}
+
+/* =========================================================================
+   PROJECTS HERO (ledger variant)
+   Alternate opening-header treatment for /projects — a two-column ledger
+   row (entry count, then kicker/title/sub) instead of the mono-label +
+   .section-title--display pattern used elsewhere. Markup + params live
+   in _includes/projects-hero.html.
+
+   The title's own font-size/line-height reasoning is on .proj-hero-b__title
+   below.
+
+   margin-bottom on .proj-hero-b matches --space-7, the same token
+   .section-head declares below for exactly this purpose (the gap
+   before a section's list starts) — this is that same site-wide rule,
+   not a new value invented for this component. .work-item's own
+   border-top + padding-top: var(--space-7) still applies on top of
+   this, same as it always has for every .section-head + .work-list
+   pairing elsewhere on the site.
+   ========================================================================= */
+.proj-hero-b {
+  max-width: var(--measure-wide);
+  display: grid;
+  grid-template-columns: 5.5rem 1fr;
+  gap: var(--space-6);
+  align-items: start;
+  margin-bottom: var(--space-7);
+}
+@media (max-width: 36rem) {
+  .proj-hero-b { grid-template-columns: 1fr; }
+}
+/* The ledger numeral — deliberately stacked three lines by fixed
+   character position ("02" / "/0" / "2" for a "NN/NN" count), not
+   left to wrap. It first read as an accidental line-break (the fixed
+   5.5rem column IS narrower than "NN/NN" set inline), but that
+   2-2-1 stacked look is the wanted one — a flex column makes it
+   deliberate and stable instead of depending on the browser's own
+   line-breaking around "/", which is fragile across fonts/zoom
+   levels. The three chunks are separate <span class="proj-hero-b__n-line">
+   children in the markup (see _includes/projects-hero.html), sliced
+   by character index, so this never depends on where the browser
+   happens to wrap. */
+.proj-hero-b__n {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  font-family: var(--font-mono);
+  font-size: clamp(2.5rem, 4vw + 1rem, 3.75rem);
+  line-height: 0.85;
+  letter-spacing: -0.01em;
+  color: var(--fg-faint);
+}
+.proj-hero-b__n-slash { color: var(--accent); }
+/* font-size: 2rem, not a token or clamp(). The copy runs to ~45
+   characters and needs to stay on one line (tested 375/~800/~980px);
+   at --fs-headline scale (max 3.25rem) it wraps to two lines
+   everywhere, and even --fs-subhead (max 1.875rem, the prior value
+   here) read too small against the work-item titles below. 2rem is
+   the FLOOR of .work-item--featured .work-title's own clamp
+   (clamp(2rem, 3vw + 1rem, 2.875rem)) — a deliberate anchor to "at
+   least as big as a project title ever gets", not an arbitrary
+   number. Not itself clamped: letting it scale up with viewport
+   width the way the featured titles do reintroduces the two-line
+   wrap on wide screens, and this component isn't the featured card
+   titles' equal in the hierarchy, just close in size. text-wrap:
+   balance stays as a fallback — if the copy grows past what fits, it
+   degrades to two even lines instead of overflowing. */
+.proj-hero-b__title {
+  font-family: var(--font-serif);
+  font-weight: var(--fw-regular);
+  font-size: 2rem;
+  line-height: var(--lh-snug);
+  letter-spacing: var(--tr-headline);
+  color: var(--fg);
+  text-wrap: balance;
+}
+.proj-hero-b__kicker {
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono-caps);
+  text-transform: uppercase;
+  color: var(--fg-quiet);
+  margin-bottom: var(--space-3);
+}
+.proj-hero-b__sub {
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
+  line-height: var(--lh-prose);
+  color: var(--fg-muted);
+  margin-top: var(--space-4);
+  max-width: var(--measure-prose);
+}
+
+/* =========================================================================
+   LEDE — the opening line. The single biggest element on the page.
+   ========================================================================= */
+.lede-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  max-width: var(--measure-wide);
+}
+.lede-meta {
+  color: var(--fg-quiet);
+}
+.lede-line {
+  font-family: var(--font-serif);
+  font-weight: var(--fw-regular);
+  font-size: var(--fs-display);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--tr-display);
+  text-wrap: balance;
+  color: var(--fg);
+}
+.lede-line__row {
+  display: block;
+  white-space: nowrap;
+}
+@media (max-width: 30rem) {
+  .lede-line {
+    font-size: clamp(2rem, 8.5vw, 3.25rem);
+  }
+}
+
+/* =========================================================================
+   NARRATIVE — single prose paragraph inside the wide measure.
+   ========================================================================= */
+.narrative .prose {
+  font-size: var(--fs-lede);
+  color: var(--fg-muted);
+}
+
+/* =========================================================================
+   PAST ROLES
+   Reverse-chronological list. Two-column row: mono date left, serif
+   org / sans role / one-line note right. Stacks on narrow widths.
+   No card chrome, no logos. Hairlines and space, per the design system.
+   ========================================================================= */
+.role-list {
+  display: flex;
+  flex-direction: column;
+}
+.role-item {
+  border-top: var(--border-hairline);
+  padding: var(--space-6) 0;
+  cursor: pointer;
+  display: grid;
+  /* Fixed-width date column keeps the dates aligned regardless of role
+     title length — the typographic version of a CV gutter. */
+  grid-template-columns: 11rem 1fr;
+  gap: var(--space-7);
+  align-items: baseline;
+
+  /* :target uses an inset left rule. Keep a transparent border-left in
+     the default state so layout doesn't jump when the rule appears. */
+  border-left: 2px solid transparent;
+  padding-left: var(--space-4);
+  margin-left: calc(var(--space-4) * -1);
+}
+.role-item:last-child { padding-bottom: 0; }
+
+.role-when {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  color: var(--fg-quiet);
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono-caps);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.role-status {
+  color: var(--accent);
+}
+.role-status::before {
+  content: "● ";
+  font-size: 0.7em;
+  vertical-align: 0.15em;
+  margin-right: 0.15em;
+}
+
+.role-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: var(--measure-prose);
+}
+.role-org {
+  font-family: var(--font-sans);
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-ui);
+  line-height: var(--lh-ui);
+  letter-spacing: var(--tr-ui);
+  color: var(--fg);
+}
+.role-org-sub {
+  font-weight: var(--fw-regular);
+  color: var(--fg-quiet);
+}
+.role-tm {
+  font-size: 0.55em;
+  vertical-align: 0.6em;
+  margin-left: 0.05em;
+  color: var(--fg-quiet);
+}
+.role-title {
+  font-family: var(--font-serif);
+  font-weight: var(--fw-regular);
+  font-size: clamp(1.375rem, 1vw + 1rem, 1.75rem);
+  line-height: 1.2;
+  letter-spacing: var(--tr-headline);
+  color: var(--fg);
+}
+.role-title-sub {
+  font-style: italic;
+  color: var(--fg-muted);
+  font-size: 0.78em;
+  margin-left: 0.15em;
+}
+.role-note {
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
+  line-height: var(--lh-prose);
+  color: var(--fg-muted);
+  text-wrap: pretty;
+  margin-top: var(--space-1);
+}
+
+/* Longer-form role detail — bullet list of responsibilities.
+   Short roles (Red Bull, Apple) use just .role-note and stop there;
+   richer roles add this list under the lead paragraph. Each item
+   is hung off a quiet em-dash so the list reads as editorial bullets
+   rather than tickbox UI. */
+.role-subsection-label {
+  margin-top: var(--space-5);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-body);
+  letter-spacing: var(--tr-ui);
+}
+.role-subsection-label:first-child {
+  margin-top: var(--space-3);
+}
+.role-points {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+.role-points li {
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
+  color: var(--fg-muted);
+  line-height: var(--lh-prose);
+  color: var(--fg-muted);
+  position: relative;
+  padding-left: var(--space-5);
+  text-wrap: pretty;
+}
+.role-points li::before {
+  content: "—";
+  color: var(--fg-quiet);
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+/* Key wins — small mono eyebrow above a final serif sentence.
+   Used to spotlight the things from the role most worth pointing
+   at. Slightly stronger ink than .role-note so the eye lands on
+   it as the closer for the row. */
+.role-wins {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+}
+.role-wins-line {
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
+  line-height: var(--lh-prose);
+  color: var(--fg);
+  text-wrap: pretty;
+  margin-top: var(--space-2);
+}
+
+/* Disclosure rows — Responsibilities & Key wins/achievements/competencies.
+   A button + panel pair: the button is a clickable mono eyebrow with a small
+   rotating chevron; the panel below holds the content. Collapsed by default
+   so the role reads as a paragraph and visitors choose what to expand. */
+.role-disclosure {
+  margin-top: var(--space-4);
+}
+
+/* Button reset + clickable mono-label styling. Using a real <button> gives us
+   keyboard support and the pointer cursor for free; the reset strips every bit
+   of native browser chrome (the box, the focus ring, the OS background) so the
+   label reads as plain text — just like the nav links — until you hover it. */
+.role-disclosure-summary {
+  -webkit-appearance: none;
+  appearance: none;
+  color: var(--accent);
+  background: transparent;
+  background-color: transparent;
+  background-image: none;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  transition: color var(--dur-1) var(--ease);
+}
+.role-disclosure-summary:focus { outline: none; }
+.role-disclosure-summary::after {
+  content: "›";
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  line-height: 1;
+  color: var(--fg-quiet);
+  display: inline-block;
+  transform: translateY(-1px);
+  transition: transform var(--dur-2) var(--ease), color var(--dur-1) var(--ease);
+}
+.role-disclosure-summary[aria-expanded="true"]::after {
+  transform: translateY(-1px) rotate(90deg);
+  color: var(--accent);
+  transition: transform 300ms var(--ease), color var(--dur-1) var(--ease);
+}
+.role-disclosure-summary .mono-label,
+.role-disclosure-summary:hover .mono-label,
+.role-disclosure-summary:focus-visible .mono-label {
+  color: var(--accent);
+}
+.role-disclosure-summary:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 3px;
+  border-radius: var(--radius-1);
+}
+
+/* Animated panel — max-height with a generous ceiling collapses the panel
+   inline. Paired with the nav's fade + 6px slide + 0.985 scale so the motion
+   language matches across the site. Asymmetric timing: 500ms to open (letting
+   the eye follow content unfolding), 200ms to close (snappy dismissal). */
+.role-disclosure-panel {
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-6px) scale(0.985);
+  transform-origin: top left;
+  transition:
+    max-height var(--dur-2) var(--ease),
+    opacity    var(--dur-2) var(--ease),
+    transform  var(--dur-2) var(--ease);
+}
+.role-disclosure-panel.is-open {
+  max-height: 2000px;
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition:
+    max-height 300ms var(--ease),
+    opacity    300ms var(--ease),
+    transform  300ms var(--ease);
+}
+
+/* Targeted-by-anchor state — vermillion left rule lights up.
+   :target handles deep-links (e.g. someone shares /#exp-amf1).
+   .is-targeted is the JS-applied equivalent for in-page nav clicks,
+   where animations.js strips the hash from the URL after scrolling
+   and adds this class so the highlight still fires. */
+.role-item:target,
+.role-item.is-targeted {
+  border-left-color: var(--accent);
+}
+.role-item:target .role-title,
+.role-item.is-targeted .role-title {
+  color: var(--fg);
+}
+
+@media (max-width: 48rem) {
+  .role-item {
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+  }
+  .role-when {
+    flex-direction: row;
+    gap: var(--space-3);
+    align-items: baseline;
+  }
+}
+
+/* =========================================================================
+   WORK — project cards as list rows. No box, no shadow.
+   ========================================================================= */
+.work-list {
+  display: flex;
+  flex-direction: column;
+}
+.work-item {
+  border-top: var(--border-hairline);
+  padding-top: var(--space-7);
+  padding-bottom: var(--space-7);
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+}
+.work-item:last-child { padding-bottom: 0; }
+
+.work-item--featured {
+  border-top: var(--border-rule);
+  padding-top: var(--space-8);
+  padding-bottom: var(--space-8);
+}
+
+/* Metadata — mono, separated by middle dots */
+.work-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  color: var(--fg-quiet);
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono-caps);
+  text-transform: uppercase;
+}
+.work-meta .mono { color: var(--fg-quiet); }
+.mono-sep { color: var(--fg-faint); }
+
+/* Title — serif, big, link coloured as ink not accent. */
+.work-title {
+  font-family: var(--font-serif);
+  font-weight: var(--fw-regular);
+  font-size: clamp(1.625rem, 2vw + 1rem, 2.25rem);
+  line-height: 1.15;
+  letter-spacing: var(--tr-headline);
+}
+.work-item--featured .work-title {
+  font-size: clamp(2rem, 3vw + 1rem, 2.875rem);
+}
+.work-link {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-decoration-color: var(--accent);
+  text-underline-offset: 0.2em;
+}
+.work-link:hover {
+  color: var(--accent-hover);
+  text-decoration-color: var(--accent-hover);
+}
+
+.work-lede {
+  font-family: var(--font-serif);
+  font-size: var(--fs-lede);
+  line-height: 1.45;
+  color: var(--fg);
+  max-width: var(--measure-prose);
+  text-wrap: pretty;
+}
+.work-body {
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
+  line-height: var(--lh-prose);
+  color: var(--fg-muted);
+  max-width: var(--measure-prose);
+  text-wrap: pretty;
+}
+
+.work-attrs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, max-content));
+  gap: var(--space-3) var(--space-7);
+  margin-top: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: var(--border-hairline);
+}
+.work-attr {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.work-attr dt {
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono-caps);
+  text-transform: uppercase;
+  color: var(--fg-quiet);
+}
+.work-attr dd {
+  font-family: var(--font-sans);
+  font-size: var(--fs-ui);
+  line-height: var(--lh-ui);
+  color: var(--fg);
+}
+
+.work-item.is-placeholder .work-link {
+  color: var(--fg-quiet);
+  font-style: italic;
+}
+.work-item.is-placeholder .work-lede,
+.work-item.is-placeholder .work-body {
+  color: var(--fg-quiet);
+}
+
+/* =========================================================================
+   ABOUT — long-form section in four numbered parts. Each .about__sub is
+   its own reveal unit; layout primitives (rows, columns, comp-grid, keeps)
+   are scoped under .about so they can't leak.
+   ========================================================================= */
+
+/* Rule between the section header and the first subsection. */
+.about__rule {
+  border-top: var(--border-hairline);
+  margin: var(--space-7) 0 var(--space-6);
+}
+
+/* Subsection wrapper — vertical rhythm. */
+.about__sub {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+.about__sub + .about__sub {
+  margin-top: var(--space-9);
+}
+
+/* Numbered kicker — mono caps with accent number. */
+.about__sub-kicker {
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono-caps);
+  text-transform: uppercase;
+  color: var(--fg-quiet);
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+.about__num { color: var(--fg-faint); }
+
+/* Subsection title — serif subhead. */
+.about__sub-title {
+  font-family: var(--font-serif);
+  font-weight: var(--fw-medium);
+  font-size: var(--fs-subhead);
+  line-height: var(--lh-snug);
+  letter-spacing: var(--tr-headline);
+  max-width: 32ch;
+  text-wrap: balance;
+  color: var(--fg);
+  margin: 0;
+}
+
+/* Prose inside the About section sits on the standard prose measure. */
+.about__sub .prose {
+  max-width: var(--measure-prose);
+}
+
+/* ----- Labelled rows (01) ---------------------------------------------- */
+.about__rows {
+  display: flex;
+  flex-direction: column;
+  border-top: var(--border-hairline);
+  margin: 0;
+}
+.about__row {
+  display: grid;
+  grid-template-columns: 9.5rem minmax(0, 1fr);
+  gap: var(--space-5);
+  padding: var(--space-4) 0;
+  border-bottom: var(--border-hairline);
+  align-items: baseline;
+}
+@media (max-width: 40rem) {
+  .about__row {
+    grid-template-columns: 1fr;
+    gap: var(--space-2);
+    padding: var(--space-4) 0;
+  }
+}
+.about__row-label {
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono-caps);
+  text-transform: uppercase;
+  color: var(--fg-quiet);
+  line-height: var(--lh-ui);
+  margin: 0;
+  padding-top: 0.2rem;
+}
+.about__row-body {
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
+  line-height: 1.6;
+  color: var(--fg);
+  margin: 0;
+}
+
+/* ----- Two-column layout (02) ------------------------------------------ */
+.about__columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-6) var(--space-8);
+  align-items: start;
+}
+@media (max-width: 45rem) {
+  .about__columns { grid-template-columns: 1fr; }
+}
+.about__minihead {
+  margin-bottom: var(--space-4);
+}
+.about__bullets {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.about__bullets li {
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
+  line-height: 1.55;
+  color: var(--fg);
+  padding-left: var(--space-5);
+  position: relative;
+  max-width: var(--measure-prose);
+  text-wrap: pretty;
+}
+.about__bullets li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.78em;
+  width: 0.6rem;
+  height: 1px;
+  background: var(--fg-faint);
+}
+.about__mono-inline {
+  font-family: var(--font-mono);
+  font-size: 0.95em;
+  color: var(--fg);
+  letter-spacing: var(--tr-mono);
+}
+
+/* ----- Three-column competencies grid (03) ----------------------------- */
+.about__comp-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-top: var(--border-hairline);
+  border-bottom: var(--border-hairline);
+  margin-top: var(--space-3);
+}
+@media (max-width: 45rem) {
+  .about__comp-grid { grid-template-columns: 1fr; }
+}
+.about__comp-col {
+  padding: var(--space-5) var(--space-6) var(--space-5) 0;
+  border-right: var(--border-hairline);
+}
+.about__comp-col:last-child {
+  border-right: 0;
+  padding-right: 0;
+}
+@media (max-width: 45rem) {
+  .about__comp-col {
+    border-right: 0;
+    border-bottom: var(--border-hairline);
+    padding: var(--space-4) 0;
+  }
+  .about__comp-col:last-child { border-bottom: 0; }
+}
+.about__comp-head {
+  margin-bottom: var(--space-4);
+}
+.about__comp-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.about__comp-list li {
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
+  line-height: 1.45;
+  color: var(--fg);
+  text-wrap: pretty;
+}
+/* "Currently learning" row directly under the comp grid — labelled row
+   pattern but without the rows-list borders. */
+.about__comp-foot {
+  display: grid;
+  grid-template-columns: 9.5rem minmax(0, 1fr);
+  gap: var(--space-5);
+  padding-top: var(--space-4);
+  align-items: baseline;
+}
+@media (max-width: 40rem) {
+  .about__comp-foot { grid-template-columns: 1fr; gap: var(--space-2); }
+}
+
+/* ----- Pull quote + numbered keeps list (04) --------------------------- */
+.about__pull {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: var(--fw-regular);
+  font-size: var(--fs-subhead);
+  line-height: 1.3;
+  margin: 0;
+  padding-left: var(--space-5);
+  border-left: 2px solid var(--accent);
+  color: var(--fg);
+  max-width: 44ch;
+  text-wrap: balance;
+}
+.about__keeps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.about__keeps li {
+  display: grid;
+  grid-template-columns: 3.5rem minmax(0, 1fr);
+  gap: var(--space-5);
+  padding: var(--space-5) 0;
+  border-top: var(--border-hairline);
+  align-items: baseline;
+}
+.about__keeps li:last-child {
+  border-bottom: var(--border-hairline);
+}
+@media (max-width: 40rem) {
+  .about__keeps li {
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+    padding: var(--space-4) 0;
+  }
+}
+.about__keeps-num {
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono-caps);
+  text-transform: uppercase;
+  color: var(--fg-quiet);
+  padding-top: 0.25rem;
+}
+.about__keeps-head {
+  font-family: var(--font-serif);
+  font-size: 1.125rem;
+  font-weight: var(--fw-medium);
+  color: var(--fg);
+  margin-bottom: var(--space-2);
+  letter-spacing: -0.01em;
+}
+.about__keeps p {
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
+  line-height: 1.6;
+  color: var(--fg);
+  margin: 0;
+  max-width: 56ch;
+  text-wrap: pretty;
+}
+
+
+/* =========================================================================
+   FOOTER — three info blocks then a hairline-separated bottom strip.
+   ========================================================================= */
+.site-footer {
+  border-top: var(--border-hairline);
+  /* Transparent so the body grain reads continuously into the footer */
+  background: transparent;
+  margin-top: clamp(var(--space-6), 5vw, var(--space-8));
+}
+.footer-inner {
+  max-width: var(--container);
+  margin: 0 auto;
+  padding: var(--space-9) clamp(var(--space-5), 5vw, var(--space-8)) var(--space-7);
+  display: grid;
+  grid-template-columns: 7rem repeat(3, 1fr);
+  gap: var(--space-7) var(--space-8);
+  align-items: start;
+}
+.footer-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.footer-block--portrait {
+  /* Portrait sits in its own narrow column; label aligns with the mono labels
+     in the neighbouring columns. */
+}
+.footer-portrait {
+  width: 6rem;
+  /* Two linear gradients (one per axis) composited with `intersect` give a
+     feathered rectangle: every edge fades over the same small band, and the
+     corners naturally double up to a softer round-off. */
+  -webkit-mask-image:
+    linear-gradient(to right, transparent 0, #000 11.5%, #000 88.5%, transparent 100%),
+    linear-gradient(to bottom, transparent 0, #000 11.5%, #000 88.5%, transparent 100%);
+  -webkit-mask-composite: source-in;
+          mask-image:
+    linear-gradient(to right, transparent 0, #000 11.5%, #000 88.5%, transparent 100%),
+    linear-gradient(to bottom, transparent 0, #000 11.5%, #000 88.5%, transparent 100%);
+          mask-composite: intersect;
+  -webkit-mask-repeat: no-repeat;
+          mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+          mask-size: 100% 100%;
+}
+.footer-portrait img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 12%;
+}
+.footer-line {
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
+  line-height: var(--lh-prose);
+  color: var(--fg);
+  max-width: 34ch;
+}
+.footer-links {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.footer-links a {
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
+}
+
+.footer-rule {
+  border-top: var(--border-hairline);
+  max-width: var(--container);
+  margin: 0 auto;
+  padding: var(--space-5) clamp(var(--space-5), 5vw, var(--space-8));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.footer-fineprint {
+  color: var(--fg-quiet);
+  font-size: var(--fs-mono);
+}
+
+/* =========================================================================
+   AI THESIS — long-form essay page (/ai-thesis/).
+   Mast + stat strip + sticky-rail TOC + article body, three chapters.
+   One-off page, so its rules live here rather than a new partial — same
+   call as .proj-hero-b above. Micro mono labels reuse .mono-label and
+   .accent (see global.css) instead of restating that pattern; chapter
+   tags reuse .chip. Font-size is the one type-scale category with no
+   existing rung small enough for these — --fs-mono stands in rather
+   than adding a token for what is currently a single page.
+   ========================================================================= */
+/* The reading-progress line that used to live here as .es-progress is
+   now .read-progress in components.css — the home page and /projects
+   opt into it too, so it stopped being an essay-only one-off. */
+
+.es-mast {
+  /* .page's own padding-top (clamp(--space-7, 6vw, --space-10)) grows
+     past --space-7 on wide viewports — fine for .lede-block and
+     .proj-hero-b, which don't need to match anything below them. This
+     page does: the gap under the stat strip (.es-rail/.es-art's own
+     padding-top) is a flat --space-7. Cancelling the clamp's growth
+     here keeps the top gap pinned to exactly --space-7 too, so the
+     mast reads as evenly spaced above and below at every width. */
+  margin-top: calc(var(--space-7) - clamp(var(--space-7), 6vw, var(--space-10)));
+  max-width: 56rem;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 0 clamp(var(--space-4), 3vw, var(--space-7)) 0;
+}
+.es-mast__title {
+  font-family: var(--font-serif);
+  font-weight: var(--fw-regular);
+  font-size: clamp(2.25rem, 3.6vw + 1rem, 3.75rem);
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  color: var(--fg);
+  margin-top: var(--space-3);
+  text-wrap: balance;
+}
+.es-mast__dek {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: var(--fs-lede);
+  line-height: var(--lh-prose);
+  color: var(--fg-muted);
+  max-width: var(--measure-prose);
+  margin-top: var(--space-4);
+  text-wrap: pretty;
+}
+
+.es-stats {
+  max-width: 56rem;
+  margin: var(--space-6) auto 0;
+  padding: 0 clamp(var(--space-4), 3vw, var(--space-7));
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-top: var(--border-rule);
+  border-bottom: var(--border-hairline);
+}
+.es-stats div {
+  padding: var(--space-4) var(--space-5);
+  border-left: var(--border-hairline);
+}
+.es-stats div:first-child,
+.es-stats div:nth-child(3) { border-left: 0; }
+.es-stats dt {
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono-caps);
+  text-transform: uppercase;
+  color: var(--fg-faint);
+  margin: 0;
+}
+.es-stats dd {
+  margin: var(--space-2) 0 0;
+  font-family: var(--font-serif);
+  font-size: 1.375rem;
+  color: var(--fg);
+}
+
+.es-wrap {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 0 clamp(var(--space-4), 3vw, var(--space-7)) var(--space-9);
+  display: grid;
+  grid-template-columns: 13rem minmax(0, 1fr);
+  gap: clamp(var(--space-6), 4vw, var(--space-8));
+  align-items: start;
+}
+.es-rail {
+  position: sticky;
+  top: var(--space-6);
+  max-height: calc(100vh - var(--space-8));
+  overflow: auto;
+  padding-top: var(--space-7);
+}
+.es-rail__h {
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono-caps);
+  text-transform: uppercase;
+  color: var(--fg-faint);
+  padding-bottom: var(--space-2);
+  border-bottom: var(--border-hairline);
+  margin-bottom: var(--space-3);
+}
+.es-toc { display: flex; flex-direction: column; }
+.es-toc a {
+  text-decoration: none;
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  line-height: 1.35;
+  color: var(--fg-quiet);
+  padding: 5px 0 5px var(--space-3);
+  border-left: 1px solid var(--rule);
+  transition: color var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+.es-toc a:hover { color: var(--fg); }
+.es-toc a.lvl3 { padding-left: var(--space-5); font-size: 0.75rem; }
+.es-toc a.is-active { color: var(--accent); border-left-color: var(--accent); }
+
+.es-art {
+  min-width: 0;
+  padding-top: var(--space-7);
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
+  line-height: var(--lh-prose);
+  color: var(--fg);
+  max-width: var(--measure-prose);
+}
+.es-chapter { scroll-margin-top: var(--space-6); }
+.es-chapter + .es-chapter { margin-top: var(--space-9); }
+.es-chapter__num {
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono-caps);
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.es-chapter__title {
+  font-family: var(--font-serif);
+  font-weight: var(--fw-regular);
+  font-size: var(--fs-headline);
+  line-height: 1.08;
+  letter-spacing: var(--tr-headline);
+  color: var(--fg);
+  margin-top: var(--space-2);
+  padding-bottom: var(--space-4);
+  border-bottom: var(--border-rule);
+}
+.es-chapter__tags {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-top: var(--space-4);
+}
+.es-chapter__tags .chip { cursor: default; }
+.es-chapter__tags .chip:hover {
+  background: transparent;
+  border-color: var(--rule-strong);
+  color: var(--fg);
+}
+
+.es-art h3 {
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono-caps);
+  text-transform: uppercase;
+  color: var(--fg-quiet);
+  margin-top: var(--space-6);
+  scroll-margin-top: var(--space-6);
+}
+.es-art > .es-chapter > h3:first-of-type { margin-top: var(--space-5); }
+/* :not() the two label <p>s below — .es-chapter__num and .es-close are
+   <p> tags too, so the bare ".es-art p" was catching them as well and
+   (being more specific than their own single-class rules) was winning:
+   .es-chapter__num picked up an unwanted --space-4 top margin it never
+   asked for, and .es-close's own explicit margin-top was being
+   overridden down to --space-4 instead of the --space-6 it declares. */
+.es-art p:not(.es-chapter__num):not(.es-close) { margin-top: var(--space-4); text-wrap: pretty; }
+.es-art strong { font-weight: var(--fw-semibold); }
+
+.es-pull {
+  margin: var(--space-6) 0;
+  padding-left: var(--space-5);
+  border-left: 2px solid var(--accent);
+}
+.es-pull p {
+  margin-top: 0;
+  font-style: italic;
+  font-size: 1.1875rem;
+  line-height: 1.45;
+  color: var(--fg-muted);
+}
+
+.es-info {
+  margin: var(--space-6) 0;
+  border: var(--border-hairline);
+  background: var(--bg-recessed);
+}
+.es-info__head {
+  background: var(--fg);
+  color: var(--bg);
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono-caps);
+  text-transform: uppercase;
+  padding: 6px 12px;
+}
+.es-info__body {
+  padding: var(--space-4) var(--space-5);
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  line-height: 1.55;
+  color: var(--fg-muted);
+}
+.es-info__body ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.es-info__body li { position: relative; padding-left: var(--space-4); }
+.es-info__body li::before { content: "—"; position: absolute; left: 0; color: var(--fg-faint); }
+.es-info__body li b { font-weight: var(--fw-semibold); color: var(--fg); }
+
+.es-roman { list-style: none; padding: 0; counter-reset: er; margin-top: var(--space-4); }
+.es-roman li { position: relative; padding-left: var(--space-6); counter-increment: er; }
+.es-roman li + li { margin-top: var(--space-3); }
+.es-roman li::before {
+  content: counter(er, upper-roman);
+  position: absolute;
+  left: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  color: var(--accent);
+  letter-spacing: var(--tr-mono);
+}
+
+/* Nested sub-list (a taxonomy's lettered items under a numbered category).
+   Selectors need every ancestor type named (.es-roman li ol li, not just
+   "li") so they out-specificity the bare .es-roman li rules above —
+   otherwise a nested <li> would inherit the outer roman counter/colour
+   instead of its own lower-alpha one. Same pattern as .es-art p:not()
+   further up this file. */
+.es-roman li ol { list-style: none; padding: 0; counter-reset: er-sub; margin-top: var(--space-3); }
+.es-roman li ol li { padding-left: var(--space-5); counter-increment: er-sub; }
+.es-roman li ol li + li { margin-top: var(--space-2); }
+.es-roman li ol li::before {
+  content: counter(er-sub, lower-alpha) ".";
+  color: var(--fg-quiet);
+}
+
+.es-close {
+  margin-top: var(--space-6);
+  padding-top: var(--space-4);
+  border-top: var(--border-hairline);
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono-caps);
+  text-transform: uppercase;
+  color: var(--fg-faint);
+}
+.es-end {
+  margin-top: var(--space-8);
+  padding-top: var(--space-5);
+  border-top: var(--border-rule);
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-5);
+  flex-wrap: wrap;
+}
+.es-end a {
+  text-decoration: none;
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--tr-mono-caps);
+  text-transform: uppercase;
+  color: var(--fg-quiet);
+}
+.es-end a:hover { color: var(--accent); }
+
+@media (max-width: 40rem) {
+  .es-stats { grid-template-columns: repeat(2, 1fr); }
+  .es-stats div:nth-child(odd) { border-left: 0; }
+  .es-stats div:nth-child(n+3) { border-top: var(--border-hairline); }
+}
+@media (max-width: 56rem) {
+  .es-wrap { grid-template-columns: minmax(0, 1fr); }
+  .es-rail { display: none; }
+}
+
+/* =========================================================================
+   RESPONSIVE — breakpoints that don't fit cleanly inside clamp().
+   ========================================================================= */
+@media (max-width: 56rem) {
+  .footer-inner {
+    grid-template-columns: 6rem 1fr 1fr;
+  }
+  .footer-block--colophon { grid-column: 1 / -1; }
+  .footer-portrait { width: 6rem; }
+}
+@media (max-width: 36rem) {
+  .footer-inner {
+    grid-template-columns: 1fr;
+    gap: var(--space-6);
+  }
+  .footer-block--portrait { margin-top: 0; }
+  .footer-portrait { width: 6rem; }
+  .work-attrs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3) var(--space-5);
+  }
+  .footer-rule {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
+}

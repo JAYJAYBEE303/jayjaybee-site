@@ -1,0 +1,1210 @@
+/* Gaffer IQ — components.css
+   Reusable component styles: score pill, score chip, and each module's
+   own blocks. The Matchup Analyser's styles
+   live in css/matchup.css (only its Full Season wrapper stays here), and the
+   Fixtures, Ranker and Dashboard pages' in their own css/<page>.css.
+   BEM-lite per CONVENTIONS.md §5.1. All values via var(--…) from base.css.
+   Band modifier classes (--great, --good, --neutral, --tough, --brutal) map
+   directly from CompositeScore.band — see CONVENTIONS.md §5.2. */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MATCHUP SHELL — now only the Full Season strip's full-width wrapper
+   The rest of the Matchup page moved to css/matchup.css. The notes below
+   explain why the strip sits in its own box; they predate that move.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* The shell is two stacked boxes: the three-column row (.matchup-shell__main)
+   and the full-width season strip under it.
+
+   The strip used to be a second row of ONE grid, spanning columns 1-2 while
+   team-nav spanned both rows beside it. Widening that span to the full width
+   is not something the single grid can express: .team-nav is position: sticky,
+   and Chrome constrains a sticky grid item to the whole grid container rather
+   than to its own grid area — so the pinned panel slid 343px down over the
+   strip as soon as the strip stopped sitting beside it. Splitting the two rows
+   into two boxes puts the strip outside the sticky element's containing block
+   entirely, which is a structural answer rather than a z-index one. */
+.matchup-shell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  /* Break out of .app-main's max-width:1400px + centering (layout.css) —
+     same escape .ranker-shell uses below, for the same reason: the fixed-
+     width side navigators were squeezing the middle column's two team cards
+     into well under half the viewport. width:100vw + these negative margins
+     is the standard technique for escaping a centred ancestor's max-width;
+     the side navigators land further out toward the viewport edges as a
+     direct result, and the middle column (both nav columns are fixed-width)
+     absorbs the rest — roughly doubling the cards' width on a typical
+     desktop viewport. Padding restores the horizontal inset app-main's own
+     padding provided before this element escaped its box. */
+  width: 100vw;
+  max-width: 100vw;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+  /* No side padding: .season-strip__wrap carries the page gutter now. */
+  padding: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SCORE PILL — main composite score display
+   Band modifiers key off CompositeScore.band (CONVENTIONS.md §5.2).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.score-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  min-width: 76px;
+  flex-shrink: 0;
+}
+
+.score-pill--great   { background: var(--band-great-bg);   border-color: var(--band-great);   color: var(--band-great); }
+.score-pill--good    { background: var(--band-good-bg);    border-color: var(--band-good);    color: var(--band-good); }
+.score-pill--neutral { background: var(--band-neutral-bg); border-color: var(--band-neutral); color: var(--band-neutral); }
+.score-pill--tough   { background: var(--band-tough-bg);   border-color: var(--band-tough);   color: var(--band-tough); }
+.score-pill--brutal  { background: var(--band-brutal-bg);  border-color: var(--band-brutal);  color: var(--band-brutal); }
+/* Top tier carries a glow the other six do not — the pill is the card's
+   headline, and 80+ is the one reading the page exists to spot. Gold chrome,
+   silver ink: see --band-excellent-ink in base.css for why this tier alone
+   splits the two. The text glow is warm-white rather than pure white so the
+   digits read as lit BY the gold around them; a cold white halo made the
+   number look pasted on. */
+.score-pill--excellent {
+  background: var(--band-excellent-bg);
+  border-color: var(--band-excellent);
+  color: var(--band-excellent-ink);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--band-excellent) 35%, transparent);
+  text-shadow:
+    0 0 10px color-mix(in srgb, var(--band-excellent-ink) 60%, transparent),
+    0 0 20px color-mix(in srgb, var(--band-excellent) 45%, transparent);
+}
+/* The bottom tier is the top tier's mirror: a fill that names it, an ink that
+   is not the fill, and an edge where the middle five have none. Black where
+   gold has gold, the darkest red in the palette where gold has silver — and
+   the border takes that same ink, since a black border on a black fill is no
+   border at all and this tier has to read as bounded rather than as a hole in
+   the card. No glow, unlike the top tier: gold glows because 80+ is the thing
+   the reader is hunting for, and this is the opposite errand. */
+.score-pill--extreme {
+  background: var(--band-extreme-bg);
+  border-color: var(--band-extreme-ink);
+  color: var(--band-extreme-ink);
+}
+
+/* Provisional: muted + hatched — score still shown, never hidden */
+.score-pill--provisional {
+  opacity: 0.6;
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 4px,
+    rgba(255, 255, 255, 0.05) 4px,
+    rgba(255, 255, 255, 0.05) 8px
+  );
+}
+
+/* Estimated: low-confidence score — dashed border, never hidden. Combined
+   with a band modifier: score-pill--good score-pill--estimated. No separate
+   "~" marker — the dashed border + reduced opacity already carry the signal
+   (matchup page's no-symbol convention). See ARCHITECTURE.md §11,
+   FEATURE_ENGINE.md §8.3. */
+.score-pill--estimated {
+  border-style: var(--estimated-border-style);
+  opacity: 0.82;
+}
+
+.score-pill__value {
+  font-size: var(--font-size-2xl);
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.score-pill__band {
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-top: 2px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SCORE CHIP — compact inline score used in counter-matchup pairings
+   Same band modifiers, no double-line layout.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.score-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+  min-width: 32px;
+  flex-shrink: 0;
+}
+
+.score-chip--great   { background: var(--band-great-bg);   color: var(--band-great); }
+.score-chip--good    { background: var(--band-good-bg);    color: var(--band-good); }
+.score-chip--neutral { background: var(--band-neutral-bg); color: var(--band-neutral); }
+.score-chip--tough   { background: var(--band-tough-bg);   color: var(--band-tough); }
+.score-chip--brutal  { background: var(--band-brutal-bg);  color: var(--band-brutal); }
+/* Same gold-chrome/silver-ink split as the pill, at chip scale — where it
+   matters more, not less: these digits are 11px and were the hardest gold
+   text on the page to read. Glow radii scale down with the type.
+   The gold edge is an INSET ring, not a border: .score-chip has none, and a
+   real 1px border would grow this tier's chips by 2px in each axis — enough
+   to jog the row it sits in, and only for the rows that happen to be 80+. The
+   ring follows --radius-sm on its own, and the outer glow still reads as the
+   pill's does because both come off the same box-shadow. */
+.score-chip--excellent {
+  background: var(--band-excellent-bg);
+  color: var(--band-excellent-ink);
+  box-shadow:
+    inset 0 0 0 1px var(--band-excellent),
+    0 0 6px color-mix(in srgb, var(--band-excellent) 45%, transparent);
+  text-shadow:
+    0 0 6px color-mix(in srgb, var(--band-excellent-ink) 55%, transparent),
+    0 0 12px color-mix(in srgb, var(--band-excellent) 50%, transparent);
+}
+/* The mirror of .score-chip--excellent above: black fill, dark red ink, and a
+   ring in that same ink — INSET for the same reason gold's is, since
+   .score-chip has no border and a real 1px one would grow only this tier's
+   chips by 2px in each axis and jog the rows they sit in. The ring is what
+   makes the tier visible here at all: a black fill on a dark card is
+   otherwise just a gap in the row. No glow — see .score-pill--extreme. */
+.score-chip--extreme {
+  background: var(--band-extreme-bg);
+  color: var(--band-extreme-ink);
+  box-shadow: inset 0 0 0 1px var(--band-extreme-ink);
+}
+
+/* Rank-relative tiers (pool-percentile, NOT the 0-100 band above — see
+   FEATURE_ENGINE.md §13). Rendered ALONGSIDE a .score-chip--{band} class, never
+   instead of it — these rules come after the seven band rules above so they win
+   the cascade at equal specificity, without needing !important or JS to strip
+   the band class. Every player now gets exactly one of these six (calcRankTier
+   no longer returns null except for a malformed/empty pool), so in practice
+   this block fully determines colour, not just for a handful of standouts.
+   rank-neutral/rank-yellow are their OWN classes (not a reuse of .score-chip--
+   neutral/.score-chip--tough directly) specifically so their cascade position
+   here — after ALL SEVEN band classes, not just some — is guaranteed regardless
+   of which band a given player's own absolute score happens to carry.
+
+   These are named after their COLOUR, not their tier, so they read the
+   primitives directly: this axis is deliberately not on the 0-100 scale and
+   must not move when that scale is re-pointed.
+
+   The blue was light green until the seven-tier scale landed. Two greens one
+   step apart is a distinction the eye has to work for, and the column was
+   asking it to do that ~700 rows deep; against the dark green above it, blue
+   separates at a glance and costs nothing, since nothing else in this table
+   is blue. It reads --band-light-blue, the same primitive the 'good' band
+   reads: these two axes are independent and must be free to move apart, but
+   "the blue one" has to be ONE blue app-wide, or a reader carrying a colour
+   from the Matchup page to this table finds a second, darker blue here and
+   has to ask whether the difference means something. The deep #1f6feb this
+   used to be lost that argument for the same reason it lost it as a band —
+   at 11px on this ground it is the one hue that has to be hunted for. */
+/* Clearing the band's CHROME is as much a part of taking over the colour as
+   setting background and color is. Two of the seven bands paint more than
+   those two properties: --excellent carries an inset gold ring plus a gold
+   outer glow and a silver-on-gold text-shadow, and --extreme an inset dark-red
+   ring. Those are not colour properties, so the five rules below were not
+   overriding them — an 80+ player who was not also rank 1 of his position
+   rendered as a GOLD-ringed, gold-glowing chip filled and lettered in his
+   rank tier's green or blue, reading as a chip that could not decide which
+   tier it was, with the leftover glow smearing the digits. Reset here rather
+   than by narrowing the band rules, because the band is right to paint chrome
+   when nothing overrides it — this block is the thing doing the overriding.
+   .score-chip--rank-gold below is deliberately absent: it sets both shadows
+   itself, being the gold tier's own twin. */
+.score-chip--rank-green,
+.score-chip--rank-light-green,
+.score-chip--rank-red,
+.score-chip--rank-neutral,
+.score-chip--rank-yellow {
+  box-shadow: none;
+  text-shadow: none;
+}
+
+.score-chip--rank-green       { background: var(--band-dark-green-bg); color: var(--band-dark-green); }
+.score-chip--rank-light-green { background: var(--band-light-blue-bg); color: var(--band-light-blue); }
+.score-chip--rank-red         { background: var(--band-red-bg);        color: var(--band-red); }
+.score-chip--rank-neutral     { background: var(--band-neutral-bg);    color: var(--band-neutral); }
+.score-chip--rank-yellow      { background: var(--band-amber-bg);      color: var(--band-amber); }
+
+/* Rank 1 of a position — the gold the 0-100 scale gives its top tier, on the
+   one rank tier scarce enough to earn it: exactly four chips on the whole
+   table, one per position, however the pool moves (calcRankTier,
+   'positionBest'). Same gold-chrome/silver-ink split and the same glow as
+   .score-chip--excellent, so "best there is" reads identically whether it was
+   earned on the absolute scale or the relative one. Last in the block, so it
+   beats rank-green for the player who is both. */
+.score-chip--rank-gold {
+  background: var(--band-excellent-bg);
+  color: var(--band-excellent-ink);
+  box-shadow:
+    inset 0 0 0 1px var(--band-excellent),
+    0 0 6px color-mix(in srgb, var(--band-excellent) 45%, transparent);
+  text-shadow:
+    0 0 6px color-mix(in srgb, var(--band-excellent-ink) 55%, transparent),
+    0 0 12px color-mix(in srgb, var(--band-excellent) 50%, transparent);
+}
+
+/* Estimated compact chip — dashed border in the band's own colour, ~ prefix. */
+.score-chip--estimated {
+  border: 1px var(--estimated-border-style) currentColor;
+  opacity: 0.82;
+}
+.score-chip--estimated::before {
+  content: '~';
+  font-size: 0.7em;
+  opacity: 0.7;
+  margin-right: 1px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CALIBRATION VIEW  (#calibration — developer tool)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.calib-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.calib-title {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.calib-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.calib-accuracy {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.calib-btn {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.calib-btn:hover {
+  background: var(--color-border);
+}
+
+.calib-btn--clear {
+  color: var(--band-red);
+  border-color: var(--band-red);
+}
+
+.calib-empty {
+  color: var(--color-muted);
+  font-size: var(--font-size-sm);
+  padding: var(--space-8) 0;
+}
+
+.calib-table-wrap {
+  overflow-x: auto;
+}
+
+.calib-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.calib-table th,
+.calib-table td {
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  border-bottom: 1px solid var(--color-border-subtle);
+  white-space: nowrap;
+}
+
+.calib-table th {
+  color: var(--color-muted);
+  font-weight: 600;
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--color-surface);
+  position: sticky;
+  top: 0;
+}
+
+.calib-table tbody tr:hover {
+  background: var(--color-surface-raised);
+}
+
+.calib-fixture {
+  white-space: nowrap;
+}
+
+.calib-call--correct {
+  color: var(--band-green);
+  font-weight: 700;
+}
+
+.calib-call--wrong {
+  color: var(--band-red);
+  font-weight: 700;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PHASE 4-4  PRICE CHANGE INDICATORS
+   Ranker column + Transfer Planner warnings.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Transfer Planner: price change footer on transfer cards ───────────────── */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MOBILE COMPONENTS  ≤ 768px — Phase 4-5
+   Purely additive overrides. Desktop rules are completely untouched.
+   No new hardcoded values — all tokens from base.css.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+
+  /* ─── Score pill ───────────────────────────────────────────────────────── */
+
+  /* Score pill value: one step smaller so the pill fits in the card header */
+  .score-pill__value {
+    font-size: var(--font-size-xl);
+  }
+
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SCHEDULE CONTEXT BAR
+   App-wide, above every module view. Carries the shape of the schedule to the
+   three tabs that render no fixture strip (Dashboard, Planner, Fixtures).
+   Uses --color-accent, the structural-emphasis colour, for the same reason the
+   double-gameweek slot does: it is not one of the five band colours, so it
+   cannot be misread as a fixture-quality signal. See FEATURE_ENGINE.md §9.1.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.schedule-bar {
+  padding: var(--space-2) var(--space-4) 0;
+}
+
+.schedule-bar__inner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-muted);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 35%, transparent);
+  font-size: var(--font-size-xs);
+  color: var(--color-text);
+}
+
+.schedule-bar__item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+
+.schedule-bar__gw {
+  color: var(--color-accent);
+  font-weight: 700;
+}
+
+.schedule-bar__detail {
+  color: var(--color-muted);
+}
+
+.schedule-bar__sep {
+  width: 1px;
+  height: 12px;
+  background: var(--color-border);
+  flex: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FULL SEASON STRIP — GW1-38 planning strip (Matchup page), "Refine" (R2)
+   js/modules/fullSeason.js. Two halves split at the chip reset, one <button>
+   cell per gameweek, chip-window lanes, and a click-to-pin popover (bottom
+   sheet ≤640px) the cell morphs into. Motion is WAAPI in the module; nothing
+   here animates layout. BEM-lite per CONVENTIONS.md §5.1.
+
+   The popover, its scrim and the morph box are appended to document.body
+   (position: fixed), so the values they read live on :root rather than on
+   .season-strip — a custom property scoped to the strip would not inherit
+   onto them.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --season-pad: clamp(16px, 3vw, 40px);
+  --season-shadow-pop: 0 16px 40px rgba(1, 4, 9, .6);
+  --season-shadow-lift: 0 8px 20px rgba(1, 4, 9, .5);
+  --season-scrim: rgba(1, 4, 9, .55);
+  --season-neutral-ink: #a2abb5;   /* neutral band text — grey is too dark on its tint */
+  --season-dur-fast: 120ms;
+}
+
+/* Band vars per element: --b hue, --bb tint, --bt text, --lv rank-rule
+   length (rank / 6). Tough reads orange, the same scope re-point .mx makes. */
+:where(.season-strip, .season-pop) [data-band]  { --b: var(--band-neutral); --bb: var(--band-neutral-bg); --bt: var(--color-muted); --lv: 0; }
+:where(.season-strip, .season-pop) [data-band=excellent] { --b: var(--band-excellent); --bb: var(--band-excellent-bg); --bt: var(--band-excellent); --lv: 1; }
+:where(.season-strip, .season-pop) [data-band=great]     { --b: var(--band-great);     --bb: var(--band-great-bg);     --bt: var(--band-great);     --lv: .833; }
+:where(.season-strip, .season-pop) [data-band=good]      { --b: var(--band-good);      --bb: var(--band-good-bg);      --bt: var(--band-good);      --lv: .667; }
+:where(.season-strip, .season-pop) [data-band=neutral]   { --b: var(--band-neutral);   --bb: var(--band-neutral-bg);   --bt: var(--season-neutral-ink); --lv: .5; }
+:where(.season-strip, .season-pop) [data-band=tough]     { --b: var(--band-orange);    --bb: var(--band-orange-bg);    --bt: var(--band-orange);    --lv: .333; }
+:where(.season-strip, .season-pop) [data-band=brutal]    { --b: var(--band-brutal);    --bb: var(--band-brutal-bg);    --bt: var(--band-brutal);    --lv: .167; }
+:where(.season-strip, .season-pop) [data-band=extreme]   { --b: var(--band-extreme-ink); --bb: var(--band-extreme-bg); --bt: var(--band-extreme-ink); --lv: .167; }
+
+.season-strip *,
+.season-strip *::before,
+.season-strip *::after,
+.season-pop *,
+.season-pop *::before,
+.season-pop *::after { box-sizing: border-box; }
+
+.season-sr {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap;
+}
+
+/* ─── Panel chrome ───────────────────────────────────────────────────────── */
+
+.season-strip {
+  padding: var(--space-8) 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+  font: 14px/1.45 var(--font-sans);
+  color: var(--color-text);
+}
+
+.season-strip__wrap {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 0 var(--season-pad);
+}
+
+.season-strip__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px var(--space-3);
+  padding-bottom: var(--space-3);
+  margin-bottom: var(--space-4);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+/* Micro-label — 11px / 700 / .1em caps, the system's one label style. */
+.season-strip__lbl,
+.season-key__lbl,
+.season-half__title,
+.season-pop__lbl {
+  font: 700 11px/1.2 var(--font-sans);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.season-strip__title {
+  margin: 0;
+  font: 600 22px/1 var(--font-head);
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.season-strip__meta {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.season-strip__nojs {
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+/* ─── Key ────────────────────────────────────────────────────────────────── */
+
+.season-key {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: var(--space-2) var(--space-4);
+  align-items: start;
+  margin-bottom: var(--space-4);
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--color-muted);
+}
+
+.season-key__lbl { line-height: 16px; padding-top: 2px; }
+.season-key__row { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-5); }
+.season-key__item { display: inline-flex; align-items: center; gap: var(--space-2); min-height: 20px; }
+.season-key__item b { color: var(--color-text); font-weight: 600; }
+.season-key__note { font-style: italic; }
+
+/* Every swatch sits in the same 24×12 box, so the key's text aligns. */
+.season-key__sw {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 12px;
+}
+
+.season-key .season-tile { width: 24px; height: 12px; }
+.season-key .season-tile > i { left: 3px; bottom: 3px; width: calc((100% - 6px) * var(--lv)); }
+.season-key .season-tile--pp::after { left: 3px; right: 3px; bottom: 3px; }
+.season-key .season-lane { width: 24px; height: 6px; }
+.season-key .season-tag { height: 14px; }
+
+.season-key__hot {
+  display: block;
+  width: 24px;
+  height: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 2px;
+  box-shadow: inset 0 2px 0 var(--color-text);
+}
+
+/* ─── Halves ─────────────────────────────────────────────────────────────── */
+
+/* --season-halves / --season-cols are set by the module from the model: a
+   played week is 0.6 of an upcoming week, so every live cell in both halves
+   is the same width (17fr / 19fr with five weeks played). */
+.season-halves {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--season-halves, 1fr 1fr);
+  gap: var(--space-4);
+}
+
+.season-half {
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
+  min-width: 0;
+}
+
+.season-half__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.season-half__title { color: var(--color-text); }
+.season-half__note { margin-left: auto; font-size: 12px; color: var(--color-muted); }
+
+.season-grid {
+  display: grid;
+  grid-template-columns: var(--season-cols, repeat(19, minmax(0, 1fr)));
+  gap: 3px;
+}
+
+/* ─── Week cell ──────────────────────────────────────────────────────────── */
+
+.season-cell {
+  position: relative;
+  display: grid;
+  gap: var(--space-1);
+  justify-items: center;
+  align-content: start;
+  min-width: 0;
+  min-height: 96px;
+  margin: 0;
+  padding: 18px var(--space-1) 6px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: inherit;
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color var(--season-dur-fast), background-color var(--season-dur-fast);
+}
+
+.season-cell > * { max-width: 100%; }
+
+.season-cell:hover {
+  background: var(--color-surface-raised);
+  border-color: var(--color-muted);
+}
+
+.season-cell:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.season-cell[aria-pressed=true] {
+  border-color: var(--color-accent);
+  background: var(--color-accent-muted);
+}
+
+/* Loaded: 2+ of the top three clear SEASON_LOADED_MIN_VALUE. A top rule, no glow. */
+.season-cell--hot { box-shadow: inset 0 2px 0 var(--color-text); }
+
+.season-cell--cur { border-color: var(--color-text); }
+
+.season-cell--past {
+  min-height: 0;
+  background: transparent;
+  border-color: transparent;
+}
+
+.season-cell--past .season-cell__n { color: var(--color-muted); font-weight: 600; }
+
+.season-cell--pending { cursor: default; }
+.season-cell--pending:hover { background: var(--color-surface); border-color: var(--color-border-subtle); }
+
+.season-cell__n {
+  font: 700 12px/1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+}
+
+.season-cell__band {
+  font: 700 9px/1 var(--font-sans);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--bt, var(--color-muted));
+}
+
+.season-cell__band.skeleton { width: 100%; border-radius: 2px; }
+
+/* `translate`, not `transform`: the module's settle animation owns transform. */
+.season-cell__now {
+  position: absolute;
+  left: 50%;
+  top: var(--space-1);
+  translate: -50% 0;
+  padding: 2px 3px;
+  border-radius: 2px;
+  background: var(--color-text);
+  color: var(--color-bg);
+  font: 700 8px/1 var(--font-sans);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.season-cell .season-tile { width: 100%; height: 8px; }
+
+.season-dots { display: flex; gap: 1px; justify-content: center; flex-wrap: nowrap; }
+.season-dot {
+  flex: none;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px var(--color-muted);
+}
+.season-dot--s { background: var(--color-text); box-shadow: none; }
+.season-key .season-dots { gap: 2px; }
+.season-key .season-dot { width: 5px; height: 5px; }
+
+/* ─── Ladder tile ────────────────────────────────────────────────────────── */
+
+/* Colour = band; the 2px rank rule's LENGTH = band rank, so tiles read in
+   order in grayscale / under colour-vision deficiency. */
+.season-tile {
+  position: relative;
+  display: block;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--bb, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--b, var(--color-border)) 70%, transparent);
+  overflow: hidden;
+}
+
+.season-tile > i {
+  position: absolute;
+  left: 2px;
+  bottom: 2px;
+  height: 2px;
+  width: calc((100% - 4px) * var(--lv, 0));
+  background: var(--b);
+}
+
+/* Excellent: the one solid tile, and the system's one allowed glow. */
+.season-tile[data-band=excellent] {
+  background: var(--band-excellent);
+  box-shadow: 0 0 0 1px var(--band-excellent), 0 0 8px color-mix(in srgb, var(--band-excellent) 35%, transparent);
+}
+.season-tile[data-band=excellent] > i { background: var(--color-bg); }
+
+/* Postponed reads the PRIMITIVE red, not the Brutal semantic. */
+.season-tile--pp { background: transparent; box-shadow: inset 0 0 0 1px var(--band-red); }
+.season-tile--pp::after {
+  content: "";
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  bottom: 2px;
+  height: 2px;
+  background: var(--band-red);
+}
+
+.season-tile--miss { background: transparent; box-shadow: none; border: 1px dashed var(--color-estimated); }
+.season-tile.skeleton { box-shadow: none; }
+
+/* ─── Chip lanes ─────────────────────────────────────────────────────────── */
+
+/* Same column template as the week grid above, one 6px row per lane.
+   Distinguishable without colour: solid / outline × text / muted. */
+.season-lanes {
+  grid-template-rows: repeat(3, 6px);
+  row-gap: 2px;
+  margin-top: 2px;
+}
+
+.season-lane { display: block; height: 6px; border-radius: 2px; }
+.season-lane--wildcard      { background: var(--color-text); }
+.season-lane--freehit       { box-shadow: inset 0 0 0 1px var(--color-text); }
+.season-lane--triplecaptain { background: var(--color-muted); }
+
+.season-lanes-text { display: none; margin: 0; font-size: 12px; color: var(--color-muted); }
+
+/* ─── Selection ring + morph box (positioned by the module) ──────────────── */
+
+.season-ring {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 2;
+  border: 2px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  pointer-events: none;
+  opacity: 0;
+}
+
+.season-morph {
+  position: fixed;
+  z-index: 235;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  pointer-events: none;
+}
+
+.season-morph > .season-cell {
+  position: absolute;
+  left: -1px;
+  top: -1px;
+  margin: 0;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* ─── States ─────────────────────────────────────────────────────────────── */
+
+.season-state {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+  max-width: 560px;
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.season-state__t {
+  margin: 0;
+  font: 600 20px/1.05 var(--font-head);
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--color-text);
+}
+
+.season-state p { margin: 0; font-size: 13px; color: var(--color-muted); text-wrap: pretty; }
+.season-state--err .season-state__t::before { content: "⚠ "; color: var(--band-red); }
+
+.season-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: 600 12px/1 var(--font-sans);
+  cursor: pointer;
+  transition: border-color var(--season-dur-fast), background-color var(--season-dur-fast);
+}
+.season-btn:hover { background: var(--color-surface-raised); border-color: var(--color-muted); }
+.season-btn:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+
+.season-kbd {
+  font: 700 11px/1.2 var(--font-sans);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+/* ─── Shared marks: score chip, band name, tag, chip window ──────────────── */
+
+.season-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 24px;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--bb);
+  color: var(--bt);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--b) 60%, transparent);
+  font: 700 12px/1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+.season-chip[data-band=excellent] {
+  background: var(--band-excellent);
+  color: var(--color-bg);
+  box-shadow: 0 0 0 1px var(--band-excellent), 0 0 12px color-mix(in srgb, var(--band-excellent) 35%, transparent);
+}
+
+.season-bn {
+  font: 700 10px/1 var(--font-sans);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--bt, var(--color-muted));
+}
+.season-bn--muted { color: var(--color-muted); }
+
+.season-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 16px;
+  padding: 0 var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  color: var(--color-muted);
+  font: 700 9px/1 var(--font-sans);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.season-tag--pp { color: var(--band-red); border-color: var(--band-red); }
+
+.season-cw {
+  display: flex;
+  align-items: center;
+  height: 16px;
+  padding: 0 6px;
+  border-radius: 2px;
+  font: 700 9px/1 var(--font-sans);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.season-cw--wildcard      { background: var(--color-text); color: var(--color-bg); }
+.season-cw--freehit       { color: var(--color-text); box-shadow: inset 0 0 0 1px var(--color-text); }
+.season-cw--triplecaptain { background: var(--color-muted); color: var(--color-bg); }
+
+.season-crest {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--color-surface-raised);
+  box-shadow: inset 0 0 0 1px var(--color-border);
+}
+.season-crest img { width: 72%; height: 72%; object-fit: contain; }
+
+/* ─── Popover / sheet ────────────────────────────────────────────────────── */
+
+/* Above the app nav (100) and phone tab bar (200), level with Matchup's .pop. */
+.season-pop {
+  position: fixed;
+  z-index: 230;
+  left: 0;
+  top: 0;
+  display: none;
+  gap: 10px;
+  width: min(320px, calc(100vw - 24px));
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
+  padding: 14px;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-raised);
+  box-shadow: var(--season-shadow-pop);
+  color: var(--color-text);
+  font: 13px/1.4 var(--font-sans);
+}
+.season-pop.is-open { display: grid; }
+
+.season-pop__t {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  font: 600 22px/1 var(--font-head);
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+.season-pop__t small {
+  font: 700 10px/1 var(--font-sans);
+  letter-spacing: .1em;
+  color: var(--color-muted);
+}
+
+.season-pop__rows { display: grid; gap: var(--space-1); }
+
+.season-pop__r {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 32px;
+  padding: 6px var(--space-2);
+  border-radius: 3px;
+  background: var(--color-surface);
+}
+
+.season-pop__m { display: flex; align-items: center; gap: 6px; min-width: 0; font-weight: 600; }
+.season-pop__m i { font-style: normal; font-size: 11px; color: var(--color-muted); }
+.season-pop__s { display: flex; align-items: center; gap: 6px; }
+.season-pop__s .season-tile { width: 22px; height: 8px; }
+
+.season-pop__fav { padding-bottom: 1px; border-bottom: 2px solid var(--color-text); }
+
+.season-pop__p {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 5px var(--space-2);
+  border-radius: 3px;
+  background: var(--color-surface);
+  font-size: 12px;
+}
+.season-pop__p.is-standout { box-shadow: inset 2px 0 0 var(--color-text); }
+.season-pop__p b { font-weight: 700; font-variant-numeric: tabular-nums; }
+.season-pop__pos { font: 700 9px/1 var(--font-sans); letter-spacing: .08em; color: var(--color-muted); }
+.season-pop__nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.season-pop__pr { color: var(--color-muted); font-variant-numeric: tabular-nums; }
+
+.season-pop__cws { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+
+.season-pop__note {
+  margin: 0;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border-subtle);
+  font-size: 12px;
+  color: var(--color-muted);
+  text-wrap: pretty;
+}
+
+.season-pop__x { justify-self: end; }
+
+.season-pop--sheet {
+  left: 0 !important;
+  right: 0;
+  top: auto !important;
+  bottom: 0;
+  width: auto;
+  max-height: 80vh;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  padding-bottom: calc(14px + env(safe-area-inset-bottom));
+}
+
+.season-pop-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 205;
+  display: none;
+  background: var(--season-scrim);
+}
+.season-pop-scrim.is-on { display: block; }
+
+/* ─── Responsive ─────────────────────────────────────────────────────────── */
+
+@media (max-width: 1366px) {
+  .season-halves { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 900px) {
+  .season-key { grid-template-columns: minmax(0, 1fr); gap: var(--space-1); }
+  .season-key__lbl { padding-top: 6px; }
+  .season-key__row { gap: 2px var(--space-4); }
+
+  /* Rows of 10; the lanes give way to a one-line text summary. */
+  .season-grid { grid-template-columns: repeat(10, minmax(0, 1fr)); gap: var(--space-1); }
+  .season-lanes { display: none; }
+  .season-lanes-text { display: block; }
+
+  .season-cell { min-height: 60px; padding: 17px 3px 5px; }
+  .season-cell--past { min-height: 44px; }
+  .season-cell__band,
+  .season-cell .season-dots { display: none; }
+  .season-cell .season-tile { height: 6px; }
+}
+
+@media (pointer: coarse) {
+  .season-btn { height: 44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .season-cell,
+  .season-btn { transition: none; }
+}
+
+/* WHERE THIS LIVES, AND WHY IT IS LAST IN THE FILE.
+   A skeleton is composed onto the real component's class
+   (`class="breakdown-row__bar skeleton"`), and several of those components set
+   `background` at the same specificity this block does — .breakdown-row__bar
+   paints itself --color-muted, for one. Equal specificity means source order
+   decides, so the skeleton fill only reliably wins from the bottom of the
+   file. Keep this block last; moving it up silently returns those skeletons to
+   whatever colour their component paints, with no error anywhere to say so.
+
+   That is exactly what had happened: the FULL SEASON STRIP section was
+   appended BELOW this block, which quietly demoted it: the panel's placeholder
+   player rows rendered as readable muted text on a real pill rather than as
+   skeletons. The strip's .season-tile skeletons rely on the same ordering
+   today. Append new sections ABOVE it. */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SKELETON — placeholder for a value that is still settling
+   ---------------------------------------------------------------------------
+   WHAT IT IS FOR. A CompositeScore is a weighted blend, and one of its
+   components (counter-matchup) cannot be computed until that team's Understat
+   payload lands during the boot-time prefetch. Before this existed the score
+   rendered anyway and then silently rewrote itself a second or two later — a
+   number that looks final and is not. A skeleton says "not yet" for exactly as
+   long as that is true, and is replaced by the settled number.
+
+   HOW TO USE IT. Compose, don't replace: put `skeleton` ON the element that
+   would have carried the value, alongside its normal structural class, and
+   OMIT the band modifier.
+
+       <span class="score-chip skeleton">…</span>     not  <span class="skeleton">
+       <div class="score-pill skeleton">…</div>
+       <div class="pgw-cell skeleton"></div>
+
+   The structural class keeps the element's exact footprint — padding, min-width,
+   line-height — so the settled value drops in with no layout shift, and there
+   is no second set of sizes here to keep in step with the real components.
+   Skeletons keep their placeholder text (rendered transparent) for the same
+   reason: it is what gives a text-sized box its height.
+
+   The band modifier is what must be left off. Band backgrounds and the
+   skeleton fill are the same specificity, so emitting both would leave the
+   winner decided by source order — an unsettled score would read as a real
+   band-coloured chip. Omitting it makes that unrepresentable rather than
+   merely discouraged.
+
+   Skeletons are decorative and carry no information, so mark them
+   `aria-hidden="true"` and put `aria-busy="true"` on the region that owns them.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.skeleton {
+  /* Transparent text, not empty markup: the placeholder characters size the
+     box to the same line height the real value will occupy. */
+  color: transparent;
+  /* The placeholder text is a sizing device, not content — never let it be
+     selected or copied as if it were a real value. */
+  user-select: none;
+  /* Deliberately NOT pointer-events:none. Some skeletons sit on elements that
+     are navigation as well as value — a per-gameweek strip cell is a link to
+     that fixture's card whether or not its score has settled — and disabling
+     the element wholesale would take the navigation away for the few seconds
+     the number is still arriving. Withhold the VALUE, not the affordance. */
+  /* Deliberately no border rule: each composed element keeps its own, so a
+     skeleton score pill still shows the pill's outline and a skeleton chip
+     still has none. The one thing a skeleton must always win is the FILL. */
+  background-color: var(--color-skeleton);
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--color-skeleton-highlight) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: skeleton-sweep var(--skeleton-shimmer-duration) linear infinite;
+}
+
+/* Any nested text (a score pill's value/band spans) inherits the transparency
+   rather than punching through with its own band colour. */
+.skeleton * {
+  color: transparent;
+}
+
+@keyframes skeleton-sweep {
+  from { background-position: 100% 0; }
+  to   { background-position: 0 0; }
+}
+
+/* The shimmer is the only thing that distinguishes a skeleton from an empty
+   box, so when motion is unwelcome it becomes a flat tone that still reads as
+   a filled placeholder — not simply an animation switched off. */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    background-image: none;
+    background-color: var(--color-skeleton-highlight);
+  }
+}
+
+/* A standalone placeholder line, for regions with no existing element to
+   compose onto — a loading pane, a recommendation panel, a table row. Fills
+   its container's width, so the container chooses how wide a line reads. */
+.skeleton--text {
+  display: block;
+  width: 100%;
+  height: 1.1rem;
+  border-radius: var(--radius-sm);
+}
+
+/* Stack of placeholder lines with the rhythm of body copy. */
+.skeleton-lines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+}
+
+/* Successive lines shorten, so the block reads as a paragraph rather than a
+   grey rectangle. */
+.skeleton-lines .skeleton--text:last-child {
+  width: 60%;
+}

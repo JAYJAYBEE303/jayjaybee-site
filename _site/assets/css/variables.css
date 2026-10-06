@@ -1,0 +1,156 @@
+/* =========================================================================
+   jayjaybee.com — variables.css
+   Design tokens for the whole site. Every colour, font family, type scale
+   step, spacing value, radius, shadow, and timing lives here.
+
+   Two layers:
+     1. Raw palette + scales (paper/ink/accent, type families, durations).
+     2. Role tokens (--bg, --fg, --link) that map onto the raw palette.
+
+   Use the role tokens everywhere downstream. Edit the raw palette here
+   to rebrand; nothing else should ever need to change.
+   ========================================================================= */
+
+/* ---------- Web fonts (Google Fonts) -------------------------------------- */
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400;1,6..72,500&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@300;400;500&display=swap');
+
+:root {
+  /* Type families */
+  --font-serif: 'Newsreader', 'Charter', 'Iowan Old Style', Georgia, 'Times New Roman', serif;
+  --font-sans:  'Hanken Grotesk', -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono:  'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+
+  /* Type scale — roles, not sizes */
+  --fs-display:   clamp(3.25rem, 5.6vw + 1rem, 5.5rem);
+  --fs-headline:  clamp(2.25rem, 2.8vw + 1rem, 3.25rem);
+  --fs-subhead:   clamp(1.5rem, 1.2vw + 1rem, 1.875rem);
+  --fs-lede:      1.3125rem;
+  --fs-body:      1.0625rem;
+  --fs-ui:        0.9375rem;
+  --fs-small:     0.8125rem;
+  --fs-mono:      0.8125rem;
+  --fs-mono-lg:   0.9375rem;
+
+  /* Line heights */
+  --lh-tight: 1.05; --lh-snug: 1.18; --lh-prose: 1.55; --lh-ui: 1.45; --lh-flush: 1.0;
+
+  /* Tracking */
+  --tr-display:  -0.02em;
+  --tr-headline: -0.015em;
+  --tr-body:      0em;
+  --tr-ui:       -0.005em;
+  --tr-mono:      0.04em;
+  --tr-mono-caps: 0.08em;
+
+  /* Weights */
+  --fw-light: 300; --fw-regular: 400; --fw-medium: 500; --fw-semibold: 600; --fw-bold: 700;
+
+  /* Colour — light (default) */
+  --paper:        #F4EFE6;
+  --paper-2:      #ECE5D7;
+  --paper-3:      #E2DAC8;
+  --ink:          #1A1714;
+  --ink-2:        #4A4540;
+  --ink-3:        #7A746C;
+  --ink-4:        #A8A096;
+  --accent:       #B5391C;
+  --accent-hover: #8E2C13;
+  --accent-soft:  #E8C8BD;
+  --rule:         rgba(26, 23, 20, 0.14);
+  --rule-strong:  rgba(26, 23, 20, 0.28);
+  --selection-bg: #E8C8BD;
+  --selection-fg: #1A1714;
+
+  /* Role tokens — refer to these, not the raw palette */
+  --bg:          var(--paper);
+  --bg-recessed: var(--paper-2);
+  --fg:          var(--ink);
+  --fg-muted:    var(--ink-2);
+  --fg-quiet:    var(--ink-3);
+  --fg-faint:    var(--ink-4);
+  --link:        var(--accent);
+  --link-hover:  var(--accent-hover);
+  --hairline:    var(--rule);
+
+  /* Spacing — 4px base. --baseline is 24px and everything snaps to it. */
+  --space-1: 0.25rem; --space-2: 0.5rem; --space-3: 0.75rem;
+  --space-4: 1rem;    --space-5: 1.5rem; --space-6: 2rem;
+  --space-7: 3rem;    --space-8: 4rem;   --space-9: 6rem;
+  --space-10: 8rem;   --space-11: 12rem;
+  --baseline: 1.5rem;
+
+  --section-gap-s: var(--space-7);
+  --section-gap-m: var(--space-9);
+  --section-gap-l: var(--space-11);
+
+  /* Content widths */
+  --measure-prose: 62ch;
+  --measure-wide:  76ch;
+  --measure-ui:    34rem;
+  --container:     72rem;
+
+  /* Borders + radii — almost none */
+  --radius-0: 0;
+  --radius-1: 2px;
+  --radius-2: 4px;
+  --border-hairline: 1px solid var(--hairline);
+  --border-rule:     1px solid var(--rule-strong);
+
+  /* Elevation */
+  --shadow-none: none;
+  --shadow-1:    0 1px 0 0 var(--rule);
+  --shadow-2:    0 8px 24px -12px rgba(0, 0, 0, 0.18);
+
+  /* Motion */
+  --dur-1: 120ms; --dur-2: 200ms; --dur-3: 320ms;
+  --ease:    cubic-bezier(.2, 0, 0, 1);
+  --ease-in: cubic-bezier(.4, 0, .8, .2);
+
+  /* Paper grain — subtle SVG noise, layered over --bg.
+     Light mode = dark specks; the dark-mode override below swaps in
+     light specks at lower opacity so the contrast feels consistent.
+     Tile is 640px with asymmetric baseFrequency + 4 octaves so the
+     repeat doesn't read as a grid; --bg shows through wherever the
+     SVG is transparent. */
+  --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='640' height='640'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.48 0.56' numOctaves='4' stitchTiles='stitch' seed='23'/><feColorMatrix values='0 0 0 0 0.10  0 0 0 0 0.09  0 0 0 0 0.08  0.85 0 0 0 -0.48'/><feGaussianBlur stdDeviation='1.0'/></filter><rect width='100%25' height='100%25' filter='url(%23g)'/></svg>");
+}
+
+/* Dark mode by user preference, when no manual override is set */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper:   #14110E;
+    --paper-2: #1C1814;
+    --paper-3: #25201A;
+    --ink:     #EBE4D5;
+    --ink-2:   #B8B0A0;
+    --ink-3:   #857E72;
+    --ink-4:   #4F4A42;
+    --accent:       #D2553A;
+    --accent-hover: #E27052;
+    --accent-soft:  #5A2B1F;
+    --rule:        rgba(235, 228, 213, 0.12);
+    --rule-strong: rgba(235, 228, 213, 0.24);
+    --selection-bg: #5A2B1F;
+    --selection-fg: #EBE4D5;
+    --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='640' height='640'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.48 0.56' numOctaves='4' stitchTiles='stitch' seed='23'/><feColorMatrix values='0 0 0 0 0.92  0 0 0 0 0.89  0 0 0 0 0.83  0.65 0 0 0 -0.48'/><feGaussianBlur stdDeviation='1.0'/></filter><rect width='100%25' height='100%25' filter='url(%23g)'/></svg>");
+  }
+}
+
+/* Manual override — wins over system preference */
+:root[data-theme="dark"] {
+  --paper:   #14110E;
+  --paper-2: #1C1814;
+  --paper-3: #25201A;
+  --ink:     #EBE4D5;
+  --ink-2:   #B8B0A0;
+  --ink-3:   #857E72;
+  --ink-4:   #4F4A42;
+  --accent:       #D2553A;
+  --accent-hover: #E27052;
+  --accent-soft:  #5A2B1F;
+  --rule:        rgba(235, 228, 213, 0.12);
+  --rule-strong: rgba(235, 228, 213, 0.24);
+  --selection-bg: #5A2B1F;
+  --selection-fg: #EBE4D5;
+  --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='640' height='640'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.48 0.56' numOctaves='4' stitchTiles='stitch' seed='23'/><feColorMatrix values='0 0 0 0 0.92  0 0 0 0 0.89  0 0 0 0 0.83  0.65 0 0 0 -0.48'/><feGaussianBlur stdDeviation='1.0'/></filter><rect width='100%25' height='100%25' filter='url(%23g)'/></svg>");
+}

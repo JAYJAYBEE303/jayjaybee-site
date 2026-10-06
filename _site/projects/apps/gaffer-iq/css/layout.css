@@ -1,0 +1,397 @@
+/* Gaffer IQ — layout.css
+   App shell: sticky nav, module sections, horizon switcher.
+   No component-specific styles here — those belong in components.css.
+   All values reference var(--…) from base.css. */
+
+/* ─── App shell ──────────────────────────────────────────────────────────── */
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* ─── Top nav ────────────────────────────────────────────────────────────── */
+
+.app-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: 0 var(--space-6);
+  height: var(--app-header-height);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  flex-shrink: 0;
+}
+
+.app-nav__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  text-decoration: none;
+  color: var(--color-text);
+  flex-shrink: 0;
+}
+
+.app-nav__logo {
+  font-size: var(--font-size-lg);
+  line-height: 1;
+}
+
+.app-nav__title {
+  font-size: var(--font-size-md);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+/* ─── Module navigation ──────────────────────────────────────────────────── */
+
+.module-nav {
+  display: flex;
+  gap: 0;
+  flex: 1;
+}
+
+.module-nav__item {
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-4);
+  height: var(--app-header-height);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-muted);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.module-nav__item:hover {
+  color: var(--color-text);
+}
+
+.module-nav__item.is-active {
+  color: var(--color-accent);
+  border-bottom-color: var(--color-accent);
+}
+
+.module-nav__item--inactive {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+/* ─── Main content ───────────────────────────────────────────────────────── */
+
+.app-main {
+  flex: 1;
+  padding: var(--space-6);
+  max-width: 1400px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* ─── Module sections ────────────────────────────────────────────────────── */
+
+.module-view {
+  display: none;
+}
+
+.module-view.is-active {
+  display: block;
+}
+
+/* ─── Landing route ──────────────────────────────────────────────────────── */
+
+/* The landing page is a module view like any other (data-module="landing", see
+   CONVENTIONS.md §6) so hash routing, deep links and the render-when-visible
+   contract all keep working untouched. It just needs the app chrome out of the
+   way: it carries no nav of its own by design, and it is a full-bleed,
+   viewport-height composition rather than a padded document inside .app-main.
+
+   KEYED OFF :has(), NOT A JS-APPLIED BODY CLASS. js/main.js is a module with a
+   large import graph, so the browser paints long before the router runs — a
+   class added in JS meant the fully-styled nav rendered and then vanished, a
+   visible flash on every load. index.html already ships with .is-active on the
+   landing section, so this resolves during the first style pass with no script
+   involved, and it re-derives itself for free every time routeToHash() moves
+   the class. Nothing here depends on load order.
+
+   :has() is baseline across the evergreen browsers this project targets
+   (CONVENTIONS.md §1). Where it is unsupported the app chrome simply stays
+   visible on the landing route — degraded, not broken. */
+
+/* NOT `display: none` on .app-nav. assets/js/back-to-jayjaybee.js injects the
+   shared "‹ jayjaybee.com" link as the first child of this header, so hiding
+   the header outright would take that link with it and strand the landing page
+   with no route back to the parent site. Instead the bar is emptied of app
+   chrome and left in place, transparent, carrying only the injected link.
+
+   position: fixed rather than sticky so the bar leaves the flex flow entirely
+   and the landing keeps the full viewport height it lays out against. The bar
+   matches the landing's own top row (.top in landing.css) so the link sits on
+   that row's right-hand end, in the slot the tagline otherwise fills, and lets
+   clicks through everywhere but the link itself. */
+body:has(.landing.is-active) .app-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  justify-content: flex-end;
+  height: auto;
+  padding: var(--landing-top-pad) var(--landing-pad);
+  background: transparent;
+  border-bottom: none;
+  pointer-events: none;
+}
+
+/* The link borrows .module-nav__item, whose phone rules make it a stretched
+   bottom-tab cell; undo that here. */
+body:has(.landing.is-active) .app-nav .jjb-back-link {
+  flex: none;
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  border: none;
+  pointer-events: auto;
+}
+
+body:has(.jjb-back-link) .landing .top__meta {
+  visibility: hidden;
+}
+
+body:has(.landing.is-active) .app-nav__brand,
+body:has(.landing.is-active) .module-nav {
+  display: none;
+}
+
+/* Drop .app-main's centred 1400px column and its padding so the landing can
+   own the full viewport. The landing re-establishes its own 1240px column
+   internally. */
+body:has(.landing.is-active) .app-main {
+  max-width: none;
+  padding: 0;
+}
+
+/* The FPL error banner and the schedule bar are app chrome too. Data still
+   loads behind the landing and both still populate — they are only visually
+   suppressed here, and reappear intact the moment the visitor enters a module.
+   The landing is a fixed-height, non-scrolling page, so anything stacked above
+   it would push its footer off screen. */
+body:has(.landing.is-active) .app-error-banner,
+body:has(.landing.is-active) .schedule-bar {
+  display: none;
+}
+
+/* Matchup: full-bleed, so its command bar and score tape run edge to edge
+   (css/matchup.css). Bottom padding stays so the Full Season strip keeps its
+   gap to the page end; that strip's own .matchup-shell does the same 100vw
+   escape it always has. */
+body:has([data-module="matchup"].is-active) .app-main {
+  max-width: none;
+  padding: 0 0 var(--space-6);
+}
+
+/* Fixtures, Ranker, Dashboard and Planner: full-bleed too, so their mode tabs / command bar run
+   edge to edge. Each page re-establishes its own centred column
+   (css/fixtures.css, css/ranker.css, css/dashboard.css, css/planner.css). */
+body:has([data-module="fixtures"].is-active) .app-main,
+body:has([data-module="ranker"].is-active) .app-main,
+body:has([data-module="dashboard"].is-active) .app-main,
+body:has([data-module="planner"].is-active) .app-main {
+  max-width: none;
+  padding: 0;
+}
+
+@media (max-width: 768px) {
+  /* Keep clear of the fixed bottom tab bar (see the 768px block below). */
+  body:has([data-module="fixtures"].is-active) .app-main,
+  body:has([data-module="ranker"].is-active) .app-main,
+  body:has([data-module="dashboard"].is-active) .app-main,
+  body:has([data-module="planner"].is-active) .app-main {
+    padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (max-width: 640px) {
+  body:has(.landing.is-active) .app-nav {
+    /* 10px, the landing's own phone .top padding */
+    padding: calc(var(--space-2) + var(--space-1) / 2) var(--landing-pad);
+  }
+}
+
+/* ─── Error banner ───────────────────────────────────────────────────────── */
+
+.app-error-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--band-red-bg);
+  border: 1px solid var(--band-red);
+  border-radius: var(--radius-md);
+  color: var(--band-red);
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--space-4);
+}
+
+/* The HTML `hidden` attribute applies `display: none` via the user-agent
+   stylesheet, but the author rule above (`display: flex`) overrides it.
+   Restore the expected behaviour so the banner stays hidden until an error
+   actually fires. */
+.app-error-banner[hidden] {
+  display: none;
+}
+
+.app-error-banner__retry {
+  background: none;
+  border: 1px solid var(--band-red);
+  border-radius: var(--radius-sm);
+  color: var(--band-red);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  font-family: var(--font-sans);
+  padding: 2px var(--space-2);
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.app-error-banner__retry:hover {
+  background: var(--band-red-bg);
+}
+
+/* ─── Module loading / placeholder ──────────────────────────────────────── */
+
+.app-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+  color: var(--color-muted);
+  font-size: var(--font-size-md);
+}
+
+.coming-soon {
+  color: var(--color-muted);
+  font-size: var(--font-size-md);
+  padding: var(--space-8) 0;
+  text-align: center;
+}
+
+/* ─── Responsive fallback ────────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  .app-nav {
+    flex-wrap: wrap;
+    height: auto;
+    padding: var(--space-2) var(--space-4);
+    gap: var(--space-2);
+  }
+
+  .module-nav {
+    order: 3;
+    width: 100%;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .module-nav__item {
+    height: 40px;
+    padding: 0 var(--space-3);
+    font-size: var(--font-size-xs);
+  }
+
+
+
+  .app-main {
+    padding: var(--space-4);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MOBILE LAYOUT  ≤ 768px — Phase 4-5
+   All desktop rules above are completely untouched; this block is purely
+   additive. Overrides the 900px breakpoint where needed.
+   Test breakpoints: 375px (iPhone SE), 390px (iPhone 14), 768px (tablet).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+
+  /* ─── App shell ────────────────────────────────────────────────────────── */
+
+  /* Reserve space for the fixed bottom tab bar (56px) plus system safe-area
+     (home indicator on iPhone 14 etc.) so the last content row is never
+     hidden behind the tab bar. */
+  .app-main {
+    padding: var(--space-3);
+    padding-bottom: calc(56px + var(--space-4) + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* ─── Top nav — slimmed to brand + horizon switcher only ──────────────── */
+
+  /* The module nav is fixed to the bottom (see below), so it no longer takes
+     up space here. The app-nav becomes a single-row brand + switcher bar. */
+  .app-nav {
+    flex-wrap: wrap;
+    height: auto;
+    padding: var(--space-2) var(--space-3);
+    gap: var(--space-2);
+    align-items: center;
+  }
+
+  .app-nav__title {
+    font-size: var(--font-size-sm);
+  }
+
+  /* ─── Bottom tab bar — replaces the inline module nav ─────────────────── */
+
+  /* position:fixed removes the element from the app-nav flex flow, making the
+     app-nav naturally show only brand + horizon switcher. The tab bar sits
+     above the system home indicator via env(safe-area-inset-bottom). */
+  .module-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 200;
+    display: flex;
+    flex-direction: row;
+    order: unset;
+    width: 100%;
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+    border-bottom: none;
+    /* Push tabs above the iOS home indicator */
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .module-nav__item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    /* 56px total: 44px tap target + breathing room. */
+    height: 56px;
+    min-height: 44px;
+    padding: var(--space-1) var(--space-2);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    /* Active indicator moves from bottom underline to top accent bar. */
+    border-bottom: none;
+    border-top: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+  }
+
+  .module-nav__item.is-active {
+    color: var(--color-accent);
+    border-bottom-color: transparent;
+    border-top-color: var(--color-accent);
+  }
+
+  /* ─── Horizon switcher — full width below brand ────────────────────────── */
+
+
+}

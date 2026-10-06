@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gaffer IQ</title>
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
+</head>
+<body>
+  <noscript>Gaffer IQ requires JavaScript.</noscript>
+
+  <div class="app-shell">
+
+    <header class="app-nav">
+      <div class="app-nav__brand">
+        <span class="app-nav__logo">⚡</span>
+        <span class="app-nav__title">Gaffer IQ</span>
+      </div>
+
+      <nav class="module-nav" aria-label="Module navigation">
+        <a class="module-nav__item is-active" href="#matchup">Matchup</a>
+        <a class="module-nav__item" href="#ranker">Ranker</a>
+        <a class="module-nav__item" href="#dashboard">Dashboard</a>
+        <a class="module-nav__item" href="#planner">Planner</a>
+      </nav>
+
+      <div class="horizon-switcher" role="group" aria-label="Planning horizon">
+        <button class="horizon-switcher__btn is-active" data-horizon="GW1" type="button">This GW</button>
+        <button class="horizon-switcher__btn" data-horizon="GW3" type="button">Next 3 GWs</button>
+        <button class="horizon-switcher__btn" data-horizon="GW6" type="button">Next 6 GWs</button>
+      </div>
+    </header>
+
+    <main class="app-main">
+
+      <div id="app-error-banner" class="app-error-banner" hidden>
+        <span id="app-error-text"></span>
+        <button class="app-error-banner__retry" id="app-error-retry" type="button">Retry</button>
+      </div>
+
+      <section class="module-view is-active" data-module="matchup" aria-label="Matchup Analyser">
+        <div class="matchup-controls"></div>
+        <div class="matchup-grid">
+          <div class="app-status">Loading FPL data…</div>
+        </div>
+      </section>
+
+      <section class="module-view" data-module="ranker" aria-label="Player Ranker">
+
+        <div class="ranker-controls">
+          <div class="ranker-controls__pos-group" role="group" aria-label="Filter by position">
+            <button class="ranker-pos-btn is-active" data-pos="GKP" type="button">GKP</button>
+            <button class="ranker-pos-btn is-active" data-pos="DEF" type="button">DEF</button>
+            <button class="ranker-pos-btn is-active" data-pos="MID" type="button">MID</button>
+            <button class="ranker-pos-btn is-active" data-pos="FWD" type="button">FWD</button>
+          </div>
+
+          <div class="ranker-controls__select-wrap">
+            <label class="ranker-controls__label" for="ranker-price">Price</label>
+            <select class="ranker-select" id="ranker-price">
+              <option value="all">All prices</option>
+              <option value="budget">≤ £5.0m</option>
+              <option value="mid">£5.1m – £8.0m</option>
+              <option value="premium">£8.1m – £10.0m</option>
+              <option value="elite">≥ £10.1m</option>
+            </select>
+          </div>
+
+          <div class="ranker-controls__select-wrap">
+            <label class="ranker-controls__label" for="ranker-team">Team</label>
+            <select class="ranker-select" id="ranker-team">
+              <option value="all">All teams</option>
+            </select>
+          </div>
+
+          <button class="ranker-toggle-btn" id="ranker-vs-toggle"
+                  type="button" aria-pressed="false">Show £/pt</button>
+        </div>
+
+        <div class="ranker-loading" id="ranker-loading">
+          <span class="ranker-loading__text">Computing rankings…</span>
+        </div>
+
+        <div class="ranker-table-wrap">
+          <table class="ranker-table">
+            <thead id="ranker-thead"></thead>
+            <tbody id="ranker-tbody">
+              <tr><td class="ranker-table__empty" colspan="7">Loading FPL data…</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+      </section>
+
+      <section class="module-view" data-module="dashboard" aria-label="GW Dashboard">
+
+        <!-- Controls bar: player search + position pills + squad tally -->
+        <div class="dash-controls">
+          <div class="dash-search-wrap">
+            <label class="dash-search-label" for="dash-search-input">Add player</label>
+            <div class="dash-search-combo">
+              <input class="dash-search-input" id="dash-search-input"
+                     type="text" placeholder="Search by name…"
+                     autocomplete="off"
+                     aria-autocomplete="list" aria-controls="dash-search-results">
+              <ul class="dash-search-results" id="dash-search-results"
+                  role="listbox"></ul>
+            </div>
+          </div>
+
+          <div class="dash-pos-filter" role="group" aria-label="Filter search by position">
+            <button class="dash-pos-btn is-active" data-pos="GKP" type="button">GKP</button>
+            <button class="dash-pos-btn is-active" data-pos="DEF" type="button">DEF</button>
+            <button class="dash-pos-btn is-active" data-pos="MID" type="button">MID</button>
+            <button class="dash-pos-btn is-active" data-pos="FWD" type="button">FWD</button>
+          </div>
+
+          <p class="dash-squad-tally" id="dash-squad-tally">0 / 15 players selected</p>
+        </div>
+
+        <!-- Two-column shell: squad panel (left) + decisions panel (right) -->
+        <div class="dash-shell">
+
+          <aside class="dash-squad-panel" aria-label="My squad">
+            <div id="dash-squad-slots"></div>
+          </aside>
+
+          <section class="dash-decisions" id="dash-decisions" aria-label="GW recommendations">
+            <p class="dash-decisions__hint">Add 15 players to see GW recommendations.</p>
+          </section>
+
+        </div>
+
+      </section>
+
+      <section class="module-view" data-module="planner" aria-label="Transfer Planner">
+
+        <!-- Controls bar: search + position filter + budget + free transfers + hit toggle -->
+        <div class="planner-controls">
+
+          <div class="dash-search-wrap">
+            <label class="dash-search-label" for="planner-search-input">Add player</label>
+            <div class="dash-search-combo">
+              <input class="dash-search-input" id="planner-search-input"
+                     type="text" placeholder="Search by name…"
+                     autocomplete="off"
+                     aria-autocomplete="list" aria-controls="planner-search-results">
+              <ul class="dash-search-results" id="planner-search-results"
+                  role="listbox"></ul>
+            </div>
+          </div>
+
+          <div class="dash-pos-filter" role="group" aria-label="Filter search by position">
+            <button class="planner-pos-btn is-active" data-pos="GKP" type="button">GKP</button>
+            <button class="planner-pos-btn is-active" data-pos="DEF" type="button">DEF</button>
+            <button class="planner-pos-btn is-active" data-pos="MID" type="button">MID</button>
+            <button class="planner-pos-btn is-active" data-pos="FWD" type="button">FWD</button>
+          </div>
+
+          <div class="planner-budget-wrap">
+            <label class="planner-label" for="planner-budget">Budget (£m)</label>
+            <input class="planner-budget-input" id="planner-budget"
+                   type="number" min="0" max="200" step="0.1" value="0"
+                   placeholder="0.0">
+          </div>
+
+          <div class="planner-ft-wrap">
+            <span class="planner-label" id="planner-ft-label">Free transfers</span>
+            <div class="planner-ft-btns" role="group" aria-labelledby="planner-ft-label">
+              <button class="planner-ft-btn is-active" data-ft="1" type="button">1</button>
+              <button class="planner-ft-btn" data-ft="2" type="button">2</button>
+            </div>
+          </div>
+
+          <div class="planner-hit-wrap">
+            <label class="planner-label" for="planner-hit-toggle">Allow hit (−4 pts)</label>
+            <button class="planner-hit-toggle" id="planner-hit-toggle"
+                    type="button" aria-pressed="false">Off</button>
+          </div>
+
+          <p class="dash-squad-tally" id="planner-squad-tally">0 / 15 players selected</p>
+
+        </div>
+
+        <!-- Two-column shell: squad panel (left) + recommendations (right) -->
+        <div class="planner-shell">
+
+          <aside class="dash-squad-panel" aria-label="My squad">
+            <div id="planner-squad-slots"></div>
+          </aside>
+
+          <section class="planner-recommendations" id="planner-recommendations"
+                   aria-label="Transfer recommendations">
+            <p class="planner-hint">Add 15 players to see transfer recommendations.</p>
+          </section>
+
+        </div>
+
+      </section>
+
+      <section class="module-view" data-module="calibration" aria-label="Model Calibration">
+        <p class="calib-empty">Loading calibration data…</p>
+      </section>
+
+    </main>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
