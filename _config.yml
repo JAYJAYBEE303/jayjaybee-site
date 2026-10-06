@@ -9,6 +9,7 @@
 title: Josh Bailey
 description: IT Desktop Analyst at Aston Martin F1. Endpoint work, PowerShell tooling, and the small, sharp tools that should already exist.
 url: https://jayjaybee.com
+encoding: utf-8
 
 # -----------------------------------------------------------------------------
 # Layout defaults. Jekyll applies these in order, with later + more specific
