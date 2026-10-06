@@ -1,4 +1,4 @@
-# jayjaybee.com — design-system directives
+# jayjaybee.com — design-system directives.
 
 Jekyll static site, no build step beyond Jekyll itself. No npm, no
 `package.json`, no bundler — there is nothing to `npm install`, `lint`,
