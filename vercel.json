@@ -1,0 +1,28 @@
+{
+  "rewrites": [
+    {
+      "source": "/projects/apps/gaffer-iq",
+      "destination": "https://gaffer-iq-project-try2.vercel.app"
+    },
+    {
+      "source": "/projects/apps/gaffer-iq/:path*",
+      "destination": "https://gaffer-iq-project-try2.vercel.app/:path*"
+    },
+    {
+      "source": "/projects/apps/f1live",
+      "destination": "https://f1-live-alpha.vercel.app"
+    },
+    {
+      "source": "/projects/apps/f1live/:path*",
+      "destination": "https://f1-live-alpha.vercel.app/:path*"
+    },
+    {
+      "source": "/projects/apps/fc26-calculator",
+      "destination": "https://jayjaybee-site-fc26-calculator.vercel.app"
+    },
+    {
+      "source": "/projects/apps/fc26-calculator/:path*",
+      "destination": "https://jayjaybee-site-fc26-calculator.vercel.app/:path*"
+    }
+  ]
+}
