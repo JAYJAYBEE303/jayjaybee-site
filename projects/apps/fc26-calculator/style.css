@@ -7,7 +7,7 @@
      Slate UI · Blue accent #2563EB · Orange highlight #EA580C
      ───────────────────────────────────────────────────────── */
   :root {
-    --c-canvas:      245 246 248;   /* slate-50 paper */
+    --c-canvas:      245 246 248;   /* slate-50 paper .*/
     --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='640' height='640'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.48 0.56' numOctaves='4' stitchTiles='stitch' seed='23'/><feColorMatrix values='0 0 0 0 0.09  0 0 0 0 0.09  0 0 0 0 0.10  0.85 0 0 0 -0.48'/><feGaussianBlur stdDeviation='1.0'/></filter><rect width='100%25' height='100%25' filter='url(%23g)'/></svg>");
     --c-surface:     255 255 255;
     --c-sunken:      241 243 245;
