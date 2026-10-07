@@ -4,6 +4,8 @@
 
 **Goal:** Bring the browser replay (`projects/apps/f1live/`) up to feature parity with the desktop Python app [f1-race-replay](https://github.com/IAmTomShaw/f1-race-replay), one stage at a time.
 
+**Note (React migration):** the app has since been ported to Vite + React + TypeScript with no change to look or behaviour; see `README.md` for the current files. The stages below describe the original plain-JS build, now in `legacy/`.
+
 **Architecture:** Static page with no build and no backend. `app.js` fetches the public OpenF1 API from the browser, draws on a canvas, and renders the leaderboard and panels in HTML. `replay.js` holds pure, DOM-free helpers that `check.mjs` asserts with plain `node`.
 
 **Tech Stack:** Vanilla ES modules, Canvas 2D, CSS custom properties, OpenF1 REST (`https://api.openf1.org/v1/`).

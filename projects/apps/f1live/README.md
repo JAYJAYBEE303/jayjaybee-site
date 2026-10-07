@@ -21,24 +21,33 @@ It is a web port of the race view from
 [f1-race-replay](https://github.com/IAmTomShaw/f1-race-replay), a desktop
 Python app. That app pulls data with FastF1 in Python. This one reads the
 public [OpenF1](https://openf1.org) API straight from the browser, so it
-needs no backend and no build step.
+needs no backend. It's built with Vite, React and TypeScript.
 
 ## Files
 
-- `index.html`: page shell
-- `style.css`: tokens and layout
-- `app.js`: OpenF1 fetching, playback loop, canvas drawing, controls
-- `replay.js`: pure helpers (binary search, interpolation, track outline)
-- `check.mjs`: `node check.mjs` asserts `replay.js`
-- `vercel.json`: static deploy, no framework or build
+- `index.html`: page shell (Vite entry)
+- `src/style.css`: tokens and layout
+- `src/main.tsx`, `src/App.tsx`: React root, layout, keyboard shortcuts, standings loading
+- `src/useReplay.ts`: replay engine hook: season and race loading, frame loop, playback, preferences
+- `src/openf1.ts`: OpenF1 fetching (spacing, `429` backoff, Cache API) and map rotation
+- `src/loaders.ts`: background loaders (car positions, DRS zones, telemetry, fastest-lap traces)
+- `src/race.ts`: race model and the readouts the panels show (leaderboard, race control, standings)
+- `src/replay.ts`: pure helpers (binary search, interpolation, track outline)
+- `src/drawMap.ts`: track map canvas drawing
+- `src/components/`: header, leaderboard, transport bar, insight tabs, line chart, dialogs
+- `check.ts`: `npm test` asserts `replay.ts` and `race.ts` (plain node, no test framework)
+- `legacy/`: the original plain HTML/JS app, kept until the React port is signed off
+- `vercel.json`: Vercel builds with `npm run build` and serves `dist/`
 
 ## Run locally
 
 ```
-python3 -m http.server 8000   # from this folder, then open http://localhost:8000/
+npm install
+npm run dev       # dev server, http://localhost:5173/
+npm test          # logic checks
+npm run build     # type-check + production build into dist/
+npm run preview   # serve dist/ at http://localhost:4173/
 ```
-
-ES modules don't load from `file://`, so serve the folder over HTTP.
 
 ## Data notes
 
