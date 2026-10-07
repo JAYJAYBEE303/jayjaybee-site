@@ -1,19 +1,46 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600&display=swap"
-      rel="stylesheet"
-    />
-    <title>F1 Live</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>F1 Race Replay</title>
+  <!-- Served at /projects/apps/f1live/ via a proxy rewrite: relative URLs below need the trailing slash. -->
+  <script>if (!location.pathname.endsWith('/') && !/\.\w+$/.test(location.pathname)) location.replace(location.pathname + '/' + location.search + location.hash);</script>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='6' fill='%23f2a63d'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@500;600&display=swap">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <header class="bar">
+    <h1>F1 Race Replay</h1>
+    <label>Season <select id="year"></select></label>
+    <label class="grow">Race <select id="race"></select></label>
+  </header>
+
+  <main class="stage">
+    <section class="track">
+      <canvas id="map" role="img" aria-label="Track map showing each car's position"></canvas>
+      <p id="status" class="status" role="status"></p>
+    </section>
+    <aside class="tower" aria-label="Leaderboard">
+      <div class="tower-head"><span id="lap">Lap –</span><span id="clock">0:00:00</span></div>
+      <ol id="board" class="board"></ol>
+      <p id="rc" class="rc" aria-live="polite"></p>
+    </aside>
+  </main>
+
+  <footer class="controls">
+    <button id="play" type="button" aria-label="Play">▶</button>
+    <input id="scrub" type="range" min="0" max="0" step="1" value="0" aria-label="Race time">
+    <select id="speed" aria-label="Playback speed"></select>
+    <label class="toggle"><input id="labels" type="checkbox" checked> Names</label>
+  </footer>
+  <p class="credit">
+    Space play/pause · ←/→ 10 s · ↑/↓ speed · R restart · L names.
+    Data from <a href="https://openf1.org">OpenF1</a>. Unofficial, not associated with Formula 1.
+  </p>
+</body>
 </html>
