@@ -28,7 +28,7 @@
 
 | # | Stage | Status |
 |---|-------|--------|
-| 1 | Race view parity | in progress |
+| 1 | Race view parity | built + reviewed; awaiting user `node check.mjs` + preview check |
 | 2 | Driver telemetry + insights panels | planned |
 | 3 | Qualifying, sprint qualifying, practice replays | planned |
 | 4 | Championship overlays, settings, caching, map rotation | planned |
@@ -86,8 +86,8 @@ Rules:
 - `SAFETY CAR DEPLOYED` gives `sc`; `SAFETY CAR IN THIS LAP` gives `green` at the next leader lap start after the message.
 - Flag `RED` gives `red`; Track-scope `GREEN` or `CLEAR` gives `green`.
 
-- [ ] Assert in `check.mjs`: an SC deploy at 10 s, "in this lap" at 50 s and a leader lap start at 80 s give `[{10,'sc'},{80,'green'}]`. A VSC deploy and ending pair works the same way. `periods(..., 'sc')` returns `[{start:10, end:80}]`.
-- [ ] Implement both functions.
+- [x] Assert in `check.mjs`: an SC deploy at 10 s, "in this lap" at 50 s and a leader lap start at 80 s give `[{10,'sc'},{80,'green'}]`. A VSC deploy and ending pair works the same way. `periods(..., 'sc')` returns `[{start:10, end:80}]`.
+- [x] Implement both functions.
 
 ### Task 1.2: Track colour, SC dot, event bar
 
@@ -95,34 +95,34 @@ Rules:
 
 **Interfaces:** consumes Task 1.1. Adds `pointAhead(outline, cum, p, frac) -> {x, y}` to `replay.js` (`cum` holds cumulative outline lengths) and a matching assert.
 
-- [ ] Track stroke uses `--track-sc` / `--track-vsc` / `--track-red` by status at `S.t`.
-- [ ] SC dot (`--sc`, "SC" label) at `pointAhead(…, 0.1)` from the leader during `sc` periods, alpha = min(1, (t − start)/3 s, (end − t)/3 s).
-- [ ] Event bar: absolutely positioned segments under `#scrub`, one per period; B toggles `hidden`.
+- [x] Track stroke uses `--track-sc` / `--track-vsc` / `--track-red` by status at `S.t`.
+- [x] SC dot (`--sc`, "SC" label) at `pointAhead(…, 0.1)` from the leader during `sc` periods, alpha = min(1, (t − start)/3 s, (end − t)/3 s).
+- [x] Event bar: absolutely positioned segments under `#scrub`, one per period; B toggles `hidden`.
 
 ### Task 1.3: DRS zones
 
 **Files:** Modify `app.js`
 
-- [ ] After a race loads, in the background: `sessions?meeting_key=&session_name=Qualifying`, then `laps` of that session, then the fastest `lap_duration`, then `location` and `car_data` for that driver and lap window.
-- [ ] Store `S.drs` as `[[{x,y}, …], …]`, the runs of points where the nearest `car_data` sample has `drs >= 10`. Draw them in `--drs` at 4 px over the track; D toggles. No qualifying or no DRS (2026+) means nothing is drawn.
+- [x] After a race loads, in the background: `sessions?meeting_key=&session_name=Qualifying`, then `laps` of that session, then the fastest `lap_duration`, then `location` and `car_data` for that driver and lap window.
+- [x] Store `S.drs` as `[[{x,y}, …], …]`, the runs of points where the nearest `car_data` sample has `drs >= 10`. Draw them in `--drs` at 4 px over the track; D toggles. No qualifying or no DRS (2026+) means nothing is drawn.
 
 ### Task 1.4: Leaderboard + weather + race-control feed
 
 **Files:** Modify `app.js` (renderBoard), `index.html`, `style.css`, `replay.js` (`tyreAge`)
 
-- [ ] Fetch `weather` and `pit` together with the other session data.
-- [ ] Row: pos, team, code, gap to leader, interval, tyre letter + age. `IN PIT` when `t` is in [pit.date, pit.date + pit_duration]. `OUT` when the driver's last lap ended at least 30 s before the chequered flag and `t` is past that end + 30 s.
-- [ ] `tyreAge(stint, lap) = (tyre_age_at_start ?? 0) + lap − lap_start`, with an assert.
-- [ ] Weather line under the tower head, from `lastAt(weather, t)`.
-- [ ] `#rc` becomes an `<ol>` of every message up to `t`, newest first, re-rendered only when the count changes.
+- [x] Fetch `weather` and `pit` together with the other session data.
+- [x] Row: pos, team, code, gap to leader, interval, tyre letter + age. `IN PIT` when `t` is in [pit.date, pit.date + pit_duration]. `OUT` when the driver's last lap ended at least 30 s before the chequered flag and `t` is past that end + 30 s.
+- [x] `tyreAge(stint, lap) = (tyre_age_at_start ?? 0) + lap − lap_start`, with an assert.
+- [x] Weather line under the tower head, from `lastAt(weather, t)`.
+- [x] `#rc` becomes an `<ol>` of every message up to `t`, newest first, re-rendered only when the count changes.
 
 ### Task 1.5: Controls
 
 **Files:** Modify `app.js`, `index.html`, `style.css`
 
-- [ ] `SPEEDS = [0.1, 0.2, 0.5, 1, 2, 4, 8, 16, 32, 64, 128, 256]`.
-- [ ] `,` / `.` step −1 s / +1 s; D toggles DRS; B toggles the event bar; H opens `<dialog id="help">` listing every shortcut.
-- [ ] Credit line points to H instead of listing shortcuts.
+- [x] `SPEEDS = [0.1, 0.2, 0.5, 1, 2, 4, 8, 16, 32, 64, 128, 256]`.
+- [x] `,` / `.` step −1 s / +1 s; D toggles DRS; B toggles the event bar; H opens `<dialog id="help">` listing every shortcut.
+- [x] Credit line points to H instead of listing shortcuts.
 
 ### Stage 1 done when
 
