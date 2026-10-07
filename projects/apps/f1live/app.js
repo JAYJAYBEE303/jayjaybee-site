@@ -87,7 +87,7 @@ async function loadRace(session) {
     const t1 = lapEnds.length ? Math.max(...lapEnds) : toMs(session.date_end);
 
     S = {
-      session, t0, t1, t: t0, playing: false,
+      session, t0, t1, t: t0, playing: false, speed: Number(ui.speed.value),
       drivers: new Map(drivers.map((d) => [d.driver_number, {
         code: d.name_acronym ?? String(d.driver_number),
         colour: /^[0-9a-f]{6}$/i.test(d.team_colour ?? '') ? `#${d.team_colour}` : color('--text-dim'),
