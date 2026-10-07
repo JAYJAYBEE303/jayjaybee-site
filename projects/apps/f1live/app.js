@@ -150,7 +150,7 @@ async function loadRace(session) {
 const windowQuery = (i) => `date>${new Date(S.t0 + i * CHUNK - PAD).toISOString()}`
   + `&date<${new Date(S.t0 + (i + 1) * CHUNK + PAD).toISOString()}`;
 
-const chunkIndex = (t) =>Math.min(S.chunks.length - 1, Math.max(0, Math.floor((t - S.t0) / CHUNK)));
+const chunkIndex = (t) => Math.min(S.chunks.length - 1, Math.max(0, Math.floor((t - S.t0) / CHUNK)));
 
 // Fetch location windows, always preferring the one at (or just after) the playhead.
 async function loadChunks(id) {
