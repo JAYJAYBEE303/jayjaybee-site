@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { buildRace, SPEEDS } from './src/race.ts';
 import { toSnapshot } from './src/toSnapshot.ts';
+import { toViewModel } from './src/viewModel.ts';
 import { createMockController } from './src/mock/controller.ts';
 import { mockCharts, SCENARIOS, T1 } from './src/mock/data.ts';
 import type { SourceUi, Snapshot } from './src/snapshot.ts';
@@ -234,3 +235,64 @@ for (const frozen of ['red-flag', 'feed-dropped', 'loading', 'no-session']) {
 }
 
 console.log('mock ok');
+
+// ---- view model: parity with the reference renderVals() on every golden scenario ----
+const norm = (v: unknown): unknown =>
+  v === '#0A0A0B' ? 'var(--p-black-950)' : v === '#FFFFFF' ? 'var(--text-on-accent)'
+  : Array.isArray(v) ? v.map(norm)
+  : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, norm(x)])) : v;
+const asOptions = (v: unknown) => (v as string[]).map((x) => ({ value: x, label: x }));
+/** Project `got` onto the keys golden `want` carries (nested lists compare only those sub-keys); count compared leaves. */
+function project(got: unknown, want: unknown, tally: { n: number }, path: string): unknown {
+  if (Array.isArray(want)) {
+    assert.ok(Array.isArray(got) && got.length === want.length, `${path} length`);
+    return want.map((w, i) => project(got[i], w, tally, `${path}[${i}]`));
+  }
+  if (want && typeof want === 'object') {
+    assert.ok(got && typeof got === 'object', path);
+    return Object.fromEntries(Object.keys(want).map((k) => [k, project((got as Record<string, unknown>)[k], (want as Record<string, unknown>)[k], tally, `${path}.${k}`)]));
+  }
+  tally.n++;
+  return got;
+}
+for (const name of SCENARIOS) {
+  const vm = toViewModel(mockRun(name).snap()) as unknown as Record<string, unknown>;
+  const want = norm(golden[name].vm) as Record<string, unknown>;
+  want.years = asOptions(want.years);
+  want.sessions = asOptions(want.sessions);
+  want.lights = (want.lights as { bg: string }[]).map(({ bg }) => ({ bg }));
+  for (const k of Object.keys(want)) {
+    const tally = { n: 0 };
+    assert.deepEqual(project(vm[k], want[k], tally, `${name}.${k}`), want[k], `${name}.${k}`);
+    if (Array.isArray(want[k]) && (want[k] as unknown[]).length) assert.ok(tally.n > 0, `${name}.${k} compared nothing`);
+  }
+  assert.equal((want.tiles as unknown[]).length, 20, name);
+}
+
+// no race loaded: focus placeholders, no throw
+{
+  const e = toViewModel(toSnapshot(null, ui()));
+  assert.equal(e.focus.posText, '–');
+  assert.equal(e.focus.colour, 'transparent');
+  assert.deepEqual(e.focus.sectors, [0, 1, 2].map(() => ({ v: '', fg: 'var(--text-tertiary)', mark: '', aria: 'no time' })));
+  assert.deepEqual([e.hasAhead, e.noAhead, e.hasBehind, e.noBehind, e.hasFocusTele, e.noFocusTele], [false, true, false, true, false, true]);
+  assert.deepEqual([e.tiles, e.ribbon], [[], []]);
+}
+// practice: bests use int, hero is the session name, tower title is Best laps
+{
+  const pv = toViewModel(p);
+  assert.deepEqual([pv.towerTitle, pv.heroA, pv.heroB], ['Best laps', 'Practice 1', '']);
+  assert.equal(pv.ribbonTicks[0].label, 'Leader');
+}
+// buffering, red band, fastest labels, reduced motion
+{
+  const live = mockRun('live').snap();
+  assert.equal(toViewModel({ ...live, buffering: true }).chipText, 'Buffering · 1×');
+  assert.equal(toViewModel({ ...live, buffering: true, playing: false }).chipText, 'Paused · 1×');
+  assert.equal(toViewModel({ ...live, reduced: true }).ribbonMotion, 'none');
+  assert.equal(toViewModel({ ...live, events: [{ kind: 'red', left: 1, width: 2, label: 'Red flag' }] }).events[0].bg, 'var(--status-red)');
+  assert.deepEqual(toViewModel({ ...live, fastestText: ['A'] }).legend2.map((l) => l.code), ['A']);
+  assert.equal(toViewModel(live).legend2[0].code, 'NOR');
+}
+
+console.log('viewModel ok');
