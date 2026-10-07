@@ -1,14 +1,15 @@
+import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './tokens.css';
 import './style.css';
 import { App } from './App.tsx';
 
-// No StrictMode: its dev-only double effects would double every OpenF1 request (rate-limited API).
+// No StrictMode on the real app: its dev-only double effects would double every OpenF1 request (rate-limited API). The mock makes no requests, so it runs strict to prove cleanup.
 const root = createRoot(document.getElementById('root')!);
 // The mock source is dev-only: `import.meta.env.DEV` is false in `vite build`, so the dynamic import (and the mock) never ship.
 if (import.meta.env.DEV) {
   const sc = new URLSearchParams(location.search).get('scenario');
   if (sc) {
-    import('./mock/MockApp.tsx').then(({ MockApp }) => root.render(<MockApp scenario={sc} />));
+    import('./mock/MockApp.tsx').then(({ MockApp }) => root.render(<StrictMode><MockApp scenario={sc} /></StrictMode>));
   } else root.render(<App />);
 } else root.render(<App />);

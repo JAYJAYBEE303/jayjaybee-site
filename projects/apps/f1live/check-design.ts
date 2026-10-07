@@ -7,6 +7,7 @@ import { toViewModel } from './src/viewModel.ts';
 import { createMockController } from './src/mock/controller.ts';
 import { mockCharts, SCENARIOS, T1 } from './src/mock/data.ts';
 import type { SourceUi, Snapshot } from './src/snapshot.ts';
+import { shortcutFor } from './src/useShortcuts.ts';
 import { raceSession, lap, raceData, at, ms } from './test/race-fixture.ts';
 
 const ui = (extra: Partial<SourceUi> = {}): SourceUi => ({
@@ -300,3 +301,23 @@ for (const name of SCENARIOS) {
 }
 
 console.log('viewModel ok');
+
+// shortcuts: pure key map
+{
+  const k = (key: string, o: { ctrl?: boolean; button?: boolean; field?: boolean } = {}) => ({
+    key, metaKey: false, ctrlKey: !!o.ctrl, altKey: false, target: { tag: 'BODY', inButton: !!o.button, inField: !!o.field },
+  });
+  assert.equal(shortcutFor(k(' '), false), 'play');
+  assert.equal(shortcutFor(k(' ', { button: true }), false), null);
+  assert.equal(shortcutFor(k('H'), true), 'help');
+  assert.equal(shortcutFor(k('l'), true), null);
+  assert.equal(shortcutFor(k('ArrowUp'), false), 'faster');
+  assert.equal(shortcutFor(k(','), false), 'back1');
+  assert.equal(shortcutFor(k('c'), false), 'drivers');
+  assert.equal(shortcutFor(k('a'), false), 'teams');
+  assert.equal(shortcutFor(k('r', { field: true }), false), null);
+  for (const key of ['h', ' ', 'ArrowUp', 'c']) assert.equal(shortcutFor(k(key, { ctrl: true }), false), null, key);
+  assert.equal(shortcutFor(k('Enter', { button: true }), false), null);
+  assert.equal(shortcutFor(k('Escape'), false), null);
+  console.log('shortcuts ok');
+}
