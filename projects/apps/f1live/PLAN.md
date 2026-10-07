@@ -30,7 +30,7 @@
 |---|-------|--------|
 | 1 | Race view parity | built + reviewed; awaiting user `node check.mjs` + preview check |
 | 2 | Driver telemetry + insights panels | built + reviewed; awaiting user `node check.mjs` + preview check |
-| 3 | Qualifying, sprint qualifying, practice replays | in progress |
+| 3 | Qualifying, sprint qualifying, practice replays | built + reviewed; awaiting user `node check.mjs` + preview check |
 | 4 | Championship overlays, settings, caching, map rotation | planned |
 | 5 | Optional: pre-2023 seasons via FastF1 export, tyre degradation model | planned |
 
@@ -169,23 +169,23 @@ Ruling: non-race sessions reuse the whole-session replay (cars on track for the 
 
 ### Task 3.1: Pure helpers (`replay.js`, `check.mjs`)
 
-- [ ] Segment boundaries come from `race_control` CHEQUERED flags (one at the end of each segment): Q2 starts after the first, Q3 after the second, and the segment at `t` = the number of boundaries passed. Red flags don't affect it. No chequered messages means one segment.
-- [ ] `bestLap(laps, t, from = -Infinity, to = Infinity)`: the fastest lap finished by `t` that started in `[from, to)`, or `undefined`.
-- [ ] `lapTrace(loc, car) -> [{ x: % of lap, speed, throttle, brake, gear }]`: each `car_data` sample is placed at its distance along the lap (from cumulative `location` distance, interpolated by time).
-- [ ] An assert for each.
+- [x] Segment boundaries come from `race_control` CHEQUERED flags (one at the end of each segment): Q2 starts after the first, Q3 after the second, and the segment at `t` = the number of boundaries passed. Red flags don't affect it. No chequered messages means one segment.
+- [x] `bestLap(laps, t, from = -Infinity, to = Infinity)`: the fastest lap finished by `t` that started in `[from, to)`, or `undefined`.
+- [x] `lapTrace(loc, car) -> [{ x: % of lap, speed, throttle, brake, gear }]`: each `car_data` sample is placed at its distance along the lap (from cumulative `location` distance, interpolated by time).
+- [x] An assert for each.
 
 ### Task 3.2: Session picker + non-race sessions
 
-- [ ] `loadSeason` lists every finished session (`sessions?year=`), filtered to Practice 1–3, Qualifying, Sprint Qualifying/Shootout, Sprint and Race, in an `<optgroup>` per meeting. The default is the latest Race.
-- [ ] Non-race: `t0` = session start, `t1` = max(session end, last lap end); `intervals` and the OUT logic are skipped; the Positions tab is hidden.
-- [ ] Tower head: race shows `Lap x / y`; qualifying shows the segment (`Q2`, or `SQ2` for sprint qualifying); practice shows the session name.
-- [ ] Leaderboard in non-race sessions: gap column = best lap in the driver's latest segment (`formatLap`); interval column = delta to the fastest of those, or `Q1`/`Q2` when the driver was knocked out in that segment.
+- [x] `loadSeason` lists every finished session (`sessions?year=`), filtered to Practice 1–3, Qualifying, Sprint Qualifying/Shootout, Sprint and Race, in an `<optgroup>` per meeting. The default is the latest Race.
+- [x] Non-race: `t0` = session start, `t1` = max(session end, last lap end); `intervals` and the OUT logic are skipped; the Positions tab is hidden.
+- [x] Tower head: race shows `Lap x / y`; qualifying shows the segment (`Q2`, or `SQ2` for sprint qualifying); practice shows the session name.
+- [x] Leaderboard in non-race sessions: gap column = best lap in the driver's latest segment (`formatLap`); interval column = delta to the fastest of those, or `Q1`/`Q2` when the driver was knocked out in that segment.
 
 ### Task 3.3: Fastest lap tab
 
-- [ ] `lineChart` gains `xFmt` and `discrete` options (`discrete: false` = nearest point per series on hover).
-- [ ] The tab shows the selected drivers, or the top 2 when none are selected. Each driver's fastest lap finished by `S.t` is fetched (`location` + `car_data` over the lap window), cached per `driver:lap`, with failures cached as empty.
-- [ ] Four stacked mini charts over % of lap: Speed, Throttle, Brake, Gear. One shared legend; the second teammate's line is dashed.
+- [x] `lineChart` gains `xFmt` and `discrete` options (`discrete: false` = nearest point per series on hover).
+- [x] The tab shows the selected drivers, or the top 2 when none are selected. Each driver's fastest lap finished by `S.t` is fetched (`location` + `car_data` over the lap window), cached per `driver:lap`, with failures cached as empty.
+- [x] Four stacked mini charts over % of lap: Speed, Throttle, Brake, Gear. One shared legend; the second teammate's line is dashed.
 
 ### Stage 3 done when
 
