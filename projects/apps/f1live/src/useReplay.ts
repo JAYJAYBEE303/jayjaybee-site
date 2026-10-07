@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, circuitRotation } from './openf1.ts';
 import { toMs } from './replay.ts';
-import { buildRace, chunkReady, order, SPEEDS } from './race.ts';
+import { buildRace, chunkReady, order, sessionLabel, shortMeeting, SPEEDS } from './race.ts';
 import type { Race, Row, Session } from './race.ts';
 import { loadChunks, loadDrs } from './loaders.ts';
 import { color, drawMap } from './drawMap.ts';
+import type { Option } from './snapshot.ts';
 
 const FIRST_SEASON = 2023; // OpenF1 history starts here
 // Session names offered in the picker (testing days and anything else are left out).
@@ -17,7 +18,8 @@ export const thisYear = new Date().getFullYear();
 export const YEARS = Array.from({ length: thisYear - FIRST_SEASON + 1 }, (_, i) => thisYear - i);
 
 export type Prefs = { speed: number; names: boolean; drs: boolean; events: boolean };
-export type RaceOptions = { note: string } | { groups: { label: string; sessions: Session[] }[] };
+type Meeting = { meeting_key: number; meeting_name: string };
+const msg = (err: unknown) => (err as Error).message;
 
 function loadPrefs(): Prefs {
   const p: Prefs = { speed: 1, names: true, drs: true, events: true };
@@ -45,8 +47,17 @@ export function useReplay() {
   prefsRef.current = prefs;
   const [year, setYear] = useState(thisYear);
   const [raceKey, setRaceKey] = useState('');
-  const [options, setOptions] = useState<RaceOptions>({ note: '' });
+  const [sessionOptions, setSessionOptions] = useState<Option[]>([]); // flat session select: 'Italian GP · Race'
   const sessions = useRef<Session[]>([]); // finished sessions of the selected season
+  const meetings = useRef(new Map<number, string>()); // meeting_key -> meeting_name, selected season
+  // A failed load sets `error` (the feed-lost banner) and keeps the step that failed for retry().
+  const [error, setError] = useState<string | null>(null);
+  const again = useRef<(() => void) | null>(null);
+  const fail = useCallback((message: string, retryStep: () => void) => {
+    again.current = retryStep;
+    setError(message);
+    setStatus('');
+  }, []);
   const [pickOrder, setPickOrder] = useState<number[]>([]); // driver picker, in starting order
 
   useEffect(() => {
@@ -63,6 +74,8 @@ export function useReplay() {
   const loadRace = useCallback(async (session: Session) => {
     const id = ++loadId.current;
     raceRef.current = null;
+    again.current = null;
+    setError(null);
     history.replaceState(null, '', `?session=${session.session_key}`);
     setStatus('Loading session…');
     bump();
@@ -76,40 +89,36 @@ export function useReplay() {
       ]);
       if (id !== loadId.current) return;
       const R = buildRace(session, { drivers, laps, position, stints, intervals, raceControl, weather, pit },
-        color('--text-dim'), prefsRef.current.speed);
+        color('--text-tertiary'), prefsRef.current.speed);
       raceRef.current = R;
       setPickOrder(order(R)); // running order at the start, as the original built its picker
       bump();
-      loadChunks(R, current, setStatus);
+      const onChunkError = (m: string) => fail(m, () => loadChunks(R, current, onChunkError));
+      loadChunks(R, current, onChunkError);
       loadDrs(R, current, session);
       circuitRotation(session.circuit_key, session.year).then((rot) => {
         if (rot != null && current() === R) R.rot = rot;
       });
     } catch (err) {
-      if (id === loadId.current) setStatus(`Couldn't load this race (${(err as Error).message}). Try again shortly.`);
+      if (id === loadId.current) fail(`Couldn't load this race (${msg(err)})`, () => loadRace(session));
     }
-  }, [bump, current]);
+  }, [bump, current, fail]);
 
   // Returns false when the season has no finished sessions.
   const loadSeason = useCallback(async (y: number, pickKey?: number) => {
     setYear(y);
     setRaceKey('');
-    setOptions({ note: 'Loading…' });
+    setSessionOptions([]);
     const now = Date.now();
-    const list = (await api<Session>(`sessions?year=${y}`))
+    // Meeting names only shorten the labels: if they fail, labels fall back to the location.
+    const [all, named] = await Promise.all([api<Session>(`sessions?year=${y}`), api<Meeting>(`meetings?year=${y}`).catch(() => [])]);
+    const list = all
       .filter((s) => KINDS.includes(s.session_name) && toMs(s.date_end) < now)
       .sort((a, b) => toMs(a.date_start) - toMs(b.date_start));
     sessions.current = list;
-    if (!list.length) {
-      setOptions({ note: 'No finished sessions' });
-      return false;
-    }
-    setOptions({
-      groups: [...Map.groupBy(list, (s) => s.meeting_key).values()].map((g) => ({
-        label: `${new Date(g[0].date_start).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} · ${g[0].location}`,
-        sessions: g,
-      })),
-    });
+    meetings.current = new Map(named.map((m) => [m.meeting_key, m.meeting_name]));
+    if (!list.length) return false;
+    setSessionOptions(list.map((s) => ({ value: String(s.session_key), label: sessionLabel(meetings.current.get(s.meeting_key), s) })));
     const latest = list.findLast((s) => s.session_name === 'Race') ?? list.at(-1)!;
     const pick = list.find((s) => s.session_key === pickKey) ?? latest;
     setRaceKey(String(pick.session_key));
@@ -123,22 +132,42 @@ export function useReplay() {
     if (s) loadRace(s);
   }, [loadRace]);
 
+  // Season picked in the header; a failed season fetch is retried as a whole.
+  const pickSeason = useCallback((y: number) => {
+    setError(null);
+    loadSeason(y).catch((err) => fail(`Couldn't reach OpenF1 (${msg(err)})`, () => pickSeason(y)));
+  }, [loadSeason, fail]);
+
   // Boot: ?session= deep link, else the latest race of this season (or last season early on).
-  useEffect(() => {
+  const boot = useCallback(async () => {
     const key = new URLSearchParams(location.search).get('session');
-    (async () => {
-      try {
-        const [s] = key ? await api<Session>(`sessions?session_key=${encodeURIComponent(key)}`) : [];
-        const y = s ? s.year : thisYear;
-        const found = await loadSeason(y, s?.session_key);
-        // Early in a season there may be nothing finished yet — fall back a year.
-        if (!found && y === thisYear) await loadSeason(thisYear - 1);
-      } catch (err) {
-        setStatus(`Couldn't reach OpenF1 (${(err as Error).message}).`);
-      }
-    })();
+    try {
+      const [s] = key ? await api<Session>(`sessions?session_key=${encodeURIComponent(key)}`) : [];
+      const y = s ? s.year : thisYear;
+      const found = await loadSeason(y, s?.session_key);
+      // Early in a season there may be nothing finished yet — fall back a year.
+      if (!found && y === thisYear) await loadSeason(thisYear - 1);
+    } catch (err) {
+      fail(`Couldn't reach OpenF1 (${msg(err)})`, boot);
+    }
+  }, [loadSeason, fail]);
+  useEffect(() => {
+    boot();
     return () => { loadId.current++; raceRef.current = null; }; // unmount: stale loaders stop
-  }, [loadSeason]);
+  }, [boot]);
+
+  /** Re-run the step that failed and clear the error. */
+  const retry = useCallback(() => {
+    const step = again.current;
+    again.current = null;
+    setError(null);
+    step?.();
+  }, []);
+
+  const meetingShort = useCallback((key: number) => {
+    const name = meetings.current.get(key);
+    return name ? shortMeeting(name) : '';
+  }, []);
 
   // Frame loop: advance the playhead, draw the map every frame, re-render panels at 4 Hz.
   useEffect(() => {
@@ -182,6 +211,6 @@ export function useReplay() {
 
   return {
     race: raceRef.current, current, mapRef, bump, status, prefs, setPrefs, stepSpeed,
-    year, loadSeason, raceKey, pickRace, options, pickOrder, setPlaying, seek,
+    year, pickSeason, raceKey, pickRace, sessions: sessionOptions, meetingShort, pickOrder, setPlaying, seek, error, retry,
   };
 }

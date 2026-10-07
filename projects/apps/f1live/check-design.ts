@@ -1,7 +1,7 @@
 // Self-check for the design adapter: `npm test` (node strips the types; no test framework).
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { buildRace, SPEEDS } from './src/race.ts';
+import { buildRace, sessionLabel, SPEEDS } from './src/race.ts';
 import { toSnapshot } from './src/toSnapshot.ts';
 import { toViewModel } from './src/viewModel.ts';
 import { createMockController } from './src/mock/controller.ts';
@@ -151,6 +151,10 @@ fp.t = fp.t1;
 const p = toSnapshot(fp, ui());
 assert.deepEqual([p.practice, p.quali, p.finished, p.banner, p.segment], [true, false, false, null, '']);
 assert.equal(p.standNote, 'Standings are shown for races and sprints — pick one of those.');
+
+// session select labels: meeting name shortened, location when the meetings request failed
+assert.equal(sessionLabel('Italian Grand Prix', raceSession), 'Italian GP · Race');
+assert.equal(sessionLabel(undefined, raceSession), 'X · Race');
 
 console.log('adapter ok');
 

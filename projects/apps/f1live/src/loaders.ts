@@ -20,7 +20,7 @@ export async function loadChunks(R: Race, current: Current, onError: (msg: strin
     try {
       rows = await api<Loc>(`location?session_key=${R.session.session_key}&${windowQuery(R, i)}`);
     } catch (err) {
-      if (current() === R) { R.chunks[i] = undefined; onError(`Couldn't load car positions (${(err as Error).message}).`); }
+      if (current() === R) { R.chunks[i] = undefined; onError(`Couldn't load car positions (${(err as Error).message})`); }
       return;
     }
     if (current() !== R) return;

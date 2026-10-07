@@ -31,6 +31,9 @@ const KEYS = ['speed', 'throttle', 'brake', 'gear'] as const;
 export const tyreLetter = (compound: string | null | undefined): TyreLetter =>
   TYRE_LETTER.get((compound ?? '').toUpperCase()) ?? '–';
 
+/** Drivers a chart shows: the selection, else the first n in running order (fastest lap: n = 2). */
+export const shownDrivers = (R: Race, n: number) => (R.selected.size ? [...R.selected] : order(R).slice(0, n));
+
 const fullName = (d: { first: string; last: string }) => `${d.first} ${d.last}`.trim();
 
 /** The driver holding the fastest lap finished by R.t (first one on a tie), or undefined. */
@@ -157,7 +160,7 @@ function fromUi(ui: SourceUi) {
     speeds: SPEEDS.map((s, k) => ({ value: String(k), label: `${s}×` })),
     speedValue: String(SPEEDS.indexOf(ui.prefs.speed)), speedLabel: `${ui.prefs.speed}×`,
     labels: ui.prefs.names, drs: ui.prefs.drs, eventsOn: ui.prefs.events,
-    years: ui.years.map((y) => ({ value: String(y), label: String(y) })),
+    years: ui.years.map((y) => ({ value: String(y), label: String(y) })), yearValue: String(ui.year),
     sessions: ui.sessions, sessionValue: ui.sessionValue, standKind: ui.standKind,
     nextSession: { title: '', name: '', when: '', countdown: '' },
     skeleton: Array.from({ length: 20 }, (_, k) => ({ k, w: 40 + ((k * 37) % 45) })),
@@ -202,8 +205,8 @@ export function toSnapshot(R: Race | null, ui: SourceUi): Snapshot {
   const rank = new Map(ui.pickOrder.map((d, i) => [d, i]));
   const stable = [...rows].sort((a, b) => (rank.get(a.d) ?? Infinity) - (rank.get(b.d) ?? Infinity));
 
-  const legendIds = R.selected.size ? [...R.selected] : ranked.slice(0, 3);
-  const fastestIds = R.selected.size ? [...R.selected] : ranked.slice(0, 2);
+  const legendIds = shownDrivers(R, 3);
+  const fastestIds = shownDrivers(R, 2);
   const legend: LegendItem[] = seriesFor(R, legendIds, () => [])
     .map((s, i) => ({ d: legendIds[i], code: s.label, colour: s.colour, dashed: s.dashed }));
   const fastestText = fastestIds.map((d) => {

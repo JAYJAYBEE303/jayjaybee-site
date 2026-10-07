@@ -416,7 +416,7 @@ export function mockSnapshot(rp: MockState): Snapshot {
     scrubMax: Math.round(T1), scrubVal: Math.round(Math.max(0, t)), progress: Math.max(0, t) / T1 * 100,
     speeds: SPEEDS.map((s, k) => ({ value: String(k), label: `${s}×` })), speedValue: String(rp.speedIdx), speedLabel: `${SPEEDS[rp.speedIdx]}×`,
     labels: rp.labels, drs: rp.drs, eventsOn: rp.events,
-    years: ['2026', '2025', '2024', '2023'].map(opt),
+    years: ['2026', '2025', '2024', '2023'].map(opt), yearValue: '2025',
     sessions: ['Italian GP · Race', 'Italian GP · Qualifying', 'Italian GP · Practice 3', 'Dutch GP · Race', 'Dutch GP · Qualifying', 'Hungarian GP · Race'].map(opt),
     sessionValue: rp.quali ? 'Italian GP · Qualifying' : 'Italian GP · Race',
     nextSession: { title: 'Azerbaijan Grand Prix', name: 'Practice 1', when: 'Fri 19 Sep · 10:30 BST', countdown: '4d 21h 07m' },

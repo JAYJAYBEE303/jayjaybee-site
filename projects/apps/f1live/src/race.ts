@@ -24,6 +24,11 @@ export type Session = {
   location: string;
   circuit_short_name?: string | null;
 };
+/** 'Italian Grand Prix' -> 'Italian GP' (the design's short meeting name). */
+export const shortMeeting = (name: string) => name.replace('Grand Prix', 'GP');
+/** Session select label, e.g. 'Italian GP · Race'; the location stands in when the meeting name is unknown. */
+export const sessionLabel = (meetingName: string | undefined, s: Session) =>
+  `${meetingName ? shortMeeting(meetingName) : s.location} · ${s.session_name}`;
 export type Driver = { code: string; first: string; last: string; team: string; colour: string };
 export type Weather = {
   t: number; air_temperature?: number; track_temperature?: number; humidity?: number; wind_speed?: number; rainfall?: number;

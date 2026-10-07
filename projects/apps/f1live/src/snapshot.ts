@@ -72,7 +72,7 @@ export interface Snapshot {
   scrubMax: number; scrubVal: number; progress: number;
   speeds: Option[]; speedValue: string; speedLabel: string;
   labels: boolean; drs: boolean; eventsOn: boolean;
-  years: Option[]; sessions: Option[]; sessionValue: string;
+  years: Option[]; yearValue: string; sessions: Option[]; sessionValue: string;
   nextSession: { title: string; name: string; when: string; countdown: string };
   skeleton: { k: number; w: number }[];
   reduced: boolean;

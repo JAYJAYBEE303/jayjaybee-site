@@ -48,7 +48,7 @@ export interface ViewModel {
   rcCount: number; rcAll: RcVm[]; tabs: TabVm[]; picker: PickerVm[]; panelHidden: Record<TabId, boolean>;
   telemetryEmpty: boolean; telemetry: TelemetryVm[]; legend: LegendVm[]; legend2: LegendVm[];
   sectors: SectorsRowVm[]; tyres: TyresRowVm[];
-  years: Option[]; sessions: Option[]; sessionValue: string;
+  years: Option[]; yearValue: string; sessions: Option[]; sessionValue: string;
   standings: StandingRow[]; standNote: string; isDrivers: boolean; isTeams: boolean;
   drvFg: string; drvBg: string; drvBar: string; teamFg: string; teamBg: string; teamBar: string;
   shortcuts: Shortcut[];
@@ -201,7 +201,7 @@ export function toViewModel(s: Snapshot): ViewModel {
       d: t.d, code: t.code,
       bars: t.bars.map((b) => ({ compound: b.compound, from: b.from, to: b.to, laps: b.laps, left: b.left, width: b.width, bg: tyreColor(b.tyre), tyre: b.tyre })),
     })),
-    years: s.years, sessions: s.sessions, sessionValue: s.sessionValue,
+    years: s.years, yearValue: s.yearValue, sessions: s.sessions, sessionValue: s.sessionValue,
     standings: s.standings, standNote: s.standNote, isDrivers: s.standKind === 'drivers', isTeams: s.standKind === 'teams',
     drvFg: dv.color, drvBg: dv.bg, drvBar: dv.bar, teamFg: tm.color, teamBg: tm.bg, teamBar: tm.bar,
     shortcuts: SHORTCUTS,

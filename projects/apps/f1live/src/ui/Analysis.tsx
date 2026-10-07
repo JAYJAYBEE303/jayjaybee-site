@@ -79,7 +79,7 @@ export function Analysis({ vm, actions, tipRef }: { vm: ViewModel; actions: Acti
 
       <div {...panel('laps')} aria-label="Lap times" hidden={vm.panelHidden.laps} className="card an-chart">
         <Legend items={vm.legend} />
-        <LineChart series={vm.charts.laps} tipRef={tipRef} yDomain={vm.charts.lapsY ?? undefined} yFmt={formatLap}
+        <LineChart series={vm.charts.laps} tipRef={tipRef} yDomain={vm.charts.lapsY ?? undefined} yFmt={(y) => formatLap(y, 3).slice(0, 6)}
           label="Lap times by lap for the chosen drivers" className="an-canvas an-canvas-laps" />
       </div>
 

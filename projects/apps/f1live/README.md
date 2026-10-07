@@ -26,18 +26,41 @@ needs no backend. It's built with Vite, React and TypeScript.
 ## Files
 
 - `index.html`: page shell (Vite entry)
-- `src/style.css`: tokens and layout
-- `src/main.tsx`, `src/App.tsx`: React root, layout, keyboard shortcuts, standings loading
-- `src/useReplay.ts`: replay engine hook: season and race loading, frame loop, playback, preferences
+- `src/main.tsx`: React root; renders the real app, or the mock under `?scenario=` in dev
+- `src/RealApp.tsx`: the real data source: `useReplay` plus tab, standings and selection state, as a `Source` for the page
+- `src/snapshot.ts`: the view contract (`Snapshot`, `Actions`, `Source`; types only)
+- `src/toSnapshot.ts`: pure adapter from the race model to a `Snapshot`
+- `src/viewModel.ts`: pure `Snapshot` to view model (colours, labels, layout values the components bind)
+- `src/ui/`: page components (header, session bar, focus card, track panel, timing, analysis tabs, line chart, dialogs) and their CSS
+- `src/tokens.css`, `src/app.css`: design tokens and shared classes
+- `src/useShortcuts.ts`, `src/useDialogs.ts`: keyboard shortcuts and the help/standings dialogs, shared by both sources
+- `src/paint.ts`: token-themed canvas painters for the track map and charts
+- `src/useReplay.ts`: replay engine hook: season and race loading, load errors and retry, frame loop, playback, preferences
 - `src/openf1.ts`: OpenF1 fetching (spacing, `429` backoff, Cache API) and map rotation
 - `src/loaders.ts`: background loaders (car positions, DRS zones, telemetry, fastest-lap traces)
 - `src/race.ts`: race model and the readouts the panels show (leaderboard, race control, standings)
 - `src/replay.ts`: pure helpers (binary search, interpolation, track outline)
-- `src/drawMap.ts`: track map canvas drawing
-- `src/components/`: header, leaderboard, transport bar, insight tabs, line chart, dialogs
-- `check.ts`: `npm test` asserts `replay.ts` and `race.ts` (plain node, no test framework)
+- `src/drawMap.ts`: real race to map scene for the painter
+- `src/mock/`: dev-only mock source (simulation, controller, `MockApp`); never in the production build
+- `check.ts`, `check-design.ts`: `npm test` asserts the race model, adapter, mock, view model, shortcuts and map scenes (plain node, no test framework)
+- `test/`: shared race fixture and the design reference's golden output
 - `legacy/`: the original plain HTML/JS app, kept until the React port is signed off
 - `vercel.json`: Vercel builds with `npm run build` and serves `dist/`
+
+## Swapping the data source
+
+The page (`src/ui/Page.tsx`) renders whatever a `Source` gives it: a
+`Snapshot` (plain data), `Actions` (play, seek, select, …) and the map
+canvas ref. To feed it from somewhere else, implement `Source` from
+`src/snapshot.ts`. `src/RealApp.tsx` is the OpenF1 implementation; the mock
+in `src/mock/` is the second one.
+
+## Dev scenarios
+
+In `npm run dev`, `?scenario=<name>` swaps OpenF1 for the mock source:
+`live`, `safety-car`, `vsc`, `red-flag`, `feed-dropped`, `retirements`,
+`chequered`, `qualifying`, `loading`, `no-session`. The mock is reachable
+only in dev; `vite build` leaves it out.
 
 ## Run locally
 
@@ -56,7 +79,9 @@ npm run preview   # serve dist/ at http://localhost:4173/
   window under the playhead has arrived.
 - Requests are spaced about 400 ms apart to stay under OpenF1's free-tier
   rate limit. A `429` response is retried with backoff.
-- The map isn't rotated to the broadcast orientation; OpenF1 has no rotation
-  field.
+- OpenF1 has no map rotation field; the broadcast rotation comes from
+  MultiViewer's circuit data, and the map stays unrotated if that fails.
+- A failed load (session, car positions) shows the Feed lost banner;
+  Reconnect re-runs the step that failed.
 - Before 2023 there's no OpenF1 data. Supporting older seasons would need a
   FastF1 export to static JSON.

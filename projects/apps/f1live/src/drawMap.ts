@@ -10,7 +10,7 @@ const SC_LEAD = 0.1; // simulated safety car runs ~10 % of a lap ahead of the le
 const FADE = 3e3; // safety car fade in/out
 
 let css: CSSStyleDeclaration | undefined;
-// Token value from style.css (live: the declaration object tracks the stylesheet).
+// Token value from tokens.css (live: the declaration object tracks the stylesheet).
 export const color = (name: string) => (css ??= getComputedStyle(document.documentElement)).getPropertyValue(name).trim();
 
 // World -> canvas mapping that fits the (rotated) outline; recomputed when size, pad, outline or rotation change.

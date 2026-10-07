@@ -1,13 +1,8 @@
-import { useState } from 'react';
 import type { Actions } from '../snapshot.ts';
 import type { ViewModel } from '../viewModel.ts';
 import './Chrome.css';
 
-// The reference hard-codes the season select to 2025; the view model carries no selected year.
-const DEFAULT_YEAR = '2025';
-
 export function Header({ vm, actions }: { vm: ViewModel; actions: Actions }) {
-  const [year, setYear] = useState(() => (vm.years.some((y) => y.value === DEFAULT_YEAR) ? DEFAULT_YEAR : vm.years[0]?.value ?? ''));
   return (
     <header className="hd">
       <div className="wrap hd-in">
@@ -18,7 +13,7 @@ export function Header({ vm, actions }: { vm: ViewModel; actions: Actions }) {
         </div>
         <div className="hd-pickers">
           <label className="mono-label hd-field">Season
-            <select className="hd-select" value={year} onChange={(e) => { setYear(e.target.value); actions.setYear(e.target.value); }}>
+            <select className="hd-select" value={vm.yearValue} onChange={(e) => actions.setYear(e.target.value)}>
               {vm.years.map((y) => <option key={y.value} value={y.value}>{y.label}</option>)}
             </select>
           </label>
