@@ -32,7 +32,7 @@
 | 2 | Driver telemetry + insights panels | built + reviewed; awaiting user `node check.mjs` + preview check |
 | 3 | Qualifying, sprint qualifying, practice replays | built + reviewed; awaiting user `node check.mjs` + preview check |
 | 4 | Championship overlays, settings, caching, map rotation | built + reviewed; awaiting user `node check.mjs` + preview check |
-| 5 | Tyre wear (option B); pre-2023 export dropped | in progress |
+| 5 | Tyre wear (option B); pre-2023 export dropped | built + reviewed; awaiting user `node check.mjs` + preview check |
 
 ### Stage 1 — Race view parity
 
@@ -229,14 +229,14 @@ Decisions by the user: the pre-2023 export is **dropped** (too heavy for the sit
 
 ### Task 5.1: Pure helpers (`replay.js`, `check.mjs`)
 
-- [ ] `theilSen(pts) -> slope | null`: the median of pairwise slopes; null when there are fewer than 2 distinct x.
-- [ ] `tyreWear(laps, stint, t) -> { rate, n } | null`: uses laps finished by `t` within the stint, excluding lap 1, pit-out laps and laps more than 7 % slower than the stint median (SC, traffic, in-laps). Lap times are fuel-corrected by `FUEL_S_PER_LAP = 0.06` × lap number; rate = Theil-Sen slope (s/lap) over lap number. Returns null with fewer than 3 clean laps.
-- [ ] Asserts: an outlier doesn't move the slope; a known 0.1 s/lap stint with an SC lap and a pit-out lap gives 0.1; too few laps gives null.
+- [x] `theilSen(pts) -> slope | null`: the median of pairwise slopes; null when there are fewer than 2 distinct x.
+- [x] `tyreWear(laps, stint, t) -> { rate, n } | null`: uses laps finished by `t` within the stint, excluding lap 1, pit-out laps and laps more than 7 % slower than the stint median (SC, traffic, in-laps). Lap times are fuel-corrected by `FUEL_S_PER_LAP = 0.06` × lap number; rate = Theil-Sen slope (s/lap) over lap number. Returns null with fewer than 3 clean laps.
+- [x] Asserts: an outlier doesn't move the slope; a known 0.1 s/lap stint with an SC lap and a pit-out lap gives 0.1; too few laps gives null.
 
 ### Task 5.2: Telemetry tab
 
-- [ ] Each selected driver's row adds "Wear +0.08 s/lap · ~0.6 s lost" (loss = max(0, rate) × tyre age), plus a bar coloured green→red by loss (full at `WEAR_FULL_S = 2`). "Wear: after 3 laps" until there's enough data.
-- [ ] The current-stint lookup is shared with the leaderboard (`stintOf`).
+- [x] Each selected driver's row adds "Wear +0.08 s/lap · ~0.6 s lost" (loss = max(0, rate) × tyre age), plus a bar coloured green→red by loss (full at `WEAR_FULL_S = 2`). "Wear: after 3 laps" until there's enough data.
+- [x] The current-stint lookup is shared with the leaderboard (`stintOf`).
 
 ### Stage 5 done when
 
