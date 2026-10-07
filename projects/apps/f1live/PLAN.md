@@ -31,7 +31,7 @@
 | 1 | Race view parity | built + reviewed; awaiting user `node check.mjs` + preview check |
 | 2 | Driver telemetry + insights panels | built + reviewed; awaiting user `node check.mjs` + preview check |
 | 3 | Qualifying, sprint qualifying, practice replays | built + reviewed; awaiting user `node check.mjs` + preview check |
-| 4 | Championship overlays, settings, caching, map rotation | in progress |
+| 4 | Championship overlays, settings, caching, map rotation | built + reviewed; awaiting user `node check.mjs` + preview check |
 | 5 | Optional: pre-2023 seasons via FastF1 export, tyre degradation model | planned |
 
 ### Stage 1 — Race view parity
@@ -202,21 +202,21 @@ Rulings:
 
 ### Task 4.1: Pure helpers (`replay.js`, `check.mjs`)
 
-- [ ] `liveStandings(rows, gained) -> [{ label, start, gain, total }]`: `rows` are `[{ key, label, start }]`, `gained` is a `Map<key, pts>`. Sorted by total descending, then start descending.
-- [ ] `rotator(deg) -> (p) => { x, y }`: rotation counter-clockwise by `deg`.
-- [ ] Asserts for both.
+- [x] `liveStandings(rows, gained) -> [{ label, start, gain, total }]`: `rows` are `[{ key, label, start }]`, `gained` is a `Map<key, pts>`. Sorted by total descending, then start descending.
+- [x] `rotator(deg) -> (p) => { x, y }`: rotation counter-clockwise by `deg`.
+- [x] Asserts for both.
 
 ### Task 4.2: Standings overlay
 
-- [ ] `<dialog id="standings">` with a Drivers / Constructors switch; C opens drivers and A opens constructors; a "Standings" button in the controls.
-- [ ] Data is fetched once per session (cached promise). While open, it re-renders on the 250 ms tick.
-- [ ] Non-race sessions, or no data, show a note instead of a table.
+- [x] `<dialog id="standings">` with a Drivers / Constructors switch; C opens drivers and A opens constructors; a "Standings" button in the controls.
+- [x] Data is fetched once per session (cached promise). While open, it re-renders on the 250 ms tick.
+- [x] Non-race sessions, or no data, show a note instead of a table.
 
 ### Task 4.3: Preferences, cache, rotation
 
-- [ ] `loadPrefs()` runs at boot and `savePrefs()` runs on every speed, names, DRS or event-bar change (keys included). Every `localStorage` access is wrapped in try/catch.
-- [ ] `api()` looks in the Cache API before the throttle and stores ok responses for `session_key=` URLs; the cache is skipped when `caches` is unavailable.
-- [ ] `fitView()` rotates through `rotator(S.rot ?? 0)`; `loadRotation()` sets `S.rot` and refits.
+- [x] `loadPrefs()` runs at boot and `savePrefs()` runs on every speed, names, DRS or event-bar change (keys included). Every `localStorage` access is wrapped in try/catch.
+- [x] `api()` looks in the Cache API before the throttle and stores ok responses for `session_key=` URLs; the cache is skipped when `caches` is unavailable.
+- [x] `fitView()` rotates through `rotator(S.rot ?? 0)`; `loadRotation()` sets `S.rot` and refits.
 
 ### Stage 4 done when
 
