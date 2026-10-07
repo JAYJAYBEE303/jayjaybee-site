@@ -5,7 +5,7 @@
   --border: #2a3038;
   --text: #e7eaee;
   --text-dim: #8b95a1;
-  --accent: #f2a63d;
+  --legacy-accent: #f2a63d;
   --track: #232930;
   --track-line: #3a424d;
   --track-sc: #5a4520;
@@ -52,7 +52,7 @@ select, button {
 
 button { cursor: pointer; min-width: 2.75rem; }
 
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+:focus-visible { outline: 2px solid var(--legacy-accent); outline-offset: 2px; }
 
 .bar, .controls {
   display: flex;
@@ -106,7 +106,7 @@ button { cursor: pointer; min-width: 2.75rem; }
   justify-content: space-between;
   padding: 0.6rem 0.9rem;
   border-bottom: 1px solid var(--border);
-  color: var(--accent);
+  color: var(--legacy-accent);
 }
 
 .board { list-style: none; margin: 0; padding: 0.25rem 0; overflow-y: auto; flex: 1; }
@@ -156,7 +156,7 @@ button { cursor: pointer; min-width: 2.75rem; }
   margin: 0;
   padding: 0.5rem 0.9rem 0.25rem;
   border-top: 1px solid var(--border);
-  color: var(--accent);
+  color: var(--legacy-accent);
   font: inherit;
 }
 
@@ -183,7 +183,7 @@ button { cursor: pointer; min-width: 2.75rem; }
 .scrub input::-webkit-slider-runnable-track {
   height: 4px;
   border-radius: 2px;
-  background: linear-gradient(var(--accent), var(--accent)) 0 / var(--fill, 0%) 100% no-repeat, var(--border);
+  background: linear-gradient(var(--legacy-accent), var(--legacy-accent)) 0 / var(--fill, 0%) 100% no-repeat, var(--border);
 }
 .scrub input::-webkit-slider-thumb {
   -webkit-appearance: none;
@@ -192,11 +192,11 @@ button { cursor: pointer; min-width: 2.75rem; }
   margin-top: -5px;
   border: 2px solid var(--bg);
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--legacy-accent);
 }
 .scrub input::-moz-range-track { height: 4px; border-radius: 2px; background: var(--border); }
-.scrub input::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--accent); }
-.scrub input::-moz-range-thumb { width: 10px; height: 10px; border: 2px solid var(--bg); border-radius: 50%; background: var(--accent); }
+.scrub input::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--legacy-accent); }
+.scrub input::-moz-range-thumb { width: 10px; height: 10px; border: 2px solid var(--bg); border-radius: 50%; background: var(--legacy-accent); }
 .events { position: absolute; left: 0; right: 0; bottom: 0; height: 0.25rem; pointer-events: none; }
 .events div { position: absolute; top: 0; bottom: 0; min-width: 2px; border-radius: 1px; }
 .events [data-status="sc"] { background: var(--sc); }
@@ -214,17 +214,17 @@ button { cursor: pointer; min-width: 2.75rem; }
 .help::backdrop { background: rgb(0 0 0 / 0.6); }
 .help h2 { margin: 0 0 0.75rem; font-size: 1rem; }
 .help dl { display: grid; grid-template-columns: auto 1fr; gap: 0.35rem 1rem; margin: 0 0 1rem; }
-.help dt { font-family: var(--font-data); color: var(--accent); }
+.help dt { font-family: var(--font-data); color: var(--legacy-accent); }
 .help dd { margin: 0; }
 .help-note { max-width: 32rem; color: var(--text-dim); font-size: 0.8125rem; }
 .help-actions { display: flex; gap: 0.5rem; }
 .switch { display: flex; gap: 0.25rem; margin-bottom: 0.75rem; }
-.switch [aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.switch [aria-pressed="true"] { border-color: var(--legacy-accent); color: var(--legacy-accent); }
 .toggle { display: flex; align-items: center; gap: 0.35rem; color: var(--text-dim); }
-.toggle input { accent-color: var(--accent); }
+.toggle input { accent-color: var(--legacy-accent); }
 
 .credit { margin: 0; padding: 0 1rem 0.75rem; color: var(--text-dim); font-size: 0.75rem; }
-.credit a { color: var(--accent); }
+.credit a { color: var(--legacy-accent); }
 
 .insights { padding: 0.5rem 1rem 1rem; border-top: 1px solid var(--border); }
 
@@ -232,12 +232,12 @@ button { cursor: pointer; min-width: 2.75rem; }
 .picker legend { color: var(--text-dim); padding: 0 0.3rem; }
 .picker-list { display: flex; flex-wrap: wrap; gap: 0.25rem 0.9rem; font-family: var(--font-data); font-size: 0.8125rem; }
 .picker-list label { display: flex; align-items: center; gap: 0.3rem; cursor: pointer; }
-.picker-list input { accent-color: var(--accent); }
+.picker-list input { accent-color: var(--legacy-accent); }
 .swatch { display: inline-block; width: 0.25rem; height: 0.9rem; border-radius: 1px; }
 
 .tabs { display: flex; gap: 0.25rem; border-bottom: 1px solid var(--border); overflow-x: auto; }
 .tabs button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--text-dim); }
-.tabs [aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
+.tabs [aria-selected="true"] { color: var(--text); border-bottom-color: var(--legacy-accent); }
 
 .panel { padding-top: 0.75rem; font-family: var(--font-data); font-variant-numeric: tabular-nums; font-size: 0.8125rem; }
 .telemetry:empty::after { content: 'Tick drivers above, or click them in the leaderboard.'; color: var(--text-dim); }
