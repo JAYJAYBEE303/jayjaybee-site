@@ -55,6 +55,10 @@ canvas ref. To feed it from somewhere else, implement `Source` from
 `src/snapshot.ts`. `src/RealApp.tsx` is the OpenF1 implementation; the mock
 in `src/mock/` is the second one.
 
+A `Source` also owns painting its `mapRef` canvas: the real source paints in
+`useReplay`'s frame loop via `drawMap`, the mock in `MockApp`'s rAF loop via
+`paintMap`.
+
 ## Dev scenarios
 
 In `npm run dev`, `?scenario=<name>` swaps OpenF1 for the mock source:

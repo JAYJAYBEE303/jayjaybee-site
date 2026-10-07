@@ -59,6 +59,7 @@ function scDeployLap(R: Race, start: number) {
   return n;
 }
 
+const pct = (v: number | undefined) => Math.min(100, Math.max(0, v ?? 0)); // OpenF1 throttle can read 104
 const fmtSector = (s: number) => (s < 60 ? s.toFixed(3) : formatLap(s, 3));
 
 function sectorCells(R: Race, d: number, lap: Lap | undefined, bests: ReturnType<typeof sectorBests>, missing: string): Sectors3 {
@@ -118,7 +119,7 @@ function telemetryCards(R: Race): TelemetryCard[] {
     return [{
       d, code: car.code, name: fullName(car), colour: car.colour,
       speed: c?.speed != null ? String(c.speed) : '–', gear: c?.n_gear != null ? String(c.n_gear) : '–',
-      throttle: c?.throttle ?? 0, brake: c?.brake ?? 0, drs: (c?.drs ?? 0) >= 10,
+      throttle: pct(c?.throttle), brake: pct(c?.brake), drs: (c?.drs ?? 0) >= 10,
       wearText: wear ? `${wear.rate >= 0 ? '+' : ''}${wear.rate.toFixed(2)} s/lap · ~${loss.toFixed(1)} s lost` : 'Wear: after 3 laps',
       wearPct: Math.min(100, (loss / WEAR_FULL_S) * 100),
       compound: stint?.compound ?? '', tyre: tyreLetter(stint?.compound), age: stint ? String(tyreAge(stint, lap)) : '',
@@ -259,7 +260,7 @@ export function toSnapshot(R: Race | null, ui: SourceUi): Snapshot {
     events: eventBands(R), legend, fastestText, telemetry: telemetryCards(R), sectors, tyres,
     standings,
     standNote: standings.length ? 'Live: points before the race plus points for the running order now.'
-      : ui.standingsMsg ?? standingsNote(R, ui.standKind),
+      : R.isRace && !R.standings ? (ui.standingsMsg ?? '') : standingsNote(R, ui.standKind),
     tabs: tabsFor(!R.isRace),
     picker: ui.pickOrder.flatMap((d) => {
       const car = R.drivers.get(d);

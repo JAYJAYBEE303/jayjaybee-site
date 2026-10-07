@@ -7,7 +7,7 @@ import {
   theilSen, tyreWear, FUEL_S_PER_LAP,
 } from './src/replay.ts';
 import {
-  buildRace, windowQuery, chunkIndex, order, boardRows, lapLabel, weatherText, rcItems,
+  buildRace, windowQuery, chunkIndex, order, boardRows, inPit, rcItems,
   standingsRows, standingsNote, seriesFor, lapsYDomain,
 } from './src/race.ts';
 import { raceSession, lap, raceData, at, ms } from './test/race-fixture.ts';
@@ -179,14 +179,13 @@ assert.equal(chunkIndex(R, ms(9999)), 0, 'chunk index clamps');
 
 R.t = ms(250);
 assert.deepEqual(order(R), [1, 11, 44]);
-assert.deepEqual(boardRows(R).map((r) => [r.d, r.gap, r.int, r.compound, r.tyre, r.age, r.out]), [
-  [1, 'Leader', '', 'SOFT', 'S', 2, false],
-  [11, '+1.2', 'PIT', 'HARD', 'H', 0, false],
-  [44, 'OUT', '', '', '–', '', true],
+assert.deepEqual(boardRows(R).map((r) => [r.d, r.gap, r.int, r.compound, r.age, r.out]), [
+  [1, 'Leader', '', 'SOFT', 2, false],
+  [11, '+1.2', 'PIT', 'HARD', 0, false],
+  [44, 'OUT', '', '', '', true],
 ]);
 R.t = ms(250); assert.deepEqual(boardRows(R).map((r) => r.pit), [false, true, false]);
-assert.equal(lapLabel(R), 'Lap 3 / 3');
-assert.equal(weatherText(R), 'Air 25° · Track 40° · Hum 50% · Wind 1.2 m/s · Dry');
+assert.deepEqual([1, 11, 44].map((d) => inPit(R, d)), [false, true, false], 'inPit is the one in-pit test');
 assert.deepEqual(rcItems(R).map((r) => [r.time, r.flag, r.message]), [
   ['0:01:30', 'sc', 'SAFETY CAR IN THIS LAP'],
   ['0:00:40', 'sc', 'SAFETY CAR DEPLOYED'],
@@ -221,13 +220,11 @@ assert.equal(quali.t0, ms(0), 'non-race sessions use their whole window');
 assert.equal(quali.t1, ms(400));
 assert.deepEqual(quali.bounds, [ms(100), ms(200)], 'every chequer but the last splits segments');
 quali.t = ms(150);
-assert.equal(lapLabel(quali), 'Q2');
 assert.deepEqual(boardRows(quali).slice(0, 2).map((r) => [r.d, r.gap, r.int]), [[1, '1:10.000', 'Q1'], [11, '1:11.000', 'Q1']],
   'earlier-segment times show their segment label');
 quali.t = ms(190);
 assert.deepEqual(boardRows(quali).slice(0, 2).map((r) => [r.d, r.gap, r.int]), [[1, '1:15.000', ''], [11, '1:11.000', 'Q1']]);
 const fp = buildRace({ ...raceSession, session_name: 'Practice 1', session_type: 'Practice' }, { ...raceData, intervals: [] }, '#dim', 1);
-assert.equal(lapLabel(fp), 'Practice 1');
 assert.equal(fp.chequer, -Infinity, 'no OUT outside races');
 assert.equal(standingsNote(fp, 'drivers'), 'Standings are shown for races and sprints — pick one of those.');
 

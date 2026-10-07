@@ -192,9 +192,13 @@ function sessionBests(R: Race, ranked: number[]) {
   return { out, seg, fastest };
 }
 
+/** Driver d is in the pit lane at the playhead. */
+export const inPit = (R: Race, d: number) =>
+  !!R.pits.get(d)?.some((p) => R.t >= p.t && R.t <= p.t + (p.pit_duration ?? 20) * 1000);
+
 export type BoardRow = {
   d: number; code: string; colour: string; out: boolean; pit: boolean; selected: boolean;
-  gap: string; int: string; compound: string; tyre: string; age: number | ''; hasStint: boolean;
+  gap: string; int: string; compound: string; age: number | '';
 };
 
 // Leaderboard rows. Races: gap to leader + interval; other sessions: best lap + delta
@@ -209,39 +213,27 @@ export function boardRows(R: Race): BoardRow[] {
     const compound = stint?.compound ?? '';
     const end = R.lastEnd.get(d) ?? Infinity;
     const out = end < R.chequer - 30e3 && R.t > end + 30e3;
-    const inPit = !!R.pits.get(d)?.some((p) => R.t >= p.t && R.t <= p.t + (p.pit_duration ?? 20) * 1000);
+    const pit = inPit(R, d);
     let gap: string, int: string;
     if (bests) {
       const b = bests.out.get(d);
-      if (!b) { gap = ''; int = inPit ? 'PIT' : ''; } else {
+      if (!b) { gap = ''; int = pit ? 'PIT' : ''; } else {
         const dur = b.lap.lap_duration;
         const delta = b.seg < bests.seg ? (R.quali ? segLabel(R, b.seg) : '')
           : dur === bests.fastest ? '' : `+${(dur - bests.fastest).toFixed(3)}`;
         gap = formatLap(dur, 3);
-        int = inPit ? 'PIT' : delta;
+        int = pit ? 'PIT' : delta;
       }
     } else {
       const iv = lastAt(R.ints.get(d), R.t);
       gap = out ? 'OUT' : i ? formatGap(iv?.gap_to_leader) : 'Leader';
-      int = inPit ? 'PIT' : i && !out ? formatGap(iv?.interval) : '';
+      int = pit ? 'PIT' : i && !out ? formatGap(iv?.interval) : '';
     }
     return {
-      d, code: car.code, colour: car.colour, out, pit: inPit, selected: R.selected.has(d), gap, int,
-      compound, tyre: compound[0] ?? '–', age: stint ? tyreAge(stint, lap) : '', hasStint: !!stint,
+      d, code: car.code, colour: car.colour, out, pit, selected: R.selected.has(d), gap, int,
+      compound, age: stint ? tyreAge(stint, lap) : '',
     };
   });
-}
-
-export function lapLabel(R: Race) {
-  if (R.isRace) return `Lap ${Math.min(driverLap(R, order(R)[0]), R.totalLaps || Infinity)} / ${R.totalLaps || '–'}`;
-  return R.quali ? segLabel(R, segment(R)) : R.session.session_name;
-}
-
-export function weatherText(R: Race) {
-  const w = lastAt(R.weather, R.t);
-  return w
-    ? `Air ${w.air_temperature}° · Track ${w.track_temperature}° · Hum ${w.humidity}% · Wind ${w.wind_speed} m/s · ${w.rainfall ? 'Rain' : 'Dry'}`
-    : '';
 }
 
 // Race-control feed at the playhead, newest first, last 50 messages.

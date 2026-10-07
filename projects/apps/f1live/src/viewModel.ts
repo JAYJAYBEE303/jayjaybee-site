@@ -40,7 +40,7 @@ export interface ViewModel {
   stale: boolean; noSession: boolean; nextSession: Snapshot['nextSession']; hasSession: boolean; loading: boolean; ready: boolean;
   focus: FocusVm; hasAhead: boolean; noAhead: boolean; ahead: NeighbourVm; hasBehind: boolean; noBehind: boolean; behind: NeighbourVm;
   hasFocusTele: boolean; noFocusTele: boolean; ft: FocusTeleVm; focusStints: StintVm[];
-  session: Snapshot['session']; playText: string; playLabel: string; scrubMax: number; scrubVal: number;
+  session: Snapshot['session']; sessionLine: string; playText: string; playLabel: string; scrubMax: number; scrubVal: number;
   eventsOn: boolean; events: EventVm[]; speeds: Option[]; speedValue: string;
   labels: boolean; drs: boolean; labelsFg: string; labelsBar: string; drsFg: string; drsBar: string; eventsFg: string; eventsBar: string;
   spreadNote: string; ribbonTicks: RibbonTickVm[]; ribbon: RibbonVm[]; ribbonMotion: string;
@@ -121,7 +121,9 @@ export function toViewModel(s: Snapshot): ViewModel {
   const ft = fr && s.telemetry.find((t) => t.d === fr.d);
   const fty = fr && s.tyres.find((t) => t.d === fr.d);
 
-  const gv = new Map(s.rows.map((r) => [r.d, r.idx === 0 ? 0 : /LAP|OUT/.test(key(r)) ? null : numGap(key(r))]));
+  // Race '' = no interval yet (first seconds after lights-out): unknown, so it sits at the left, not parked like a lapped car.
+  // Best-lap sessions keep parking '' (no time set); loading / no-session keep the reference's placeholders.
+  const gv = new Map(s.rows.map((r) => [r.d, r.idx === 0 || (key(r) === '' && !bests && !s.loading && !s.noSession) ? 0 : /LAP|OUT/.test(key(r)) ? null : numGap(key(r))]));
   const finite = [...gv.values()].filter((v): v is number => v !== null);
   const spread = Math.max(0, ...finite);
   const maxGap = Math.max(bests ? 2 : 10, Math.ceil(spread));
@@ -153,7 +155,7 @@ export function toViewModel(s: Snapshot): ViewModel {
       ? { speed: ft.speed, gear: ft.gear, throttle: ft.throttle, brake: ft.brake, wearText: ft.wearText, drsText: ft.drs ? 'DRS open' : 'DRS shut', drsColor: ft.drs ? 'var(--status-green)' : 'var(--text-tertiary)' }
       : { speed: '', gear: '', throttle: 0, brake: 0, wearText: '', drsText: '', drsColor: '' },
     focusStints: (fty?.bars ?? []).map((b) => ({ compound: b.compound, from: b.from, to: b.to, left: b.left, width: b.width, bg: tyreColor(b.tyre), tyre: b.tyre })),
-    session: s.session, playText: s.playing ? 'Pause' : 'Play', playLabel: s.playing ? 'Pause' : 'Play',
+    session: s.session, sessionLine: [s.session.short, s.session.circuit, s.session.name].filter(Boolean).join(' · '), playText: s.playing ? 'Pause' : 'Play', playLabel: s.playing ? 'Pause' : 'Play',
     scrubMax: s.scrubMax, scrubVal: s.scrubVal, eventsOn: s.eventsOn,
     events: s.events.map((e) => ({
       label: e.label, left: e.left, width: e.width,

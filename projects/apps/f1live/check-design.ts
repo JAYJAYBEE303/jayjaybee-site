@@ -1,7 +1,7 @@
 // Self-check for the design adapter: `npm test` (node strips the types; no test framework).
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { buildRace, sessionLabel, SPEEDS } from './src/race.ts';
+import { buildRace, chunkIndex, sessionLabel, SPEEDS } from './src/race.ts';
 import { toSnapshot } from './src/toSnapshot.ts';
 import { toViewModel } from './src/viewModel.ts';
 import { createMockController } from './src/mock/controller.ts';
@@ -109,6 +109,10 @@ R.selected = new Set([11]);
 const tel = toSnapshot(R, ui({ tab: 'laps' }));
 assert.deepEqual(tel.tyres[1].bars.map((b) => [b.tyre, b.from, b.to, b.laps]), [['M', 1, 2, 2], ['H', 3, 3, 1]]);
 assert.deepEqual(tel.telemetry.map((c) => [c.d, c.speed, c.gear, c.throttle, c.brake, c.drs, c.wearText, c.tyre]), [[11, '–', '–', 0, 0, false, 'Wear: after 3 laps', 'H']]);
+// OpenF1 throttle can read above 100: clamp throttle and brake to [0, 100]
+R.car.set(`11:${chunkIndex(R, R.t)}`, [{ t: R.t - 1, speed: 300, throttle: 104, brake: -3, n_gear: 8, drs: 0 }]);
+assert.deepEqual(toSnapshot(R, ui()).telemetry.map((c) => [c.throttle, c.brake]), [[100, 0]]);
+R.car.clear();
 assert.deepEqual(tel.legend, [{ d: 11, code: 'PER', colour: '#3671C6', dashed: false }]);
 assert.deepEqual(tel.charts.laps.map((c) => [c.label, c.points.length]), [['PER', 2]]);
 assert.deepEqual([tel.charts.positions, tel.charts.posMax], [[], 0]);
@@ -151,6 +155,16 @@ fp.t = fp.t1;
 const p = toSnapshot(fp, ui());
 assert.deepEqual([p.practice, p.quali, p.finished, p.banner, p.segment], [true, false, false, null, '']);
 assert.equal(p.standNote, 'Standings are shown for races and sprints — pick one of those.');
+// a stale fetch message from another race never shows on a non-race session
+assert.equal(toSnapshot(fp, ui({ standingsMsg: 'X' })).standNote, 'Standings are shown for races and sprints — pick one of those.');
+// a race with empty standings says so (message only wins while the race has none loaded)
+{
+  const empty = buildRace(raceSession, raceData, '#dim', 1);
+  empty.standings = { drivers: [], teams: [] };
+  assert.equal(toSnapshot(empty, ui({ standingsMsg: 'X' })).standNote, 'No standings published for this session.');
+  empty.standings = undefined;
+  assert.equal(toSnapshot(empty, ui({ standingsMsg: 'Loading…' })).standNote, 'Loading…');
+}
 
 // session select labels: meeting name shortened, location when the meetings request failed
 assert.equal(sessionLabel('Italian Grand Prix', raceSession), 'Italian GP · Race');
@@ -172,6 +186,7 @@ for (const name of SCENARIOS) {
   const s = mockRun(name).snap();
   const got = { ...s, years: labels(s.years), sessions: labels(s.sessions) } as Record<string, unknown>;
   const want = golden[name].snap;
+  assert.ok(Object.keys(want).length > 40, `${name}: golden snapshot compared too few keys`);
   for (const k of Object.keys(want)) assert.deepEqual(JSON.parse(JSON.stringify(got[k])), want[k], `${name}.${k}`);
 }
 {
@@ -293,6 +308,19 @@ for (const name of SCENARIOS) {
   // ranks by int deltas ('+7.000' -> scale 0-7 s), not the best-lap strings in gap
   assert.equal(pv.spreadNote, 'Front to back on the lead lap: 7.0 s · scale 0–7 s · lapped cars parked at the right edge');
   assert.deepEqual(pv.ribbon.map((r) => r.left), [0, 94, 90]);
+}
+// race row with no interval yet ('' gap): unknown, so left edge with the plain code; a lapped car is still parked
+{
+  const base = toSnapshot(R, ui());
+  const rows = [{ ...base.rows[0], gap: 'Leader' }, { ...base.rows[1], gap: '', out: false }, { ...base.rows[2], gap: '+1 LAP', out: false }];
+  const rv = toViewModel({ ...base, rows, stable: rows }).ribbon;
+  assert.deepEqual(rv.map((r) => [r.left, r.code]), [[0, 'VER'], [0, 'PER'], [94, 'HAM 1 LAP']]);
+}
+// session bar never renders bare separators while no race is loaded
+{
+  const e = toViewModel(toSnapshot(null, ui()));
+  assert.equal(e.sessionLine, '');
+  assert.equal(toViewModel(toSnapshot(R, ui())).sessionLine, 'Test GP · X · Race');
 }
 // buffering, red band, fastest labels, reduced motion
 {

@@ -1,7 +1,7 @@
 // Track map: circuit outline (coloured by track status), DRS zones, simulated safety car, cars.
 import { lastAt, pointAhead, rotator, sampleAt } from './replay.ts';
 import type { Pt } from './replay.ts';
-import { chunkIndex, order } from './race.ts';
+import { chunkIndex, inPit, order } from './race.ts';
 import type { Race } from './race.ts';
 import { paintMap } from './paint.ts';
 import type { MapCar, MapScene } from './paint.ts';
@@ -56,7 +56,7 @@ export function realScene(R: Race, w: number, h: number, pad: number): MapScene 
     const [x, y] = view(p);
     cars.push({
       code: R.drivers.get(d)!.code, colour: R.drivers.get(d)!.colour, x, y, selected: R.selected.has(d),
-      inPit: !!R.pits.get(d)?.some((q) => R.t >= q.t && R.t <= q.t + (q.pit_duration ?? 20) * 1000),
+      inPit: inPit(R, d),
     });
   }
   return {

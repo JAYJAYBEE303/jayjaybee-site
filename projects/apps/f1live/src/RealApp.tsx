@@ -20,6 +20,9 @@ export function useRealSource(): Source {
   // Positions only exist for races and sprints.
   const tab = R && !R.isRace && tabPick === 'positions' ? 'telemetry' : tabPick;
 
+  // A fetch message belongs to the race it came from.
+  useEffect(() => { setStandingsMsg(null); }, [R]);
+
   // Telemetry (tab + focus card) needs car_data for the selection; the Fastest lap tab needs traces.
   useEffect(() => {
     if (!R) return;
@@ -31,6 +34,7 @@ export function useRealSource(): Source {
   const showStandings = async (k: Kind) => {
     const R = current();
     if (!R) return;
+    setStandingsMsg(null);
     setStandKind(k);
     if (R.standings || !R.isRace) return;
     const q = `session_key=${R.session.session_key}`;

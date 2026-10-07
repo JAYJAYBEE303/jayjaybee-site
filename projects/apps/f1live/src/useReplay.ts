@@ -117,7 +117,7 @@ export function useReplay() {
       .sort((a, b) => toMs(a.date_start) - toMs(b.date_start));
     sessions.current = list;
     meetings.current = new Map(named.map((m) => [m.meeting_key, m.meeting_name]));
-    if (!list.length) return false;
+    if (!list.length) { setSessionOptions([{ value: '', label: 'No finished sessions' }]); return false; }
     setSessionOptions(list.map((s) => ({ value: String(s.session_key), label: sessionLabel(meetings.current.get(s.meeting_key), s) })));
     const latest = list.findLast((s) => s.session_name === 'Race') ?? list.at(-1)!;
     const pick = list.find((s) => s.session_key === pickKey) ?? latest;
@@ -141,6 +141,7 @@ export function useReplay() {
   // Boot: ?session= deep link, else the latest race of this season (or last season early on).
   const boot = useCallback(async () => {
     const key = new URLSearchParams(location.search).get('session');
+    const id = loadId.current;
     try {
       const [s] = key ? await api<Session>(`sessions?session_key=${encodeURIComponent(key)}`) : [];
       const y = s ? s.year : thisYear;
@@ -148,7 +149,7 @@ export function useReplay() {
       // Early in a season there may be nothing finished yet — fall back a year.
       if (!found && y === thisYear) await loadSeason(thisYear - 1);
     } catch (err) {
-      fail(`Couldn't reach OpenF1 (${msg(err)})`, boot);
+      if (id === loadId.current) fail(`Couldn't reach OpenF1 (${msg(err)})`, boot); // not over a race the user already picked
     }
   }, [loadSeason, fail]);
   useEffect(() => {

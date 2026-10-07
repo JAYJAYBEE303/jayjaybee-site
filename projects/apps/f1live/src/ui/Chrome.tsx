@@ -39,7 +39,7 @@ export function SessionBar({ vm }: { vm: ViewModel }) {
       <div className="wrap sb-in">
         <div className="sb-hero">
           <span className="sb-hero-main">{vm.heroA} <span className="sb-hero-b">{vm.heroB}</span></span>
-          <span className="mono-label">{vm.session.short} · {vm.session.circuit} · {vm.session.name}</span>
+          <span className="mono-label">{vm.sessionLine}</span>
         </div>
         <div role="status" className="sb-status">
           <span aria-hidden="true" className="sb-lights">
