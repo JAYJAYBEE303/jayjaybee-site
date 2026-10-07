@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "node --experimental-strip-types --no-warnings check.ts"
+    "test": "node --experimental-strip-types --no-warnings check.ts && node --experimental-strip-types --no-warnings check-design.ts"
   },
   "dependencies": {
     "react": "19.3.0",
