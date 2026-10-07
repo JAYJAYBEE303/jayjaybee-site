@@ -32,7 +32,7 @@ export function Page({ source }: { source: Source }) {
             <div className="page-col">
               <TrackPanel
                 vm={vm} actions={actions} mapRef={mapRef}
-                onStandings={() => { actions.showStandings('drivers'); open(standingsRef); }}
+                onStandings={() => { actions.showStandings(vm.isTeams ? 'teams' : 'drivers'); open(standingsRef); }}
                 onHelp={() => open(helpRef)}
               />
             </div>

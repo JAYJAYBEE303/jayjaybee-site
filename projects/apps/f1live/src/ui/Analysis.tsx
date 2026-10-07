@@ -109,7 +109,7 @@ export function Analysis({ vm, actions }: { vm: ViewModel; actions: Actions; tip
               <span className="an-tyre-track">
                 {ty.bars.map((b, i) => (
                   <span key={i} className="an-stint" title={`${b.compound} · laps ${b.from}–${b.to}`}
-                    style={{ left: `${b.left}%`, width: `${b.width}%`, background: b.bg }}>{b.tyre} · {b.laps}</span>
+                    style={{ left: `${b.left}%`, width: `${b.width}%`, background: b.bg }}><span>{b.tyre}</span> · <span>{b.laps}</span></span>
                 ))}
               </span>
             </li>

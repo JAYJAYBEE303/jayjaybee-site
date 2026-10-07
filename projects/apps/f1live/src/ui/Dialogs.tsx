@@ -8,7 +8,9 @@ interface DialogProps { vm: ViewModel; actions: Actions; dialogRef: RefObject<HT
 
 export function HelpDialog({ vm, actions, dialogRef, onClose }: DialogProps) {
   const [forgotten, setForgotten] = useState(false);
-  const forget = async () => { await actions.clearCache(); setForgotten(true); };
+  const forget = async () => {
+    try { await actions.clearCache(); setForgotten(true); } catch { /* clear failed: keep the label */ }
+  };
   return (
     <dialog ref={dialogRef} aria-labelledby="hl-help-title" className="dlg dlg-help">
       <h2 id="hl-help-title" className="section-title dlg-title-help">Keyboard shortcuts</h2>
