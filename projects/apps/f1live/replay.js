@@ -56,6 +56,81 @@ export function lapOutline(locByDriver, lapsByDriver) {
   return best;
 }
 
+// Rows with a `date` -> same rows plus t (ms), sorted, undated rows dropped.
+export function timed(rows) {
+  return rows.map((r) => ({ ...r, t: toMs(r.date) })).filter((r) => !Number.isNaN(r.t)).sort((a, b) => a.t - b.t);
+}
+
+// Track status over time from race-control rows (with t): [{ t, status }],
+// status 'green' | 'sc' | 'vsc' | 'red'. "Safety car in this lap" turns green at the
+// leader's next lap start (leaderLapStarts: sorted ms).
+export function trackStatusTimeline(rc, leaderLapStarts) {
+  const out = [];
+  for (const r of rc) {
+    const msg = (r.message ?? '').toUpperCase();
+    let status = null, t = r.t;
+    if (r.category === 'SafetyCar') {
+      if (msg.includes('VIRTUAL')) status = msg.includes('DEPLOYED') ? 'vsc' : msg.includes('ENDING') ? 'green' : null;
+      else if (msg.includes('DEPLOYED')) status = 'sc';
+      else if (msg.includes('IN THIS LAP')) {
+        status = 'green';
+        t = leaderLapStarts.find((s) => s > r.t) ?? r.t;
+      }
+    } else if (r.flag === 'RED') status = 'red';
+    else if ((r.flag === 'GREEN' || r.flag === 'CLEAR') && r.scope === 'Track') status = 'green';
+    if (status) out.push({ t, status });
+  }
+  return out.sort((a, b) => a.t - b.t);
+}
+
+// Spans of the timeline spent in `status`; one still open at the end runs to endT.
+export function periods(timeline, status, endT) {
+  const out = [];
+  let open = null;
+  for (const e of timeline) {
+    if (e.status === status && !open) out.push((open = { start: e.t, end: endT }));
+    else if (e.status !== status && open) { open.end = e.t; open = null; }
+  }
+  return out;
+}
+
+// Cumulative distance along a polyline, cum[0] = 0.
+export function cumulative(points) {
+  const cum = [0];
+  for (let i = 1; i < points.length; i++) {
+    cum.push(cum[i - 1] + Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y));
+  }
+  return cum;
+}
+
+// Point on a closed lap polyline `frac` of a lap ahead of the point nearest p.
+export function pointAhead(points, cum, p, frac) {
+  let best = 0, bestD = Infinity;
+  points.forEach((q, i) => {
+    const d = (q.x - p.x) ** 2 + (q.y - p.y) ** 2;
+    if (d < bestD) { bestD = d; best = i; }
+  });
+  const total = cum.at(-1);
+  const target = (cum[best] + frac * total) % total;
+  const j = cum.findIndex((c) => c >= target);
+  return points[j < 0 ? 0 : j];
+}
+
+// Runs (>= 2 points) of lap points where the car's DRS was open (car_data drs >= 10).
+export function drsRuns(points, carData) {
+  const runs = [];
+  let run = null;
+  for (const p of points) {
+    if ((lastAt(carData, p.t)?.drs ?? 0) >= 10) {
+      if (!run) runs.push((run = []));
+      run.push(p);
+    } else run = null;
+  }
+  return runs.filter((r) => r.length > 1);
+}
+
+export const tyreAge = (stint, lap) => (stint.tyre_age_at_start ?? 0) + lap - stint.lap_start;
+
 export function formatGap(gap) {
   if (gap == null || gap === 0) return '';
   return typeof gap === 'number' ? `+${gap.toFixed(1)}` : String(gap);

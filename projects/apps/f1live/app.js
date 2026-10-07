@@ -1,16 +1,22 @@
-import { toMs, byDriver, lastAt, sampleAt, lapOutline, formatGap, formatClock } from './replay.js';
+import {
+  toMs, byDriver, lastAt, indexAt, sampleAt, lapOutline, formatGap, formatClock,
+  timed, trackStatusTimeline, periods, cumulative, pointAhead, drsRuns, tyreAge,
+} from './replay.js';
 
 const API = 'https://api.openf1.org/v1/';
 const CHUNK = 5 * 60e3; // location data is fetched in 5-minute windows
 const PAD = 2e3; // windows overlap so interpolation never gaps at a boundary
-const SPEEDS = [0.5, 1, 2, 4, 8, 16, 32, 64];
+const SPEEDS = [0.1, 0.2, 0.5, 1, 2, 4, 8, 16, 32, 64, 128, 256];
+const SC_LEAD = 0.1; // simulated safety car runs ~10 % of a lap ahead of the leader
+const FADE = 3e3; // safety car fade in/out
 const FIRST_SEASON = 2023; // OpenF1 history starts here
 
 const $ = (id) => document.getElementById(id);
 const ui = {
   year: $('year'), race: $('race'), map: $('map'), status: $('status'),
-  lap: $('lap'), clock: $('clock'), board: $('board'), rc: $('rc'),
-  play: $('play'), scrub: $('scrub'), speed: $('speed'), labels: $('labels'),
+  lap: $('lap'), clock: $('clock'), board: $('board'), rc: $('rc'), weather: $('weather'),
+  play: $('play'), scrub: $('scrub'), speed: $('speed'), labels: $('labels'), drs: $('drs'),
+  events: $('events'), help: $('help'), helpBtn: $('help-btn'),
 };
 const ctx = ui.map.getContext('2d');
 const css = getComputedStyle(document.documentElement);
@@ -74,17 +80,28 @@ async function loadRace(session) {
   setStatus('Loading race data…');
   const k = `session_key=${session.session_key}`;
   try {
-    const [drivers, laps, position, stints, intervals, raceControl] = await Promise.all([
-      api(`drivers?${k}`), api(`laps?${k}`), api(`position?${k}`),
-      api(`stints?${k}`), api(`intervals?${k}`), api(`race_control?${k}`),
+    const [drivers, laps, position, stints, intervals, raceControl, weather, pit] = await Promise.all([
+      api(`drivers?${k}`), api(`laps?${k}`), api(`position?${k}`), api(`stints?${k}`),
+      api(`intervals?${k}`), api(`race_control?${k}`), api(`weather?${k}`), api(`pit?${k}`),
     ]);
     if (id !== loadId) return;
 
     const lapsBy = byDriver(laps, 'date_start');
     const lap1 = laps.filter((l) => l.lap_number === 1 && l.date_start).map((l) => toMs(l.date_start));
-    const lapEnds = laps.filter((l) => l.date_start && l.lap_duration).map((l) => toMs(l.date_start) + l.lap_duration * 1000);
+    const lapEnd = (l) => toMs(l.date_start) + (l.lap_duration ?? 0) * 1000;
+    const dated = laps.filter((l) => l.date_start);
     const t0 = lap1.length ? Math.min(...lap1) : toMs(session.date_start);
-    const t1 = lapEnds.length ? Math.max(...lapEnds) : toMs(session.date_end);
+    const t1 = dated.length ? Math.max(...dated.map(lapEnd)) : toMs(session.date_end);
+    const totalLaps = Math.max(0, ...laps.map((l) => l.lap_number));
+
+    // Leader's start of each lap = earliest start of that lap number by anyone.
+    const leaderStarts = new Map();
+    for (const l of dated) leaderStarts.set(l.lap_number, Math.min(leaderStarts.get(l.lap_number) ?? Infinity, toMs(l.date_start)));
+    const finals = dated.filter((l) => l.lap_number === totalLaps).map(lapEnd);
+    const lastEnd = new Map();
+    for (const l of dated) lastEnd.set(l.driver_number, Math.max(lastEnd.get(l.driver_number) ?? 0, lapEnd(l)));
+    const rc = timed(raceControl);
+    const status = trackStatusTimeline(rc, [...leaderStarts.values()].sort((a, b) => a - b));
 
     S = {
       session, t0, t1, t: t0, playing: false, speed: Number(ui.speed.value),
@@ -93,19 +110,30 @@ async function loadRace(session) {
         colour: /^[0-9a-f]{6}$/i.test(d.team_colour ?? '') ? `#${d.team_colour}` : color('--text-dim'),
       }])),
       laps: lapsBy,
-      totalLaps: Math.max(0, ...laps.map((l) => l.lap_number)),
+      totalLaps,
+      chequer: finals.length ? Math.min(...finals) : t1,
+      lastEnd,
       pos: byDriver(position),
       ints: byDriver(intervals),
       stints: Map.groupBy(stints, (s) => s.driver_number),
-      rc: raceControl.map((r) => ({ ...r, t: toMs(r.date) })).sort((a, b) => a.t - b.t),
+      pits: Map.groupBy(timed(pit), (p) => p.driver_number),
+      weather: timed(weather),
+      rc,
+      rcShown: -2, // race-control index last rendered
+      status,
+      periods: { sc: periods(status, 'sc', t1), vsc: periods(status, 'vsc', t1), red: periods(status, 'red', t1) },
       chunks: Array.from({ length: Math.max(1, Math.ceil((t1 - t0) / CHUNK)) }),
       outline: null,
+      cum: null,
       view: null,
+      drs: null,
     };
     ui.scrub.max = Math.round((t1 - t0) / 1000);
     ui.scrub.value = 0;
+    renderEvents();
     renderBoard();
     loadChunks(id);
+    loadDrs(id, session);
   } catch (err) {
     if (id === loadId) setStatus(`Couldn't load this race (${err.message}). Try again shortly.`);
   }
@@ -134,9 +162,42 @@ async function loadChunks(id) {
     S.chunks[i] = byDriver(rows.filter((r) => r.x || r.y), 'date', (r) => ({ x: r.x, y: r.y }));
     if (!S.outline) {
       const pts = lapOutline(S.chunks[i], S.laps);
-      if (pts.length > 10) { S.outline = pts; fitView(); }
+      if (pts.length > 10) { S.outline = pts; S.cum = cumulative(pts); fitView(); }
     }
   }
+}
+
+// DRS zones from the meeting's fastest qualifying lap. Optional: any failure just means no layer.
+async function loadDrs(id, session) {
+  try {
+    const [q] = await api(`sessions?meeting_key=${session.meeting_key}&session_name=Qualifying`);
+    if (!q) return;
+    const laps = (await api(`laps?session_key=${q.session_key}`)).filter((l) => l.lap_duration && l.date_start);
+    if (!laps.length) return;
+    const best = laps.reduce((a, b) => (b.lap_duration < a.lap_duration ? b : a));
+    const from = toMs(best.date_start), to = from + best.lap_duration * 1000;
+    const win = `session_key=${q.session_key}&driver_number=${best.driver_number}`
+      + `&date>${new Date(from).toISOString()}&date<${new Date(to).toISOString()}`;
+    const [loc, car] = await Promise.all([api(`location?${win}`), api(`car_data?${win}`)]);
+    if (id !== loadId) return;
+    S.drs = drsRuns(timed(loc.filter((r) => r.x || r.y)), timed(car));
+  } catch {
+    // no DRS layer
+  }
+}
+
+// SC / VSC / red-flag spans as coloured segments under the scrubber.
+function renderEvents() {
+  const span = S.t1 - S.t0 || 1;
+  ui.events.replaceChildren(...Object.entries(S.periods).flatMap(([kind, list]) => list.map((p) => {
+    const start = Math.max(p.start, S.t0), end = Math.min(p.end, S.t1);
+    const seg = document.createElement('div');
+    seg.dataset.status = kind;
+    seg.title = kind.toUpperCase();
+    seg.style.left = `${((start - S.t0) / span) * 100}%`;
+    seg.style.width = `${(Math.max(0, end - start) / span) * 100}%`;
+    return seg;
+  })));
 }
 
 // ---- Drawing ----------------------------------------------------------------
@@ -149,6 +210,11 @@ function fitView() {
   const ox = (w - (maxX - minX) * scale) / 2, oy = (h - (maxY - minY) * scale) / 2;
   // World y points up, screen y points down.
   S.view = (p) => [ox + (p.x - minX) * scale, oy + (maxY - p.y) * scale];
+}
+
+function path(points) {
+  ctx.beginPath();
+  points.forEach((p, i) => (i ? ctx.lineTo : ctx.moveTo).call(ctx, ...S.view(p)));
 }
 
 function carAt(d) {
@@ -167,19 +233,40 @@ function draw() {
   ctx.clearRect(0, 0, w, h);
   if (!S?.view) return;
 
+  const status = lastAt(S.status, S.t)?.status ?? 'green';
   ctx.lineJoin = ctx.lineCap = 'round';
-  ctx.beginPath();
-  S.outline.forEach((p, i) => (i ? ctx.lineTo : ctx.moveTo).call(ctx, ...S.view(p)));
-  ctx.strokeStyle = color('--track');
+  path(S.outline);
+  ctx.strokeStyle = color(status === 'green' ? '--track' : `--track-${status}`);
   ctx.lineWidth = 12;
   ctx.stroke();
   ctx.strokeStyle = color('--track-line');
   ctx.lineWidth = 1;
   ctx.stroke();
 
+  if (S.drs && ui.drs.checked) {
+    ctx.strokeStyle = color('--drs');
+    ctx.lineWidth = 4;
+    for (const run of S.drs) { path(run); ctx.stroke(); }
+  }
+
   ctx.font = `500 11px ${color('--font-data')}`;
   ctx.textBaseline = 'middle';
-  for (const d of order().reverse()) { // leader drawn last, on top
+  const ranked = order();
+
+  const sc = S.periods.sc.find((p) => S.t >= p.start && S.t <= p.end);
+  const leader = sc && S.cum && carAt(ranked[0]);
+  if (leader) {
+    const [x, y] = S.view(pointAhead(S.outline, S.cum, leader, SC_LEAD));
+    ctx.globalAlpha = Math.max(0, Math.min(1, (S.t - sc.start) / FADE, (sc.end - S.t) / FADE));
+    ctx.beginPath();
+    ctx.arc(x, y, 8, 0, Math.PI * 2);
+    ctx.fillStyle = color('--sc');
+    ctx.fill();
+    ctx.fillText('SC', x + 11, y);
+    ctx.globalAlpha = 1;
+  }
+
+  for (const d of ranked.reverse()) { // leader drawn last, on top
     const p = carAt(d);
     if (!p) continue;
     const [x, y] = S.view(p);
@@ -213,31 +300,55 @@ function span(cls, text) {
   return s;
 }
 
+const flagOf = (r) => (r.category === 'SafetyCar' ? 'sc' : (r.flag ?? '').toLowerCase().replace(/\s+/g, '-'));
+
 function renderBoard() {
-  const rows = order().map((d, i) => {
+  const ranked = order();
+  const rows = ranked.map((d, i) => {
     const car = S.drivers.get(d);
     const lap = driverLap(d);
     const stint = S.stints.get(d)?.find((s) => s.lap_start <= lap && lap <= (s.lap_end ?? Infinity));
     const compound = stint?.compound ?? '';
+    const end = S.lastEnd.get(d) ?? Infinity;
+    const out = end < S.chequer - 30e3 && S.t > end + 30e3;
+    const inPit = S.pits.get(d)?.some((p) => S.t >= p.t && S.t <= p.t + (p.pit_duration ?? 20) * 1000);
+    const iv = lastAt(S.ints.get(d), S.t);
+
     const li = document.createElement('li');
+    if (out) li.className = 'out';
     const team = span('team', '');
     team.style.background = car.colour;
+    const tyre = span(`tyre tyre-${compound.toLowerCase() || 'unknown'}`, compound[0] ?? '–');
+    if (stint) tyre.title = compound;
     li.append(
       span('pos', i + 1), team, span('code', car.code),
-      span('gap', i ? formatGap(lastAt(S.ints.get(d), S.t)?.gap_to_leader) : 'Leader'),
-      span(`tyre tyre-${compound.toLowerCase() || 'unknown'}`, compound[0] ?? '–'),
+      span('gap', out ? 'OUT' : i ? formatGap(iv?.gap_to_leader) : 'Leader'),
+      span('int', inPit ? 'PIT' : i && !out ? formatGap(iv?.interval) : ''),
+      tyre, span('age', stint ? tyreAge(stint, lap) : ''),
     );
-    if (stint) li.lastChild.title = compound;
     return li;
   });
   ui.board.replaceChildren(...rows);
 
-  const leader = order()[0];
-  ui.lap.textContent = `Lap ${Math.min(driverLap(leader), S.totalLaps || Infinity)} / ${S.totalLaps || '–'}`;
+  ui.lap.textContent = `Lap ${Math.min(driverLap(ranked[0]), S.totalLaps || Infinity)} / ${S.totalLaps || '–'}`;
   ui.clock.textContent = formatClock(S.t - S.t0);
-  const msg = lastAt(S.rc, S.t);
-  ui.rc.textContent = msg?.message ?? '';
-  ui.rc.dataset.flag = msg?.category === 'SafetyCar' ? 'sc' : (msg?.flag ?? '').toLowerCase().replace(/\s+/g, '-');
+
+  const w = lastAt(S.weather, S.t);
+  ui.weather.textContent = w
+    ? `Air ${w.air_temperature}° · Track ${w.track_temperature}° · Hum ${w.humidity}% · Wind ${w.wind_speed} m/s · ${w.rainfall ? 'Rain' : 'Dry'}`
+    : '';
+
+  // Race-control feed, newest first; only rebuilt when the visible count changes (also on rewind).
+  const idx = indexAt(S.rc, S.t);
+  if (idx !== S.rcShown) {
+    S.rcShown = idx;
+    ui.rc.replaceChildren(...S.rc.slice(Math.max(0, idx - 49), idx + 1).reverse().map((r) => {
+      const item = document.createElement('li');
+      item.dataset.flag = flagOf(r);
+      item.append(span('rc-time', formatClock(r.t - S.t0)), ` ${r.message ?? ''}`);
+      return item;
+    }));
+  }
   if (S.playing) ui.scrub.value = Math.round((S.t - S.t0) / 1000);
 }
 
@@ -296,17 +407,26 @@ ui.race.addEventListener('change', () => {
   if (s) loadRace(s);
 });
 
+const toggleHelp = () => (ui.help.open ? ui.help.close() : ui.help.showModal());
+ui.helpBtn.addEventListener('click', toggleHelp);
+
 document.addEventListener('keydown', (e) => {
-  if (!S || e.target.closest('input, select, textarea') || e.metaKey || e.ctrlKey) return;
+  if (e.target.closest('input, select, textarea') || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.key.toLowerCase() === 'h') { e.preventDefault(); toggleHelp(); return; }
+  if (!S || ui.help.open) return;
   const speedIdx = SPEEDS.indexOf(Number(ui.speed.value));
   const keys = {
     ' ': () => setPlaying(!S.playing),
     ArrowLeft: () => seek(S.t - 10e3),
     ArrowRight: () => seek(S.t + 10e3),
+    ',': () => seek(S.t - 1e3),
+    '.': () => seek(S.t + 1e3),
     ArrowUp: () => setSpeed(speedIdx + 1),
     ArrowDown: () => setSpeed(speedIdx - 1),
     r: () => seek(S.t0),
     l: () => (ui.labels.checked = !ui.labels.checked),
+    d: () => (ui.drs.checked = !ui.drs.checked),
+    b: () => (ui.events.hidden = !ui.events.hidden),
   };
   const fn = keys[e.key] ?? keys[e.key.toLowerCase()];
   if (fn) { e.preventDefault(); fn(); }

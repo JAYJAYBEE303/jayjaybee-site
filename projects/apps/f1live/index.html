@@ -27,20 +27,42 @@
     </section>
     <aside class="tower" aria-label="Leaderboard">
       <div class="tower-head"><span id="lap">Lap –</span><span id="clock">0:00:00</span></div>
+      <p id="weather" class="weather"></p>
       <ol id="board" class="board"></ol>
-      <p id="rc" class="rc" aria-live="polite"></p>
+      <h2 class="rc-head">Race control</h2>
+      <ol id="rc" class="rc"></ol>
     </aside>
   </main>
 
   <footer class="controls">
     <button id="play" type="button" aria-label="Play">▶</button>
-    <input id="scrub" type="range" min="0" max="0" step="1" value="0" aria-label="Race time">
+    <div class="scrub">
+      <input id="scrub" type="range" min="0" max="0" step="1" value="0" aria-label="Race time">
+      <div id="events" class="events" aria-hidden="true"></div>
+    </div>
     <select id="speed" aria-label="Playback speed"></select>
     <label class="toggle"><input id="labels" type="checkbox" checked> Names</label>
+    <label class="toggle"><input id="drs" type="checkbox" checked> DRS</label>
+    <button id="help-btn" type="button" aria-label="Keyboard shortcuts">?</button>
   </footer>
   <p class="credit">
-    Space play/pause · ←/→ 10 s · ↑/↓ speed · R restart · L names.
-    Data from <a href="https://openf1.org">OpenF1</a>. Unofficial, not associated with Formula 1.
+    Press H for shortcuts. Data from <a href="https://openf1.org">OpenF1</a>. Unofficial, not associated with Formula 1.
   </p>
+
+  <dialog id="help" class="help" aria-labelledby="help-title">
+    <h2 id="help-title">Keyboard shortcuts</h2>
+    <dl>
+      <dt>Space</dt><dd>Play / pause</dd>
+      <dt>← →</dt><dd>Back / forward 10 s</dd>
+      <dt>, .</dt><dd>Back / forward 1 s</dd>
+      <dt>↑ ↓</dt><dd>Faster / slower</dd>
+      <dt>R</dt><dd>Restart</dd>
+      <dt>L</dt><dd>Driver names</dd>
+      <dt>D</dt><dd>DRS zones</dd>
+      <dt>B</dt><dd>Safety car / red flag bar</dd>
+      <dt>H</dt><dd>This list</dd>
+    </dl>
+    <form method="dialog"><button>Close</button></form>
+  </dialog>
 </body>
 </html>
