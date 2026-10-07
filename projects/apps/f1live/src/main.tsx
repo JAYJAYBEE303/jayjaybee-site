@@ -4,4 +4,11 @@ import './style.css';
 import { App } from './App.tsx';
 
 // No StrictMode: its dev-only double effects would double every OpenF1 request (rate-limited API).
-createRoot(document.getElementById('root')!).render(<App />);
+const root = createRoot(document.getElementById('root')!);
+// The mock source is dev-only: `import.meta.env.DEV` is false in `vite build`, so the dynamic import (and the mock) never ship.
+if (import.meta.env.DEV) {
+  const sc = new URLSearchParams(location.search).get('scenario');
+  if (sc) {
+    import('./mock/MockApp.tsx').then(({ MockApp }) => root.render(<MockApp scenario={sc} />));
+  } else root.render(<App />);
+} else root.render(<App />);
