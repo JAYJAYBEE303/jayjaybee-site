@@ -22,7 +22,7 @@ function guard(a: Actions, alive: () => boolean): Actions {
   };
 }
 
-/** Paint the mock map; like the reference, the outline stays up while loading and cars hide (the scene has none). */
+/** Paint the mock map. Reference condition (f1mock.js frame): drawn only when `!loading && !noSession`, else the canvas is left untouched. */
 const paintMock = (c: Controller, canvas: HTMLCanvasElement | null) => {
   if (canvas) paintMap(canvas, mockScene(c.state), { labels: c.state.labels, drs: c.state.drs });
 };
@@ -59,7 +59,8 @@ function useMockSource(scenario: string, drawMap: (c: Controller, canvas: HTMLCa
       ticking = true;
       c.tick(dt);
       ticking = false;
-      draw.current(c, mapRef.current);
+      // Reference parity: no map paint while loading or between sessions (the canvas keeps its last frame).
+      if (!c.state.loading && !c.state.noSession) draw.current(c, mapRef.current);
       raf = requestAnimationFrame(frame);
     };
     raf = requestAnimationFrame(frame);
