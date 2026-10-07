@@ -5,7 +5,8 @@ import { buildRace, SPEEDS } from './src/race.ts';
 import { toSnapshot } from './src/toSnapshot.ts';
 import { toViewModel } from './src/viewModel.ts';
 import { createMockController } from './src/mock/controller.ts';
-import { mockCharts, SCENARIOS, T1 } from './src/mock/data.ts';
+import { mockCharts, mockScene, SCENARIOS, T1 } from './src/mock/data.ts';
+import { realScene } from './src/drawMap.ts';
 import type { SourceUi, Snapshot } from './src/snapshot.ts';
 import { shortcutFor } from './src/useShortcuts.ts';
 import { raceSession, lap, raceData, at, ms } from './test/race-fixture.ts';
@@ -320,4 +321,36 @@ console.log('viewModel ok');
   assert.equal(shortcutFor(k('Enter', { button: true }), false), null);
   assert.equal(shortcutFor(k('Escape'), false), null);
   console.log('shortcuts ok');
+}
+
+// map scenes: real race (fixture) and mock
+{
+  const pad = 30, w = 800, h = 400;
+  const sm = (t: number, x: number, y: number) => ({ t: ms(t), x, y });
+  const track = [sm(0, 0, 0), sm(1, 100, 0), sm(2, 100, 100), sm(3, 0, 100)];
+  const race = buildRace(raceSession, raceData, '#dim', 1);
+  race.t = ms(250);
+  race.outline = track;
+  race.chunks[0] = new Map([
+    [1, [sm(200, 10, 10), sm(300, 90, 10)]], [11, [sm(200, 50, 50), sm(300, 50, 50)]], [44, [sm(200, 90, 90), sm(300, 90, 90)]],
+  ]);
+  race.selected = new Set([44]);
+  const sc = realScene(race, w, h, pad)!;
+  assert.deepEqual(sc.cars.map((c) => c.code), ['HAM', 'PER', 'VER']); // leader painted last
+  for (const c of sc.cars) assert.ok(c.x >= pad && c.x <= w - pad && c.y >= pad && c.y <= h - pad, c.code);
+  assert.deepEqual(sc.cars.map((c) => [c.inPit, c.selected]), [[false, true], [true, false], [false, false]]);
+  assert.equal(sc.outline.length, 4);
+  assert.deepEqual([sc.status, sc.sc, sc.drs], ['green', null, []]);
+  race.outline = null;
+  assert.equal(realScene(race, w, h, pad), null);
+
+  const mock = mockRun('live');
+  const live = mockScene(mock.c.state)(800, 400, 30);
+  assert.deepEqual([live.cars.length, live.sc, live.status, live.drs.length], [20, null, 'green', 2]);
+  assert.ok(live.cars.every((c) => c.x >= 30 && c.x <= 770 && c.y >= 30 && c.y <= 370));
+  assert.ok(live.cars.some((c) => c.selected));
+  const safety = mockScene(mockRun('safety-car').c.state)(800, 400, 30);
+  assert.ok(safety.sc && safety.sc.alpha > 0 && safety.status === 'sc');
+  assert.equal(mockScene(mockRun('loading').c.state)(800, 400, 30).cars.length, 0);
+  console.log('scenes ok');
 }

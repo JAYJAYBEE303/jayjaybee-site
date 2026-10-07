@@ -1,6 +1,9 @@
 import type { CSSProperties, RefObject } from 'react';
 import type { Actions } from '../snapshot.ts';
 import type { LegendVm, ViewModel } from '../viewModel.ts';
+import type { Series } from '../race.ts';
+import { formatLap } from '../replay.ts';
+import { LineChart } from './LineChart.tsx';
 import './Analysis.css';
 
 const Legend = ({ items }: { items: LegendVm[] }) => (
@@ -13,17 +16,22 @@ const Legend = ({ items }: { items: LegendVm[] }) => (
   </div>
 );
 
+/** Fastest-lap y domains: speed widens [60, 360] to fit the data; the rest are fixed. */
+const speedDomain = (ss: Series[]): [number, number] => {
+  const ys = ss.flatMap((x) => x.points.map((p) => p.y));
+  return [Math.min(60, ...ys), Math.max(360, ...ys)];
+};
 const MINIS = [
-  ['Speed · km/h', "Speed over each driver's fastest lap"],
-  ['Throttle · %', "Throttle over each driver's fastest lap"],
-  ['Brake', "Brake over each driver's fastest lap"],
-  ['Gear', "Gear over each driver's fastest lap"],
-] as const;
+  ['Speed · km/h', "Speed over each driver's fastest lap", 'speed', speedDomain],
+  ['Throttle · %', "Throttle over each driver's fastest lap", 'throttle', () => [0, 100]],
+  ['Brake', "Brake over each driver's fastest lap", 'brake', () => [0, 100]],
+  ['Gear', "Gear over each driver's fastest lap", 'gear', () => [1, 8]],
+] as const satisfies readonly (readonly [string, string, 'speed' | 'throttle' | 'brake' | 'gear', (ss: Series[]) => [number, number]])[];
 
 const panel = (id: string) => ({ role: 'tabpanel', id: `panel-${id}`, 'aria-labelledby': `tab-${id}` }) as const;
 
-// tipRef is accepted for the Task 8 chart hover; painting and the tooltip are not wired here yet.
-export function Analysis({ vm, actions }: { vm: ViewModel; actions: Actions; tipRef: RefObject<HTMLDivElement | null> }) {
+// tipRef is the shared chart tooltip owned by Page.
+export function Analysis({ vm, actions, tipRef }: { vm: ViewModel; actions: Actions; tipRef: RefObject<HTMLDivElement | null> }) {
   return (
     <section aria-labelledby="hl-ins" className="an">
       <div className="an-head">
@@ -71,11 +79,13 @@ export function Analysis({ vm, actions }: { vm: ViewModel; actions: Actions; tip
 
       <div {...panel('laps')} aria-label="Lap times" hidden={vm.panelHidden.laps} className="card an-chart">
         <Legend items={vm.legend} />
-        <canvas role="img" aria-label="Lap times by lap for the chosen drivers" className="an-canvas an-canvas-laps" />
+        <LineChart series={vm.charts.laps} tipRef={tipRef} yDomain={vm.charts.lapsY ?? undefined} yFmt={formatLap}
+          label="Lap times by lap for the chosen drivers" className="an-canvas an-canvas-laps" />
       </div>
 
       <div {...panel('positions')} aria-label="Positions" hidden={vm.panelHidden.positions} className="card an-chart">
-        <canvas role="img" aria-label="Race position by lap for every driver" className="an-canvas an-canvas-pos" />
+        <LineChart series={vm.charts.positions} tipRef={tipRef} invert yDomain={[1, vm.charts.posMax]} yFmt={(y) => `P${Math.round(y)}`}
+          label="Race position by lap for every driver" className="an-canvas an-canvas-pos" />
       </div>
 
       <div {...panel('sectors')} aria-label="Sectors" hidden={vm.panelHidden.sectors} className="an-sectors">
@@ -119,10 +129,11 @@ export function Analysis({ vm, actions }: { vm: ViewModel; actions: Actions; tip
 
       <div {...panel('fastest')} aria-label="Fastest lap" hidden={vm.panelHidden.fastest} className="an-fastest">
         <Legend items={vm.legend2} />
-        {MINIS.map(([title, label]) => (
+        {MINIS.map(([title, label, key, domain]) => (
           <div key={title} className="card an-mini">
             <h4 className="mono-label an-mini-title">{title}</h4>
-            <canvas role="img" aria-label={label} className="an-canvas an-canvas-mini" />
+            <LineChart series={vm.charts.fastest[key]} tipRef={tipRef} discrete={false} yDomain={domain(vm.charts.fastest[key])}
+              xFmt={(x) => `${Math.round(x)}%`} empty="No fastest lap yet" label={label} className="an-canvas an-canvas-mini" />
           </div>
         ))}
       </div>

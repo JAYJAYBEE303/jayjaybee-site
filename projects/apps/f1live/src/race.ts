@@ -65,7 +65,7 @@ export type Race = {
   outline: Sample[] | null;
   cum: number[] | null;
   rot?: number;
-  view?: { w: number; h: number; outline: Sample[]; rot?: number; map: (p: Pt) => [number, number] };
+  view?: { w: number; h: number; pad: number; outline: Sample[]; rot?: number; map: (p: Pt) => [number, number] };
   drs: Sample[][] | null;
   selected: Set<number>;
   car: Map<string, CarRow[] | 'loading'>; // `${driver}:${window}` -> car_data rows

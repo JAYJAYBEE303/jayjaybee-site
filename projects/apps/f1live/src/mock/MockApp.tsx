@@ -1,24 +1,34 @@
 // Dev-only (see main.tsx): the mock controller feeding <Page>, driven by one rAF loop.
 import { useEffect, useRef, useState } from 'react';
 import type { Actions, Snapshot, Source } from '../snapshot.ts';
+import { paintMap } from '../paint.ts';
 import { Page } from '../ui/Page.tsx';
 import { createMockController } from './controller.ts';
+import { mockScene } from './data.ts';
 
 type Controller = ReturnType<typeof createMockController>;
 const EMIT_MS = 250; // state reaches React at <= 4 Hz; the canvas redraws every frame
 
 /** Actions that do nothing once the source is disposed (a fake load could otherwise outlive the controller). */
-function guard(actions: Actions, alive: () => boolean): Actions {
-  const out = { ...actions };
-  for (const k of Object.keys(out) as (keyof Actions)[]) {
-    const f = actions[k] as (...a: never[]) => unknown;
-    (out as Record<keyof Actions, unknown>)[k] = (...a: never[]) => (alive() ? f(...a) : undefined);
-  }
-  return out;
+function guard(a: Actions, alive: () => boolean): Actions {
+  const g = <A extends unknown[]>(f: (...args: A) => void) => (...args: A): void => { if (alive()) f(...args); };
+  return {
+    togglePlay: g(a.togglePlay), seekBy: g(a.seekBy), restart: g(a.restart), scrub: g(a.scrub),
+    setSpeed: g(a.setSpeed), stepSpeed: g(a.stepSpeed),
+    toggleLabels: g(a.toggleLabels), toggleDrs: g(a.toggleDrs), toggleEvents: g(a.toggleEvents),
+    select: g(a.select), toggleDriver: g(a.toggleDriver), setTab: g(a.setTab), showStandings: g(a.showStandings),
+    setYear: g(a.setYear), setSession: g(a.setSession), retry: g(a.retry), replayLast: g(a.replayLast),
+    clearCache: () => (alive() ? a.clearCache() : Promise.resolve()),
+  };
 }
 
-/** `null` until the controller's first tick. `drawMap` is the Task 8 hook-up point, called each frame. */
-function useMockSource(scenario: string, drawMap: (c: Controller, canvas: HTMLCanvasElement | null) => void = () => {}): Source | null {
+/** Paint the mock map; like the reference, the outline stays up while loading and cars hide (the scene has none). */
+const paintMock = (c: Controller, canvas: HTMLCanvasElement | null) => {
+  if (canvas) paintMap(canvas, mockScene(c.state), { labels: c.state.labels, drs: c.state.drs });
+};
+
+/** `null` until the controller's first tick. `drawMap` is called each frame (default: paint the mock map). */
+function useMockSource(scenario: string, drawMap: (c: Controller, canvas: HTMLCanvasElement | null) => void = paintMock): Source | null {
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [actions, setActions] = useState<Actions | null>(null);
   const mapRef = useRef<HTMLCanvasElement>(null);
@@ -44,12 +54,12 @@ function useMockSource(scenario: string, drawMap: (c: Controller, canvas: HTMLCa
     setActions(guard(c.actions, () => alive));
     let last = performance.now();
     const frame = (now: number) => {
-      const dt = Math.min(0.25, (now - last) / 1000);
+      const dt = Math.max(0, Math.min(0.25, (now - last) / 1000));
       last = now;
       ticking = true;
       c.tick(dt);
       ticking = false;
-      draw.current(c, mapRef.current); // Task 8: paint the map here
+      draw.current(c, mapRef.current);
       raf = requestAnimationFrame(frame);
     };
     raf = requestAnimationFrame(frame);

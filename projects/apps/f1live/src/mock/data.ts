@@ -3,6 +3,7 @@
 // prevPos/changedAt bookkeeping on the state object passed to mockSnapshot. Never import this outside import.meta.env.DEV.
 import { SPEEDS } from '../race.ts';
 import type { Series } from '../race.ts';
+import type { MapScene } from '../paint.ts';
 import type {
   Banner, Charts, Compound, EventBand, LegendItem, PickerItem, RcItem, Row, SectorClass, SectorRow, Sectors3,
   Snapshot, StandKind, StandingRow, StintBar, Tab, TabId, TelemetryCard, TrackStatus, TyreLetter, TyreRow,
@@ -196,6 +197,28 @@ function tyreWear(L: Lap[], stint: Stint, t: number) {
 }
 
 // ---- Telemetry profile over lap fraction (car_data-like sample) ------------------
+// ---- Track geometry (normalised 0..1; Catmull-Rom through CTRL, closed) -----------------------
+const CTRL = [[0.16, 0.86], [0.42, 0.88], [0.66, 0.87], [0.8, 0.82], [0.84, 0.68], [0.72, 0.56], [0.76, 0.4], [0.9, 0.26], [0.8, 0.1], [0.56, 0.12], [0.4, 0.27], [0.24, 0.31], [0.1, 0.47], [0.08, 0.7]];
+type XY = { x: number; y: number };
+const OUTLINE: XY[] = [];
+for (let k = 0; k < CTRL.length; k++) {
+  const p0 = CTRL[(k - 1 + CTRL.length) % CTRL.length], p1 = CTRL[k], p2 = CTRL[(k + 1) % CTRL.length], p3 = CTRL[(k + 2) % CTRL.length];
+  for (let s = 0; s < 24; s++) {
+    const u = s / 24, u2 = u * u, u3 = u2 * u;
+    const f = (j: 0 | 1) => 0.5 * (2 * p1[j] + (-p0[j] + p2[j]) * u + (2 * p0[j] - 5 * p1[j] + 4 * p2[j] - p3[j]) * u2 + (-p0[j] + 3 * p1[j] - 3 * p2[j] + p3[j]) * u3);
+    OUTLINE.push({ x: f(0), y: f(1) });
+  }
+}
+const CUM = [0];
+for (let k = 1; k <= OUTLINE.length; k++) { const a = OUTLINE[k - 1], b = OUTLINE[k % OUTLINE.length]; CUM.push(CUM[k - 1] + Math.hypot(b.x - a.x, b.y - a.y)); }
+/** point at lap fraction f along the outline */
+function pointAt(f: number): XY {
+  const d = (((f % 1) + 1) % 1) * CUM[CUM.length - 1];
+  let k = 1; while (k < CUM.length - 1 && CUM[k] < d) k++;
+  const a = OUTLINE[k - 1], b = OUTLINE[k % OUTLINE.length], u = (d - CUM[k - 1]) / (CUM[k] - CUM[k - 1] || 1);
+  return { x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u };
+}
+
 const DRS_ZONES = [[0.93, 0.13], [0.36, 0.45]];
 const inDrs = (f: number) => DRS_ZONES.some(([a, b]) => (a < b ? f >= a && f <= b : f >= a || f <= b));
 const CORNERS = [[0.15, 82], [0.27, 192], [0.47, 128], [0.56, 186], [0.62, 168], [0.74, 206], [0.89, 214]];
@@ -400,6 +423,37 @@ export function mockSnapshot(rp: MockState): Snapshot {
     skeleton: Array.from({ length: 20 }, (_, k) => ({ k, w: 40 + ((k * 37) % 45) })),
     reduced: typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches,
     charts: mockCharts(rp),
+  };
+}
+
+/** Map geometry in canvas pixels for the painter: the square track box centred in w x h, `pad` inside the edge. */
+export function mockScene(rp: MockState): (w: number, h: number, pad: number) => MapScene {
+  return (w, h, pad) => {
+    const t = rp.t, status: TrackStatus = rp.forcedRed ? 'red' : statusAt(t);
+    const side = Math.min(w - pad * 2, h - pad * 2), ox = (w - side) / 2, oy = (h - side) / 2;
+    const P = (p: XY): [number, number] => [ox + p.x * side, oy + p.y * side];
+    const scene: MapScene = {
+      outline: [...OUTLINE, OUTLINE[0]].map(P), status, cars: [], sc: null,
+      drs: DRS_ZONES.map(([a, b]) => { const span = (b - a + 1) % 1; return Array.from({ length: 31 }, (_, k) => P(pointAt(a + (span * k) / 30))); }),
+    };
+    if (rp.loading || rp.noSession) return scene;
+    let leaderFrac: number | null = null, leaderProg = -1;
+    for (const [i, d] of drivers.entries()) {
+      const L = lapsBy[i], k = lapIndex(L, t), cur = L[k];
+      if (!cur) continue;
+      const f = Math.max(0, Math.min(1, (t - cur.t) / (cur.end - cur.t)));
+      if (k + f > leaderProg) { leaderProg = k + f; leaderFrac = f; }
+      const [x, y] = P(pointAt(f));
+      scene.cars.push({
+        code: d.name_acronym, colour: `#${d.team_colour}`, x, y, selected: rp.selected.has(d.driver_number),
+        inPit: pits.some((p) => p.driver_number === d.driver_number && t >= p.t && t <= p.t + p.pit_duration),
+      });
+    }
+    if (status === 'sc' && leaderFrac !== null) {
+      const [x, y] = P(pointAt(leaderFrac + 0.1));
+      scene.sc = { x, y, alpha: Math.min(1, (t - SC_START) / 3, (SC_END - t) / 3) };
+    }
+    return scene;
   };
 }
 
