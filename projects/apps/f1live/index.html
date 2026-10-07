@@ -43,6 +43,7 @@
     <select id="speed" aria-label="Playback speed"></select>
     <label class="toggle"><input id="labels" type="checkbox" checked> Names</label>
     <label class="toggle"><input id="drs" type="checkbox" checked> DRS</label>
+    <button id="standings-btn" type="button">Standings</button>
     <button id="help-btn" type="button" aria-label="Keyboard shortcuts">?</button>
   </footer>
   <section class="insights" aria-label="Insights">
@@ -106,8 +107,28 @@
       <dt>L</dt><dd>Driver names</dd>
       <dt>D</dt><dd>DRS zones</dd>
       <dt>B</dt><dd>Safety car / red flag bar</dd>
+      <dt>C</dt><dd>Drivers' standings</dd>
+      <dt>A</dt><dd>Constructors' standings</dd>
       <dt>H</dt><dd>This list</dd>
     </dl>
+    <p class="help-note">Your speed, names, DRS and event-bar choices are remembered. Race data you've opened is saved in this browser so it reloads instantly.</p>
+    <form method="dialog" class="help-actions">
+      <button id="clear-cache" type="button">Clear saved data</button>
+      <button>Close</button>
+    </form>
+  </dialog>
+
+  <dialog id="standings" class="help" aria-labelledby="standings-title">
+    <h2 id="standings-title">Standings</h2>
+    <div class="switch" role="group" aria-label="Championship">
+      <button type="button" data-kind="drivers" aria-pressed="true">Drivers</button>
+      <button type="button" data-kind="teams" aria-pressed="false">Constructors</button>
+    </div>
+    <table class="sectors">
+      <thead><tr><th scope="col">Pos</th><th scope="col">Name</th><th scope="col">Points</th><th scope="col">This session</th></tr></thead>
+      <tbody id="standings-body"></tbody>
+    </table>
+    <p id="standings-note" class="help-note"></p>
     <form method="dialog"><button>Close</button></form>
   </dialog>
 </body>

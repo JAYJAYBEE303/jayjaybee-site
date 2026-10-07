@@ -186,6 +186,23 @@ export function formatGap(gap) {
   return typeof gap === 'number' ? `+${gap.toFixed(1)}` : String(gap);
 }
 
+// Championship table with points gained so far this session.
+// rows: [{ key, label, start }], gained: Map<key, pts> -> sorted [{ label, start, gain, total }].
+export function liveStandings(rows, gained) {
+  return rows
+    .map((r) => {
+      const gain = gained.get(r.key) ?? 0;
+      return { label: r.label, start: r.start, gain, total: r.start + gain };
+    })
+    .sort((a, b) => b.total - a.total || b.start - a.start);
+}
+
+// Counter-clockwise rotation by deg, as a reusable point mapper.
+export function rotator(deg) {
+  const a = (deg * Math.PI) / 180, c = Math.cos(a), s = Math.sin(a);
+  return (p) => ({ x: p.x * c - p.y * s, y: p.x * s + p.y * c });
+}
+
 // Lap time in seconds -> "m:ss.s" (dp decimal places).
 export function formatLap(sec, dp = 1) {
   const f = 10 ** dp, t = Math.round(sec * f) / f;

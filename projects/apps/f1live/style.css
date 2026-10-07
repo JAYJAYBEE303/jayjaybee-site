@@ -216,6 +216,10 @@ button { cursor: pointer; min-width: 2.75rem; }
 .help dl { display: grid; grid-template-columns: auto 1fr; gap: 0.35rem 1rem; margin: 0 0 1rem; }
 .help dt { font-family: var(--font-data); color: var(--accent); }
 .help dd { margin: 0; }
+.help-note { max-width: 32rem; color: var(--text-dim); font-size: 0.8125rem; }
+.help-actions { display: flex; gap: 0.5rem; }
+.switch { display: flex; gap: 0.25rem; margin-bottom: 0.75rem; }
+.switch [aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
 .toggle { display: flex; align-items: center; gap: 0.35rem; color: var(--text-dim); }
 .toggle input { accent-color: var(--accent); }
 

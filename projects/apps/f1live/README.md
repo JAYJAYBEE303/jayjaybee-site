@@ -10,7 +10,11 @@ drivers you pick, lap-time and position charts, sector times, and tyre
 stints, all limited to what has happened so far in the replay.
 Practice, qualifying, sprint qualifying and sprint sessions replay the same
 way. Qualifying shows Q1/Q2/Q3 best times, and a Fastest lap tab compares
-drivers' speed, throttle, brake and gear over their best lap. The staged roadmap to full parity is in `PLAN.md`.
+drivers' speed, throttle, brake and gear over their best lap. C and A
+open live championship standings. The map is rotated to match TV
+graphics where the circuit data allows. Playback preferences are
+remembered, and session data is saved in the browser so races reopen
+instantly. The staged roadmap to full parity is in `PLAN.md`.
 
 It is a web port of the race view from
 [f1-race-replay](https://github.com/IAmTomShaw/f1-race-replay), a desktop

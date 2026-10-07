@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   indexAt, lastAt, byDriver, sampleAt, lapOutline, formatGap, formatClock,
   timed, trackStatusTimeline, periods, cumulative, pointAhead, drsRuns, tyreAge,
-  lapsDone, sectorBests, stintBars, formatLap, bestLap, lapTrace,
+  lapsDone, sectorBests, stintBars, formatLap, bestLap, lapTrace, liveStandings, rotator,
 } from './replay.js';
 
 const rows = [{ t: 0 }, { t: 10 }, { t: 20 }];
@@ -111,6 +111,21 @@ const lt = lapTrace(
 assert.deepEqual(lt.map((p) => p.x), [0, 25, 100]);
 assert.deepEqual(lt[1], { x: 25, speed: 2, throttle: 50, brake: 0, gear: 3 });
 assert.deepEqual(lapTrace([{ t: 0, x: 0, y: 0 }], [{ t: 0 }]), [], 'needs two points');
+
+// liveStandings: B overtakes A on gained points; ties broken by starting points.
+const ls = liveStandings(
+  [{ key: 1, label: 'A', start: 100 }, { key: 2, label: 'B', start: 90 }, { key: 3, label: 'C', start: 90 }],
+  new Map([[2, 25], [3, 0]]),
+);
+assert.deepEqual(ls.map((r) => r.label), ['B', 'A', 'C']);
+assert.deepEqual(ls[0], { label: 'B', start: 90, gain: 25, total: 115 });
+assert.equal(ls[1].gain, 0, 'missing key gains nothing');
+assert.deepEqual(liveStandings([{ key: 1, label: 'X', start: 5 }, { key: 2, label: 'Y', start: 9 }], new Map([[1, 4]])).map((r) => r.label), ['Y', 'X'], 'tie on total -> higher start first');
+
+// rotator: 90 deg turns +x into +y; 0 deg is identity.
+const r90 = rotator(90)({ x: 1, y: 0 });
+assert.deepEqual([Math.round(r90.x * 1e9) / 1e9, Math.round(r90.y * 1e9) / 1e9], [0, 1]);
+assert.deepEqual(rotator(0)({ x: 3, y: -2 }), { x: 3, y: -2 });
 
 assert.equal(formatGap(null), '');
 assert.equal(formatGap(3.456), '+3.5');

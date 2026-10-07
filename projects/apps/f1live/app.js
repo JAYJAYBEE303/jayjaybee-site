@@ -1,7 +1,7 @@
 import {
   toMs, byDriver, lastAt, indexAt, sampleAt, lapOutline, formatGap, formatClock,
   timed, trackStatusTimeline, periods, cumulative, pointAhead, drsRuns, tyreAge,
-  lapsDone, sectorBests, stintBars, formatLap, bestLap, lapTrace,
+  lapsDone, sectorBests, stintBars, formatLap, bestLap, lapTrace, liveStandings, rotator,
 } from './replay.js';
 
 const API = 'https://api.openf1.org/v1/';
@@ -17,7 +17,10 @@ const ui = {
   year: $('year'), race: $('race'), map: $('map'), status: $('status'),
   lap: $('lap'), clock: $('clock'), board: $('board'), rc: $('rc'), weather: $('weather'),
   play: $('play'), scrub: $('scrub'), speed: $('speed'), labels: $('labels'), drs: $('drs'),
-  events: $('events'), help: $('help'), helpBtn: $('help-btn'),
+  events: $('events'), help: $('help'), helpBtn: $('help-btn'), clearCache: $('clear-cache'),
+  standings: $('standings'), standingsBtn: $('standings-btn'), standingsTitle: $('standings-title'),
+  standingsBody: $('standings-body'), standingsNote: $('standings-note'),
+  standingsKinds: [...document.querySelectorAll('[data-kind]')],
   picker: $('picker'), telemetry: $('telemetry'), lapsChart: $('laps-chart'), lapsLegend: $('laps-legend'),
   posChart: $('positions-chart'), sectors: $('sectors'), tyres: $('tyres'), tip: $('tip'),
   fastLegend: $('fastest-legend'), fastSpeed: $('fastest-speed'), fastThrottle: $('fastest-throttle'),
@@ -35,14 +38,25 @@ let loadId = 0; // bumps on every race switch so stale loaders stop
 let nextSlot = 0;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Finished sessions don't change, so per-session responses are kept in the Cache API.
+// ponytail: no expiry; "Clear saved data" in the help dialog empties it.
+const CACHE = 'openf1-v1';
+const openCache = () => globalThis.caches?.open(CACHE).catch(() => null) ?? Promise.resolve(null);
+
 async function api(path) {
+  const cache = path.includes('session_key=') ? await openCache() : null;
+  const hit = await cache?.match(API + path);
+  if (hit) return hit.json();
   for (let attempt = 0; ; attempt++) {
     const wait = nextSlot - Date.now();
     // ponytail: fixed spacing keeps us under OpenF1's free-tier burst limit; 429s back off below.
     nextSlot = Math.max(nextSlot, Date.now()) + 400;
     if (wait > 0) await sleep(wait);
     const res = await fetch(API + path);
-    if (res.ok) return res.json();
+    if (res.ok) {
+      cache?.put(API + path, res.clone()).catch(() => {}); // full storage: just don't cache
+      return res.json();
+    }
     if (res.status === 404) return []; // OpenF1 answers "no results" with 404
     if (res.status !== 429 || attempt >= 5) throw new Error(`OpenF1 returned ${res.status}`);
     await sleep(2000 * (attempt + 1));
@@ -121,6 +135,7 @@ async function loadRace(session) {
       session, t0, t1, t: t0, playing: false, speed: Number(ui.speed.value),
       drivers: new Map(drivers.map((d) => [d.driver_number, {
         code: d.name_acronym ?? String(d.driver_number),
+        team: d.team_name,
         colour: /^[0-9a-f]{6}$/i.test(d.team_colour ?? '') ? `#${d.team_colour}` : color('--text-dim'),
       }])),
       laps: lapsBy,
@@ -158,6 +173,7 @@ async function loadRace(session) {
     renderBoard();
     loadChunks(id);
     loadDrs(id, session);
+    loadRotation(id, session);
   } catch (err) {
     if (id === loadId) setStatus(`Couldn't load this race (${err.message}). Try again shortly.`);
   }
@@ -227,15 +243,34 @@ function renderEvents() {
 }
 
 // ---- Drawing ----------------------------------------------------------------
+// Circuit rotation (degrees) as used by broadcast maps; FastF1's source. Optional.
+async function loadRotation(id, session) {
+  try {
+    const res = await fetch(`https://api.multiviewer.app/api/v1/circuits/${session.circuit_key}/${session.year}`);
+    if (!res.ok) return;
+    const { rotation } = await res.json();
+    if (id !== loadId || typeof rotation !== 'number') return;
+    S.rot = rotation;
+    fitView();
+  } catch {
+    // blocked or offline: map stays unrotated
+  }
+}
+
 function fitView() {
   if (!S?.outline) return;
   const w = ui.map.clientWidth, h = ui.map.clientHeight, pad = 32;
-  const xs = S.outline.map((p) => p.x), ys = S.outline.map((p) => p.y);
+  const turn = rotator(S.rot ?? 0);
+  const pts = S.outline.map(turn);
+  const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
   const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
   const scale = Math.min((w - pad * 2) / (maxX - minX || 1), (h - pad * 2) / (maxY - minY || 1));
   const ox = (w - (maxX - minX) * scale) / 2, oy = (h - (maxY - minY) * scale) / 2;
   // World y points up, screen y points down.
-  S.view = (p) => [ox + (p.x - minX) * scale, oy + (maxY - p.y) * scale];
+  S.view = (p) => {
+    const q = turn(p);
+    return [ox + (q.x - minX) * scale, oy + (maxY - q.y) * scale];
+  };
 }
 
 function path(points) {
@@ -741,7 +776,12 @@ function frame(now) {
     if (!S.outline) setStatus('Loading track…');
     else if (!ready) setStatus('Buffering car positions…');
     else setStatus('');
-    if (now - lastBoard > 250) { renderBoard(); renderInsights(); lastBoard = now; }
+    if (now - lastBoard > 250) {
+      renderBoard();
+      renderInsights();
+      if (ui.standings.open) renderStandings();
+      lastBoard = now;
+    }
   }
   last = now;
   draw();
@@ -772,7 +812,15 @@ function setSpeed(i) {
 
 ui.speed.replaceChildren(...SPEEDS.map((s) => option(s, `${s}×`)));
 ui.speed.value = 1;
-ui.speed.addEventListener('change', () => S && (S.speed = Number(ui.speed.value)));
+ui.speed.addEventListener('change', () => { if (S) S.speed = Number(ui.speed.value); savePrefs(); });
+ui.labels.addEventListener('change', savePrefs);
+ui.drs.addEventListener('change', savePrefs);
+ui.standingsBtn.addEventListener('click', () => showStandings('drivers'));
+for (const b of ui.standingsKinds) b.addEventListener('click', () => showStandings(b.dataset.kind));
+ui.clearCache.addEventListener('click', async () => {
+  await globalThis.caches?.delete(CACHE).catch(() => {});
+  ui.clearCache.textContent = 'Saved data cleared';
+});
 ui.play.addEventListener('click', () => setPlaying(!S?.playing));
 ui.scrub.addEventListener('input', () => S && seek(S.t0 + Number(ui.scrub.value) * 1000));
 ui.year.addEventListener('change', () => loadSeason(ui.year.value));
@@ -802,12 +850,94 @@ document.addEventListener('keydown', (e) => {
     l: () => (ui.labels.checked = !ui.labels.checked),
     d: () => (ui.drs.checked = !ui.drs.checked),
     b: () => (ui.events.hidden = !ui.events.hidden),
+    c: () => showStandings('drivers'),
+    a: () => showStandings('teams'),
   };
   const fn = keys[e.key] ?? keys[e.key.toLowerCase()];
-  if (fn) { e.preventDefault(); fn(); }
+  if (fn) { e.preventDefault(); fn(); savePrefs(); }
 });
 
+// ---- Standings ----------------------------------------------------------------
+const RACE_PTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
+const SPRINT_PTS = [8, 7, 6, 5, 4, 3, 2, 1];
+let standingsKind = 'drivers';
+
+// Championship before this session plus points for the running order at the playhead.
+async function showStandings(kind) {
+  if (!S) return;
+  standingsKind = kind;
+  for (const b of ui.standingsKinds) b.setAttribute('aria-pressed', String(b.dataset.kind === kind));
+  if (!ui.standings.open) ui.standings.showModal();
+  if (!S.standings && S.isRace) {
+    const k = `session_key=${S.session.session_key}`, mine = S;
+    ui.standingsNote.textContent = 'Loading…';
+    try {
+      const [drivers, teams] = await Promise.all([api(`championship_drivers?${k}`), api(`championship_teams?${k}`)]);
+      if (mine !== S) return;
+      S.standings = { drivers, teams };
+    } catch (err) {
+      if (mine === S) ui.standingsNote.textContent = `Couldn't load standings (${err.message}).`;
+      return;
+    }
+  }
+  renderStandings();
+}
+
+function renderStandings() {
+  if (!S) return;
+  if (S.isRace && !S.standings) return; // still loading
+  const { drivers, teams } = S.standings ?? { drivers: [], teams: [] };
+  ui.standingsTitle.textContent = standingsKind === 'drivers' ? "Drivers' championship" : "Constructors' championship";
+  const list = standingsKind === 'drivers' ? drivers : teams;
+  if (!S.isRace || !list.length) {
+    ui.standingsBody.replaceChildren();
+    ui.standingsNote.textContent = S.isRace ? 'No standings published for this session.' : 'Standings are shown for races and sprints — pick one of those.';
+    return;
+  }
+  const pts = S.session.session_name === 'Sprint' ? SPRINT_PTS : RACE_PTS;
+  const byDriver = new Map(order().map((d, i) => [d, pts[i] ?? 0]));
+  const gained = new Map();
+  if (standingsKind === 'drivers') for (const [d, p] of byDriver) gained.set(d, p);
+  else for (const [d, p] of byDriver) { const t = S.drivers.get(d)?.team; gained.set(t, (gained.get(t) ?? 0) + p); }
+  const rows = list.map((r) => standingsKind === 'drivers'
+    ? { key: r.driver_number, label: S.drivers.get(r.driver_number)?.code ?? `#${r.driver_number}`, start: r.points_start ?? 0 }
+    : { key: r.team_name, label: r.team_name ?? '–', start: r.points_start ?? 0 });
+  const cell = (text) => { const td = document.createElement('td'); td.textContent = text; return td; };
+  ui.standingsBody.replaceChildren(...liveStandings(rows, gained).map((r, i) => {
+    const tr = document.createElement('tr');
+    tr.append(cell(i + 1), cell(r.label), cell(r.total), cell(r.gain ? `+${r.gain}` : ''));
+    return tr;
+  }));
+  ui.standingsNote.textContent = 'Live: standings before this session plus points for the current running order.';
+}
+
+// ---- Preferences --------------------------------------------------------------
+const PREFS = 'f1live.prefs';
+
+function savePrefs() {
+  try {
+    localStorage.setItem(PREFS, JSON.stringify({
+      speed: Number(ui.speed.value), names: ui.labels.checked, drs: ui.drs.checked, events: !ui.events.hidden,
+    }));
+  } catch {
+    // storage blocked: preferences just aren't remembered
+  }
+}
+
+function loadPrefs() {
+  try {
+    const p = JSON.parse(localStorage.getItem(PREFS) ?? '{}') ?? {};
+    if (SPEEDS.includes(p.speed)) ui.speed.value = p.speed;
+    if (typeof p.names === 'boolean') ui.labels.checked = p.names;
+    if (typeof p.drs === 'boolean') ui.drs.checked = p.drs;
+    if (typeof p.events === 'boolean') ui.events.hidden = !p.events;
+  } catch {
+    // corrupt or blocked storage: keep defaults
+  }
+}
+
 // ---- Boot -------------------------------------------------------------------
+loadPrefs();
 const thisYear = new Date().getFullYear();
 for (let y = thisYear; y >= FIRST_SEASON; y--) ui.year.append(option(y, y));
 

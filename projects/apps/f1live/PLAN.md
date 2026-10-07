@@ -31,7 +31,7 @@
 | 1 | Race view parity | built + reviewed; awaiting user `node check.mjs` + preview check |
 | 2 | Driver telemetry + insights panels | built + reviewed; awaiting user `node check.mjs` + preview check |
 | 3 | Qualifying, sprint qualifying, practice replays | built + reviewed; awaiting user `node check.mjs` + preview check |
-| 4 | Championship overlays, settings, caching, map rotation | planned |
+| 4 | Championship overlays, settings, caching, map rotation | in progress |
 | 5 | Optional: pre-2023 seasons via FastF1 export, tyre degradation model | planned |
 
 ### Stage 1 — Race view parity
@@ -191,6 +191,37 @@ Ruling: non-race sessions reuse the whole-session replay (cars on track for the 
 
 - `node check.mjs` prints `replay.js ok` (run by the user).
 - Preview: the picker lists FP/Q/SQ/Sprint/Race per meeting. A qualifying session replays with Q1→Q3 in the header and knocked-out drivers marked. The Fastest lap tab compares two drivers' traces.
+
+## Stage 4 tasks
+
+Rulings:
+- **Settings:** remembered preferences instead of a settings dialog. Speed, names, DRS and event bar are saved to `localStorage` on every change and restored on load.
+- **Standings:** standings before the session (`championship_drivers` / `championship_teams`, `points_start`) plus points for the running order at the playhead (race 25-18-15-12-10-8-6-4-2-1, sprint 8-1). Live, and no spoilers.
+- **Caching:** the Cache API (not IndexedDB) on every `session_key=` request; a "Clear saved data" button in the help dialog.
+- **Rotation:** `api.multiviewer.app/api/v1/circuits/{circuit_key}/{year}` → `rotation` (degrees), FastF1's source. Any failure means no rotation.
+
+### Task 4.1: Pure helpers (`replay.js`, `check.mjs`)
+
+- [ ] `liveStandings(rows, gained) -> [{ label, start, gain, total }]`: `rows` are `[{ key, label, start }]`, `gained` is a `Map<key, pts>`. Sorted by total descending, then start descending.
+- [ ] `rotator(deg) -> (p) => { x, y }`: rotation counter-clockwise by `deg`.
+- [ ] Asserts for both.
+
+### Task 4.2: Standings overlay
+
+- [ ] `<dialog id="standings">` with a Drivers / Constructors switch; C opens drivers and A opens constructors; a "Standings" button in the controls.
+- [ ] Data is fetched once per session (cached promise). While open, it re-renders on the 250 ms tick.
+- [ ] Non-race sessions, or no data, show a note instead of a table.
+
+### Task 4.3: Preferences, cache, rotation
+
+- [ ] `loadPrefs()` runs at boot and `savePrefs()` runs on every speed, names, DRS or event-bar change (keys included). Every `localStorage` access is wrapped in try/catch.
+- [ ] `api()` looks in the Cache API before the throttle and stores ok responses for `session_key=` URLs; the cache is skipped when `caches` is unavailable.
+- [ ] `fitView()` rotates through `rotator(S.rot ?? 0)`; `loadRotation()` sets `S.rot` and refits.
+
+### Stage 4 done when
+
+- `node check.mjs` prints `replay.js ok` (run by the user).
+- Preview: C and A open live standings that change as positions change; reloading a race is near-instant (cache); preferences survive a reload; the map matches the broadcast orientation, or is unrotated if MultiViewer blocks the request.
 
 ## Review Focus
 
