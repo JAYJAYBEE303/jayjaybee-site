@@ -239,6 +239,7 @@ console.log('mock ok');
 // ---- view model: parity with the reference renderVals() on every golden scenario ----
 const norm = (v: unknown): unknown =>
   v === '#0A0A0B' ? 'var(--p-black-950)' : v === '#FFFFFF' ? 'var(--text-on-accent)'
+  : typeof v === 'string' ? v.replaceAll('cubic-bezier(.16,1,.3,1)', 'var(--ease-out)')
   : Array.isArray(v) ? v.map(norm)
   : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, norm(x)])) : v;
 const asOptions = (v: unknown) => (v as string[]).map((x) => ({ value: x, label: x }));
@@ -283,6 +284,9 @@ for (const name of SCENARIOS) {
   const pv = toViewModel(p);
   assert.deepEqual([pv.towerTitle, pv.heroA, pv.heroB], ['Best laps', 'Practice 1', '']);
   assert.equal(pv.ribbonTicks[0].label, 'Leader');
+  // ranks by int deltas ('+7.000' -> scale 0-7 s), not the best-lap strings in gap
+  assert.equal(pv.spreadNote, 'Front to back on the lead lap: 7.0 s · scale 0–7 s · lapped cars parked at the right edge');
+  assert.deepEqual(pv.ribbon.map((r) => r.left), [0, 94, 90]);
 }
 // buffering, red band, fastest labels, reduced motion
 {

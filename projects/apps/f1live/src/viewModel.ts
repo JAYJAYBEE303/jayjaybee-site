@@ -171,7 +171,7 @@ export function toViewModel(s: Snapshot): ViewModel {
         code: v === null && !r.out ? `${r.code} ${key(r).replace('+', '')}` : r.code,
       };
     }),
-    ribbonMotion: s.reduced ? 'none' : 'left 700ms cubic-bezier(.16,1,.3,1), top 300ms ease',
+    ribbonMotion: s.reduced ? 'none' : 'left 700ms var(--ease-out), top 300ms ease',
     towerTitle: s.practice ? 'Best laps' : s.quali ? 'Qualifying order' : s.finished ? 'Classification' : 'Running order',
     skeleton: s.skeleton,
     tiles: s.stable.map((r) => ({
