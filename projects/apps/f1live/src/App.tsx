@@ -37,9 +37,12 @@ export function App() {
       const q = `session_key=${R.session.session_key}`;
       setStandingsMsg('Loading…');
       try {
-        const [drivers, teams] = await Promise.all([api(`championship_drivers?${q}`), api(`championship_teams?${q}`)]);
+        const [drivers, teams] = await Promise.all([
+          api<Standings['drivers'][number]>(`championship_drivers?${q}`),
+          api<Standings['teams'][number]>(`championship_teams?${q}`),
+        ]);
         if (current() !== R) return;
-        R.standings = { drivers, teams } as Standings;
+        R.standings = { drivers, teams };
       } catch (err) {
         if (current() === R) setStandingsMsg(`Couldn't load standings (${(err as Error).message}).`);
         return;

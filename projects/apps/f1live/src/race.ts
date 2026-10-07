@@ -22,8 +22,9 @@ export type Session = {
   circuit_key: number;
   year: number;
   location: string;
+  circuit_short_name?: string | null;
 };
-export type Driver = { code: string; team: string; colour: string };
+export type Driver = { code: string; first: string; last: string; team: string; colour: string };
 export type Weather = {
   t: number; air_temperature?: number; track_temperature?: number; humidity?: number; wind_speed?: number; rainfall?: number;
 };
@@ -74,7 +75,10 @@ export type Race = {
 
 // Raw OpenF1 rows for one session, as fetched by loadRace.
 export type RaceData = {
-  drivers: { driver_number: number; name_acronym?: string | null; team_name: string; team_colour?: string | null }[];
+  drivers: {
+    driver_number: number; name_acronym?: string | null; first_name?: string | null; last_name?: string | null;
+    team_name: string; team_colour?: string | null;
+  }[];
   laps: Omit<Lap, 't'>[];
   position: { driver_number: number; date: string; position?: number }[];
   stints: Stint[];
@@ -83,6 +87,9 @@ export type RaceData = {
   weather: (Omit<Weather, 't'> & { date: string })[];
   pit: { driver_number: number; date: string; pit_duration?: number | null }[];
 };
+
+// One raw OpenF1 row of a RaceData table, e.g. Row<'laps'>.
+export type Row<K extends keyof RaceData> = RaceData[K][number];
 
 export function buildRace(session: Session, data: RaceData, dimColour: string, speed: number): Race {
   const { drivers, laps, position, stints, intervals, raceControl, weather, pit } = data;
@@ -107,11 +114,16 @@ export function buildRace(session: Session, data: RaceData, dimColour: string, s
 
   return {
     session, t0, t1, t: t0, playing: false, speed,
-    drivers: new Map(drivers.map((d) => [d.driver_number, {
-      code: d.name_acronym ?? String(d.driver_number),
-      team: d.team_name,
-      colour: /^[0-9a-f]{6}$/i.test(d.team_colour ?? '') ? `#${d.team_colour}` : dimColour,
-    }])),
+    drivers: new Map(drivers.map((d): [number, Driver] => {
+      const code = d.name_acronym ?? String(d.driver_number);
+      return [d.driver_number, {
+        code,
+        first: d.first_name || '',
+        last: d.last_name || code,
+        team: d.team_name,
+        colour: /^[0-9a-f]{6}$/i.test(d.team_colour ?? '') ? `#${d.team_colour}` : dimColour,
+      }];
+    })),
     laps: lapsBy,
     totalLaps,
     isRace,
@@ -158,8 +170,8 @@ export const driverLap = (R: Race, d: number) => lastAt(R.laps.get(d), R.t)?.lap
 
 export const flagOf = (r: RaceControl) => (r.category === 'SafetyCar' ? 'sc' : (r.flag ?? '').toLowerCase().replace(/\s+/g, '-'));
 
-const segment = (R: Race) => R.bounds.filter((b) => b < R.t).length; // 0-based
-const segLabel = (R: Race, k: number) => `${R.session.session_name.startsWith('Sprint') ? 'SQ' : 'Q'}${k + 1}`;
+export const segment = (R: Race) => R.bounds.filter((b) => b < R.t).length; // 0-based
+export const segLabel = (R: Race, k: number) => `${R.session.session_name.startsWith('Sprint') ? 'SQ' : 'Q'}${k + 1}`;
 
 // Non-race sessions: each driver's best lap in the latest segment they ran in.
 function sessionBests(R: Race, ranked: number[]) {
@@ -176,7 +188,7 @@ function sessionBests(R: Race, ranked: number[]) {
 }
 
 export type BoardRow = {
-  d: number; code: string; colour: string; out: boolean; selected: boolean;
+  d: number; code: string; colour: string; out: boolean; pit: boolean; selected: boolean;
   gap: string; int: string; compound: string; tyre: string; age: number | ''; hasStint: boolean;
 };
 
@@ -209,7 +221,7 @@ export function boardRows(R: Race): BoardRow[] {
       int = inPit ? 'PIT' : i && !out ? formatGap(iv?.interval) : '';
     }
     return {
-      d, code: car.code, colour: car.colour, out, selected: R.selected.has(d), gap, int,
+      d, code: car.code, colour: car.colour, out, pit: inPit, selected: R.selected.has(d), gap, int,
       compound, tyre: compound[0] ?? '–', age: stint ? tyreAge(stint, lap) : '', hasStint: !!stint,
     };
   });

@@ -10,6 +10,7 @@ import {
   buildRace, windowQuery, chunkIndex, order, boardRows, lapLabel, weatherText, rcItems,
   standingsRows, standingsNote, seriesFor, lapsYDomain,
 } from './src/race.ts';
+import { raceSession, lap, raceData, at, ms } from './test/race-fixture.ts';
 
 const rows = [{ t: 0 }, { t: 10 }, { t: 20 }];
 assert.equal(indexAt(rows, -1), -1);
@@ -161,46 +162,6 @@ assert.equal(formatLap(65.0004, 3), '1:05.000');
 console.log('replay ok');
 
 // ---- race.ts: behaviour captured from the original app.js before the port ----------------
-const T = Date.UTC(2024, 0, 1);
-const at = (s: number) => new Date(T + s * 1000).toISOString();
-const ms = (s: number) => T + s * 1000;
-const raceSession = {
-  session_key: 9, session_name: 'Race', session_type: 'Race', date_start: at(0), date_end: at(3600),
-  meeting_key: 1, circuit_key: 1, year: 2024, location: 'X',
-};
-const lap = (d: number, n: number, start: number, dur: number | null, extra = {}) =>
-  ({ driver_number: d, lap_number: n, date_start: at(start), lap_duration: dur, ...extra });
-const raceData = {
-  drivers: [
-    { driver_number: 1, name_acronym: 'VER', team_name: 'Red Bull', team_colour: '3671C6' },
-    { driver_number: 11, name_acronym: 'PER', team_name: 'Red Bull', team_colour: '3671C6' },
-    { driver_number: 44, name_acronym: 'HAM', team_name: 'Mercedes', team_colour: 'bad' },
-  ],
-  laps: [
-    lap(1, 1, 60, 95), lap(1, 2, 155, 90), lap(1, 3, 245, 91),
-    lap(11, 1, 60, 96), lap(11, 2, 156, 91), lap(11, 3, 247, 90),
-    lap(44, 1, 60, 97),
-  ],
-  position: [
-    { driver_number: 1, date: at(60), position: 1 },
-    { driver_number: 11, date: at(60), position: 2 },
-    { driver_number: 44, date: at(60), position: 3 },
-  ],
-  stints: [
-    { driver_number: 1, lap_start: 1, lap_end: 3, compound: 'SOFT', tyre_age_at_start: 0 },
-    { driver_number: 11, lap_start: 1, lap_end: 2, compound: 'MEDIUM', tyre_age_at_start: 2 },
-    { driver_number: 11, lap_start: 3, lap_end: 3, compound: 'HARD', tyre_age_at_start: 0 },
-  ],
-  intervals: [{ driver_number: 11, date: at(200), gap_to_leader: 1.234, interval: 1.234 }],
-  raceControl: [
-    { date: at(30), category: 'Flag', flag: 'GREEN', scope: 'Track', message: 'GREEN LIGHT' },
-    { date: at(100), category: 'SafetyCar', message: 'SAFETY CAR DEPLOYED' },
-    { date: at(150), category: 'SafetyCar', message: 'SAFETY CAR IN THIS LAP' },
-    { date: at(330), category: 'Flag', flag: 'CHEQUERED', message: 'CHEQUERED FLAG' },
-  ],
-  weather: [{ date: at(0), air_temperature: 25, track_temperature: 40, humidity: 50, wind_speed: 1.2, rainfall: 0 }],
-  pit: [{ driver_number: 11, date: at(240), pit_duration: 22 }],
-};
 const R = buildRace(raceSession, raceData, '#dim', 1);
 assert.equal(R.t0, ms(60), 'race starts at lights-out (earliest lap 1)');
 assert.equal(R.t1, ms(337), 'race ends at the last lap end');
@@ -209,6 +170,8 @@ assert.equal(R.chequer, ms(336), 'chequer = first finisher of the final lap');
 assert.deepEqual(R.bounds, []);
 assert.equal(R.drivers.get(44)!.colour, '#dim', 'bad team colour falls back');
 assert.equal(R.drivers.get(1)!.colour, '#3671C6');
+assert.deepEqual([R.drivers.get(1)!.first, R.drivers.get(1)!.last], ['Max', 'Verstappen']);
+assert.deepEqual([R.drivers.get(11)!.first, R.drivers.get(11)!.last], ['', 'PER'], 'missing names fall back to the code');
 assert.deepEqual(R.periods.sc, [{ start: ms(100), end: ms(155) }], 'SC ends at the leader\'s next lap start');
 assert.equal(R.chunks.length, 1);
 assert.equal(windowQuery(R, 0), `date>${new Date(ms(58)).toISOString()}&date<${new Date(ms(362)).toISOString()}`);
@@ -221,6 +184,7 @@ assert.deepEqual(boardRows(R).map((r) => [r.d, r.gap, r.int, r.compound, r.tyre,
   [11, '+1.2', 'PIT', 'HARD', 'H', 0, false],
   [44, 'OUT', '', '', '–', '', true],
 ]);
+R.t = ms(250); assert.deepEqual(boardRows(R).map((r) => r.pit), [false, true, false]);
 assert.equal(lapLabel(R), 'Lap 3 / 3');
 assert.equal(weatherText(R), 'Air 25° · Track 40° · Hum 50% · Wind 1.2 m/s · Dry');
 assert.deepEqual(rcItems(R).map((r) => [r.time, r.flag, r.message]), [

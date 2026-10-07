@@ -33,7 +33,7 @@ export async function loadChunks(R: Race, current: Current, onError: (msg: strin
   }
 }
 
-// DRS zones from the meeting's fastest qualifying lap. Optional: any failure just means no layer.
+// DRS zones from the meeting's fastest qualifying lap. Optional: a failure just means no layer.
 export async function loadDrs(R: Race, current: Current, session: Session) {
   try {
     const [q] = await api<Session>(`sessions?meeting_key=${session.meeting_key}&session_name=Qualifying`);

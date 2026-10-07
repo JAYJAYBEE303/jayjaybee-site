@@ -10,7 +10,7 @@ const CACHE = 'openf1-v1';
 const openCache = (): Promise<Cache | null> =>
   globalThis.caches?.open(CACHE).catch(() => null) ?? Promise.resolve(null);
 
-export async function api<T = any>(path: string): Promise<T[]> {
+export async function api<T = unknown>(path: string): Promise<T[]> {
   const cache = path.includes('session_key=') ? await openCache() : null;
   const hit = await cache?.match(API + path);
   if (hit) return hit.json();
@@ -32,7 +32,7 @@ export async function api<T = any>(path: string): Promise<T[]> {
 
 export const clearCache = () => globalThis.caches?.delete(CACHE).catch(() => {});
 
-// Circuit rotation (degrees) as used by broadcast maps; FastF1's source. Optional: null on any failure.
+// Circuit rotation (degrees) as used by broadcast maps; FastF1's source. Optional: null on failure.
 export async function circuitRotation(circuitKey: number, year: number): Promise<number | null> {
   try {
     const res = await fetch(`https://api.multiviewer.app/api/v1/circuits/${circuitKey}/${year}`);

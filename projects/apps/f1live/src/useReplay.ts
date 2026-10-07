@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, circuitRotation } from './openf1.ts';
 import { toMs } from './replay.ts';
 import { buildRace, chunkReady, order, SPEEDS } from './race.ts';
-import type { Race, RaceData, Session } from './race.ts';
+import type { Race, Row, Session } from './race.ts';
 import { loadChunks, loadDrs } from './loaders.ts';
 import { color, drawMap } from './drawMap.ts';
 
@@ -70,11 +70,12 @@ export function useReplay() {
     const isRace = session.session_type === 'Race'; // includes sprints
     try {
       const [drivers, laps, position, stints, intervals, raceControl, weather, pit] = await Promise.all([
-        api(`drivers?${k}`), api(`laps?${k}`), api(`position?${k}`), api(`stints?${k}`),
-        isRace ? api(`intervals?${k}`) : [], api(`race_control?${k}`), api(`weather?${k}`), api(`pit?${k}`),
+        api<Row<'drivers'>>(`drivers?${k}`), api<Row<'laps'>>(`laps?${k}`), api<Row<'position'>>(`position?${k}`),
+        api<Row<'stints'>>(`stints?${k}`), isRace ? api<Row<'intervals'>>(`intervals?${k}`) : [],
+        api<Row<'raceControl'>>(`race_control?${k}`), api<Row<'weather'>>(`weather?${k}`), api<Row<'pit'>>(`pit?${k}`),
       ]);
       if (id !== loadId.current) return;
-      const R = buildRace(session, { drivers, laps, position, stints, intervals, raceControl, weather, pit } as RaceData,
+      const R = buildRace(session, { drivers, laps, position, stints, intervals, raceControl, weather, pit },
         color('--text-dim'), prefsRef.current.speed);
       raceRef.current = R;
       setPickOrder(order(R)); // running order at the start, as the original built its picker
