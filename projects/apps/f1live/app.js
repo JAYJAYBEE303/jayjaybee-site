@@ -135,7 +135,7 @@ async function loadRace(session) {
       car: new Map(), // `${driver}:${window}` -> car_data rows | 'loading'
     };
     ui.scrub.max = Math.round((t1 - t0) / 1000);
-    ui.scrub.value = 0;
+    syncScrub();
     buildPicker();
     renderEvents();
     renderBoard();
@@ -363,11 +363,18 @@ function renderBoard() {
     ui.rc.replaceChildren(...S.rc.slice(Math.max(0, idx - 49), idx + 1).reverse().map((r) => {
       const item = document.createElement('li');
       item.dataset.flag = flagOf(r);
-      item.append(span('rc-time', formatClock(r.t - S.t0)), ` ${r.message ?? ''}`);
+      item.append(span('rc-time', r.t < S.t0 ? 'Pre-race' : formatClock(r.t - S.t0)), ` ${r.message ?? ''}`);
       return item;
     }));
   }
-  if (S.playing) ui.scrub.value = Math.round((S.t - S.t0) / 1000);
+  if (S.playing) syncScrub();
+}
+
+// Scrubber position + its filled part (--fill drives the WebKit track gradient).
+function syncScrub() {
+  const v = Math.round((S.t - S.t0) / 1000);
+  ui.scrub.value = v;
+  ui.scrub.style.setProperty('--fill', `${(v / (Number(ui.scrub.max) || 1)) * 100}%`);
 }
 
 function setStatus(text) {
@@ -656,7 +663,7 @@ function setPlaying(on) {
 function seek(t) {
   if (!S) return;
   S.t = Math.min(S.t1, Math.max(S.t0, t));
-  ui.scrub.value = Math.round((S.t - S.t0) / 1000);
+  syncScrub();
   renderBoard();
 }
 
