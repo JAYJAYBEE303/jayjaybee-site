@@ -253,6 +253,8 @@ button { cursor: pointer; min-width: 2.75rem; }
 .drs-badge.on { color: var(--bg); background: var(--drs); border-color: var(--drs); }
 
 .chart { display: block; width: 100%; height: 18rem; }
+.chart.mini { height: 7rem; }
+.mini-title { margin: 0.5rem 0 0.1rem; font: inherit; color: var(--text-dim); }
 .legend { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; margin-bottom: 0.5rem; color: var(--text-dim); }
 .legend span { display: flex; align-items: center; gap: 0.35rem; }
 .legend i { display: inline-block; width: 1.2rem; border-top: 2px solid; }

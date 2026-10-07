@@ -154,18 +154,43 @@ export const stintBars = (stints, lap) => (stints ?? [])
   .filter((s) => s.lap_start <= lap)
   .map((s) => ({ compound: s.compound ?? '', from: s.lap_start, to: Math.min(s.lap_end ?? lap, lap) }));
 
-export const tyreAge =(stint, lap) => (stint.tyre_age_at_start ?? 0) + lap - stint.lap_start;
+// Fastest lap finished by t that started in [from, to), or undefined.
+export function bestLap(laps, t, from = -Infinity, to = Infinity) {
+  let best;
+  for (const l of lapsDone(laps, t)) {
+    if (l.t >= from && l.t < to && (!best || l.lap_duration < best.lap_duration)) best = l;
+  }
+  return best;
+}
+
+// car_data samples placed along one lap: [{ x: % of lap distance, speed, throttle, brake, gear }].
+// Distance comes from the lap's location trace (cumulative, interpolated by time).
+export function lapTrace(loc, car) {
+  if (loc.length < 2) return [];
+  const cum = cumulative(loc), total = cum.at(-1) || 1;
+  return car.map((r) => {
+    const i = indexAt(loc, r.t);
+    let d = 0;
+    if (i >= 0) {
+      const a = loc[i], b = loc[i + 1];
+      d = cum[i] + (b && b.t > a.t ? ((r.t - a.t) / (b.t - a.t)) * (cum[i + 1] - cum[i]) : 0);
+    }
+    return { x: Math.min(100, (d / total) * 100), speed: r.speed, throttle: r.throttle, brake: r.brake, gear: r.n_gear };
+  });
+}
+
+export const tyreAge = (stint, lap) => (stint.tyre_age_at_start ?? 0) + lap - stint.lap_start;
 
 export function formatGap(gap) {
   if (gap == null || gap === 0) return '';
   return typeof gap === 'number' ? `+${gap.toFixed(1)}` : String(gap);
 }
 
-// Lap time in seconds -> "m:ss.s".
-export function formatLap(sec) {
-  const t = Math.round(sec * 10) / 10;
+// Lap time in seconds -> "m:ss.s" (dp decimal places).
+export function formatLap(sec, dp = 1) {
+  const f = 10 ** dp, t = Math.round(sec * f) / f;
   const m = Math.floor(t / 60);
-  return `${m}:${(t - m * 60).toFixed(1).padStart(4, '0')}`;
+  return `${m}:${(t - m * 60).toFixed(dp).padStart(dp + 3, '0')}`;
 }
 
 export function formatClock(ms) {

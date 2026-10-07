@@ -30,7 +30,7 @@
 |---|-------|--------|
 | 1 | Race view parity | built + reviewed; awaiting user `node check.mjs` + preview check |
 | 2 | Driver telemetry + insights panels | built + reviewed; awaiting user `node check.mjs` + preview check |
-| 3 | Qualifying, sprint qualifying, practice replays | planned |
+| 3 | Qualifying, sprint qualifying, practice replays | in progress |
 | 4 | Championship overlays, settings, caching, map rotation | planned |
 | 5 | Optional: pre-2023 seasons via FastF1 export, tyre degradation model | planned |
 
@@ -160,6 +160,37 @@ Rule for every panel: only data up to the playhead `S.t` is shown (no spoilers).
 
 - `node check.mjs` prints `replay.js ok` (run by the user).
 - On the preview: clicking a driver shows live telemetry and a map ring; lap and position charts grow as the race plays and show nothing ahead of the playhead; the sectors table shows purple and green; tyre bars match the leaderboard tyre.
+
+## Stage 3 tasks
+
+Reference: `src/interfaces/qualifying.py`, `practice.py`, `f1_data.get_driver_quali_telemetry`. The original shows a results table (Q1/Q2/Q3), per-driver fastest-lap speed, gear and throttle/brake traces over lap distance with a comparison driver, and DRS zones.
+
+Ruling: non-race sessions reuse the whole-session replay (cars on track for the full session, leaderboard from OpenF1 `position`, the existing Lap times, Sectors, Tyres and Telemetry tabs). The distance-trace comparison becomes a new **Fastest lap** tab that works in every session. Not ported: the animated single-lap replay with a ghost comparison dot.
+
+### Task 3.1: Pure helpers (`replay.js`, `check.mjs`)
+
+- [ ] Segment boundaries come from `race_control` CHEQUERED flags (one at the end of each segment): Q2 starts after the first, Q3 after the second, and the segment at `t` = the number of boundaries passed. Red flags don't affect it. No chequered messages means one segment.
+- [ ] `bestLap(laps, t, from = -Infinity, to = Infinity)`: the fastest lap finished by `t` that started in `[from, to)`, or `undefined`.
+- [ ] `lapTrace(loc, car) -> [{ x: % of lap, speed, throttle, brake, gear }]`: each `car_data` sample is placed at its distance along the lap (from cumulative `location` distance, interpolated by time).
+- [ ] An assert for each.
+
+### Task 3.2: Session picker + non-race sessions
+
+- [ ] `loadSeason` lists every finished session (`sessions?year=`), filtered to Practice 1–3, Qualifying, Sprint Qualifying/Shootout, Sprint and Race, in an `<optgroup>` per meeting. The default is the latest Race.
+- [ ] Non-race: `t0` = session start, `t1` = max(session end, last lap end); `intervals` and the OUT logic are skipped; the Positions tab is hidden.
+- [ ] Tower head: race shows `Lap x / y`; qualifying shows the segment (`Q2`, or `SQ2` for sprint qualifying); practice shows the session name.
+- [ ] Leaderboard in non-race sessions: gap column = best lap in the driver's latest segment (`formatLap`); interval column = delta to the fastest of those, or `Q1`/`Q2` when the driver was knocked out in that segment.
+
+### Task 3.3: Fastest lap tab
+
+- [ ] `lineChart` gains `xFmt` and `discrete` options (`discrete: false` = nearest point per series on hover).
+- [ ] The tab shows the selected drivers, or the top 2 when none are selected. Each driver's fastest lap finished by `S.t` is fetched (`location` + `car_data` over the lap window), cached per `driver:lap`, with failures cached as empty.
+- [ ] Four stacked mini charts over % of lap: Speed, Throttle, Brake, Gear. One shared legend; the second teammate's line is dashed.
+
+### Stage 3 done when
+
+- `node check.mjs` prints `replay.js ok` (run by the user).
+- Preview: the picker lists FP/Q/SQ/Sprint/Race per meeting. A qualifying session replays with Q1→Q3 in the header and knocked-out drivers marked. The Fastest lap tab compares two drivers' traces.
 
 ## Review Focus
 

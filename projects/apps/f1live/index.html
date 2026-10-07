@@ -56,6 +56,7 @@
       <button type="button" role="tab" aria-selected="false" aria-controls="panel-positions" data-tab="positions">Positions</button>
       <button type="button" role="tab" aria-selected="false" aria-controls="panel-sectors" data-tab="sectors">Sectors</button>
       <button type="button" role="tab" aria-selected="false" aria-controls="panel-tyres" data-tab="tyres">Tyres</button>
+      <button type="button" role="tab" aria-selected="false" aria-controls="panel-fastest" data-tab="fastest">Fastest lap</button>
     </div>
     <div id="panel-telemetry" class="panel" role="tabpanel">
       <ul id="telemetry" class="telemetry"></ul>
@@ -75,6 +76,17 @@
     </div>
     <div id="panel-tyres" class="panel" role="tabpanel" hidden>
       <ol id="tyres" class="stints"></ol>
+    </div>
+    <div id="panel-fastest" class="panel" role="tabpanel" hidden>
+      <div id="fastest-legend" class="legend"></div>
+      <h3 class="mini-title">Speed (km/h)</h3>
+      <canvas id="fastest-speed" class="chart mini" role="img" aria-label="Speed over each driver's fastest lap"></canvas>
+      <h3 class="mini-title">Throttle</h3>
+      <canvas id="fastest-throttle" class="chart mini" role="img" aria-label="Throttle over each driver's fastest lap"></canvas>
+      <h3 class="mini-title">Brake</h3>
+      <canvas id="fastest-brake" class="chart mini" role="img" aria-label="Brake over each driver's fastest lap"></canvas>
+      <h3 class="mini-title">Gear</h3>
+      <canvas id="fastest-gear" class="chart mini" role="img" aria-label="Gear over each driver's fastest lap"></canvas>
     </div>
   </section>
   <div id="tip" class="tip" hidden></div>

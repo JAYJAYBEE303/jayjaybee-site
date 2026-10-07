@@ -1,7 +1,7 @@
 import {
   toMs, byDriver, lastAt, indexAt, sampleAt, lapOutline, formatGap, formatClock,
   timed, trackStatusTimeline, periods, cumulative, pointAhead, drsRuns, tyreAge,
-  lapsDone, sectorBests, stintBars, formatLap,
+  lapsDone, sectorBests, stintBars, formatLap, bestLap, lapTrace,
 } from './replay.js';
 
 const API = 'https://api.openf1.org/v1/';
@@ -20,6 +20,8 @@ const ui = {
   events: $('events'), help: $('help'), helpBtn: $('help-btn'),
   picker: $('picker'), telemetry: $('telemetry'), lapsChart: $('laps-chart'), lapsLegend: $('laps-legend'),
   posChart: $('positions-chart'), sectors: $('sectors'), tyres: $('tyres'), tip: $('tip'),
+  fastLegend: $('fastest-legend'), fastSpeed: $('fastest-speed'), fastThrottle: $('fastest-throttle'),
+  fastBrake: $('fastest-brake'), fastGear: $('fastest-gear'),
   tabs: [...document.querySelectorAll('[role="tab"]')],
 };
 const ctx = ui.map.getContext('2d');
@@ -55,24 +57,30 @@ function option(value, text) {
   return o;
 }
 
-let sessions = []; // finished races of the selected season
+// Session names offered in the picker (testing days and anything else are left out).
+const KINDS = ['Practice 1', 'Practice 2', 'Practice 3', 'Sprint Shootout', 'Sprint Qualifying', 'Qualifying', 'Sprint', 'Race'];
+let sessions = []; // finished sessions of the selected season
 
 async function loadSeason(year, pickKey) {
   ui.race.replaceChildren(option('', 'Loading…'));
   const now = Date.now();
-  sessions = (await api(`sessions?year=${year}&session_type=Race`))
-    .filter((s) => toMs(s.date_end) < now)
+  sessions = (await api(`sessions?year=${year}`))
+    .filter((s) => KINDS.includes(s.session_name) && toMs(s.date_end) < now)
     .sort((a, b) => toMs(a.date_start) - toMs(b.date_start));
   if (!sessions.length) {
-    ui.race.replaceChildren(option('', 'No finished races'));
+    ui.race.replaceChildren(option('', 'No finished sessions'));
     return;
   }
-  ui.race.replaceChildren(...sessions.map((s) => {
-    const day = new Date(s.date_start).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
-    return option(s.session_key, `${day} · ${s.location} · ${s.session_name}`);
+  ui.race.replaceChildren(...[...Map.groupBy(sessions, (s) => s.meeting_key).values()].map((list) => {
+    const group = document.createElement('optgroup');
+    const day = new Date(list[0].date_start).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+    group.label = `${day} · ${list[0].location}`;
+    group.append(...list.map((s) => option(s.session_key, s.session_name)));
+    return group;
   }));
-  ui.race.value = String(pickKey ?? sessions.at(-1).session_key);
-  if (!ui.race.value) ui.race.value = String(sessions.at(-1).session_key);
+  const latest = sessions.findLast((s) => s.session_name === 'Race') ?? sessions.at(-1);
+  ui.race.value = String(pickKey ?? latest.session_key);
+  if (!ui.race.value) ui.race.value = String(latest.session_key);
   loadRace(sessions.find((s) => String(s.session_key) === ui.race.value));
 }
 
@@ -81,12 +89,13 @@ async function loadRace(session) {
   const id = ++loadId;
   S = null;
   history.replaceState(null, '', `?session=${session.session_key}`);
-  setStatus('Loading race data…');
+  setStatus('Loading session…');
   const k = `session_key=${session.session_key}`;
+  const isRace = session.session_type === 'Race'; // includes sprints
   try {
     const [drivers, laps, position, stints, intervals, raceControl, weather, pit] = await Promise.all([
       api(`drivers?${k}`), api(`laps?${k}`), api(`position?${k}`), api(`stints?${k}`),
-      api(`intervals?${k}`), api(`race_control?${k}`), api(`weather?${k}`), api(`pit?${k}`),
+      isRace ? api(`intervals?${k}`) : [], api(`race_control?${k}`), api(`weather?${k}`), api(`pit?${k}`),
     ]);
     if (id !== loadId) return;
 
@@ -94,8 +103,9 @@ async function loadRace(session) {
     const lap1 = laps.filter((l) => l.lap_number === 1 && l.date_start).map((l) => toMs(l.date_start));
     const lapEnd = (l) => toMs(l.date_start) + (l.lap_duration ?? 0) * 1000;
     const dated = laps.filter((l) => l.date_start);
-    const t0 = lap1.length ? Math.min(...lap1) : toMs(session.date_start);
-    const t1 = dated.length ? Math.max(...dated.map(lapEnd)) : toMs(session.date_end);
+    // Races run from lights-out to the last finisher; other sessions use their whole window.
+    const t0 = isRace && lap1.length ? Math.min(...lap1) : toMs(session.date_start);
+    const t1 = isRace && dated.length ? Math.max(...dated.map(lapEnd)) : Math.max(toMs(session.date_end), ...dated.map(lapEnd));
     const totalLaps = Math.max(0, ...laps.map((l) => l.lap_number));
 
     // Leader's start of each lap = earliest start of that lap number by anyone.
@@ -115,7 +125,11 @@ async function loadRace(session) {
       }])),
       laps: lapsBy,
       totalLaps,
-      chequer: finals.length ? Math.min(...finals) : t1,
+      isRace,
+      quali: session.session_type === 'Qualifying',
+      // Qualifying segment boundaries: every chequered flag but the last one.
+      bounds: isRace ? [] : rc.filter((r) => r.flag === 'CHEQUERED').map((r) => r.t).slice(0, -1),
+      chequer: isRace ? (finals.length ? Math.min(...finals) : t1) : -Infinity, // -Infinity: no OUT outside races
       lastEnd,
       pos: byDriver(position),
       ints: byDriver(intervals),
@@ -133,7 +147,10 @@ async function loadRace(session) {
       drs: null,
       selected: new Set(), // driver numbers picked for telemetry/charts
       car: new Map(), // `${driver}:${window}` -> car_data rows | 'loading'
+      traces: new Map(), // `${driver}:${lap}` -> lapTrace points | 'loading'
     };
+    ui.tabs.find((b) => b.dataset.tab === 'positions').hidden = !isRace;
+    if (!isRace && tab === 'positions') selectTab('telemetry');
     ui.scrub.max = Math.round((t1 - t0) / 1000);
     syncScrub();
     buildPicker();
@@ -318,8 +335,26 @@ function span(cls, text) {
 
 const flagOf = (r) => (r.category === 'SafetyCar' ? 'sc' : (r.flag ?? '').toLowerCase().replace(/\s+/g, '-'));
 
+const segment = () => S.bounds.filter((b) => b < S.t).length; // 0-based
+const segLabel = (k) => `${S.session.session_name.startsWith('Sprint') ? 'SQ' : 'Q'}${k + 1}`;
+
+// Non-race sessions: each driver's best lap in the latest segment they ran in.
+function sessionBests(ranked) {
+  const seg = segment(), edges = [-Infinity, ...S.bounds, Infinity];
+  const out = new Map();
+  for (const d of ranked) {
+    for (let k = seg; k >= 0; k--) {
+      const lap = bestLap(S.laps.get(d), S.t, edges[k], edges[k + 1]);
+      if (lap) { out.set(d, { lap, seg: k }); break; }
+    }
+  }
+  const fastest = Math.min(...[...out.values()].filter((b) => b.seg === seg).map((b) => b.lap.lap_duration));
+  return { out, seg, fastest };
+}
+
 function renderBoard() {
   const ranked = order();
+  const bests = S.isRace ? null : sessionBests(ranked);
   const rows = ranked.map((d, i) => {
     const car = S.drivers.get(d);
     const lap = driverLap(d);
@@ -340,15 +375,19 @@ function renderBoard() {
     if (stint) tyre.title = compound;
     li.append(
       span('pos', i + 1), team, span('code', car.code),
-      span('gap', out ? 'OUT' : i ? formatGap(iv?.gap_to_leader) : 'Leader'),
-      span('int', inPit ? 'PIT' : i && !out ? formatGap(iv?.interval) : ''),
+      ...(S.isRace ? [
+        span('gap', out ? 'OUT' : i ? formatGap(iv?.gap_to_leader) : 'Leader'),
+        span('int', inPit ? 'PIT' : i && !out ? formatGap(iv?.interval) : ''),
+      ] : sessionCells(bests, d, inPit)),
       tyre, span('age', stint ? tyreAge(stint, lap) : ''),
     );
     return li;
   });
   ui.board.replaceChildren(...rows);
 
-  ui.lap.textContent = `Lap ${Math.min(driverLap(ranked[0]), S.totalLaps || Infinity)} / ${S.totalLaps || '–'}`;
+  ui.lap.textContent = S.isRace
+    ? `Lap ${Math.min(driverLap(ranked[0]), S.totalLaps || Infinity)} / ${S.totalLaps || '–'}`
+    : S.quali ? segLabel(segment()) : S.session.session_name;
   ui.clock.textContent = formatClock(S.t - S.t0);
 
   const w = lastAt(S.weather, S.t);
@@ -363,11 +402,21 @@ function renderBoard() {
     ui.rc.replaceChildren(...S.rc.slice(Math.max(0, idx - 49), idx + 1).reverse().map((r) => {
       const item = document.createElement('li');
       item.dataset.flag = flagOf(r);
-      item.append(span('rc-time', r.t < S.t0 ? 'Pre-race' : formatClock(r.t - S.t0)), ` ${r.message ?? ''}`);
+      item.append(span('rc-time', r.t < S.t0 ? 'Pre-start' : formatClock(r.t - S.t0)), ` ${r.message ?? ''}`);
       return item;
     }));
   }
   if (S.playing) syncScrub();
+}
+
+// Best-lap cells: time in the driver's latest segment; delta to the fastest in the current
+// segment, or the segment label (e.g. Q1) when their time comes from an earlier one.
+function sessionCells({ out, seg, fastest }, d, inPit) {
+  const b = out.get(d);
+  if (!b) return [span('gap', ''), span('int', inPit ? 'PIT' : '')];
+  const dur = b.lap.lap_duration;
+  const delta = b.seg < seg ? (S.quali ? segLabel(b.seg) : '') : dur === fastest ? '' : `+${(dur - fastest).toFixed(3)}`;
+  return [span('gap', formatLap(dur, 3)), span('int', inPit ? 'PIT' : delta)];
 }
 
 // Scrubber position + its filled part (--fill drives the WebKit track gradient).
@@ -459,7 +508,8 @@ function seriesFor(ids, pointsOf) {
 
 // Line chart by lap: series [{ label, colour, dashed, dim, points: [{ x: lap, y }] }].
 // invert puts low y at the top (positions). Hover draws a crosshair and fills #tip.
-function lineChart(canvas, series, { invert = false, yDomain, yFmt = String } = {}) {
+// xFmt labels x; discrete (lap numbers) snaps hover to whole x, otherwise nearest point per series.
+function lineChart(canvas, series, { invert = false, yDomain, yFmt = String, xFmt = (x) => `Lap ${x}`, discrete = true } = {}) {
   const dpr = devicePixelRatio || 1, w = canvas.clientWidth, h = canvas.clientHeight;
   canvas.width = Math.round(w * dpr);
   canvas.height = Math.round(h * dpr);
@@ -468,7 +518,7 @@ function lineChart(canvas, series, { invert = false, yDomain, yFmt = String } = 
   c.font = `11px ${color('--font-data')}`;
   c.fillStyle = color('--text-dim');
   const pts = series.flatMap((s) => s.points);
-  if (!pts.length) { c.fillText('No finished laps yet.', 8, 16); ui.tip.hidden = true; return; }
+  if (!pts.length) { c.fillText('No finished laps yet.', 8, 16); return; }
 
   const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
   const x0 = Math.min(...xs), x1 = Math.max(...xs);
@@ -486,9 +536,9 @@ function lineChart(canvas, series, { invert = false, yDomain, yFmt = String } = 
     c.fillText(yFmt(v), 4, y);
   }
   c.textBaseline = 'top';
-  c.fillText(`Lap ${x0}`, L, h - B + 6);
+  c.fillText(xFmt(x0), L, h - B + 6);
   c.textAlign = 'right';
-  c.fillText(`Lap ${x1}`, w - R, h - B + 6);
+  c.fillText(xFmt(x1), w - R, h - B + 6);
   c.textAlign = 'left';
 
   c.save();
@@ -506,17 +556,20 @@ function lineChart(canvas, series, { invert = false, yDomain, yFmt = String } = 
   c.restore();
 
   const hv = hover.get(canvas);
-  const lap = hv && Math.round(x0 + ((hv.x - L) / (pw || 1)) * (x1 - x0));
-  if (!hv || lap < x0 || lap > x1) { ui.tip.hidden = true; return; }
+  if (!hv) return; // other charts may own the tooltip
+  const xv = x0 + ((hv.x - L) / (pw || 1)) * (x1 - x0);
+  const at = discrete ? Math.round(xv) : xv;
+  if (at < x0 || at > x1) { ui.tip.hidden = true; return; }
   c.strokeStyle = color('--text-dim');
   c.lineWidth = 1;
-  c.beginPath(); c.moveTo(sx(lap), T); c.lineTo(sx(lap), T + ph); c.stroke();
+  c.beginPath(); c.moveTo(sx(at), T); c.lineTo(sx(at), T + ph); c.stroke();
+  const nearest = (ps) => ps.reduce((m, p) => (!m || Math.abs(p.x - at) < Math.abs(m.x - at) ? p : m), null);
   const rows = series.filter((s) => !s.dim)
-    .map((s) => [s.label, s.points.find((p) => p.x === lap)])
+    .map((s) => [s.label, discrete ? s.points.find((p) => p.x === at) : nearest(s.points)])
     .filter(([, p]) => p)
     .sort((a, b) => a[1].y - b[1].y)
     .map(([label, p]) => `${label.padEnd(4)} ${yFmt(p.y)}`);
-  ui.tip.textContent = [`Lap ${lap}`, ...rows].join('\n');
+  ui.tip.textContent = [xFmt(discrete ? at : Math.round(at)), ...rows].join('\n');
   ui.tip.hidden = false;
   ui.tip.style.left = `${Math.min(hv.cx + 14, innerWidth - ui.tip.offsetWidth - 8)}px`;
   ui.tip.style.top = `${hv.cy + 14}px`;
@@ -529,15 +582,56 @@ function renderLaps() {
   const ys = series.flatMap((s) => s.points.map((p) => p.y)).sort((a, b) => a - b);
   // Clip pit and SC laps so racing laps aren't flattened.
   const yDomain = ys.length ? [ys[0], Math.min(ys.at(-1), ys[Math.floor(ys.length / 2)] * 1.12)] : undefined;
-  ui.lapsLegend.replaceChildren(...series.map((s) => {
+  renderLegend(ui.lapsLegend, series);
+  lineChart(ui.lapsChart, series, { yDomain, yFmt: formatLap });
+}
+
+function renderLegend(el, series, text = (s) => s.label) {
+  el.replaceChildren(...series.map((s) => {
     const item = span('', '');
     const line = document.createElement('i');
     line.className = s.dashed ? 'dashed' : '';
     line.style.borderColor = s.colour;
-    item.append(line, s.label);
+    item.append(line, text(s));
     return item;
   }));
-  lineChart(ui.lapsChart, series, { yDomain, yFmt: formatLap });
+}
+
+// Distance trace of a driver's fastest lap finished by the playhead; fetched once per lap.
+function fastestTrace(d) {
+  const lap = bestLap(S.laps.get(d), S.t);
+  if (!lap) return { lap, points: [] };
+  const key = `${d}:${lap.lap_number}`, hit = S.traces.get(key);
+  if (hit === undefined) {
+    S.traces.set(key, 'loading');
+    const id = loadId;
+    const win = `session_key=${S.session.session_key}&driver_number=${d}`
+      + `&date>${new Date(lap.t).toISOString()}&date<${new Date(lap.t + lap.lap_duration * 1000).toISOString()}`;
+    Promise.all([api(`location?${win}`), api(`car_data?${win}`)])
+      .then(([loc, car]) => id === loadId && S.traces.set(key, lapTrace(timed(loc.filter((r) => r.x || r.y)), timed(car))))
+      .catch(() => id === loadId && S.traces.set(key, [])); // cache the failure: no retry loop
+  }
+  return { lap, points: Array.isArray(hit) ? hit : [] };
+}
+
+// Port of the qualifying screen's telemetry: speed / throttle / brake / gear over lap distance.
+function renderFastest() {
+  const ids = S.selected.size ? [...S.selected] : order().slice(0, 2);
+  const traces = ids.map(fastestTrace);
+  const base = seriesFor(ids, () => []).map((s) => ({ ...s, dim: false }));
+  renderLegend(ui.fastLegend, base, (s) => {
+    const lap = traces[base.indexOf(s)].lap;
+    return lap ? `${s.label} ${formatLap(lap.lap_duration, 3)} (lap ${lap.lap_number})` : `${s.label} –`;
+  });
+  const chart = (canvas, key, opts) => lineChart(
+    canvas,
+    base.map((s, i) => ({ ...s, points: traces[i].points.map((p) => ({ x: p.x, y: p[key] })) })),
+    { xFmt: (x) => `${Math.round(x)}% of lap`, discrete: false, ...opts },
+  );
+  chart(ui.fastSpeed, 'speed', { yFmt: (v) => `${Math.round(v)}` });
+  chart(ui.fastThrottle, 'throttle', { yDomain: [0, 100], yFmt: (v) => `${Math.round(v)}%` });
+  chart(ui.fastBrake, 'brake', { yDomain: [0, 100], yFmt: (v) => `${Math.round(v)}%` });
+  chart(ui.fastGear, 'gear', { yDomain: [0, 8], yFmt: (v) => `G${Math.round(v)}` });
 }
 
 function renderPositions() {
@@ -587,22 +681,25 @@ function renderTyres() {
 
 function renderInsights() {
   if (!S) return;
-  ({ telemetry: renderTelemetry, laps: renderLaps, positions: renderPositions, sectors: renderSectors, tyres: renderTyres })[tab]();
+  ({
+    telemetry: renderTelemetry, laps: renderLaps, positions: renderPositions,
+    sectors: renderSectors, tyres: renderTyres, fastest: renderFastest,
+  })[tab]();
 }
 
-for (const b of ui.tabs) {
-  b.addEventListener('click', () => {
-    tab = b.dataset.tab;
-    for (const o of ui.tabs) {
-      o.setAttribute('aria-selected', String(o === b));
-      $(o.getAttribute('aria-controls')).hidden = o !== b;
-    }
-    ui.tip.hidden = true;
-    renderInsights();
-  });
+function selectTab(name) {
+  tab = name;
+  for (const o of ui.tabs) {
+    o.setAttribute('aria-selected', String(o.dataset.tab === name));
+    $(o.getAttribute('aria-controls')).hidden = o.dataset.tab !== name;
+  }
+  ui.tip.hidden = true;
+  renderInsights();
 }
 
-for (const cv of [ui.lapsChart, ui.posChart]) {
+for (const b of ui.tabs) b.addEventListener('click', () => selectTab(b.dataset.tab));
+
+for (const cv of document.querySelectorAll('canvas.chart')) {
   cv.addEventListener('pointermove', (e) => {
     hover.set(cv, { x: e.offsetX, cx: e.clientX, cy: e.clientY });
     renderInsights();

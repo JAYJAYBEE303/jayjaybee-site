@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   indexAt, lastAt, byDriver, sampleAt, lapOutline, formatGap, formatClock,
   timed, trackStatusTimeline, periods, cumulative, pointAhead, drsRuns, tyreAge,
-  lapsDone, sectorBests, stintBars, formatLap,
+  lapsDone, sectorBests, stintBars, formatLap, bestLap, lapTrace,
 } from './replay.js';
 
 const rows = [{ t: 0 }, { t: 10 }, { t: 20 }];
@@ -91,6 +91,27 @@ const st = [{ lap_start: 1, lap_end: 20, compound: 'MEDIUM' }, { lap_start: 21, 
 assert.deepEqual(stintBars(st, 10), [{ compound: 'MEDIUM', from: 1, to: 10 }], 'future stint hidden, current clipped');
 assert.deepEqual(stintBars(st, 30), [{ compound: 'MEDIUM', from: 1, to: 20 }, { compound: 'HARD', from: 21, to: 30 }]);
 
+// bestLap: fastest finished lap, optionally within a start window.
+const ql = [
+  { lap_number: 1, t: 0, lap_duration: 95 },
+  { lap_number: 2, t: 100e3, lap_duration: 88 },
+  { lap_number: 3, t: 500e3, lap_duration: 90 },
+];
+assert.equal(bestLap(ql, 999e3).lap_number, 2);
+assert.equal(bestLap(ql, 150e3).lap_number, 1, 'lap 2 not finished yet');
+assert.equal(bestLap(ql, 999e3, 400e3).lap_number, 3, 'window excludes earlier laps');
+assert.equal(bestLap(ql, 999e3, 0, 50e3).lap_number, 1);
+assert.equal(bestLap([], 999e3), undefined);
+
+// lapTrace: straight 20-unit lap over 2 s.
+const lt = lapTrace(
+  [{ t: 0, x: 0, y: 0 }, { t: 1, x: 10, y: 0 }, { t: 2, x: 20, y: 0 }],
+  [{ t: -1, speed: 1, n_gear: 1 }, { t: 0.5, speed: 2, throttle: 50, brake: 0, n_gear: 3 }, { t: 2, speed: 3, n_gear: 8 }],
+);
+assert.deepEqual(lt.map((p) => p.x), [0, 25, 100]);
+assert.deepEqual(lt[1], { x: 25, speed: 2, throttle: 50, brake: 0, gear: 3 });
+assert.deepEqual(lapTrace([{ t: 0, x: 0, y: 0 }], [{ t: 0 }]), [], 'needs two points');
+
 assert.equal(formatGap(null), '');
 assert.equal(formatGap(3.456), '+3.5');
 assert.equal(formatGap('+1 LAP'), '+1 LAP');
@@ -98,5 +119,7 @@ assert.equal(formatClock(3723e3), '1:02:03');
 assert.equal(formatLap(92.345), '1:32.3');
 assert.equal(formatLap(59.96), '1:00.0', 'rounding carries into the minute');
 assert.equal(formatLap(65.04), '1:05.0');
+assert.equal(formatLap(92.3456, 3), '1:32.346');
+assert.equal(formatLap(65.0004, 3), '1:05.000');
 
 console.log('replay.js ok');
