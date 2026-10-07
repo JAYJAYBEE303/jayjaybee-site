@@ -23,6 +23,7 @@
   --flag-yellow: #ffd84d;
   --flag-red: #ff5a5a;
   --flag-green: #3ddc84;
+  --purple: #b26bff; /* fastest-sector convention */
 
   --font-ui: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
   --font-data: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
@@ -35,8 +36,6 @@
 body {
   margin: 0;
   min-height: 100vh;
-  display: grid;
-  grid-template-rows: auto 1fr auto auto;
   background: var(--bg);
   color: var(--text);
   font: 0.9375rem/1.4 var(--font-ui);
@@ -71,7 +70,9 @@ button { cursor: pointer; min-width: 2.75rem; }
 .stage {
   display: grid;
   grid-template-columns: 1fr 20rem;
-  min-height: 0;
+  /* Map + controls fill the first screen; insights sit below the fold. */
+  height: calc(100svh - 7.5rem);
+  min-height: 26rem;
 }
 
 .track { position: relative; min-height: 22rem; }
@@ -122,6 +123,8 @@ button { cursor: pointer; min-width: 2.75rem; }
 .board .team { height: 0.9rem; border-radius: 1px; }
 .board .gap, .board .int, .board .age { color: var(--text-dim); text-align: right; }
 .board .int:not(:empty) { color: var(--text); }
+.board li { cursor: pointer; }
+.board li.selected { background: var(--track); }
 .board .out { opacity: 0.45; }
 
 .weather {
@@ -201,8 +204,84 @@ button { cursor: pointer; min-width: 2.75rem; }
 .credit { margin: 0; padding: 0 1rem 0.75rem; color: var(--text-dim); font-size: 0.75rem; }
 .credit a { color: var(--accent); }
 
+.insights { padding: 0.5rem 1rem 1rem; border-top: 1px solid var(--border); }
+
+.picker { margin: 0 0 0.75rem; padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); }
+.picker legend { color: var(--text-dim); padding: 0 0.3rem; }
+.picker-list { display: flex; flex-wrap: wrap; gap: 0.25rem 0.9rem; font-family: var(--font-data); font-size: 0.8125rem; }
+.picker-list label { display: flex; align-items: center; gap: 0.3rem; cursor: pointer; }
+.picker-list input { accent-color: var(--accent); }
+.swatch { display: inline-block; width: 0.25rem; height: 0.9rem; border-radius: 1px; }
+
+.tabs { display: flex; gap: 0.25rem; border-bottom: 1px solid var(--border); overflow-x: auto; }
+.tabs button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--text-dim); }
+.tabs [aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
+
+.panel { padding-top: 0.75rem; font-family: var(--font-data); font-variant-numeric: tabular-nums; font-size: 0.8125rem; }
+.telemetry:empty::after { content: 'Tick drivers above, or click them in the leaderboard.'; color: var(--text-dim); }
+
+.telemetry { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+.telemetry li {
+  display: grid;
+  grid-template-columns: 0.25rem 2.6rem 5rem 2rem minmax(4rem, 1fr) minmax(4rem, 1fr) 2.6rem;
+  align-items: center;
+  gap: 0.6rem;
+}
+.bar-track { height: 0.5rem; background: var(--track); border-radius: 1px; overflow: hidden; }
+.bar-fill { display: block; height: 100%; }
+.throttle .bar-fill { background: var(--flag-green); }
+.brake .bar-fill { background: var(--flag-red); }
+.drs-badge { text-align: center; border: 1px solid var(--border); border-radius: 2px; color: var(--text-dim); }
+.drs-badge.on { color: var(--bg); background: var(--drs); border-color: var(--drs); }
+
+.chart { display: block; width: 100%; height: 18rem; }
+.legend { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; margin-bottom: 0.5rem; color: var(--text-dim); }
+.legend span { display: flex; align-items: center; gap: 0.35rem; }
+.legend i { display: inline-block; width: 1.2rem; border-top: 2px solid; }
+.legend i.dashed { border-top-style: dashed; }
+
+.tip {
+  position: fixed;
+  z-index: 10;
+  pointer-events: none;
+  padding: 0.4rem 0.6rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font: 0.75rem/1.4 var(--font-data);
+  white-space: pre;
+}
+
+.sectors { border-collapse: collapse; width: 100%; max-width: 40rem; }
+.sectors th, .sectors td { padding: 0.2rem 0.6rem; text-align: right; border-bottom: 1px solid var(--border); }
+.sectors th { color: var(--text-dim); font-weight: 400; }
+.sectors th:nth-child(2), .sectors td:nth-child(2) { text-align: left; }
+.sectors .pb { color: var(--flag-green); }
+.sectors .ob { color: var(--purple); }
+
+.stints { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.3rem; }
+.stints li { display: grid; grid-template-columns: 2.6rem 1fr; align-items: center; gap: 0.6rem; }
+.stint-track { position: relative; height: 1rem; }
+.stint-track span {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 2px;
+  background: var(--text-dim);
+  color: var(--bg);
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  text-align: center;
+  overflow: hidden;
+}
+.stint-track .tyre-soft { background: var(--tyre-soft); }
+.stint-track .tyre-medium { background: var(--tyre-medium); }
+.stint-track .tyre-hard { background: var(--tyre-hard); }
+.stint-track .tyre-intermediate { background: var(--tyre-inter); }
+.stint-track .tyre-wet { background: var(--tyre-wet); }
+
 @media (max-width: 48rem) {
-  .stage { grid-template-columns: 1fr; }
+  .stage { grid-template-columns: 1fr; height: auto; }
   .track { min-height: 60vh; }
   .tower { border-left: 0; border-top: 1px solid var(--border); max-height: 50vh; }
 }

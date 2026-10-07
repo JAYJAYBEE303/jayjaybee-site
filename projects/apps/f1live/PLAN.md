@@ -29,7 +29,7 @@
 | # | Stage | Status |
 |---|-------|--------|
 | 1 | Race view parity | built + reviewed; awaiting user `node check.mjs` + preview check |
-| 2 | Driver telemetry + insights panels | planned |
+| 2 | Driver telemetry + insights panels | in progress |
 | 3 | Qualifying, sprint qualifying, practice replays | planned |
 | 4 | Championship overlays, settings, caching, map rotation | planned |
 | 5 | Optional: pre-2023 seasons via FastF1 export, tyre degradation model | planned |
@@ -50,7 +50,7 @@ Python reference: `src/interfaces/race_replay.py`, `src/ui_components.py`, `src/
 ### Stage 2 — Driver telemetry + insights panels
 
 - Click a leaderboard row (shift-click for several) to see live speed, gear, throttle, brake and DRS for those drivers (`car_data`, fetched per selected driver).
-- Insight panels, as tabs beside the map: lap time chart, sector times, tyre strategy timeline, track position chart, race-control history.
+- Insight panels, as tabs under the controls: lap time chart, sector times, tyre strategy timeline, track position chart. Race-control history is already covered by the Stage 1 feed.
 
 ### Stage 3 — Qualifying / sprint qualifying / practice
 
@@ -129,6 +129,37 @@ Rules:
 - `node check.mjs` prints `replay.js ok` (run by the user).
 - On the Vercel preview, a 2024 race with a safety car (e.g. 2024 Australia) shows DRS zones, an amber track and SC dot during the SC period, the event bar, weather, intervals, tyre ages and the race-control feed.
 - Pushed to `origin/foundational-feature-build`; the status table above is updated.
+
+## Stage 2 tasks
+
+Rule for every panel: only data up to the playhead `S.t` is shown (no spoilers). Laps count once they have finished.
+
+### Task 2.1: Pure helpers (`replay.js`, `check.mjs`)
+
+- [ ] `lapsDone(laps, t)`: rows (with `t` = lap start) whose `t + lap_duration*1000 <= t`. Laps without a duration are excluded.
+- [ ] `sectorBests(lapsByDriver, t) -> { overall: [s1,s2,s3], personal: Map<d, [s1,s2,s3]> }` over finished laps, using `duration_sector_1..3`.
+- [ ] `stintBars(stints, lap) -> [{ compound, from, to }]`, clipped to `lap`. Stints that start after `lap` are dropped; `lap_end` null means `lap`.
+- [ ] An assert for each in `check.mjs`.
+
+### Task 2.2: Driver selection + telemetry
+
+- [ ] `S.selected: Set<driver_number>`. A leaderboard click selects only that driver; shift-click toggles. A checkbox picker in the insights section shows the same set; it's built once per race so keyboard users keep focus.
+- [ ] Selected cars get a ring on the map.
+- [ ] Telemetry tab: for each selected driver, speed, gear, throttle bar, brake bar and DRS from `car_data`. Fetched per driver per 5-minute window and cached in `S.car`; a failed fetch caches `[]`, so it never retry-loops.
+
+### Task 2.3: Insight tabs
+
+- [ ] Tabs: Telemetry · Lap times · Positions · Sectors · Tyres (`role="tablist"`, arrow keys not required).
+- [ ] Lap times: line chart of finished laps for the selected drivers, or the top 3 when nothing is selected. The y-range is clipped to `[best, median × 1.12]` so pit and SC laps don't flatten it. The second teammate's line is dashed. HTML legend, plus a hover crosshair and tooltip.
+- [ ] Positions: bump chart of the position at each lap end for all drivers; unselected ones are dimmed when a selection exists. Same chart function with an inverted y.
+- [ ] Sectors: table of each driver's last finished lap S1–S3, purple for the overall best, green for a personal best.
+- [ ] Tyres: per-driver stint bars up to the current lap, coloured with the existing tyre tokens.
+- [ ] Insights render on the 250 ms board tick, active tab only.
+
+### Stage 2 done when
+
+- `node check.mjs` prints `replay.js ok` (run by the user).
+- On the preview: clicking a driver shows live telemetry and a map ring; lap and position charts grow as the race plays and show nothing ahead of the playhead; the sectors table shows purple and green; tyre bars match the leaderboard tyre.
 
 ## Review Focus
 

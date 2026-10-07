@@ -5,7 +5,9 @@ track map with DRS zones, track colour that follows SC, VSC and red flags,
 and a simulated safety car. A leaderboard shows gap, interval, tyre and age,
 plus PIT and OUT. There's also weather, the race-control feed, an event bar
 under the scrubber, and play/pause, scrubbing and 0.1×–256× speed. Press H
-for shortcuts. The staged roadmap to full parity is in `PLAN.md`.
+for shortcuts. Below the map, insight tabs show live telemetry for the
+drivers you pick, lap-time and position charts, sector times, and tyre
+stints, all limited to what has happened so far in the replay. The staged roadmap to full parity is in `PLAN.md`.
 
 It is a web port of the race view from
 [f1-race-replay](https://github.com/IAmTomShaw/f1-race-replay), a desktop

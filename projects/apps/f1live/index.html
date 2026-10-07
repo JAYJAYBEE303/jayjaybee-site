@@ -45,6 +45,40 @@
     <label class="toggle"><input id="drs" type="checkbox" checked> DRS</label>
     <button id="help-btn" type="button" aria-label="Keyboard shortcuts">?</button>
   </footer>
+  <section class="insights" aria-label="Insights">
+    <fieldset class="picker">
+      <legend>Drivers</legend>
+      <div id="picker" class="picker-list"></div>
+    </fieldset>
+    <div class="tabs" role="tablist" aria-label="Insight views">
+      <button type="button" role="tab" aria-selected="true" aria-controls="panel-telemetry" data-tab="telemetry">Telemetry</button>
+      <button type="button" role="tab" aria-selected="false" aria-controls="panel-laps" data-tab="laps">Lap times</button>
+      <button type="button" role="tab" aria-selected="false" aria-controls="panel-positions" data-tab="positions">Positions</button>
+      <button type="button" role="tab" aria-selected="false" aria-controls="panel-sectors" data-tab="sectors">Sectors</button>
+      <button type="button" role="tab" aria-selected="false" aria-controls="panel-tyres" data-tab="tyres">Tyres</button>
+    </div>
+    <div id="panel-telemetry" class="panel" role="tabpanel">
+      <ul id="telemetry" class="telemetry"></ul>
+    </div>
+    <div id="panel-laps" class="panel" role="tabpanel" hidden>
+      <div id="laps-legend" class="legend"></div>
+      <canvas id="laps-chart" class="chart" role="img" aria-label="Lap times by lap for the chosen drivers"></canvas>
+    </div>
+    <div id="panel-positions" class="panel" role="tabpanel" hidden>
+      <canvas id="positions-chart" class="chart" role="img" aria-label="Race position by lap for every driver"></canvas>
+    </div>
+    <div id="panel-sectors" class="panel" role="tabpanel" hidden>
+      <table class="sectors">
+        <thead><tr><th scope="col">Pos</th><th scope="col">Driver</th><th scope="col">Lap</th><th scope="col">S1</th><th scope="col">S2</th><th scope="col">S3</th><th scope="col">Time</th></tr></thead>
+        <tbody id="sectors"></tbody>
+      </table>
+    </div>
+    <div id="panel-tyres" class="panel" role="tabpanel" hidden>
+      <ol id="tyres" class="stints"></ol>
+    </div>
+  </section>
+  <div id="tip" class="tip" hidden></div>
+
   <p class="credit">
     Press H for shortcuts. Data from <a href="https://openf1.org">OpenF1</a>. Unofficial, not associated with Formula 1.
   </p>

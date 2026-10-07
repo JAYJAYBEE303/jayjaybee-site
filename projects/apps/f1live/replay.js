@@ -129,11 +129,43 @@ export function drsRuns(points, carData) {
   return runs.filter((r) => r.length > 1);
 }
 
-export const tyreAge = (stint, lap) => (stint.tyre_age_at_start ?? 0) + lap - stint.lap_start;
+// Laps finished by time t (rows carry t = lap start; lap_duration in s). Undurationed laps excluded.
+export const lapsDone = (laps, t) => (laps ?? []).filter((l) => l.lap_duration && l.t + l.lap_duration * 1000 <= t);
+
+// Fastest sector times over laps finished by t: overall [s1, s2, s3] and per driver.
+export function sectorBests(lapsByDriver, t) {
+  const overall = [Infinity, Infinity, Infinity];
+  const personal = new Map();
+  for (const [d, laps] of lapsByDriver) {
+    const best = [Infinity, Infinity, Infinity];
+    for (const l of lapsDone(laps, t)) {
+      [l.duration_sector_1, l.duration_sector_2, l.duration_sector_3].forEach((s, i) => {
+        if (s && s < best[i]) best[i] = s;
+      });
+    }
+    personal.set(d, best);
+    best.forEach((s, i) => { if (s < overall[i]) overall[i] = s; });
+  }
+  return { overall, personal };
+}
+
+// A driver's stints up to their current lap: [{ compound, from, to }].
+export const stintBars = (stints, lap) => (stints ?? [])
+  .filter((s) => s.lap_start <= lap)
+  .map((s) => ({ compound: s.compound ?? '', from: s.lap_start, to: Math.min(s.lap_end ?? lap, lap) }));
+
+export const tyreAge =(stint, lap) => (stint.tyre_age_at_start ?? 0) + lap - stint.lap_start;
 
 export function formatGap(gap) {
   if (gap == null || gap === 0) return '';
   return typeof gap === 'number' ? `+${gap.toFixed(1)}` : String(gap);
+}
+
+// Lap time in seconds -> "m:ss.s".
+export function formatLap(sec) {
+  const t = Math.round(sec * 10) / 10;
+  const m = Math.floor(t / 60);
+  return `${m}:${(t - m * 60).toFixed(1).padStart(4, '0')}`;
 }
 
 export function formatClock(ms) {

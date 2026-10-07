@@ -1,6 +1,7 @@
 import {
   toMs, byDriver, lastAt, indexAt, sampleAt, lapOutline, formatGap, formatClock,
   timed, trackStatusTimeline, periods, cumulative, pointAhead, drsRuns, tyreAge,
+  lapsDone, sectorBests, stintBars, formatLap,
 } from './replay.js';
 
 const API = 'https://api.openf1.org/v1/';
@@ -17,6 +18,9 @@ const ui = {
   lap: $('lap'), clock: $('clock'), board: $('board'), rc: $('rc'), weather: $('weather'),
   play: $('play'), scrub: $('scrub'), speed: $('speed'), labels: $('labels'), drs: $('drs'),
   events: $('events'), help: $('help'), helpBtn: $('help-btn'),
+  picker: $('picker'), telemetry: $('telemetry'), lapsChart: $('laps-chart'), lapsLegend: $('laps-legend'),
+  posChart: $('positions-chart'), sectors: $('sectors'), tyres: $('tyres'), tip: $('tip'),
+  tabs: [...document.querySelectorAll('[role="tab"]')],
 };
 const ctx = ui.map.getContext('2d');
 const css = getComputedStyle(document.documentElement);
@@ -127,9 +131,12 @@ async function loadRace(session) {
       cum: null,
       view: null,
       drs: null,
+      selected: new Set(), // driver numbers picked for telemetry/charts
+      car: new Map(), // `${driver}:${window}` -> car_data rows | 'loading'
     };
     ui.scrub.max = Math.round((t1 - t0) / 1000);
     ui.scrub.value = 0;
+    buildPicker();
     renderEvents();
     renderBoard();
     loadChunks(id);
@@ -139,7 +146,11 @@ async function loadRace(session) {
   }
 }
 
-const chunkIndex = (t) => Math.min(S.chunks.length - 1, Math.max(0, Math.floor((t - S.t0) / CHUNK)));
+// Date filter for fetch window i (padded so interpolation never gaps at a boundary).
+const windowQuery = (i) => `date>${new Date(S.t0 + i * CHUNK - PAD).toISOString()}`
+  + `&date<${new Date(S.t0 + (i + 1) * CHUNK + PAD).toISOString()}`;
+
+const chunkIndex = (t) =>Math.min(S.chunks.length - 1, Math.max(0, Math.floor((t - S.t0) / CHUNK)));
 
 // Fetch location windows, always preferring the one at (or just after) the playhead.
 async function loadChunks(id) {
@@ -148,11 +159,9 @@ async function loadChunks(id) {
     if (i < 0) i = S.chunks.findIndex((c) => !c);
     if (i < 0) return;
     S.chunks[i] = 'loading';
-    const from = new Date(S.t0 + i * CHUNK - PAD).toISOString();
-    const to = new Date(S.t0 + (i + 1) * CHUNK + PAD).toISOString();
     let rows;
     try {
-      rows = await api(`location?session_key=${S.session.session_key}&date>${from}&date<${to}`);
+      rows = await api(`location?session_key=${S.session.session_key}&${windowQuery(i)}`);
     } catch (err) {
       if (id === loadId) { S.chunks[i] = undefined; setStatus(`Couldn't load car positions (${err.message}).`); }
       return;
@@ -278,6 +287,13 @@ function draw() {
     ctx.strokeStyle = color('--bg');
     ctx.lineWidth = 1.5;
     ctx.stroke();
+    if (S.selected.has(d)) {
+      ctx.beginPath();
+      ctx.arc(x, y, 9.5, 0, Math.PI * 2);
+      ctx.strokeStyle = color('--text');
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
     if (ui.labels.checked) {
       ctx.fillStyle = color('--text');
       ctx.fillText(car.code, x + 9, y);
@@ -315,7 +331,9 @@ function renderBoard() {
     const iv = lastAt(S.ints.get(d), S.t);
 
     const li = document.createElement('li');
-    if (out) li.className = 'out';
+    li.dataset.driver = d;
+    li.classList.toggle('out', out);
+    li.classList.toggle('selected', S.selected.has(d));
     const team = span('team', '');
     team.style.background = car.colour;
     const tyre = span(`tyre tyre-${compound.toLowerCase() || 'unknown'}`, compound[0] ?? '–');
@@ -357,6 +375,258 @@ function setStatus(text) {
   ui.status.hidden = !text;
 }
 
+// ---- Insights ---------------------------------------------------------------
+// Every panel shows only what has happened by the playhead S.t.
+let tab = 'telemetry';
+const hover = new Map(); // chart canvas -> pointer { x, cx, cy } while over it
+
+function buildPicker() {
+  ui.picker.replaceChildren(...order().map((d) => {
+    const car = S.drivers.get(d);
+    const label = document.createElement('label');
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.value = d;
+    const sw = span('swatch', '');
+    sw.style.background = car.colour;
+    label.append(box, sw, car.code);
+    return label;
+  }));
+}
+
+function syncPicker() {
+  for (const box of ui.picker.querySelectorAll('input')) box.checked = S.selected.has(Number(box.value));
+}
+
+// car_data sample at the playhead; fetched per driver per window on first ask.
+function carData(d) {
+  const i = chunkIndex(S.t), key = `${d}:${i}`;
+  const rows = S.car.get(key);
+  if (rows === undefined) {
+    S.car.set(key, 'loading');
+    const id = loadId;
+    api(`car_data?session_key=${S.session.session_key}&driver_number=${d}&${windowQuery(i)}`)
+      .then((r) => id === loadId && S.car.set(key, timed(r)))
+      .catch(() => id === loadId && S.car.set(key, [])); // cache the failure: no retry loop
+    return null;
+  }
+  return Array.isArray(rows) ? lastAt(rows, S.t) : null;
+}
+
+function meter(cls, value) {
+  const pct = Math.min(100, Math.max(0, value ?? 0));
+  const track = span(`bar-track ${cls}`, '');
+  const fill = span('bar-fill', '');
+  fill.style.width = `${pct}%`;
+  track.title = `${cls} ${Math.round(pct)}%`;
+  track.append(fill);
+  return track;
+}
+
+function renderTelemetry() {
+  ui.telemetry.replaceChildren(...[...S.selected].map((d) => {
+    const car = S.drivers.get(d), c = carData(d);
+    const li = document.createElement('li');
+    const sw = span('swatch', '');
+    sw.style.background = car.colour;
+    li.append(
+      sw, span('code', car.code),
+      span('speed', c ? `${c.speed} km/h` : '…'), span('gear', c ? `G${c.n_gear}` : ''),
+      meter('throttle', c?.throttle), meter('brake', c?.brake),
+      span(`drs-badge${(c?.drs ?? 0) >= 10 ? ' on' : ''}`, 'DRS'),
+    );
+    return li;
+  }));
+}
+
+// Series for drivers; a teammate (same team colour as an earlier series) gets a dashed line.
+function seriesFor(ids, pointsOf) {
+  const seen = new Set();
+  return ids.map((d) => {
+    const car = S.drivers.get(d);
+    const dashed = seen.has(car.colour);
+    seen.add(car.colour);
+    return { label: car.code, colour: car.colour, dashed, dim: S.selected.size > 0 && !S.selected.has(d), points: pointsOf(d) };
+  });
+}
+
+// Line chart by lap: series [{ label, colour, dashed, dim, points: [{ x: lap, y }] }].
+// invert puts low y at the top (positions). Hover draws a crosshair and fills #tip.
+function lineChart(canvas, series, { invert = false, yDomain, yFmt = String } = {}) {
+  const dpr = devicePixelRatio || 1, w = canvas.clientWidth, h = canvas.clientHeight;
+  canvas.width = Math.round(w * dpr);
+  canvas.height = Math.round(h * dpr);
+  const c = canvas.getContext('2d');
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  c.font = `11px ${color('--font-data')}`;
+  c.fillStyle = color('--text-dim');
+  const pts = series.flatMap((s) => s.points);
+  if (!pts.length) { c.fillText('No finished laps yet.', 8, 16); ui.tip.hidden = true; return; }
+
+  const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs);
+  const [y0, y1] = yDomain ?? [Math.min(...ys), Math.max(...ys)];
+  const L = 52, R = 12, T = 10, B = 22, pw = w - L - R, ph = h - T - B;
+  const sx = (x) => L + ((x - x0) / (x1 - x0 || 1)) * pw;
+  const sy = (y) => T + ((invert ? y - y0 : y1 - y) / (y1 - y0 || 1)) * ph;
+
+  c.strokeStyle = color('--border');
+  c.lineWidth = 1;
+  c.textBaseline = 'middle';
+  for (let k = 0; k <= 4; k++) {
+    const v = y0 + ((y1 - y0) * k) / 4, y = sy(v);
+    c.beginPath(); c.moveTo(L, y); c.lineTo(w - R, y); c.stroke();
+    c.fillText(yFmt(v), 4, y);
+  }
+  c.textBaseline = 'top';
+  c.fillText(`Lap ${x0}`, L, h - B + 6);
+  c.textAlign = 'right';
+  c.fillText(`Lap ${x1}`, w - R, h - B + 6);
+  c.textAlign = 'left';
+
+  c.save();
+  c.beginPath(); c.rect(L, T, pw, ph); c.clip();
+  c.lineWidth = 2;
+  c.lineJoin = 'round';
+  for (const s of [...series].sort((a, b) => b.dim - a.dim)) { // dimmed lines underneath
+    c.globalAlpha = s.dim ? 0.2 : 1;
+    c.setLineDash(s.dashed ? [5, 4] : []);
+    c.strokeStyle = s.colour;
+    c.beginPath();
+    s.points.forEach((p, i) => (i ? c.lineTo : c.moveTo).call(c, sx(p.x), sy(p.y)));
+    c.stroke();
+  }
+  c.restore();
+
+  const hv = hover.get(canvas);
+  const lap = hv && Math.round(x0 + ((hv.x - L) / (pw || 1)) * (x1 - x0));
+  if (!hv || lap < x0 || lap > x1) { ui.tip.hidden = true; return; }
+  c.strokeStyle = color('--text-dim');
+  c.lineWidth = 1;
+  c.beginPath(); c.moveTo(sx(lap), T); c.lineTo(sx(lap), T + ph); c.stroke();
+  const rows = series.filter((s) => !s.dim)
+    .map((s) => [s.label, s.points.find((p) => p.x === lap)])
+    .filter(([, p]) => p)
+    .sort((a, b) => a[1].y - b[1].y)
+    .map(([label, p]) => `${label.padEnd(4)} ${yFmt(p.y)}`);
+  ui.tip.textContent = [`Lap ${lap}`, ...rows].join('\n');
+  ui.tip.hidden = false;
+  ui.tip.style.left = `${Math.min(hv.cx + 14, innerWidth - ui.tip.offsetWidth - 8)}px`;
+  ui.tip.style.top = `${hv.cy + 14}px`;
+}
+
+function renderLaps() {
+  const ids = S.selected.size ? [...S.selected] : order().slice(0, 3);
+  const series = seriesFor(ids, (d) => lapsDone(S.laps.get(d), S.t).map((l) => ({ x: l.lap_number, y: l.lap_duration })))
+    .map((s) => ({ ...s, dim: false }));
+  const ys = series.flatMap((s) => s.points.map((p) => p.y)).sort((a, b) => a - b);
+  // Clip pit and SC laps so racing laps aren't flattened.
+  const yDomain = ys.length ? [ys[0], Math.min(ys.at(-1), ys[Math.floor(ys.length / 2)] * 1.12)] : undefined;
+  ui.lapsLegend.replaceChildren(...series.map((s) => {
+    const item = span('', '');
+    const line = document.createElement('i');
+    line.className = s.dashed ? 'dashed' : '';
+    line.style.borderColor = s.colour;
+    item.append(line, s.label);
+    return item;
+  }));
+  lineChart(ui.lapsChart, series, { yDomain, yFmt: formatLap });
+}
+
+function renderPositions() {
+  const series = seriesFor(order(), (d) => lapsDone(S.laps.get(d), S.t)
+    .map((l) => ({ x: l.lap_number, y: lastAt(S.pos.get(d), l.t + l.lap_duration * 1000)?.position }))
+    .filter((p) => p.y));
+  lineChart(ui.posChart, series, { invert: true, yDomain: [1, S.drivers.size], yFmt: (v) => `P${Math.round(v)}` });
+}
+
+function renderSectors() {
+  const { overall, personal } = sectorBests(S.laps, S.t);
+  const cell = (text, cls = '') => {
+    const td = document.createElement('td');
+    td.textContent = text;
+    td.className = cls;
+    return td;
+  };
+  ui.sectors.replaceChildren(...order().map((d, i) => {
+    const last = lapsDone(S.laps.get(d), S.t).at(-1);
+    const secs = [last?.duration_sector_1, last?.duration_sector_2, last?.duration_sector_3];
+    const tr = document.createElement('tr');
+    tr.append(
+      cell(i + 1), cell(S.drivers.get(d).code), cell(last?.lap_number ?? ''),
+      ...secs.map((s, k) => cell(s ? s.toFixed(3) : '', !s ? '' : s <= overall[k] ? 'ob' : s <= personal.get(d)[k] ? 'pb' : '')),
+      cell(last ? formatLap(last.lap_duration) : ''),
+    );
+    return tr;
+  }));
+}
+
+function renderTyres() {
+  const total = S.totalLaps || 1;
+  ui.tyres.replaceChildren(...order().map((d) => {
+    const track = span('stint-track', '');
+    for (const b of stintBars(S.stints.get(d), driverLap(d))) {
+      const seg = span(`tyre-${b.compound.toLowerCase() || 'unknown'}`, b.compound[0] ?? '');
+      seg.style.left = `${((b.from - 1) / total) * 100}%`;
+      seg.style.width = `${((b.to - b.from + 1) / total) * 100}%`;
+      seg.title = `${b.compound || 'Unknown'} · laps ${b.from}–${b.to}`;
+      track.append(seg);
+    }
+    const li = document.createElement('li');
+    li.append(span('code', S.drivers.get(d).code), track);
+    return li;
+  }));
+}
+
+function renderInsights() {
+  if (!S) return;
+  ({ telemetry: renderTelemetry, laps: renderLaps, positions: renderPositions, sectors: renderSectors, tyres: renderTyres })[tab]();
+}
+
+for (const b of ui.tabs) {
+  b.addEventListener('click', () => {
+    tab = b.dataset.tab;
+    for (const o of ui.tabs) {
+      o.setAttribute('aria-selected', String(o === b));
+      $(o.getAttribute('aria-controls')).hidden = o !== b;
+    }
+    ui.tip.hidden = true;
+    renderInsights();
+  });
+}
+
+for (const cv of [ui.lapsChart, ui.posChart]) {
+  cv.addEventListener('pointermove', (e) => {
+    hover.set(cv, { x: e.offsetX, cx: e.clientX, cy: e.clientY });
+    renderInsights();
+  });
+  cv.addEventListener('pointerleave', () => { hover.delete(cv); ui.tip.hidden = true; });
+}
+
+ui.picker.addEventListener('change', (e) => {
+  if (!S) return;
+  const d = Number(e.target.value);
+  if (e.target.checked) S.selected.add(d); else S.selected.delete(d);
+  renderBoard();
+  renderInsights();
+});
+
+// Leaderboard rows rebuild every 250 ms, so use pointerdown (a click can straddle a rebuild).
+// Click = just this driver (again = clear); shift-click = add/remove.
+ui.board.addEventListener('pointerdown', (e) => {
+  const li = e.target.closest('li[data-driver]');
+  if (!li || !S) return;
+  const d = Number(li.dataset.driver);
+  if (e.shiftKey) {
+    if (S.selected.has(d)) S.selected.delete(d); else S.selected.add(d);
+  } else {
+    S.selected = new Set(S.selected.size === 1 && S.selected.has(d) ? [] : [d]);
+  }
+  syncPicker();
+  renderBoard();
+  renderInsights();
+});
+
 // ---- Loop -------------------------------------------------------------------
 let last = performance.now(), lastBoard = 0;
 function frame(now) {
@@ -367,7 +637,7 @@ function frame(now) {
     if (!S.outline) setStatus('Loading track…');
     else if (!ready) setStatus('Buffering car positions…');
     else setStatus('');
-    if (now - lastBoard > 250) { renderBoard(); lastBoard = now; }
+    if (now - lastBoard > 250) { renderBoard(); renderInsights(); lastBoard = now; }
   }
   last = now;
   draw();
@@ -412,6 +682,7 @@ ui.helpBtn.addEventListener('click', toggleHelp);
 
 document.addEventListener('keydown', (e) => {
   if (e.target.closest('input, select, textarea') || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.target.closest('button') && (e.key === ' ' || e.key === 'Enter')) return; // let the button act
   if (e.key.toLowerCase() === 'h') { e.preventDefault(); toggleHelp(); return; }
   if (!S || ui.help.open) return;
   const speedIdx = SPEEDS.indexOf(Number(ui.speed.value));

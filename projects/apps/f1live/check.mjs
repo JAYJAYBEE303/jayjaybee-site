@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   indexAt, lastAt, byDriver, sampleAt, lapOutline, formatGap, formatClock,
   timed, trackStatusTimeline, periods, cumulative, pointAhead, drsRuns, tyreAge,
+  lapsDone, sectorBests, stintBars, formatLap,
 } from './replay.js';
 
 const rows = [{ t: 0 }, { t: 10 }, { t: 20 }];
@@ -71,9 +72,31 @@ assert.equal(tyreAge({ lap_start: 10, tyre_age_at_start: 3 }, 15), 8);
 assert.equal(tyreAge({ lap_start: 1 }, 1), 0);
 assert.deepEqual(timed([{ date: 'x' }, { date: iso(5) }, { date: iso(1) }]).map((r) => r.t), [Date.parse(iso(1)), Date.parse(iso(5))]);
 
+// lapsDone: lap 2 (starts 90 s, 90 s long) only counts from 180 s.
+const dl = [
+  { lap_number: 1, t: 0, lap_duration: 90, duration_sector_1: 30, duration_sector_2: 31, duration_sector_3: 29 },
+  { lap_number: 2, t: 90e3, lap_duration: 90, duration_sector_1: 28, duration_sector_2: null, duration_sector_3: 30 },
+  { lap_number: 3, t: 180e3, lap_duration: null },
+];
+assert.deepEqual(lapsDone(dl, 179e3).map((l) => l.lap_number), [1]);
+assert.deepEqual(lapsDone(dl, 999e3).map((l) => l.lap_number), [1, 2], 'no duration = not finished');
+assert.deepEqual(lapsDone(undefined, 5), []);
+
+const sb = sectorBests(new Map([[1, dl], [2, [{ t: 0, lap_duration: 95, duration_sector_1: 29, duration_sector_2: 33, duration_sector_3: 33 }]]]), 999e3);
+assert.deepEqual(sb.personal.get(1), [28, 31, 29], 'null sector ignored');
+assert.deepEqual(sb.overall, [28, 31, 29]);
+assert.deepEqual(sectorBests(new Map([[1, dl]]), 0).overall, [Infinity, Infinity, Infinity]);
+
+const st = [{ lap_start: 1, lap_end: 20, compound: 'MEDIUM' }, { lap_start: 21, lap_end: null, compound: 'HARD' }];
+assert.deepEqual(stintBars(st, 10), [{ compound: 'MEDIUM', from: 1, to: 10 }], 'future stint hidden, current clipped');
+assert.deepEqual(stintBars(st, 30), [{ compound: 'MEDIUM', from: 1, to: 20 }, { compound: 'HARD', from: 21, to: 30 }]);
+
 assert.equal(formatGap(null), '');
 assert.equal(formatGap(3.456), '+3.5');
 assert.equal(formatGap('+1 LAP'), '+1 LAP');
 assert.equal(formatClock(3723e3), '1:02:03');
+assert.equal(formatLap(92.345), '1:32.3');
+assert.equal(formatLap(59.96), '1:00.0', 'rounding carries into the minute');
+assert.equal(formatLap(65.04), '1:05.0');
 
 console.log('replay.js ok');
