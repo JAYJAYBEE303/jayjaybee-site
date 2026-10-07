@@ -1,8 +1,11 @@
 // Self-check for the design adapter: `npm test` (node strips the types; no test framework).
 import assert from 'node:assert/strict';
-import { buildRace } from './src/race.ts';
+import { readFileSync } from 'node:fs';
+import { buildRace, SPEEDS } from './src/race.ts';
 import { toSnapshot } from './src/toSnapshot.ts';
-import type { SourceUi } from './src/snapshot.ts';
+import { createMockController } from './src/mock/controller.ts';
+import { mockCharts, SCENARIOS, T1 } from './src/mock/data.ts';
+import type { SourceUi, Snapshot } from './src/snapshot.ts';
 import { raceSession, lap, raceData, at, ms } from './test/race-fixture.ts';
 
 const ui = (extra: Partial<SourceUi> = {}): SourceUi => ({
@@ -147,3 +150,87 @@ assert.deepEqual([p.practice, p.quali, p.finished, p.banner, p.segment], [true, 
 assert.equal(p.standNote, 'Standings are shown for races and sprints — pick one of those.');
 
 console.log('adapter ok');
+
+// ---- mock source: parity with the design-6e reference (golden generated once from the local reference) ----
+const golden = JSON.parse(readFileSync(new URL('./test/golden-design6e.json', import.meta.url), 'utf8')) as Record<string, { snap: Record<string, unknown>; vm: unknown }>;
+const labels = (o: { label: string }[]) => o.map((x) => x.label);
+const mockRun = (scenario: string, selected: number[] = [4]) => {
+  let last: Snapshot | undefined;
+  const c = createMockController({ selected, onTick: (s) => { last = s; } });
+  c.setScenario(scenario);
+  return { c, snap: () => last as Snapshot };
+};
+assert.equal(SCENARIOS.length, 10);
+for (const name of SCENARIOS) {
+  const s = mockRun(name).snap();
+  const got = { ...s, years: labels(s.years), sessions: labels(s.sessions) } as Record<string, unknown>;
+  const want = golden[name].snap;
+  for (const k of Object.keys(want)) assert.deepEqual(JSON.parse(JSON.stringify(got[k])), want[k], `${name}.${k}`);
+}
+{
+  const s = mockRun('live').snap();
+  assert.deepEqual([s.sourceLabel, s.practice, s.buffering, s.mapNote, s.fastestText], ['Mock data', false, false, '', []]);
+  assert.equal(mockRun('loading').snap().mapNote, 'Loading timing data…');
+  assert.equal(s.reduced, false); // node: no matchMedia
+}
+
+// ticking
+{
+  const { c } = mockRun('live');
+  const t0 = c.state.t;
+  c.tick(1);
+  assert.equal(c.state.t, t0 + SPEEDS[c.state.speedIdx]);
+  c.actions.setSpeed(4);
+  c.tick(1);
+  assert.equal(c.state.t, t0 + SPEEDS[3] + SPEEDS[4]);
+  c.actions.scrub(T1 - 1);
+  c.tick(5);
+  assert.deepEqual([c.state.t, c.state.playing], [T1, false]);
+}
+for (const frozen of ['red-flag', 'feed-dropped', 'loading', 'no-session']) {
+  const { c } = mockRun(frozen);
+  const t0 = c.state.t;
+  c.tick(1);
+  assert.equal(c.state.t, t0, frozen);
+}
+
+// actions: selection semantics, tabs, standings, charts
+{
+  const { c, snap } = mockRun('live', [4, 81]);
+  c.actions.select(1, false);
+  assert.deepEqual([...c.state.selected], [1]);
+  c.actions.select(44, true);
+  c.actions.toggleDriver(1);
+  c.actions.toggleDriver(44);
+  c.actions.toggleDriver(44);
+  assert.deepEqual([...c.state.selected], [44]);
+  c.actions.setTab('laps');
+  assert.equal(snap().tabs.find((t) => t.selected)?.id, 'laps');
+  assert.ok(snap().charts.laps.length === 1 && snap().charts.lapsY !== null);
+  c.actions.setTab('positions');
+  assert.deepEqual([snap().charts.positions.length, snap().charts.posMax, snap().charts.positions.filter((x) => !x.dim).length], [20, 20, 1]);
+  c.actions.setTab('fastest');
+  assert.deepEqual(Object.values(snap().charts.fastest).map((x) => x[0].points.length), [101, 101, 101, 101]);
+  c.actions.showStandings('teams');
+  assert.equal(snap().standKind, 'teams');
+  assert.equal(mockCharts({ ...c.state, loading: true }).fastest.speed.length, 0);
+}
+
+// fake load keeps the reference 900 ms delay; dispose cancels it
+{
+  let calls = 0;
+  const probe = createMockController({ selected: [4], onTick: () => { calls++; } });
+  probe.setScenario('live');
+  probe.actions.setSession('Italian GP · Qualifying');
+  assert.equal(probe.state.loading, true);
+  probe.dispose();
+  const before = calls;
+  await new Promise((r) => setTimeout(r, 1000));
+  assert.deepEqual([calls, probe.state.loading], [before, true]);
+  const { c, snap } = mockRun('live');
+  c.actions.setSession('Italian GP · Qualifying');
+  await new Promise((r) => setTimeout(r, 1000));
+  assert.deepEqual([snap().loading, snap().quali], [false, true]);
+}
+
+console.log('mock ok');
