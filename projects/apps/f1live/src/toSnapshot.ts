@@ -62,7 +62,7 @@ function scDeployLap(R: Race, start: number) {
 const pct = (v: number | undefined) => Math.min(100, Math.max(0, v ?? 0)); // OpenF1 throttle can read 104
 const fmtSector = (s: number) => (s < 60 ? s.toFixed(3) : formatLap(s, 3));
 
-function sectorCells(R: Race, d: number, lap: Lap | undefined, bests: ReturnType<typeof sectorBests>, missing: string): Sectors3 {
+function sectorCells(d: number, lap: Lap | undefined, bests: ReturnType<typeof sectorBests>, missing: string): Sectors3 {
   const cell = (s: number | null | undefined, k: number): SectorCell => {
     if (!s) return { v: missing, c: 'none' };
     const c: SectorClass = s <= bests.overall[k] ? 'purple' : s <= (bests.personal.get(d)?.[k] ?? Infinity) ? 'green' : 'yellow';
@@ -200,7 +200,7 @@ export function toSnapshot(R: Race | null, ui: SourceUi): Snapshot {
       d: b.d, idx, pos: idx + 1, code: b.code, name: fullName(car), first: car.first, last: car.last, team: car.team,
       colour: b.colour, gap: b.gap, int: b.int, compound: b.compound, tyre: tyreLetter(b.compound), age: b.age === '' ? '' : String(b.age),
       out: b.out, pit: b.pit, selected: b.selected, fastest: b.d === fastest, changed: justMoved(R, b.d),
-      lastLap: last ? formatLap(last.lap_duration, 3) : '', sectors: sectorCells(R, b.d, last, bests, ''),
+      lastLap: last ? formatLap(last.lap_duration, 3) : '', sectors: sectorCells(b.d, last, bests, ''),
     };
   });
   const rank = new Map(ui.pickOrder.map((d, i) => [d, i]));
@@ -219,7 +219,7 @@ export function toSnapshot(R: Race | null, ui: SourceUi): Snapshot {
     const car = R.drivers.get(d)!, last = lapsDone(R.laps.get(d), R.t).at(-1);
     return {
       d, pos: i + 1, code: car.code, colour: car.colour, lap: last ? String(last.lap_number) : '–',
-      s: sectorCells(R, d, last, bests, '–'), time: last ? formatLap(last.lap_duration, 3) : '–',
+      s: sectorCells(d, last, bests, '–'), time: last ? formatLap(last.lap_duration, 3) : '–',
     };
   });
 
