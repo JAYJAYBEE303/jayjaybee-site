@@ -40,6 +40,20 @@ const fin = toSnapshot(R, ui());
 assert.deepEqual(fin.banner, { kind: 'chequered', title: 'Chequered flag', detail: 'VER wins' });
 assert.equal(fin.finished, true);
 
+// red flag and virtual safety car (copy is binding)
+const withRc = (row: { date: string; category: string; flag?: string; scope?: string; message: string }) => {
+  const r = buildRace(raceSession, { ...raceData, raceControl: [...raceData.raceControl, row] }, '#dim', 1);
+  r.t = ms(250);
+  return toSnapshot(r, ui());
+};
+const red = withRc({ date: at(200), category: 'Flag', flag: 'RED', scope: 'Track', message: 'RED FLAG' });
+assert.deepEqual([red.status, red.statusLabel], ['red', 'Red flag']);
+assert.deepEqual(red.banner, { kind: 'red', title: 'Red flag', detail: 'Session suspended · cars to the pit lane' });
+assert.deepEqual(red.events.map((e) => e.kind), ['sc', 'red']);
+const vsc = withRc({ date: at(200), category: 'SafetyCar', message: 'VIRTUAL SAFETY CAR DEPLOYED' });
+assert.deepEqual([vsc.status, vsc.statusLabel], ['vsc', 'Virtual safety car']);
+assert.deepEqual(vsc.banner, { kind: 'vsc', title: 'Virtual safety car', detail: 'Hold delta · DRS disabled' });
+
 // no race / load failed
 const none = toSnapshot(null, ui());
 assert.equal(none.loading, true);

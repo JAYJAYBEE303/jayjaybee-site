@@ -1,12 +1,12 @@
 // Pure adapter: the real race model (+ the UI state it doesn't hold) -> the view contract in snapshot.ts.
 // Reads R, never writes it; every derivation reuses race.ts / replay.ts / loaders.ts.
 import {
-  formatClock, formatLap, indexAt, lapsDone, lastAt, liveStandings, sectorBests, stintBars, tyreAge, tyreWear,
+  formatClock, formatLap, indexAt, lapsDone, lastAt, sectorBests, stintBars, tyreAge, tyreWear,
 } from './replay.ts';
 import type { Lap } from './replay.ts';
 import {
-  RACE_PTS, SPEEDS, SPRINT_PTS, boardRows, chunkReady, driverLap, lapsYDomain, order, rcItems, segLabel, segment,
-  seriesFor, standingsNote, stintOf,
+  SPEEDS, boardRows, chunkReady, driverLap, lapsYDomain, order, rcItems, segLabel, segment,
+  seriesFor, standingsNote, standingsRows, stintOf,
 } from './race.ts';
 import type { Race, Series } from './race.ts';
 import { carSample, fastestTrace } from './loaders.ts';
@@ -95,28 +95,13 @@ function eventBands(R: Race): EventBand[] {
 
 function standingRows(R: Race, ui: SourceUi): StandingRow[] {
   if (!R.isRace || !R.standings) return [];
-  const pts = R.session.session_name === 'Sprint' ? SPRINT_PTS : RACE_PTS;
-  const byDrv = new Map(order(R).map((d, i) => [d, pts[i] ?? 0]));
   const colourOf = new Map<string, string>();
-  let ranked;
-  if (ui.standKind === 'drivers') {
-    const rows = R.standings.drivers.map((r) => {
-      const car = R.drivers.get(r.driver_number);
-      const label = car ? fullName(car) : `#${r.driver_number}`;
-      colourOf.set(label, car?.colour ?? 'transparent');
-      return { key: r.driver_number, label, start: r.points_start ?? 0 };
-    });
-    ranked = liveStandings(rows, byDrv);
-  } else {
-    const gained = new Map<string | null | undefined, number>();
-    for (const [d, p] of byDrv) { const t = R.drivers.get(d)?.team; gained.set(t, (gained.get(t) ?? 0) + p); }
-    const rows = R.standings.teams.map((r) => {
-      const label = r.team_name ?? '–';
-      colourOf.set(label, [...R.drivers.values()].find((c) => c.team === r.team_name)?.colour ?? 'transparent');
-      return { key: r.team_name, label, start: r.points_start ?? 0 };
-    });
-    ranked = liveStandings(rows, gained);
-  }
+  const ranked = standingsRows(R, ui.standKind, (key, dflt) => {
+    const car = typeof key === 'number' ? R.drivers.get(key) : [...R.drivers.values()].find((c) => c.team === key);
+    const label = typeof key === 'number' && car ? fullName(car) : dflt;
+    colourOf.set(label, car?.colour ?? 'transparent');
+    return label;
+  });
   return ranked.map((r, k) => ({ ...r, colour: colourOf.get(r.label) ?? 'transparent', pos: k + 1, gainLabel: r.gain ? `+${r.gain}` : '' }));
 }
 

@@ -251,19 +251,21 @@ export function rcItems(R: Race) {
 }
 
 // Championship before this session plus points for the running order at the playhead.
-export function standingsRows(R: Race, kind: Kind) {
+// `label` overrides a row's text: it gets the row key (driver number / team name) and the default label.
+export function standingsRows(R: Race, kind: Kind, label: (key: number | string | null | undefined, dflt: string) => string = (_, l) => l) {
   const { drivers, teams } = R.standings ?? { drivers: [], teams: [] };
   const pts = R.session.session_name === 'Sprint' ? SPRINT_PTS : RACE_PTS;
   const byDrv = new Map(order(R).map((d, i) => [d, pts[i] ?? 0]));
   if (kind === 'drivers') {
     const rows = drivers.map((r) => ({
-      key: r.driver_number, label: R.drivers.get(r.driver_number)?.code ?? `#${r.driver_number}`, start: r.points_start ?? 0,
+      key: r.driver_number, label: label(r.driver_number, R.drivers.get(r.driver_number)?.code ?? `#${r.driver_number}`),
+      start: r.points_start ?? 0,
     }));
     return liveStandings(rows, byDrv);
   }
   const gained = new Map<string | null | undefined, number>();
   for (const [d, p] of byDrv) { const t = R.drivers.get(d)?.team; gained.set(t, (gained.get(t) ?? 0) + p); }
-  const rows = teams.map((r) => ({ key: r.team_name, label: r.team_name ?? '–', start: r.points_start ?? 0 }));
+  const rows = teams.map((r) => ({ key: r.team_name, label: label(r.team_name, r.team_name ?? '–'), start: r.points_start ?? 0 }));
   return liveStandings(rows, gained);
 }
 
