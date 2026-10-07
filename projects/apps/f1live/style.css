@@ -245,7 +245,7 @@ button { cursor: pointer; min-width: 2.75rem; }
 .telemetry { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
 .telemetry li {
   display: grid;
-  grid-template-columns: 0.25rem 2.6rem 5rem 2rem minmax(4rem, 1fr) minmax(4rem, 1fr) 2.6rem;
+  grid-template-columns: 0.25rem 2.6rem 5rem 2rem minmax(4rem, 1fr) minmax(4rem, 1fr) 2.6rem minmax(13rem, auto) 4rem;
   align-items: center;
   gap: 0.6rem;
 }
@@ -253,6 +253,8 @@ button { cursor: pointer; min-width: 2.75rem; }
 .bar-fill { display: block; height: 100%; }
 .throttle .bar-fill { background: var(--flag-green); }
 .brake .bar-fill { background: var(--flag-red); }
+.wear .bar-fill { background: color-mix(in oklab, var(--flag-green), var(--flag-red) var(--wear, 0%)); }
+.telemetry .wear { color: var(--text-dim); white-space: nowrap; }
 .drs-badge { text-align: center; border: 1px solid var(--border); border-radius: 2px; color: var(--text-dim); }
 .drs-badge.on { color: var(--bg); background: var(--drs); border-color: var(--drs); }
 

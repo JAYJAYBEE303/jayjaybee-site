@@ -32,7 +32,7 @@
 | 2 | Driver telemetry + insights panels | built + reviewed; awaiting user `node check.mjs` + preview check |
 | 3 | Qualifying, sprint qualifying, practice replays | built + reviewed; awaiting user `node check.mjs` + preview check |
 | 4 | Championship overlays, settings, caching, map rotation | built + reviewed; awaiting user `node check.mjs` + preview check |
-| 5 | Optional: pre-2023 seasons via FastF1 export, tyre degradation model | planned |
+| 5 | Tyre wear (option B); pre-2023 export dropped | in progress |
 
 ### Stage 1 — Race view parity
 
@@ -222,6 +222,26 @@ Rulings:
 
 - `node check.mjs` prints `replay.js ok` (run by the user).
 - Preview: C and A open live standings that change as positions change; reloading a race is near-instant (cache); preferences survive a reload; the map matches the broadcast orientation, or is unrotated if MultiViewer blocks the request.
+
+## Stage 5 tasks
+
+Decisions by the user: the pre-2023 export is **dropped** (too heavy for the site). The tyre model goes ahead as **option B**, a measured-wear version of `bayesian_tyre_model.py`. It keeps the original's fuel correction and Theil-Sen slope, and drops the Kalman pace state, predicted next lap and age-based "health %". Like every other panel, it fits only on laps finished by the playhead.
+
+### Task 5.1: Pure helpers (`replay.js`, `check.mjs`)
+
+- [ ] `theilSen(pts) -> slope | null`: the median of pairwise slopes; null when there are fewer than 2 distinct x.
+- [ ] `tyreWear(laps, stint, t) -> { rate, n } | null`: uses laps finished by `t` within the stint, excluding lap 1, pit-out laps and laps more than 7 % slower than the stint median (SC, traffic, in-laps). Lap times are fuel-corrected by `FUEL_S_PER_LAP = 0.06` × lap number; rate = Theil-Sen slope (s/lap) over lap number. Returns null with fewer than 3 clean laps.
+- [ ] Asserts: an outlier doesn't move the slope; a known 0.1 s/lap stint with an SC lap and a pit-out lap gives 0.1; too few laps gives null.
+
+### Task 5.2: Telemetry tab
+
+- [ ] Each selected driver's row adds "Wear +0.08 s/lap · ~0.6 s lost" (loss = max(0, rate) × tyre age), plus a bar coloured green→red by loss (full at `WEAR_FULL_S = 2`). "Wear: after 3 laps" until there's enough data.
+- [ ] The current-stint lookup is shared with the leaderboard (`stintOf`).
+
+### Stage 5 done when
+
+- `node check.mjs` prints `replay.js ok` (run by the user).
+- Preview: mid-race, the Telemetry tab shows plausible wear (roughly 0.02–0.15 s/lap) that rises through a stint and resets after a pit stop.
 
 ## Review Focus
 

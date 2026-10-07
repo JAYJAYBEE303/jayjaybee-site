@@ -186,6 +186,38 @@ export function formatGap(gap) {
   return typeof gap === 'number' ? `+${gap.toFixed(1)}` : String(gap);
 }
 
+// Median of pairwise slopes: an outlier-robust line fit (Theil-Sen). null with < 2 distinct x.
+export function theilSen(pts) {
+  const slopes = [];
+  for (let i = 0; i < pts.length; i++) {
+    for (let j = i + 1; j < pts.length; j++) {
+      const dx = pts[j].x - pts[i].x;
+      if (dx) slopes.push((pts[j].y - pts[i].y) / dx);
+    }
+  }
+  if (!slopes.length) return null;
+  slopes.sort((a, b) => a - b);
+  const m = slopes.length >> 1;
+  return slopes.length % 2 ? slopes[m] : (slopes[m - 1] + slopes[m]) / 2;
+}
+
+// ponytail: fixed fuel effect (~0.035 s/kg x ~1.7 kg/lap); real burn varies by track.
+export const FUEL_S_PER_LAP = 0.06;
+
+// Measured tyre wear on a stint from laps finished by t: { rate: s/lap, n: laps used } or null.
+// Drops lap 1, pit-out laps and laps > 7 % off the stint median (SC, traffic, in-laps), then fits
+// fuel-corrected lap time against lap number.
+export function tyreWear(laps, stint, t) {
+  const used = lapsDone(laps, t).filter((l) => l.lap_number > 1 && !l.is_pit_out_lap
+    && l.lap_number >= stint.lap_start && l.lap_number <= (stint.lap_end ?? Infinity));
+  if (used.length < 3) return null;
+  const med = used.map((l) => l.lap_duration).sort((a, b) => a - b)[used.length >> 1];
+  const clean = used.filter((l) => l.lap_duration <= med * 1.07);
+  if (clean.length < 3) return null;
+  const rate = theilSen(clean.map((l) => ({ x: l.lap_number, y: l.lap_duration + FUEL_S_PER_LAP * l.lap_number })));
+  return rate == null ? null : { rate, n: clean.length };
+}
+
 // Championship table with points gained so far this session.
 // rows: [{ key, label, start }], gained: Map<key, pts> -> sorted [{ label, start, gain, total }].
 export function liveStandings(rows, gained) {

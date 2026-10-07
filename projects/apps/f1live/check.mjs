@@ -4,6 +4,7 @@ import {
   indexAt, lastAt, byDriver, sampleAt, lapOutline, formatGap, formatClock,
   timed, trackStatusTimeline, periods, cumulative, pointAhead, drsRuns, tyreAge,
   lapsDone, sectorBests, stintBars, formatLap, bestLap, lapTrace, liveStandings, rotator,
+  theilSen, tyreWear, FUEL_S_PER_LAP,
 } from './replay.js';
 
 const rows = [{ t: 0 }, { t: 10 }, { t: 20 }];
@@ -126,6 +127,22 @@ assert.deepEqual(liveStandings([{ key: 1, label: 'X', start: 5 }, { key: 2, labe
 const r90 = rotator(90)({ x: 1, y: 0 });
 assert.deepEqual([Math.round(r90.x * 1e9) / 1e9, Math.round(r90.y * 1e9) / 1e9], [0, 1]);
 assert.deepEqual(rotator(0)({ x: 3, y: -2 }), { x: 3, y: -2 });
+
+// theilSen: y = 2x + 1 with one wild point still gives slope 2.
+assert.equal(theilSen([1, 2, 3, 4].map((x) => ({ x, y: 2 * x + 1 })).concat({ x: 5, y: 100 })), 2);
+assert.equal(theilSen([{ x: 1, y: 1 }]), null);
+assert.equal(theilSen([{ x: 1, y: 1 }, { x: 1, y: 5 }]), null, 'same x has no slope');
+
+// tyreWear: true wear 0.1 s/lap hidden under fuel burn; pit-out lap 2 and an SC lap 8 ignored.
+const wl = [1, 2, 3, 4, 5, 6, 7, 8].map((n) => ({
+  lap_number: n, t: n * 100e3, is_pit_out_lap: n === 2,
+  lap_duration: n === 8 ? 120 : 90 + 0.1 * n - FUEL_S_PER_LAP * n,
+}));
+const tw = tyreWear(wl, { lap_start: 2, lap_end: null }, 999e3);
+assert.ok(Math.abs(tw.rate - 0.1) < 1e-9, `rate ${tw.rate}`);
+assert.equal(tw.n, 5);
+assert.equal(tyreWear(wl, { lap_start: 2, lap_end: null }, 450e3), null, 'too few clean laps done yet');
+assert.equal(tyreWear(wl, { lap_start: 9, lap_end: null }, 999e3), null, 'no laps in stint');
 
 assert.equal(formatGap(null), '');
 assert.equal(formatGap(3.456), '+3.5');

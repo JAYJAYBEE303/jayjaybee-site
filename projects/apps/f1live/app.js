@@ -1,7 +1,7 @@
 import {
   toMs, byDriver, lastAt, indexAt, sampleAt, lapOutline, formatGap, formatClock,
   timed, trackStatusTimeline, periods, cumulative, pointAhead, drsRuns, tyreAge,
-  lapsDone, sectorBests, stintBars, formatLap, bestLap, lapTrace, liveStandings, rotator,
+  lapsDone, sectorBests, stintBars, formatLap, bestLap, lapTrace, liveStandings, rotator, tyreWear,
 } from './replay.js';
 
 const API = 'https://api.openf1.org/v1/';
@@ -359,6 +359,7 @@ function order() {
     (lastAt(S.pos.get(a), S.t)?.position ?? 99) - (lastAt(S.pos.get(b), S.t)?.position ?? 99));
 }
 
+const stintOf = (d, lap) => S.stints.get(d)?.find((s) => s.lap_start <= lap && lap <= (s.lap_end ?? Infinity));
 const driverLap = (d) => lastAt(S.laps.get(d), S.t)?.lap_number ?? 1;
 
 function span(cls, text) {
@@ -393,7 +394,7 @@ function renderBoard() {
   const rows = ranked.map((d, i) => {
     const car = S.drivers.get(d);
     const lap = driverLap(d);
-    const stint = S.stints.get(d)?.find((s) => s.lap_start <= lap && lap <= (s.lap_end ?? Infinity));
+    const stint = stintOf(d, lap);
     const compound = stint?.compound ?? '';
     const end = S.lastEnd.get(d) ?? Infinity;
     const out = end < S.chequer - 30e3 && S.t > end + 30e3;
@@ -525,9 +526,25 @@ function renderTelemetry() {
       span('speed', c ? `${c.speed} km/h` : '…'), span('gear', c ? `G${c.n_gear}` : ''),
       meter('throttle', c?.throttle), meter('brake', c?.brake),
       span(`drs-badge${(c?.drs ?? 0) >= 10 ? ' on' : ''}`, 'DRS'),
+      ...wearCells(d),
     );
     return li;
   }));
+}
+
+// Measured tyre wear on the current stint (port of the original's degradation model, option B).
+const WEAR_FULL_S = 2; // time lost vs new tyres at which the bar is full / red
+function wearCells(d) {
+  const lap = driverLap(d), stint = stintOf(d, lap);
+  const wear = stint && tyreWear(S.laps.get(d), stint, S.t);
+  if (!wear) return [span('wear', 'Wear: after 3 laps'), span('', '')];
+  const loss = Math.max(0, wear.rate) * tyreAge(stint, lap);
+  const pct = Math.min(100, (loss / WEAR_FULL_S) * 100);
+  const bar = meter('wear', pct);
+  bar.title = `${loss.toFixed(1)} s lost vs new tyres (${wear.n} laps measured)`;
+  bar.firstChild.style.setProperty('--wear', `${pct}%`);
+  const sign = wear.rate >= 0 ? '+' : '';
+  return [span('wear', `Wear ${sign}${wear.rate.toFixed(2)} s/lap · ~${loss.toFixed(1)} s lost`), bar];
 }
 
 // Series for drivers; a teammate (same team colour as an earlier series) gets a dashed line.
