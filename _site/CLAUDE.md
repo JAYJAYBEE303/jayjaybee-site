@@ -5,6 +5,26 @@ Jekyll static site, no build step beyond Jekyll itself. No npm, no
 or `type-check`. Verification is push-and-check-live (see
 `SKILL.md`), not a local build.
 
+## Deploy
+
+Hosted on **Vercel**, not GitHub Pages. The Vercel project serves the
+committed `_site/` as its output directory and (until its settings run
+`bundle exec jekyll build`) has **no build step** — so a source edit
+pushed to `main` without a matching `_site/` does nothing live.
+
+Until Vercel builds Jekyll itself, every site change must also commit a
+rebuilt `_site/`:
+
+```sh
+LANG=C.UTF-8 bundle exec jekyll build   # writes _site/
+git add -f _site                         # _site/ is gitignored but tracked
+```
+
+`LANG=C.UTF-8` is required — without it the SCSS converter fails on
+`Invalid US-ASCII character "\xE2"`. `_config.yml`'s `keep_files`
+preserves `_site/projects/apps/f1live/` (the Vite build committed by
+that app's `npm run publish:site`); never delete it by hand.
+
 ## Scope boundary
 
 `projects/apps/**` is excluded — see `.claudeignore`. Each app under
@@ -68,7 +88,7 @@ existing `.btn--primary` styling rather than inventing a second one.
 `components.css` → `wiki.css`, each with a `?v=N` query string that
 **must be bumped** on any edit to that file (and `global.css`'s own
 `?v=N` in `_layouts/default.html`'s `<link>` when `global.css` itself
-changes, e.g. adding a new `@import`). GitHub Pages caches
+changes, e.g. adding a new `@import`). Browsers and the CDN cache
 aggressively; a stale `?v=` means the edit never reaches a visitor.
 
 ## Motion + reveal-selector sync
@@ -81,6 +101,6 @@ Adding a new reveal-eligible element means editing all four.
 
 ## What NOT to touch here
 
-`projects/apps/**` (see above), `_site/` (Jekyll build output,
-gitignored), `.claude/` (working files, gitignored), anything matching
+`projects/apps/**` (see above), `_site/` by hand (Jekyll build output
+— regenerate it with the build above, never edit it directly), `.claude/` (working files, gitignored), anything matching
 `.gitignore`'s AMF1/Aston-branded patterns.

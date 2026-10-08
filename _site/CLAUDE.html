@@ -314,6 +314,25 @@
 or <code class="language-plaintext highlighter-rouge">type-check</code>. Verification is push-and-check-live (see
 <code class="language-plaintext highlighter-rouge">SKILL.md</code>), not a local build.</p>
 
+<h2 id="deploy">Deploy</h2>
+
+<p>Hosted on <strong>Vercel</strong>, not GitHub Pages. The Vercel project serves the
+committed <code class="language-plaintext highlighter-rouge">_site/</code> as its output directory and (until its settings run
+<code class="language-plaintext highlighter-rouge">bundle exec jekyll build</code>) has <strong>no build step</strong> — so a source edit
+pushed to <code class="language-plaintext highlighter-rouge">main</code> without a matching <code class="language-plaintext highlighter-rouge">_site/</code> does nothing live.</p>
+
+<p>Until Vercel builds Jekyll itself, every site change must also commit a
+rebuilt <code class="language-plaintext highlighter-rouge">_site/</code>:</p>
+
+<div class="language-sh highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">LANG</span><span class="o">=</span>C.UTF-8 bundle <span class="nb">exec </span>jekyll build   <span class="c"># writes _site/</span>
+git add <span class="nt">-f</span> _site                         <span class="c"># _site/ is gitignored but tracked</span>
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">LANG=C.UTF-8</code> is required — without it the SCSS converter fails on
+<code class="language-plaintext highlighter-rouge">Invalid US-ASCII character "\xE2"</code>. <code class="language-plaintext highlighter-rouge">_config.yml</code>’s <code class="language-plaintext highlighter-rouge">keep_files</code>
+preserves <code class="language-plaintext highlighter-rouge">_site/projects/apps/f1live/</code> (the Vite build committed by
+that app’s <code class="language-plaintext highlighter-rouge">npm run publish:site</code>); never delete it by hand.</p>
+
 <h2 id="scope-boundary">Scope boundary</h2>
 
 <p><code class="language-plaintext highlighter-rouge">projects/apps/**</code> is excluded — see <code class="language-plaintext highlighter-rouge">.claudeignore</code>. Each app under
@@ -379,7 +398,7 @@ existing <code class="language-plaintext highlighter-rouge">.btn--primary</code>
 <code class="language-plaintext highlighter-rouge">components.css</code> → <code class="language-plaintext highlighter-rouge">wiki.css</code>, each with a <code class="language-plaintext highlighter-rouge">?v=N</code> query string that
 <strong>must be bumped</strong> on any edit to that file (and <code class="language-plaintext highlighter-rouge">global.css</code>’s own
 <code class="language-plaintext highlighter-rouge">?v=N</code> in <code class="language-plaintext highlighter-rouge">_layouts/default.html</code>’s <code class="language-plaintext highlighter-rouge">&lt;link&gt;</code> when <code class="language-plaintext highlighter-rouge">global.css</code> itself
-changes, e.g. adding a new <code class="language-plaintext highlighter-rouge">@import</code>). GitHub Pages caches
+changes, e.g. adding a new <code class="language-plaintext highlighter-rouge">@import</code>). Browsers and the CDN cache
 aggressively; a stale <code class="language-plaintext highlighter-rouge">?v=</code> means the edit never reaches a visitor.</p>
 
 <h2 id="motion--reveal-selector-sync">Motion + reveal-selector sync</h2>
@@ -392,8 +411,8 @@ Adding a new reveal-eligible element means editing all four.</p>
 
 <h2 id="what-not-to-touch-here">What NOT to touch here</h2>
 
-<p><code class="language-plaintext highlighter-rouge">projects/apps/**</code> (see above), <code class="language-plaintext highlighter-rouge">_site/</code> (Jekyll build output,
-gitignored), <code class="language-plaintext highlighter-rouge">.claude/</code> (working files, gitignored), anything matching
+<p><code class="language-plaintext highlighter-rouge">projects/apps/**</code> (see above), <code class="language-plaintext highlighter-rouge">_site/</code> by hand (Jekyll build output
+— regenerate it with the build above, never edit it directly), <code class="language-plaintext highlighter-rouge">.claude/</code> (working files, gitignored), anything matching
 <code class="language-plaintext highlighter-rouge">.gitignore</code>’s AMF1/Aston-branded patterns.</p>
 
   </main>
