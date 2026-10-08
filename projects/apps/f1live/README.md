@@ -44,7 +44,6 @@ needs no backend. It's built with Vite, React and TypeScript.
 - `src/mock/`: dev-only mock source (simulation, controller, `MockApp`); never in the production build
 - `check.ts`, `check-design.ts`: `npm test` asserts the race model, adapter, mock, view model, shortcuts and map scenes (plain node, no test framework)
 - `test/`: shared race fixture and the design reference's golden output
-- `legacy/`: the original plain HTML/JS app, kept until the React port is signed off
 - `vercel.json`: Vercel builds with `npm run build` and serves `dist/`
 
 ## Swapping the data source
