@@ -1,0 +1,63 @@
+# Builds jayjaybee.com on every push to main: the Jekyll site exactly as GitHub Pages
+# builds it, plus the F1 Live app (Vite), which Pages can't build on its own.
+# Repo Settings → Pages → Source must be "GitHub Actions".
+name: Deploy site
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+
+      # Same builder (github-pages gem, same plugins) Pages uses for branch builds.
+      - uses: actions/jekyll-build-pages@v1
+        with:
+          source: ./
+          destination: ./_site
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: projects/apps/f1live/package-lock.json
+
+      - name: Test and build F1 Live
+        working-directory: projects/apps/f1live
+        run: |
+          npm ci
+          npm test
+          npm run build
+
+      # Jekyll copied the app's unbuilt source; serve the build at the same URL instead.
+      # (jekyll-build-pages runs as root, hence sudo.)
+      - name: Swap in the F1 Live build
+        run: |
+          sudo rm -rf _site/projects/apps/f1live
+          sudo cp -r projects/apps/f1live/dist _site/projects/apps/f1live
+
+      - uses: actions/upload-pages-artifact@v3
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
