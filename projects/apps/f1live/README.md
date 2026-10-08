@@ -12,7 +12,7 @@ Replay mode replays a real recorded lap (pulled via
 on a timer paced to match the recording. Live telemetry
 (`src/lib/liveAdapter.js`) is a stub pending a separate live backend
 (Railway); the UI is deliberately minimal — richer playback controls and
-a real UI pass come in later chapters..
+a real UI pass come in later chapters.
 
 ## Develop
 
