@@ -20,7 +20,7 @@
 .btn-ghost { background: transparent; color: var(--text-primary); border: 1px solid var(--btn-ghost-border); cursor: pointer; font-size: 12px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; }
 .seg-btn { position: relative; min-height: 42px; padding: 0 14px; background: transparent; border: 0; cursor: pointer; font-size: 12px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; }
 .seg-bar { position: absolute; left: 10px; right: 10px; bottom: -1px; height: 2px; }
-.section-title { margin: 0; font-family: var(--font-display); font-weight: 700; font-size: 28px; letter-spacing: .02em; text-transform: uppercase; line-height: 1; }
+.section-title { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 28px; letter-spacing: .02em; text-transform: uppercase; line-height: 1; }
 .card { background: var(--card-bg); }
 .swatch { flex: none; width: 4px; height: 16px; }
 .tyre-dot { flex: none; border-radius: 50%; border: 2px solid; display: grid; place-items: center; font-family: var(--font-mono); font-size: 10px; font-weight: 500; }

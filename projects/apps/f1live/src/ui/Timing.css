@@ -22,7 +22,7 @@
 .tm-tile { all: unset; box-sizing: border-box; width: 100%; min-height: 156px; display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; background: var(--tm-bg); border-top: 2px solid; cursor: pointer; transition: background 140ms var(--ease-out), border-color 600ms var(--ease-out); }
 .tm-tile:hover { background: var(--bg-surface-2); }
 .tm-tile-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
-.tm-pos { font-family: var(--font-display); font-weight: 700; font-size: 46px; line-height: .8; color: var(--text-primary); }
+.tm-pos { font-family: var(--font-display); font-weight: 600; font-size: 46px; line-height: .8; color: var(--text-primary); }
 .tm-age { display: flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary); padding-right: 8px; }
 .tm-tyre { width: 24px; height: 24px; }
 .tm-name { display: flex; align-items: center; gap: 6px; min-width: 0; }

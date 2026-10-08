@@ -16,7 +16,7 @@
 .an-tele { padding: 18px; display: flex; flex-direction: column; gap: 14px; }
 .an-tele-head { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .an-tele-swatch { width: 6px; height: 22px; flex: none; }
-.an-tele-name { font-family: var(--font-display); font-weight: 700; font-size: 22px; letter-spacing: .02em; text-transform: uppercase; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.an-tele-name { font-family: var(--font-display); font-weight: 600; font-size: 22px; letter-spacing: .02em; text-transform: uppercase; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .an-tele-top { display: grid; grid-template-columns: 1fr auto; border-top: 1px solid var(--border-hairline); }
 .an-tele-speed { position: relative; padding-top: 12px; }
 .an-tele-gear { padding: 12px 0 0 18px; border-left: 1px solid var(--border-hairline); }
