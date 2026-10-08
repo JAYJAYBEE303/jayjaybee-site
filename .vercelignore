@@ -1,5 +1,0 @@
-# Main site deploy only (the f1-live Vercel project's root is projects/apps/f1live and has its own config).
-# F1 Live needs a build, which this project doesn't run. With no file at /projects/apps/f1live/,
-# vercel.json's rewrite proxies that path to the built app on f1-live-alpha.vercel.app.
-/projects/apps/f1live
-/_site/projects/apps/f1live

@@ -72,6 +72,11 @@ exclude:
   - projects/apps/gaffer-iq/docs
   - projects/apps/gaffer-iq/tests
 
+  # F1 Live is a Vite app, built and hosted by its own Vercel project (f1-live-alpha). Copying its
+  # unbuilt source into _site would put a real file at /projects/apps/f1live/, and Vercel serves
+  # real files before applying vercel.json rewrites, so the proxy to the built app would never run.
+  - projects/apps/f1live
+
   # -----------------------------------------------------------------------
   # Same trap as projects/apps/ above: docs/superpowers/ holds the plan and
   # spec documents for this work, and they contain literal Liquid examples
