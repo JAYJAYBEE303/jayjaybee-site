@@ -13,6 +13,11 @@ url: https://jayjaybee.com
 repository: JAYJAYBEE303/jayjaybee-site
 encoding: utf-8
 
+# No theme. The github-pages gem otherwise injects jekyll-theme-primer's
+# assets/css/style.scss — unused by any layout here, and the one file whose
+# non-ASCII byte breaks the build on hosts without a UTF-8 locale (Vercel).
+theme: null
+
 # -----------------------------------------------------------------------------
 # Layout defaults. Jekyll applies these in order, with later + more specific
 # scopes overriding earlier ones.

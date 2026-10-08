@@ -18,9 +18,10 @@ only when its own files change (Ignored Build Step = `git diff HEAD^ HEAD
 | fc26-calculator | `projects/apps/fc26-calculator` | that folder changes |
 | f1live | `projects/apps/f1live` | that folder changes |
 
-The site project runs `bundle exec jekyll build` (env `LANG=C.UTF-8` —
-without it SCSS fails on `Invalid US-ASCII character "\xE2"`) and serves
-`_site/`. `_site/` is build output: gitignored, never committed.
+The site project runs `bundle install` then `bundle exec jekyll build`
+and serves `_site/`. `_config.yml`'s `theme: null` is load-bearing: the
+default theme's SCSS fails on Vercel's locale (`Invalid US-ASCII
+character "\xE2"`). `_site/` is build output: gitignored, never committed.
 
 jayjaybee.com reaches each app through root `vercel.json` rewrites
 (`/projects/apps/<slug>/:path*` → that app's `*.vercel.app` host, prefix
