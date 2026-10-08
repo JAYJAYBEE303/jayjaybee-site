@@ -4,7 +4,8 @@
 # Impeccable plugin working files (config + hook cache), same class as .claude/
 .impeccable/
 
-# Jekyll build output (GitHub Pages rebuilds on push; local builds stay local)
+# Jekyll build output (Vercel builds on push; local builds stay local)
+_site/
 .jekyll-cache/
 .jekyll-metadata
 Gemfile.lock
