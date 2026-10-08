@@ -676,27 +676,19 @@
 .work-meta .mono { color: var(--fg-quiet); }
 .mono-sep { color: var(--fg-faint); }
 
-/* Title — serif, big, link coloured as ink not accent. */
+/* Title — serif, big, accent italic. Plain text, not a link: the
+   entry's actions row (.work-actions) carries both destinations. */
 .work-title {
   font-family: var(--font-serif);
   font-weight: var(--fw-regular);
+  font-style: italic;
+  color: var(--accent);
   font-size: clamp(1.625rem, 2vw + 1rem, 2.25rem);
   line-height: 1.15;
   letter-spacing: var(--tr-headline);
 }
 .work-item--featured .work-title {
   font-size: clamp(2rem, 3vw + 1rem, 2.875rem);
-}
-.work-link {
-  color: var(--accent);
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-decoration-color: var(--accent);
-  text-underline-offset: 0.2em;
-}
-.work-link:hover {
-  color: var(--accent-hover);
-  text-decoration-color: var(--accent-hover);
 }
 
 .work-lede {
@@ -718,7 +710,7 @@
 
 .work-attrs {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(10rem, max-content));
+  grid-template-columns: repeat(3, minmax(0, auto)) max-content;
   gap: var(--space-3) var(--space-7);
   margin-top: var(--space-3);
   padding-top: var(--space-4);
@@ -743,7 +735,26 @@
   color: var(--fg);
 }
 
-.work-item.is-placeholder .work-link {
+/* Actions cell — "Launch app" (a.wk-launch, the wiki's own primary
+   button) plus a quieter text link to the write-up. Sits in the last
+   grid column, pushed to the right edge and bottom of the attrs row. */
+.work-actions {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-3) var(--space-5);
+  justify-self: end;
+  align-self: end;
+}
+.work-actions a.wk-launch { margin-top: 0; }
+.work-wiki-link {
+  font-family: var(--font-sans);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-ui);
+  line-height: var(--lh-ui);
+  text-underline-offset: 0.25em;
+}
+
+.work-item.is-placeholder .work-title {
   color: var(--fg-quiet);
   font-style: italic;
 }
@@ -1386,6 +1397,14 @@
   .es-stats { grid-template-columns: repeat(2, 1fr); }
   .es-stats div:nth-child(odd) { border-left: 0; }
   .es-stats div:nth-child(n+3) { border-top: var(--border-hairline); }
+}
+@media (max-width: 56rem) {
+  .work-attrs { grid-template-columns: repeat(3, minmax(0, max-content)); }
+  .work-actions {
+    grid-column: 1 / -1;
+    justify-self: start;
+    flex-wrap: wrap;
+  }
 }
 @media (max-width: 56rem) {
   .es-wrap { grid-template-columns: minmax(0, 1fr); }

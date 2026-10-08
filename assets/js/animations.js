@@ -485,7 +485,7 @@
     '.site-nav__trigger',
     '.site-nav__menu-link',
     '.theme-toggle',
-    '.work-link',
+    '.work-actions a',
     '.role-title',
     '.footer-links a'
   ].join(', ');
