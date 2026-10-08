@@ -1,0 +1,48 @@
+/* Timing sections: gap ribbon, timing tiles, race control (template lines 192-245). */
+
+.tm-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 10px 30px; }
+.tm-head-tiles { margin-bottom: 14px; }
+.tm-note { font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary); }
+.tm-note-52 { max-width: 52ch; }
+.tm-note-46 { max-width: 46ch; }
+
+/* gaps ribbon */
+.tm-ribbon { position: relative; height: 132px; margin-top: 14px; border-top: 1px solid var(--border-strong); overflow: hidden; }
+.tm-tick { position: absolute; top: 0; bottom: 0; border-left: 1px solid var(--border-subtle); }
+.tm-tick-label { position: absolute; left: 4px; bottom: 2px; font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary); white-space: nowrap; }
+.tm-chip { all: unset; box-sizing: border-box; position: absolute; display: flex; align-items: center; gap: 5px; height: 20px; padding: 0 6px; cursor: pointer; font-family: var(--font-mono); font-size: 11px; white-space: nowrap; }
+.tm-chip:hover { outline: 1px solid var(--border-strong); }
+.tm-chip-sw { width: 4px; height: 12px; }
+
+/* tiles */
+.tm-tiles-sec { min-width: 0; }
+.tm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 180px), 1fr)); gap: 8px; }
+.tm-list { list-style: none; margin: 0; padding: 0; }
+.tm-skel { height: 156px; background: var(--bg-surface-1); }
+.tm-tile { all: unset; box-sizing: border-box; width: 100%; min-height: 156px; display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; background: var(--tm-bg); border-top: 2px solid; cursor: pointer; transition: background 140ms var(--ease-out), border-color 600ms var(--ease-out); }
+.tm-tile:hover { background: var(--bg-surface-2); }
+.tm-tile-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.tm-pos { font-family: var(--font-display); font-weight: 600; font-size: 46px; line-height: .8; color: var(--text-primary); }
+.tm-age { display: flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary); padding-right: 8px; }
+.tm-tyre { width: 24px; height: 24px; }
+.tm-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.tm-last { font-family: var(--font-display); font-weight: 600; font-size: 20px; letter-spacing: .03em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tm-fl { flex: none; font-family: var(--font-mono); font-size: 10px; font-weight: 500; padding: 1px 3px; background: var(--sec-purple); color: var(--p-black-950); }
+.tm-gaps { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.tm-gap { font-family: var(--font-mono); font-size: 15px; white-space: nowrap; }
+.tm-int { font-family: var(--font-mono); font-size: 12px; white-space: nowrap; }
+.tm-sectors { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; margin-top: auto; }
+.tm-sector { height: 4px; }
+.tm-foot { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary); }
+
+/* race control */
+.tm-rc-wrap { max-width: 720px; }
+.tm-rc { display: flex; flex-direction: column; }
+.tm-rc-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; margin-bottom: 12px; }
+.tm-rc-title { font-size: 22px; }
+.tm-rc-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border-strong); max-height: 260px; overflow: auto; }
+.tm-rc-item { position: relative; display: grid; grid-template-columns: 78px 72px minmax(0, 1fr); gap: 12px; align-items: baseline; padding: 9px 12px; border-bottom: 1px solid var(--border-subtle); }
+.tm-rc-marker { position: absolute; left: 0; top: 9px; bottom: 9px; width: 3px; }
+.tm-rc-time { font-family: var(--font-mono); font-size: 12px; color: var(--text-tertiary); }
+.tm-rc-chip { font-family: var(--font-mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; }
+.tm-rc-msg { font-size: 13px; color: var(--text-secondary); }

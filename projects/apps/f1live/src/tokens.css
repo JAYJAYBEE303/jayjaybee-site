@@ -1,0 +1,38 @@
+/* Halvard Live tokens (from Halvard Racing). L1 primitive */
+:root{
+--p-black-950:#0A0A0B;--p-grey-925:#121214;--p-grey-900:#1C1C1F;--p-grey-850:#26262A;--p-grey-800:#2F2F34;
+--p-grey-400:#8C8C93;--p-grey-300:#A8A8AF;--p-grey-050:#F2F2F2;--p-white:#FFFFFF;
+--p-red-500:#E10600;--p-red-600:#B00500;--p-red-300:#FF4A3D;--p-red-a55:rgba(225,6,0,.55);
+--p-amber-400:oklch(0.82 0.15 78);--p-green-400:oklch(0.76 0.16 150);--p-purple-400:oklch(0.68 0.2 305);--p-blue-400:oklch(0.72 0.12 245);
+--p-alpha-06:rgba(242,242,242,.06);--p-alpha-10:rgba(242,242,242,.10);--p-alpha-18:rgba(242,242,242,.18);--p-black-a94:rgba(10,10,11,.94);
+--p-font-display:'Teko','Arial Narrow',sans-serif;--p-font-mono:'JetBrains Mono',ui-monospace,Menlo,monospace;--p-font-body:var(--p-font-mono);
+--p-ease-shift:cubic-bezier(.16,1,.3,1);
+/* L2 semantic */
+--bg-base:var(--p-black-950);--bg-surface-1:var(--p-grey-925);--bg-surface-2:var(--p-grey-900);--bg-surface-3:var(--p-grey-850);--bg-surface-4:var(--p-grey-800);
+--text-primary:var(--p-grey-050);--text-secondary:var(--p-grey-300);--text-tertiary:var(--p-grey-400);--text-on-accent:var(--p-white);
+--accent:var(--p-red-500);--accent-pressed:var(--p-red-600);--accent-text:var(--p-red-300);
+--border-subtle:var(--p-alpha-06);--border-hairline:var(--p-alpha-10);--border-strong:var(--p-alpha-18);
+--focus-ring:var(--p-red-300);--status-live:var(--p-red-500);--status-sc:var(--p-amber-400);--status-green:var(--p-green-400);--status-red:var(--p-red-500);--status-blue:var(--p-blue-400);
+--sec-purple:var(--p-purple-400);--sec-green:var(--p-green-400);--sec-yellow:oklch(0.87 0.15 95);
+--tyre-s:#FF4A3D;--tyre-m:#FFD23F;--tyre-h:#F2F2F2;--tyre-i:#43D17A;--tyre-w:#4F9DFF;
+--font-display:var(--p-font-display);--font-body:var(--p-font-body);--font-mono:var(--p-font-mono);--ease-out:var(--p-ease-shift);
+/* L3 component */
+--nav-bg:var(--p-black-a94);--card-bg:var(--bg-surface-1);--card-cut:24px;--row-h:42px;--row-sel:var(--bg-surface-2);
+--btn-primary-bg:var(--accent);--btn-primary-bg-hover:var(--accent-pressed);--btn-primary-fg:var(--text-on-accent);--btn-ghost-border:var(--border-strong);
+--light-off:var(--p-grey-850);--light-glow:var(--p-red-a55);--placeholder-stripe:var(--border-subtle);
+--map-track:#1C1C1F;--map-edge:#2F2F34;--map-track-sc:#5C4C14;--map-track-vsc:#4A4118;--map-track-red:#5E1513;--map-drs:var(--p-green-400);
+--map-sc:var(--p-amber-400);--map-label:#A8A8AF;--map-ring:var(--p-red-300);--map-car-stroke:#0A0A0B;--map-font:600 13px 'Teko',sans-serif;
+--map-width:8;--map-car:circle;--map-car-size:5;--map-glow:0;--map-pad:30;
+--chart-grid:rgba(242,242,242,.06);--chart-text:#8C8C93;--chart-font:400 10px 'JetBrains Mono',monospace;--chart-width:1.75;
+}
+*{box-sizing:border-box}
+/* Teko's capitals are ~9% shorter and JetBrains Mono's ~4% taller than the fonts the design was sized in;
+   normalising every font to a 0.7em cap height keeps each declared size looking as designed. Inherited. */
+:root{font-size-adjust:cap-height 0.7}
+body{margin:0;background:#0A0A0B;-webkit-font-smoothing:antialiased}
+/* Form controls don't inherit the page font by default; without this, buttons and tabs render in the UA font. */
+button,select,input{font-family:inherit}
+a{color:var(--text-primary)}
+a:hover{color:var(--text-primary)}
+:focus-visible{outline:2px solid var(--focus-ring)!important;outline-offset:2px!important}
+dialog::backdrop{background:rgba(10,10,11,.78)}
