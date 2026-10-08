@@ -7,6 +7,13 @@ or `type-check`. Verification is push-and-check-live (see
 
 ## Deploy
 
+Commit as the owner — `git config user.name JAYJAYBEE303` and
+`git config user.email jjb303@hotmail.co.uk` before the first commit
+(Claude goes in a `Co-Authored-By:` trailer). Vercel's Hobby plan won't
+deploy a commit whose author isn't a project member, so a commit
+authored as Claude silently never ships. The free plan also caps
+deployments at 100/day: batch pushes to `main` rather than drip-feeding.
+
 Hosted on **Vercel** as one repo, several Vercel projects. Each builds
 only when its own files change (Ignored Build Step = `git diff HEAD^ HEAD
 --quiet -- <paths> || exit 1`):
