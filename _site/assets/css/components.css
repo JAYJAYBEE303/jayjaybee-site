@@ -392,29 +392,20 @@ html:not(.is-home) :is(
   transition-delay: var(--menu-item-delay, 0ms);
 }
 
-/* Work / role items — quiet hover state. Title nudges right 2px so the
-   hover lives in the typography, not the chrome. */
+/* Role items — quiet hover state. Title nudges right 2px so the
+   hover lives in the typography, not the chrome. Work titles are
+   static text (no link), so they carry no hover. */
 .work-item, .role-item {
   transition: transform var(--dur-2) var(--ease);
 }
-.work-title, .role-title {
+.role-title {
   transition: transform var(--dur-2) var(--ease);
-}
-.work-title:hover {
-  transform: translateX(2px);
 }
 .role-disclosure-summary {
   transition: transform var(--dur-2) var(--ease);
 }
 .role-item:hover .role-disclosure-summary {
   transform: translateX(2px);
-}
-
-/* Work link — fade in the underline on hover */
-.work-link {
-  transition:
-    text-decoration-color var(--dur-2) var(--ease),
-    color                 var(--dur-2) var(--ease);
 }
 
 /* Footer links — same micro-lift as nav so behaviour stays consistent. */

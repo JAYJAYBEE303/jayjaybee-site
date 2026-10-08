@@ -140,7 +140,7 @@
     })();
   </script>
 
-  <link rel="stylesheet" href="/assets/css/global.css?v=74" />
+  <link rel="stylesheet" href="/assets/css/global.css?v=75" />
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a><div class="read-progress" id="read-progress" aria-hidden="true"></div><!-- ============================================================
@@ -319,10 +319,9 @@
      Self-contained apps under /projects/apps/ are deliberately
      exempt: they own their whole document and share none of this.
 
-     The buttons below now point at the write-up for each project
-     under /projects/wiki/, not straight at the app. Each write-up
-     carries its own "Launch app" link out to /projects/apps/, which
-     is the only place the two are coupled.
+     Each entry carries two actions: "Launch app" straight to
+     /projects/apps/<slug>/, and a quieter link to the write-up under
+     /projects/wiki/<slug>/. Titles are plain text, not links.
 
      `scroll_gate: false` opts out of the layout's scroll-gate. The
      gate holds the whole body hidden until the reader scrolls past
@@ -357,7 +356,7 @@
         <span class="mono">Maintained</span>
       </div>
       <h3 class="work-title">
-        <a href="/projects/wiki/gaffer-iq/" class="work-link">Gaffer IQ</a>
+        Gaffer IQ
       </h3>
       <p class="work-lede">
         A Fantasy-Premier-League analysis tool that provides deeper fixture difficulty ratings — factoring in team form, home/away splits, style clashes, and position-based counter-matchups to give a deeper read on any fixture.
@@ -378,6 +377,10 @@
           <dt class="mono-label">Status</dt>
           <dd>Live, iterating</dd>
         </div>
+        <div class="work-attr work-actions">
+          <a class="wk-launch mono-label" href="/projects/apps/gaffer-iq/">Launch app <span aria-hidden="true">&#8599;</span></a>
+          <a class="work-wiki-link" href="/projects/wiki/gaffer-iq/">Read the wiki entry <span aria-hidden="true">&rarr;</span></a>
+        </div>
       </dl>
     </li>
 
@@ -391,7 +394,7 @@
         <span class="mono">Maintained</span>
       </div>
       <h3 class="work-title">
-        <a href="/projects/wiki/fc26-calculator/" class="work-link">FC26 Feel Calculator</a>
+        FC26 Feel Calculator
       </h3>
       <p class="work-lede">
         A tool for the EA FC26 game that models what a player <em>actually</em> feels like on the pitch in EA FC 26 — past the raw card numbers, into chemistry, PlayStyles, and the curves the game runs under the hood.
@@ -412,6 +415,10 @@
           <dt class="mono-label">Status</dt>
           <dd>Live, iterating</dd>
         </div>
+        <div class="work-attr work-actions">
+          <a class="wk-launch mono-label" href="/projects/apps/fc26-calculator/">Launch app <span aria-hidden="true">&#8599;</span></a>
+          <a class="work-wiki-link" href="/projects/wiki/fc26-calculator/">Read the wiki entry <span aria-hidden="true">&rarr;</span></a>
+        </div>
       </dl>
     </li>
 
@@ -425,7 +432,7 @@
         <span class="mono">Placeholder</span>
       </div>
       <h3 class="work-title">
-        <a href="/projects/wiki/f1live/" class="work-link">F1 Live</a>
+        F1 Live
       </h3>
       <p class="work-lede">
         Placeholder lede. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
@@ -445,6 +452,10 @@
         <div class="work-attr">
           <dt class="mono-label">Status</dt>
           <dd>Placeholder</dd>
+        </div>
+        <div class="work-attr work-actions">
+          <a class="wk-launch mono-label" href="/projects/apps/f1live/">Launch app <span aria-hidden="true">&#8599;</span></a>
+          <a class="work-wiki-link" href="/projects/wiki/f1live/">Read the wiki entry <span aria-hidden="true">&rarr;</span></a>
         </div>
       </dl>
     </li>
@@ -497,7 +508,7 @@
     </div>
   </footer>
 
-  <script src="/assets/js/animations.js?v=20" defer></script>
+  <script src="/assets/js/animations.js?v=21" defer></script>
   <script src="/assets/js/search.js?v=3" defer></script>
 </body>
 </html>
