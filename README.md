@@ -1,6 +1,6 @@
 # resources/
 
-Static assets live here. Empty for now.
+Static assets live here; Empty for now.
 
 Suggested structure when you start adding things:
 
