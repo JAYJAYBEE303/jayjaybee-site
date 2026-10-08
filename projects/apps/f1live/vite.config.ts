@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-// Relative base: the app is served at its own root and behind /projects/apps/f1live/ (proxy rewrite).
-export default defineConfig({ base: './', plugins: [react()] });
+// Assets load from /projects/apps/f1live/ so the jayjaybee.com rewrite can route them.
+// This project's vercel.json maps that prefix back to / so the direct vercel.app link still works.
+export default defineConfig({ base: '/projects/apps/f1live/', plugins: [react()] });
