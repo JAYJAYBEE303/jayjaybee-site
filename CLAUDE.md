@@ -30,6 +30,12 @@ purpose: Vercel serves real files before rewrites, so any copy in
 `_site/` would shadow the live app with a stale one. A new app = new
 Vercel project + a redirect/rewrite pair in `vercel.json`.
 
+The Ignored Build Step diffs `HEAD^` (first parent) against `HEAD`. A
+merge commit whose first parent already holds the changes — e.g. `main`
+merged *into* a branch, then that branch pushed to `main` — diffs empty
+and the site build is **skipped**. Land work on `main` as a
+fast-forward or as a merge made *on* `main`, never the other way round.
+
 ## Scope boundary
 
 `projects/apps/**` is excluded — see `.claudeignore`. Each app under
