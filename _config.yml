@@ -28,7 +28,7 @@ encoding: utf-8
 #                   front matter, so Jekyll already treats them as static
 #                   assets and copies them verbatim — a layout default cannot
 #                   reach a file Jekyll never renders. The override is here so
-#                   the rule survives someone later adding front matter
+#                   the rule survives someone later adding front matter.
 # -----------------------------------------------------------------------------
 defaults:
   - scope:
