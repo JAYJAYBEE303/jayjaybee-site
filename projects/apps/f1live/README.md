@@ -15,7 +15,7 @@ open live championship standings. The Telemetry tab also shows measured
 tyre wear (seconds per lap, and time lost against new tyres). The map is rotated to match TV
 graphics where the circuit data allows. Playback preferences are
 remembered, and session data is saved in the browser so races reopen
-instantly. The staged roadmap to full parity is in `PLAN.md`.
+instantly, The staged roadmap to full parity is in `PLAN.md`.
 
 It is a web port of the race view from
 [f1-race-replay](https://github.com/IAmTomShaw/f1-race-replay), a desktop
