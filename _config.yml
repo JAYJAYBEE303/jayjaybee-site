@@ -72,6 +72,11 @@ exclude:
   - projects/apps/gaffer-iq/docs
   - projects/apps/gaffer-iq/tests
 
+  # F1 Live is a Vite app, so Jekyll must not copy its unbuilt source into _site. The built app is
+  # committed at _site/projects/apps/f1live/ by `npm run publish:site` (see its README); this site's
+  # Vercel project has no build step and serves _site as-is.
+  - projects/apps/f1live
+
   # -----------------------------------------------------------------------
   # Same trap as projects/apps/ above: docs/superpowers/ holds the plan and
   # spec documents for this work, and they contain literal Liquid examples

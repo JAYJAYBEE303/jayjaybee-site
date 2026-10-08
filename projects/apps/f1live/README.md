@@ -44,7 +44,6 @@ needs no backend. It's built with Vite, React and TypeScript.
 - `src/mock/`: dev-only mock source (simulation, controller, `MockApp`); never in the production build
 - `check.ts`, `check-design.ts`: `npm test` asserts the race model, adapter, mock, view model, shortcuts and map scenes (plain node, no test framework)
 - `test/`: shared race fixture and the design reference's golden output
-- `legacy/`: the original plain HTML/JS app, kept until the React port is signed off
 - `vercel.json`: Vercel builds with `npm run build` and serves `dist/`
 
 ## Swapping the data source
@@ -65,6 +64,20 @@ In `npm run dev`, `?scenario=<name>` swaps OpenF1 for the mock source:
 `live`, `safety-car`, `vsc`, `red-flag`, `feed-dropped`, `retirements`,
 `chequered`, `qualifying`, `loading`, `no-session`. The mock is reachable
 only in dev; `vite build` leaves it out.
+
+## Publishing to jayjaybee.com
+
+The main site's Vercel project has no build step: it serves the committed `_site/` folder as it is,
+the same way it serves the other apps. So the built F1 Live app is committed there too:
+
+```
+npm run publish:site   # builds, then replaces _site/projects/apps/f1live/ with dist/
+git add -A ../../../_site/projects/apps/f1live && git commit && git push
+```
+
+Run it after any change to the app. A Jekyll rebuild of `_site/` wipes that folder (the source is
+excluded in `_config.yml` so Jekyll can't copy it), so run it again afterwards. `f1-live-alpha.vercel.app`
+is a separate Vercel project that builds the app itself; jayjaybee.com no longer depends on it.
 
 ## Run locally
 
