@@ -16,7 +16,7 @@ encoding: utf-8
 # Layout defaults. Jekyll applies these in order, with later + more specific
 # scopes overriding earlier ones.
 #
-#   projects/       the projects wiki. Any page dropped in here inherits the
+#   projects/       the projects wiki. Any page dropped in here inherits the.
 #                   site chrome (header, nav, footer, global.css) without
 #                   needing `layout: default` in its own front matter, so new
 #                   write-ups pick up the jayjaybee.com look for free.
