@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#E9E5DD" id="themeColorMeta">
-<title>FC26 Feel — Spatial Console</title>
+<title>FC26 Feel Calculator</title>
 <script>
   // Apply the saved theme before first paint.
   (function () {
@@ -19,7 +19,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=2">
+<link rel="stylesheet" href="style.css?v=3">
 <!-- Shared "back to jayjaybee.com" link (jayjaybee.com/projects/ pages only) -->
 <link rel="stylesheet" href="../../../assets/css/back-to-jayjaybee.css">
 </head>
@@ -30,7 +30,7 @@
     <!-- First child is the slot the shared back-link script fills. -->
     <span class="rail-site"></span>
     <div class="rail-top">
-      <div class="brand" aria-hidden="true" data-deb="md"><i class="brand-dot" data-breathe></i></div>
+      <div class="brand" aria-hidden="true" data-deb="md"><i class="brand-dot"></i></div>
       <button class="puck" id="puck" data-m="sm" type="button">
         <i data-l="face"></i><i data-l="cast"></i><i data-l="sheen"></i><i data-l="ex"></i><i data-l="db"></i>
         <i class="puck-ring" aria-hidden="true"></i><span class="puck-ovr" data-puck-ovr>—</span>
@@ -61,7 +61,7 @@
           <i class="seam seam--r" aria-hidden="true" data-deb="sm"></i><i class="seam seam--b" aria-hidden="true" data-deb="sm"></i>
           <header class="ph">
             <p class="eyebrow mute">02 · Playstyles · <span id="psActive">0</span> active</p>
-            <h2 class="title" id="h-styles">Latch a key. Twice for plus.</h2>
+            <h2 class="title" id="h-styles">Playstyles</h2>
           </header>
           <div class="ps-bar" data-deb="md">
             <p class="ps-hint" aria-live="polite"><span id="psHint">Point at a key to read its effect.</span></p>
@@ -74,7 +74,7 @@
           <i class="seam seam--b" aria-hidden="true" data-deb="sm"></i>
           <header class="ph">
             <p class="eyebrow mute">03 · Chemistry</p>
-            <h2 class="title" id="h-chem">One style, dyed through.</h2>
+            <h2 class="title" id="h-chem">Chemistry style</h2>
             <p class="helper mute">Hover or focus a pad to preview its boosts. Click to apply it.</p>
           </header>
           <div role="radiogroup" aria-label="Chemistry style" id="chemShelves"></div>
@@ -91,7 +91,7 @@
           <header class="ph--row">
             <div>
               <p class="eyebrow mute">04 · Effective feel</p>
-              <h2 class="title" id="h-feel">Twenty-one numbers, four layers.</h2>
+              <h2 class="title" id="h-feel">Effective stats</h2>
             </div>
             <ul class="heat-scale" aria-label="Heat scale" id="heatScale"></ul>
           </header>
@@ -103,7 +103,7 @@
           <header class="ph--row">
             <div>
               <p class="eyebrow mute">05 · Compare · <span id="cmpCount">0</span> of 6</p>
-              <h2 class="title" id="h-compare">Side by side, one light.</h2>
+              <h2 class="title" id="h-compare">Compare players</h2>
             </div>
             <div class="ph-controls">
               <span class="select">
@@ -124,7 +124,7 @@
           <header class="ph--row">
             <div>
               <p class="eyebrow mute">06 · Squad · <span id="squadCount">0</span> players</p>
-              <h2 class="title" id="h-squad">Load, save, mark to compare.</h2>
+              <h2 class="title" id="h-squad">Saved players</h2>
             </div>
             <div class="seg seg--roles" role="radiogroup" aria-label="Filter by position" data-deb="md" id="roleFilter"></div>
           </header>
@@ -169,7 +169,7 @@
   <aside class="readout" aria-label="Player readout" id="readout">
     <div class="ro-head">
       <div class="ring" aria-hidden="true">
-        <i class="ring-cast"></i><i class="ring-sheen"></i><i class="ring-glow"></i><i class="ring-arc"></i>
+        <i class="ring-cast"></i><i class="ring-sheen"></i><i class="ring-arc"></i>
         <div class="ring-disc" data-deb="lg"><span class="ring-label mute">OVERALL</span><span class="ring-ovr" data-puck-ovr>—</span></div>
       </div>
       <div class="ro-name" data-puck-name id="roName">Loading…</div>
@@ -192,7 +192,7 @@
 <script src="Squad_saves.js?v=1"></script>
 <script src="calculator.js?v=17"></script>
 <script src="data.js?v=1"></script>
-<script src="app.js?v=3"></script>
+<script src="app.js?v=4"></script>
 <!-- Shared "back to jayjaybee.com" link (jayjaybee.com/projects/ pages only) -->
 <script src="../../../assets/js/back-to-jayjaybee.js" defer></script>
 </body>

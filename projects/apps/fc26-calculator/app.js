@@ -679,7 +679,7 @@
     const H = heat(ovr);
     document.querySelectorAll('[data-puck-ovr]').forEach(el => setText(el, ovr));
     setText($('roName'), S.name); setText($('roHeat'), `${H.word} · ${H.range}`);
-    document.querySelectorAll('.ring-glow, .ring-arc').forEach(el => setStyle(el, '--sweep', sweep));
+    document.querySelectorAll('.ring-arc').forEach(el => setStyle(el, '--sweep', sweep));
     layersOf(res).forEach((L, i) => {
       const g = gauges[i], v = S.ignite ? L.avg : 0, h = heat(v), x = `translate3d(${(barPct(v) - 100).toFixed(2)}%,0,0)`;
       setText(g.avg, L.avg); setAttr(g.b, 'aria-label', `${L.title}, average ${L.avg}. Open details`);
@@ -770,7 +770,6 @@
     tabBtns.forEach((el, i) => el.animate([{ opacity: 0, transform: 'scale(.6)' }, { opacity: 1, transform: 'none' }], { duration: 900, delay: 200 + i * 70, easing: SPRING_EASE, fill: 'backwards' }));
     $('stage').animate([{ opacity: 0 }, { opacity: 1 }], { duration: 700, easing: SOFT, fill: 'backwards' });
     $('readout').animate([{ opacity: 0, transform: 'translate3d(28px,0,0)' }, { opacity: 1, transform: 'none' }], { duration: 1200, delay: 900, easing: SOFT, fill: 'backwards' });
-    document.querySelectorAll('[data-breathe]').forEach(el => el.animate([{ opacity: 1 }, { opacity: 0.6 }], { duration: 3600, direction: 'alternate', iterations: Infinity, easing: 'ease-in-out' }));
     mechCur(S.view); mechSet('flat'); stagger(S.view, 520 * 1);
     setTimeout(() => { mechSet('rise'); setTimeout(() => { mechSet(null); mechCur(); }, 1900); }, 350);
     setTimeout(() => set({ ignite: true }), 1100);
