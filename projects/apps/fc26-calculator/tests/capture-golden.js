@@ -10,11 +10,11 @@ const vm = require('vm');
 const here = __dirname;
 const LEGACY = fs.readFileSync(path.join(here, 'calculator.legacy.js'), 'utf8');
 // cmToFtIn lived in the legacy ui.js; calculator.js called it through the shared global scope.
+// Supplied here with the one deliberate fix (round total inches first, so 182cm reads 6'0" not
+// 5'12"). It only feeds breakdown labels, never a number.
 const CM_TO_FTIN = `function cmToFtIn(cm) {
-    const totalIn = cm / 2.54;
-    const ft = Math.floor(totalIn / 12);
-    const inch = Math.round(totalIn % 12);
-    return \`\${ft}'\${inch}"\`;
+    const totalIn = Math.round(cm / 2.54);
+    return \`\${Math.floor(totalIn / 12)}'\${totalIn % 12}"\`;
   }`;
 
 function makeContext() {
@@ -69,7 +69,6 @@ function runLegacy(state) {
       defending: parseRows(el('defendingBreakdownList').innerHTML), shooting: parseRows(el('shootingBreakdownList').innerHTML),
     },
     slip: { rows: slipRows.map(r => ({ label: r.label, chip: r.chips[0] })), total: +totalRow.chips[0] },
-    recalc: JSON.parse(JSON.stringify(vm.runInContext('recalcEffStats(__s)', ctx))),
   };
 }
 

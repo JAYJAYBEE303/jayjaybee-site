@@ -233,9 +233,7 @@
   /* ═════════ 01 Build ═════════ */
   const gm = {}; U.INPUT_GROUPS.forEach(g => { gm[g.key] = g; });
   const PLATES = [['body', 'plate--body'], ['move', ''], ['pass', ''], ['mental', ''], ['def', 'plate--def'], ['shoot', 'plate--shoot']];
-  // Rounds total inches first, so 182cm reads 6'0" (the engine's cmToFtIn, kept for its breakdown text, gives 5'12").
-  const ftin = cm => { const t = Math.round(cm / 2.54); return `${Math.floor(t / 12)}'${t % 12}"`; };
-  const wellLabel = (st, v) => st.id === 'heightCm' ? `Height · ${ftin(v)}` : st.label + (st.unit ? ` (${st.unit})` : '');
+  const wellLabel = (st, v) => st.id === 'heightCm' ? `Height · ${E.cmToFtIn(v)}` : st.label + (st.unit ? ` (${st.unit})` : '');
   $('plates').innerHTML = PLATES.map(([key, cls]) => {
     const g = gm[key];
     const wells = g.stats.map(st => `<label class="well"><span class="well-label mute">${esc(wellLabel(st, E.DEFAULTS[st.id]))}</span><span class="well-box"><span class="well-field" data-deb="sm"><input class="well-input" type="number" inputmode="numeric" min="${st.min}" max="${st.max}" data-id="${st.id}"></span><i class="well-glow" aria-hidden="true"></i></span></label>`).join('');

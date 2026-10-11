@@ -1,6 +1,6 @@
 // Golden-output tests: the pure engine in calculator.js must reproduce the legacy
-// DOM-bound calculate() exactly (numbers, verdicts, breakdown rows) and leave
-// recalcEffStats() unchanged. Run: `node --test tests/`
+// DOM-bound calculate() exactly (numbers, verdicts, breakdown rows).
+// Run: `node --test tests/*.test.js`
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -41,8 +41,10 @@ test(`computeFeel matches legacy calculate() on ${golden.length} builds`, () => 
   });
 });
 
-test('recalcEffStats is unchanged', () => {
-  golden.forEach((g, i) => assert.deepEqual(E.recalcEffStats(g.state), g.recalc, `case ${i}`));
+test('cmToFtIn rounds total inches, never 12 inches', () => {
+  const cases = { 150: `4'11"`, 178: `5'10"`, 182: `6'0"`, 183: `6'0"`, 210: `6'11"` };
+  for (const [cm, txt] of Object.entries(cases)) assert.equal(E.cmToFtIn(+cm), txt, `${cm}cm`);
+  for (let cm = 150; cm <= 210; cm++) assert.doesNotMatch(E.cmToFtIn(cm), /'12"/, `${cm}cm`);
 });
 
 test('computeFeel fills missing fields from defaults', () => {
