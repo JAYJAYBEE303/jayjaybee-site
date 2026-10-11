@@ -1,4 +1,4 @@
-// Race model and the derived readouts the UI shows — ported from app.js, no DOM, no network.
+// Race model and the derived readouts the UI shows - ported from app.js, no DOM, no network.
 // Every reader looks at the playhead R.t, so panels only show what has happened so far.
 import {
   toMs, byDriver, lastAt, indexAt, formatGap, formatClock, timed, trackStatusTimeline, periods,
@@ -268,7 +268,7 @@ export function standingsRows(R: Race, kind: Kind, label: (key: number | string 
 
 export function standingsNote(R: Race, kind: Kind) {
   const list = R.standings?.[kind] ?? [];
-  if (!R.isRace) return 'Standings are shown for races and sprints — pick one of those.';
+  if (!R.isRace) return 'Standings are shown for races and sprints - pick one of those.';
   if (!list.length) return 'No standings published for this session.';
   return 'Live: standings before this session plus points for the current running order.';
 }

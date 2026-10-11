@@ -24,7 +24,7 @@ Portrait 1.png
 Portrait 2.png
 Portrait 3.png
 
-# Work documents — never part of a public portfolio site
+# Work documents - never part of a public portfolio site
 *.docx
 *.xlsx
 *.xls
@@ -38,7 +38,7 @@ Portrait 3.png
 .bundle/
 .vscode/
 
-# Large binaries — GitHub rejects files over 100 MB
+# Large binaries - GitHub rejects files over 100 MB
 *.potx
 *.pptx
 *.psd
@@ -46,6 +46,6 @@ Portrait 3.png
 *.mov
 *.zip
 
-# AMF1 work content — must never end up public
+# AMF1 work content - must never end up public
 *AMF1*
 *Aston*

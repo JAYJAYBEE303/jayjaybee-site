@@ -1,5 +1,5 @@
 /* =========================================================================
-   jayjaybee.com — search.js
+   jayjaybee.com - search.js
    Vanilla JS, no build step. Owns the nav search component end-to-end:
 
      - Open/close UI state (`.is-open` + aria-expanded on the icon button).
@@ -20,7 +20,7 @@
   'use strict';
 
   // -------------------------------------------------------------------------
-  // DOM references — bail out cleanly if the component isn't on the page.
+  // DOM references - bail out cleanly if the component isn't on the page.
   // -------------------------------------------------------------------------
   var search    = document.querySelector('[data-search]');
   if (!search) return;
@@ -37,7 +37,7 @@
   // Per-tick state. `hits` is rebuilt on every search; `activeIdx` indexes
   // into it for prev/next navigation. `scrollCommitted` flags whether the
   // user has already triggered a scroll-action (Enter, chip, prev/next)
-  // for the current `lastQuery` — used so a second Enter advances to the
+  // for the current `lastQuery` - used so a second Enter advances to the
   // next match instead of re-scrolling to the first.
   var hits            = [];
   var activeIdx       = -1;
@@ -54,7 +54,7 @@
   }
 
   // -------------------------------------------------------------------------
-  // Open / close — toggles `.is-open` on .search and flips the button's
+  // Open / close - toggles `.is-open` on .search and flips the button's
   // aria-expanded. Close also clears highlights + match-count state per
   // the spec ("On close: clear all highlights and reset match-count state").
   // -------------------------------------------------------------------------
@@ -67,7 +67,7 @@
     search.classList.add('is-open');
     toggleBtn.setAttribute('aria-expanded', 'true');
     // setTimeout lets the CSS width transition begin before the focus
-    // grab — otherwise some browsers scroll the page on focus before
+    // grab - otherwise some browsers scroll the page on focus before
     // the input has any visible width.
     setTimeout(function () { input.focus(); }, 0);
   }
@@ -133,7 +133,7 @@
   });
 
   // -------------------------------------------------------------------------
-  // Chips — set input.value to the chip label and trigger a search.
+  // Chips - set input.value to the chip label and trigger a search.
   //   mousedown.preventDefault keeps the input focused (so blur doesn't
   //   fire and the panel doesn't try to close).
   // -------------------------------------------------------------------------
@@ -147,7 +147,7 @@
   });
 
   // -------------------------------------------------------------------------
-  // Typing — debounce to 200ms idle. Enter cancels the debounce and runs
+  // Typing - debounce to 200ms idle. Enter cancels the debounce and runs
   // immediately. Debounced runs DON'T scroll (the user is still typing and
   // a jumpy page is disorienting); Enter and chip clicks DO scroll.
   // -------------------------------------------------------------------------
@@ -164,7 +164,7 @@
 
     // If the user has already pressed Enter (or used prev/next, or a chip)
     // for this exact query, advance to the next match. Otherwise treat the
-    // Enter as a "commit" — re-confirm/scroll to the first hit (rerunning
+    // Enter as a "commit" - re-confirm/scroll to the first hit (rerunning
     // the search if anything has changed).
     var queryNorm = normaliseQuery(input.value);
     if (queryNorm && queryNorm === lastQuery && hits.length > 0) {
@@ -172,7 +172,7 @@
         // Same query, already showed first match → step forward.
         moveActive(1);
       } else {
-        // First Enter after debounced typing — scroll to the existing
+        // First Enter after debounced typing - scroll to the existing
         // active (first) hit without rebuilding the highlights.
         scrollToHit(hits[activeIdx]);
         scrollCommitted = true;
@@ -180,7 +180,7 @@
       return;
     }
 
-    // Query changed (or no hits yet) — run a fresh search with scroll.
+    // Query changed (or no hits yet) - run a fresh search with scroll.
     runSearch({ scroll: true });
   });
 
@@ -225,7 +225,7 @@
   // click handler in animations.js so the open animation (max-height +
   // transitionend bookkeeping) stays consistent.
   //
-  // scrollToHit: defers the scroll if we just expanded a panel — until the
+  // scrollToHit: defers the scroll if we just expanded a panel - until the
   // CSS max-height transition finishes the hit's bounding rect is still at
   // the panel's collapsed position, so an immediate scroll would land off
   // the highlight.
@@ -269,17 +269,17 @@
 
   // -------------------------------------------------------------------------
   // Normalisation
-  //   Lowercase, replace -/–/— with space, collapse runs of whitespace to
+  //   Lowercase, replace -/–/- with space, collapse runs of whitespace to
   //   a single space. We track for each normalised character the inclusive
   //   range of original-string indices that produced it, so a match found
   //   in the normalised string can be projected back to the original
-  //   range — which is what we wrap with <mark> to preserve display text.
+  //   range - which is what we wrap with <mark> to preserve display text.
   // -------------------------------------------------------------------------
   function normChar (c) {
     // Dashes (hyphen, en-dash, em-dash) all collapse to a single space.
     if (c === '-' || c === '–' || c === '—') return ' ';
     // /\s/ matches ASCII whitespace and U+00A0 (non-breaking space) on
-    // modern engines — important because the nav and prose use &nbsp;
+    // modern engines - important because the nav and prose use &nbsp;
     // in places like "Aston Martin Aramco Formula One™ Team".
     if (/\s/.test(c)) return ' ';
     return c.toLowerCase();
@@ -295,7 +295,7 @@
       var nc = normChar(text.charAt(i));
       if (nc === ' ') {
         if (prevSpace) {
-          // Extend the previous normalised char's "end" — runs of
+          // Extend the previous normalised char's "end" - runs of
           // whitespace map to a single space whose range covers all
           // contributing original characters.
           ends[ends.length - 1] = i;
@@ -320,7 +320,7 @@
   }
 
   // -------------------------------------------------------------------------
-  // Highlight clearing — replace every <mark.search-hit> with its inner
+  // Highlight clearing - replace every <mark.search-hit> with its inner
   // text and merge the surrounding text nodes back together so subsequent
   // searches operate on whole, untouched runs.
   // -------------------------------------------------------------------------
@@ -340,7 +340,7 @@
   // -------------------------------------------------------------------------
   // Walk the main subtree, collecting candidate text nodes. Skip:
   //   - <script>, <style>, <noscript>, <iframe>, <mark> (existing
-  //     highlights — defensive even though clearHighlights ran first).
+  //     highlights - defensive even though clearHighlights ran first).
   //   - Anything inside the search component itself.
   // -------------------------------------------------------------------------
   var EXCLUDED_TAGS = { SCRIPT: 1, STYLE: 1, NOSCRIPT: 1, IFRAME: 1, MARK: 1 };
@@ -366,7 +366,7 @@
       {
         acceptNode: function (node) {
           if (!node.nodeValue) return NodeFilter.FILTER_REJECT;
-          // Skip pure whitespace nodes — nothing to match in them.
+          // Skip pure whitespace nodes - nothing to match in them.
           if (!/\S/.test(node.nodeValue)) return NodeFilter.FILTER_REJECT;
           if (isExcluded(node)) return NodeFilter.FILTER_REJECT;
           return NodeFilter.FILTER_ACCEPT;
@@ -407,12 +407,12 @@
   }
 
   // -------------------------------------------------------------------------
-  // Main search routine — clears prior highlights, walks the main subtree,
+  // Main search routine - clears prior highlights, walks the main subtree,
   // wraps matches, updates the count + arrow state, and scrolls to the
   // first match.
   // -------------------------------------------------------------------------
   function runSearch (opts) {
-    // `scroll` defaults to false — debounced typing should not jump the
+    // `scroll` defaults to false - debounced typing should not jump the
     // page around. Enter, chip-clicks, and prev/next pass scroll: true.
     var shouldScroll = !!(opts && opts.scroll);
     var queryRaw  = input.value;

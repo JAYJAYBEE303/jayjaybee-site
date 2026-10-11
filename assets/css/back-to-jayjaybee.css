@@ -1,7 +1,7 @@
 /* ============================================================
-   jayjaybee.com — "back to jayjaybee.com" link
+   jayjaybee.com - "back to jayjaybee.com" link
    Injected only on /projects/ sub-project pages by
-   /assets/js/back-to-jayjaybee.js — see that file for the
+   /assets/js/back-to-jayjaybee.js - see that file for the
    path safeguard and detection logic.
 
    Deliberately unopinionated: no font-family and no brand
@@ -9,8 +9,8 @@
    dropped into an existing nav bar it borrows that nav's own
    item classes at runtime, so it is styled entirely by the
    host project's own CSS. The rules below only cover the
-   fallback cases — a bare, unstyled nav item, or no nav bar
-   at all — and even those derive their color from `currentColor`
+   fallback cases - a bare, unstyled nav item, or no nav bar
+   at all - and even those derive their color from `currentColor`
    so they track whatever palette the host page has already
    resolved (including its own light/dark theme).
    ============================================================ */
@@ -34,7 +34,7 @@
   opacity: 1;
 }
 
-/* No nav bar on the page at all — float in the same "leftmost,
+/* No nav bar on the page at all - float in the same "leftmost,
    top-level" spot a nav item would occupy, styled only with
    currentColor so it adapts to the host page's own theme. */
 .jjb-back-link--floating {

@@ -1,5 +1,5 @@
 /* =========================================================================
-   jayjaybee.com — wiki.js
+   jayjaybee.com - wiki.js
    Loaded only by _layouts/wiki-entry.html, i.e. only on
    /projects/wiki/<app>/<section>/.
 
@@ -19,7 +19,7 @@
      4. Open a definition when an infobox term is clicked.
      5. Show a small preview card when the reader hovers an internal wiki
         link. The card's content comes from data-peek-* attributes the
-        build already wrote onto each link — no manifest, no fetch.
+        build already wrote onto each link - no manifest, no fetch.
    ========================================================================= */
 (function () {
   'use strict';
@@ -104,7 +104,7 @@
 
      Injected rather than authored into the rail, so with JS off there is
      no dead control. Filtering is over data attributes the build already
-     wrote onto each row — no index, no fetch.
+     wrote onto each row - no index, no fetch.
 
      Row numbers are NOT rewritten when the rail narrows: 07 identifies
      the section, not its position in a filtered list.
@@ -165,7 +165,7 @@
     }
 
     input.addEventListener('input', apply);
-    // Escape clears rather than closes — there is nothing to close.
+    // Escape clears rather than closes - there is nothing to close.
     input.addEventListener('keydown', function (ev) {
       if (ev.key === 'Escape' && input.value) {
         ev.preventDefault();

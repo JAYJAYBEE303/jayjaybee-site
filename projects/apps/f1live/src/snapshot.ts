@@ -1,4 +1,4 @@
-// The view contract: everything the page renders, as plain data. Types only — no runtime code.
+// The view contract: everything the page renders, as plain data. Types only - no runtime code.
 // Built from the real race by toSnapshot() and from the simulation by the mock source.
 import type { RefObject } from 'react';
 import type { Status } from './replay.ts';

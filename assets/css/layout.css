@@ -1,9 +1,9 @@
 /* =========================================================================
-   jayjaybee.com — layout.css
+   jayjaybee.com - layout.css
    Structural rules: page shell, header, nav, footer, and the section
    shapes used on the home page (lede, narrative, roles, work, about).
 
-   Static visual properties only — colours, sizes, gutters, grids,
+   Static visual properties only - colours, sizes, gutters, grids,
    hover state changes. Motion (transitions, animations, reveal system,
    transform-based hover lifts) lives in components.css.
    ========================================================================= */
@@ -14,7 +14,7 @@
    brand mark sits on top; a row of sans-serif nav links plus the
    site search sits below. The hairline runs along the bottom edge of
    the inner block, dividing header from page body.
-   No logo, no hamburger — the link row wraps on narrow widths.
+   No logo, no hamburger - the link row wraps on narrow widths.
    ========================================================================= */
 .site-header {
   width: 100%;
@@ -32,7 +32,7 @@
   border-bottom: var(--border-hairline);
 }
 
-/* Wordmark — large serif, ink, no underline. The brand mark (an
+/* Wordmark - large serif, ink, no underline. The brand mark (an
    8px accent square) sits next to it, baselined with the cap height. */
 .site-wordmark {
   display: inline-flex;
@@ -60,13 +60,13 @@
   height: 8px;
   background: var(--accent);
   align-self: center;
-  /* Optical nudge — without it the dot sits slightly above the visual
+  /* Optical nudge - without it the dot sits slightly above the visual
      midpoint of the wordmark's lowercase x-height. */
   transform: translateY(2px);
   flex: 0 0 auto;
 }
 
-/* Top row — wordmark on the left, theme toggle on the right.
+/* Top row - wordmark on the left, theme toggle on the right.
    Vertically centred so the toggle pill sits aligned with the
    wordmark mass. */
 .site-header__top {
@@ -76,7 +76,7 @@
   gap: var(--space-5);
 }
 
-/* Nav row — links left, search right. position: relative keeps the
+/* Nav row - links left, search right. position: relative keeps the
    dropdown panels (anchored to their triggers) inside this stacking
    context. */
 .site-header__row {
@@ -88,7 +88,7 @@
   flex-wrap: wrap;
 }
 
-/* Link row — sans, ink, no underline. Accent link is the one exception. */
+/* Link row - sans, ink, no underline. Accent link is the one exception. */
 .site-nav__list {
   display: flex;
   flex-wrap: wrap;
@@ -118,7 +118,7 @@
   color: var(--accent-hover);
 }
 
-/* Dropdown triggers — buttons styled as nav links */
+/* Dropdown triggers - buttons styled as nav links */
 .site-nav__item.has-menu { position: relative; }
 .site-nav__trigger {
   appearance: none;
@@ -141,7 +141,7 @@
   transform: translateY(-0.1em) rotate(180deg);
 }
 
-/* Dropdown panel — hairline-bordered card, anchored under the trigger */
+/* Dropdown panel - hairline-bordered card, anchored under the trigger */
 .site-nav__menu {
   position: absolute;
   top: calc(100% + var(--space-3));
@@ -182,7 +182,7 @@
 }
 
 @media (max-width: 36rem) {
-  /* Tighten internal gap on small screens — the wordmark is already
+  /* Tighten internal gap on small screens - the wordmark is already
      dominating; keep the nav row close. */
   .site-header__inner { gap: var(--space-3); }
   .site-nav__list     { gap: var(--space-5); }
@@ -209,7 +209,7 @@
   margin-top: clamp(var(--space-9), 9vw, var(--section-gap-l));
 }
 
-/* Section headers — small mono eyebrow above a serif title */
+/* Section headers - small mono eyebrow above a serif title */
 .section-head {
   display: flex;
   flex-direction: column;
@@ -224,7 +224,7 @@
   letter-spacing: var(--tr-headline);
 }
 
-/* Display variant — for a section title that IS the page's opening
+/* Display variant - for a section title that IS the page's opening
    heading, on pages with no separate .lede-block above it. Borrows the
    lede's type tokens so it reads at hero scale. Keep in sync with
    .lede-line below, including its narrow-viewport clamp. */
@@ -242,7 +242,7 @@
 
 /* =========================================================================
    PROJECTS HERO (ledger variant)
-   Alternate opening-header treatment for /projects — a two-column ledger
+   Alternate opening-header treatment for /projects - a two-column ledger
    row (entry count, then kicker/title/sub) instead of the mono-label +
    .section-title--display pattern used elsewhere. Markup + params live
    in _includes/projects-hero.html.
@@ -252,7 +252,7 @@
 
    margin-bottom on .proj-hero-b matches --space-7, the same token
    .section-head declares below for exactly this purpose (the gap
-   before a section's list starts) — this is that same site-wide rule,
+   before a section's list starts) - this is that same site-wide rule,
    not a new value invented for this component. .work-item's own
    border-top + padding-top: var(--space-7) still applies on top of
    this, same as it always has for every .section-head + .work-list
@@ -269,11 +269,11 @@
 @media (max-width: 36rem) {
   .proj-hero-b { grid-template-columns: 1fr; }
 }
-/* The ledger numeral — deliberately stacked three lines by fixed
+/* The ledger numeral - deliberately stacked three lines by fixed
    character position ("02" / "/0" / "2" for a "NN/NN" count), not
    left to wrap. It first read as an accidental line-break (the fixed
    5.5rem column IS narrower than "NN/NN" set inline), but that
-   2-2-1 stacked look is the wanted one — a flex column makes it
+   2-2-1 stacked look is the wanted one - a flex column makes it
    deliberate and stable instead of depending on the browser's own
    line-breaking around "/", which is fragile across fonts/zoom
    levels. The three chunks are separate <span class="proj-hero-b__n-line">
@@ -297,13 +297,13 @@
    everywhere, and even --fs-subhead (max 1.875rem, the prior value
    here) read too small against the work-item titles below. 2rem is
    the FLOOR of .work-item--featured .work-title's own clamp
-   (clamp(2rem, 3vw + 1rem, 2.875rem)) — a deliberate anchor to "at
+   (clamp(2rem, 3vw + 1rem, 2.875rem)) - a deliberate anchor to "at
    least as big as a project title ever gets", not an arbitrary
    number. Not itself clamped: letting it scale up with viewport
    width the way the featured titles do reintroduces the two-line
    wrap on wide screens, and this component isn't the featured card
    titles' equal in the hierarchy, just close in size. text-wrap:
-   balance stays as a fallback — if the copy grows past what fits, it
+   balance stays as a fallback - if the copy grows past what fits, it
    degrades to two even lines instead of overflowing. */
 .proj-hero-b__title {
   font-family: var(--font-serif);
@@ -332,7 +332,7 @@
 }
 
 /* =========================================================================
-   LEDE — the opening line. The single biggest element on the page.
+   LEDE - the opening line. The single biggest element on the page.
    ========================================================================= */
 .lede-block {
   display: flex;
@@ -363,7 +363,7 @@
 }
 
 /* =========================================================================
-   NARRATIVE — single prose paragraph inside the wide measure.
+   NARRATIVE - single prose paragraph inside the wide measure.
    ========================================================================= */
 .narrative .prose {
   font-size: var(--fs-lede);
@@ -386,7 +386,7 @@
   cursor: pointer;
   display: grid;
   /* Fixed-width date column keeps the dates aligned regardless of role
-     title length — the typographic version of a CV gutter. */
+     title length - the typographic version of a CV gutter. */
   grid-template-columns: 11rem 1fr;
   gap: var(--space-7);
   align-items: baseline;
@@ -467,7 +467,7 @@
   margin-top: var(--space-1);
 }
 
-/* Longer-form role detail — bullet list of responsibilities.
+/* Longer-form role detail - bullet list of responsibilities.
    Short roles (Red Bull, Apple) use just .role-note and stop there;
    richer roles add this list under the lead paragraph. Each item
    is hung off a quiet em-dash so the list reads as editorial bullets
@@ -500,14 +500,14 @@
   text-wrap: pretty;
 }
 .role-points li::before {
-  content: "—";
+  content: "-";
   color: var(--fg-quiet);
   position: absolute;
   left: 0;
   top: 0;
 }
 
-/* Key wins — small mono eyebrow above a final serif sentence.
+/* Key wins - small mono eyebrow above a final serif sentence.
    Used to spotlight the things from the role most worth pointing
    at. Slightly stronger ink than .role-note so the eye lands on
    it as the closer for the row. */
@@ -526,7 +526,7 @@
   margin-top: var(--space-2);
 }
 
-/* Disclosure rows — Responsibilities & Key wins/achievements/competencies.
+/* Disclosure rows - Responsibilities & Key wins/achievements/competencies.
    A button + panel pair: the button is a clickable mono eyebrow with a small
    rotating chevron; the panel below holds the content. Collapsed by default
    so the role reads as a paragraph and visitors choose what to expand. */
@@ -537,7 +537,7 @@
 /* Button reset + clickable mono-label styling. Using a real <button> gives us
    keyboard support and the pointer cursor for free; the reset strips every bit
    of native browser chrome (the box, the focus ring, the OS background) so the
-   label reads as plain text — just like the nav links — until you hover it. */
+   label reads as plain text - just like the nav links - until you hover it. */
 .role-disclosure-summary {
   -webkit-appearance: none;
   appearance: none;
@@ -587,7 +587,7 @@
   border-radius: var(--radius-1);
 }
 
-/* Animated panel — max-height with a generous ceiling collapses the panel
+/* Animated panel - max-height with a generous ceiling collapses the panel
    inline. Paired with the nav's fade + 6px slide + 0.985 scale so the motion
    language matches across the site. Asymmetric timing: 500ms to open (letting
    the eye follow content unfolding), 200ms to close (snappy dismissal). */
@@ -612,7 +612,7 @@
     transform  300ms var(--ease);
 }
 
-/* Targeted-by-anchor state — vermillion left rule lights up.
+/* Targeted-by-anchor state - vermillion left rule lights up.
    :target handles deep-links (e.g. someone shares /#exp-amf1).
    .is-targeted is the JS-applied equivalent for in-page nav clicks,
    where animations.js strips the hash from the URL after scrolling
@@ -639,7 +639,7 @@
 }
 
 /* =========================================================================
-   WORK — project cards as list rows. No box, no shadow.
+   WORK - project cards as list rows. No box, no shadow.
    ========================================================================= */
 .work-list {
   display: flex;
@@ -661,7 +661,7 @@
   padding-bottom: var(--space-8);
 }
 
-/* Metadata — mono, separated by middle dots */
+/* Metadata - mono, separated by middle dots */
 .work-meta {
   display: flex;
   flex-wrap: wrap;
@@ -676,7 +676,7 @@
 .work-meta .mono { color: var(--fg-quiet); }
 .mono-sep { color: var(--fg-faint); }
 
-/* Title — serif, big, accent italic. Plain text, not a link: the
+/* Title - serif, big, accent italic. Plain text, not a link: the
    entry's actions row (.work-actions) carries both destinations. */
 .work-title {
   font-family: var(--font-serif);
@@ -735,7 +735,7 @@
   color: var(--fg);
 }
 
-/* Actions cell — "Launch app" (a.wk-launch, the wiki's own primary
+/* Actions cell - "Launch app" (a.wk-launch, the wiki's own primary
    button) plus a quieter text link to the write-up. Sits in the last
    grid column, pushed to the right edge and bottom of the attrs row. */
 .work-actions {
@@ -764,7 +764,7 @@
 }
 
 /* =========================================================================
-   ABOUT — long-form section in four numbered parts. Each .about__sub is
+   ABOUT - long-form section in four numbered parts. Each .about__sub is
    its own reveal unit; layout primitives (rows, columns, comp-grid, keeps)
    are scoped under .about so they can't leak.
    ========================================================================= */
@@ -775,7 +775,7 @@
   margin: var(--space-7) 0 var(--space-6);
 }
 
-/* Subsection wrapper — vertical rhythm. */
+/* Subsection wrapper - vertical rhythm. */
 .about__sub {
   display: flex;
   flex-direction: column;
@@ -785,7 +785,7 @@
   margin-top: var(--space-9);
 }
 
-/* Numbered kicker — mono caps with accent number. */
+/* Numbered kicker - mono caps with accent number. */
 .about__sub-kicker {
   font-family: var(--font-mono);
   font-size: var(--fs-mono);
@@ -798,7 +798,7 @@
 }
 .about__num { color: var(--fg-faint); }
 
-/* Subsection title — serif subhead. */
+/* Subsection title - serif subhead. */
 .about__sub-title {
   font-family: var(--font-serif);
   font-weight: var(--fw-medium);
@@ -948,7 +948,7 @@
   color: var(--fg);
   text-wrap: pretty;
 }
-/* "Currently learning" row directly under the comp grid — labelled row
+/* "Currently learning" row directly under the comp grid - labelled row
    pattern but without the rows-list borders. */
 .about__comp-foot {
   display: grid;
@@ -1028,7 +1028,7 @@
 
 
 /* =========================================================================
-   FOOTER — three info blocks then a hairline-separated bottom strip.
+   FOOTER - three info blocks then a hairline-separated bottom strip.
    ========================================================================= */
 .site-footer {
   border-top: var(--border-hairline);
@@ -1111,22 +1111,22 @@
 }
 
 /* =========================================================================
-   AI THESIS — long-form essay page (/ai-thesis/).
+   AI THESIS - long-form essay page (/ai-thesis/).
    Mast + stat strip + sticky-rail TOC + article body, three chapters.
-   One-off page, so its rules live here rather than a new partial — same
+   One-off page, so its rules live here rather than a new partial - same
    call as .proj-hero-b above. Micro mono labels reuse .mono-label and
    .accent (see global.css) instead of restating that pattern; chapter
    tags reuse .chip. Font-size is the one type-scale category with no
-   existing rung small enough for these — --fs-mono stands in rather
+   existing rung small enough for these - --fs-mono stands in rather
    than adding a token for what is currently a single page.
    ========================================================================= */
 /* The reading-progress line that used to live here as .es-progress is
-   now .read-progress in components.css — the home page and /projects
+   now .read-progress in components.css - the home page and /projects
    opt into it too, so it stopped being an essay-only one-off. */
 
 .es-mast {
   /* .page's own padding-top (clamp(--space-7, 6vw, --space-10)) grows
-     past --space-7 on wide viewports — fine for .lede-block and
+     past --space-7 on wide viewports - fine for .lede-block and
      .proj-hero-b, which don't need to match anything below them. This
      page does: the gap under the stat strip (.es-rail/.es-art's own
      padding-top) is a flat --space-7. Cancelling the clamp's growth
@@ -1282,7 +1282,7 @@
   scroll-margin-top: var(--space-6);
 }
 .es-art > .es-chapter > h3:first-of-type { margin-top: var(--space-5); }
-/* :not() the two label <p>s below — .es-chapter__num and .es-close are
+/* :not() the two label <p>s below - .es-chapter__num and .es-close are
    <p> tags too, so the bare ".es-art p" was catching them as well and
    (being more specific than their own single-class rules) was winning:
    .es-chapter__num picked up an unwanted --space-4 top margin it never
@@ -1334,7 +1334,7 @@
   gap: var(--space-2);
 }
 .es-info__body li { position: relative; padding-left: var(--space-4); }
-.es-info__body li::before { content: "—"; position: absolute; left: 0; color: var(--fg-faint); }
+.es-info__body li::before { content: "-"; position: absolute; left: 0; color: var(--fg-faint); }
 .es-info__body li b { font-weight: var(--fw-semibold); color: var(--fg); }
 
 .es-roman { list-style: none; padding: 0; counter-reset: er; margin-top: var(--space-4); }
@@ -1352,7 +1352,7 @@
 
 /* Nested sub-list (a taxonomy's lettered items under a numbered category).
    Selectors need every ancestor type named (.es-roman li ol li, not just
-   "li") so they out-specificity the bare .es-roman li rules above —
+   "li") so they out-specificity the bare .es-roman li rules above -
    otherwise a nested <li> would inherit the outer roman counter/colour
    instead of its own lower-alpha one. Same pattern as .es-art p:not()
    further up this file. */
@@ -1412,7 +1412,7 @@
 }
 
 /* =========================================================================
-   RESPONSIVE — breakpoints that don't fit cleanly inside clamp().
+   RESPONSIVE - breakpoints that don't fit cleanly inside clamp().
    ========================================================================= */
 @media (max-width: 56rem) {
   .footer-inner {

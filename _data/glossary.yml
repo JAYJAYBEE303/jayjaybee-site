@@ -1,15 +1,15 @@
 # =============================================================================
-# glossary.yml — definitions behind the clickable values in a wiki infobox.
+# glossary.yml - definitions behind the clickable values in a wiki infobox.
 #
 # A key is an infobox value, LOWERCASED and trimmed. _includes/wiki-infobox.html
 # tries each value whole first, then splits it on "·" and tries each part, so
 # both "live · iterating" as a whole and "live" on its own can be defined.
-# A part with no key here renders as plain text — that is the normal case,
+# A part with no key here renders as plain text - that is the normal case,
 # not a failure.
 #
 #   kind:  the small accent label at the top of the card
 #   text:  the definition
-#   ref:   optional — a SECTION slug. Renders "Full entry: <title> →".
+#   ref:   optional - a SECTION slug. Renders "Full entry: <title> →".
 #          An unresolvable slug renders no link rather than a broken one.
 # =============================================================================
 
@@ -30,7 +30,7 @@
 "fpl api":
   kind: Source
   text: >
-    Supplies the spine — squads, prices, positions, fixtures, per-player
+    Supplies the spine - squads, prices, positions, fixtures, per-player
     histories and live gameweek scoring. It has no standings endpoint and
     no access to any season but the current one.
   ref: the-data
@@ -48,7 +48,7 @@
   text: >
     Base difficulty, counter-matchup, team form, head-to-head and home
     and away. Each is scored separately, weighted, and combined into one
-    CompositeScore — because "hard fixture" and "hard fixture for a
+    CompositeScore - because "hard fixture" and "hard fixture for a
     winger" are different questions.
   ref: calculations
 
@@ -63,12 +63,12 @@
   kind: Stack
   text: >
     Everything analytical runs in the browser. No framework, and no CSS
-    library — the tokens and components are the app's own.
+    library - the tokens and components are the app's own.
 
 "html · js · tailwind":
   kind: Stack
   text: >
-    Rebuilt in Tailwind once the formulas had stopped moving —
+    Rebuilt in Tailwind once the formulas had stopped moving -
     deliberately in that order, so styling effort was not spent on
     layouts the maths was about to invalidate.
   ref: two-layouts
@@ -89,7 +89,7 @@
   ref: one-file-no-build
 
 # -----------------------------------------------------------------------------
-# Gaffer IQ's shape panel — the vocabulary the write-up assumes. Same keys and
+# Gaffer IQ's shape panel - the vocabulary the write-up assumes. Same keys and
 # same shape as everything above; these are just grouped in the infobox by
 # `shape` on the app page rather than sitting on the right of a key/value row.
 # -----------------------------------------------------------------------------
@@ -241,7 +241,7 @@
   kind: Sub-metric
   text: >
     The real cross-season record between two clubs. Deliberately capped
-    at a 0.1 weight — testing showed anything larger made predictions
+    at a 0.1 weight - testing showed anything larger made predictions
     worse, because a rivalry from three managers ago is weak evidence.
   ref: fixtures-head-to-head
 
@@ -272,7 +272,7 @@
 "matchup breakdown":
   kind: Region
   text: >
-    The central element of the Matchups page — the deep dive on one
+    The central element of the Matchups page - the deep dive on one
     fixture, showing decision weight, confidence, playstyle counters and
     the overall prediction score.
   ref: matchup-the-tools

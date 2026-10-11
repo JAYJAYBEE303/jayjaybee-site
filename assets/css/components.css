@@ -1,5 +1,5 @@
 /* =========================================================================
-   jayjaybee.com — components.css
+   jayjaybee.com - components.css
    Reusable bits + every motion concern: theme toggle, the reveal-on-scroll
    system, hover/state transitions shared across nav/work/role/now/footer,
    the .flash utility, and the no-JS failsafe.
@@ -41,7 +41,7 @@
   outline-offset: 2px;
 }
 .theme-toggle::before {
-  /* Leading glyph that swaps with the theme — light=○, dark=●, system=◐ */
+  /* Leading glyph that swaps with the theme - light=○, dark=●, system=◐ */
   content: attr(data-glyph) " ";
   margin-right: 0.1em;
   color: var(--fg-quiet);
@@ -59,7 +59,7 @@
 }
 
 /* =========================================================================
-   FLASH — one-shot tint utility for values that update after boot
+   FLASH - one-shot tint utility for values that update after boot
    ========================================================================= */
 @keyframes flash-once {
    0% { background-color: var(--accent-soft); }
@@ -135,23 +135,23 @@
    _layouts/default.html, which sets .wk-continue on <html> before
    first paint, only when BOTH pages are sections of the same
    write-up): the reader is staying inside one write-up, so the frame
-   around the article holds still — both rails and the breadcrumb,
+   around the article holds still - both rails and the breadcrumb,
    which are the parts that either don't change at all or change only
    by which row is marked current. Everything inside the article
    itself still fades, so the swap reads as "this panel changed"
    rather than "the page reloaded".
-   Arriving from ANYWHERE ELSE — /projects/, another write-up, a
-   direct link, off-site — sets no .wk-continue, none of this applies,
+   Arriving from ANYWHERE ELSE - /projects/, another write-up, a
+   direct link, off-site - sets no .wk-continue, none of this applies,
    and the whole page performs its normal entrance. That is the point:
    a first arrival should look like one.
    Needs .wk-layout in the chain to outrank the hidden-state rule
    above: :is()'s specificity is the specificity of its single most
    specific argument, for the WHOLE pseudo-class, not just whichever
-   branch actually matches — and something like ".about .section-head"
+   branch actually matches - and something like ".about .section-head"
    in that list already makes ".js :is(...)" work out to (0,3,0). Two
    classes plus html here would only reach (0,2,1) and lose; the third
    class from .wk-layout (a genuine ancestor of both targets below,
-   see wiki-entry.html) gets this to (0,3,1) — confirmed live rather
+   see wiki-entry.html) gets this to (0,3,1) - confirmed live rather
    than assumed, since this exact specificity race already produced a
    silent loss once. */
 html.wk-continue .wk-layout :is(
@@ -167,7 +167,7 @@ html.wk-continue .wk-layout :is(
    a wiki entry NOT handled by the shared reveal system above, and
    they are kept out of it deliberately: .wk-body is the whole rest of
    the article, several viewport-heights tall on a long entry, and the
-   shared observer only fires past a 0.06 intersection ratio — a
+   shared observer only fires past a 0.06 intersection ratio - a
    ratio an element that tall can fail to reach from a deep link or a
    restored scroll position, leaving the text invisible until the
    reader scrolls far enough to satisfy it. That is why it was pulled
@@ -175,7 +175,7 @@ html.wk-continue .wk-layout :is(
    Being out of the lists is not the same as never fading, though.
    The hidden state here is unconditional (every arrival, continue or
    not), and animations.js reveals it on boot with a plain class add
-   and no observer at all — see revealArticleBody. Nothing about a
+   and no observer at all - see revealArticleBody. Nothing about a
    wiki entry's prose wants scroll-triggering: it starts within the
    first viewport on every entry, so "reveal when scrolled to" and
    "reveal on load" are the same moment, and only one of them has a
@@ -189,7 +189,7 @@ html.wk-continue .wk-layout :is(
   /* Same --reveal-delay hook as the shared hidden-state block above.
      Without it setupWikiCascade() still sets the property here and
      nothing consumes it, so the prose ignores its place in the
-     cascade and fades in level with whatever went first — which is
+     cascade and fades in level with whatever went first - which is
      exactly the out-of-order entrance this cascade exists to fix. */
   transition-delay: var(--reveal-delay, 0ms);
   will-change: opacity, transform;
@@ -204,7 +204,7 @@ html.wk-continue .wk-layout :is(
    setupWikiCascade() rather than by the scroll observer, and the
    sitewide failsafe further down this file can't cover them: it is
    scoped to .js:not(.has-reveal), and setupReveal() sets .has-reveal
-   on every page that has a footer to observe — which is all of them.
+   on every page that has a footer to observe - which is all of them.
    So if the cascade never runs (a JS error earlier in boot(), say),
    nothing else would bring these back and the article would stay
    blank. Shorter than the sitewide 3s because this path has no scroll-
@@ -229,7 +229,7 @@ html.wk-continue .wk-layout :is(
   animation: failsafe-reveal 1ms linear 800ms forwards;
 }
 
-/* Per-element starting transforms — variants. Set after the shared
+/* Per-element starting transforms - variants. Set after the shared
    declaration so they override the default translateY. */
 .js .site-wordmark           { transform: translate3d(-12px, 0, 0); }
 .js .site-nav__list > li     { transform: translate3d( 12px, 0, 0); }
@@ -237,14 +237,14 @@ html.wk-continue .wk-layout :is(
 .js .site-header__top > .theme-toggle { transform: translate3d( 12px, 0, 0); }
 .js :is(.lede-meta, .footer-rule) { transform: none; }
 .js .lede-line               { transform: translateY(14px); --reveal-dur: 760ms; }
-/* Bio paragraph — opacity-only, no movement. Reveal timing is controlled
+/* Bio paragraph - opacity-only, no movement. Reveal timing is controlled
    by the bio-race logic in animations.js (timed or scroll-triggered). */
 .js .narrative .prose        { transform: none; }
 .js .narrative .prose.is-bio-timed {
   transition: opacity 650ms ease-in-out;
 }
 
-/* Revealed state — same end state for every element. */
+/* Revealed state - same end state for every element. */
 .js :is(
   .site-wordmark,
   .site-nav__list > li,
@@ -291,13 +291,13 @@ html.wk-continue .wk-layout :is(
   will-change: auto;
 }
 
-/* Header opt-out — every page but the front one.
+/* Header opt-out - every page but the front one.
    The four header elements above are an arrival animation: they earn
    their fade on the page a reader lands on, and on a sub-page they only
    replay motion the reader has already watched. `is-home` is written
    onto <html> by _layouts/default.html, so this holds from the first
    paint and the header never flashes hidden. The observer in
-   animations.js still runs and still adds .is-visible — it sets these
+   animations.js still runs and still adds .is-visible - it sets these
    same two values, so it lands on an element already at rest and no
    transition has anything to interpolate. Deliberately NOT `transition:
    none`: this selector outranks the hover rules further down the file,
@@ -317,11 +317,11 @@ html:not(.is-home) :is(
 
 /* =========================================================================
    HOVER / STATE TRANSITIONS
-   Every transition uses --ease so motion reads as one piece —
+   Every transition uses --ease so motion reads as one piece -
    accelerate from rest, decelerate into the new state.
    ========================================================================= */
 
-/* Wordmark — colour fade + subtle lift + tracking nudge on hover */
+/* Wordmark - colour fade + subtle lift + tracking nudge on hover */
 .site-wordmark {
   transition:
     color           var(--dur-2) var(--ease),
@@ -333,7 +333,7 @@ html:not(.is-home) :is(
   letter-spacing: calc(var(--tr-headline) + 0.005em);
 }
 
-/* Nav links — 1px lift on hover */
+/* Nav links - 1px lift on hover */
 .site-nav__link {
   transition:
     color     var(--dur-1) var(--ease),
@@ -342,14 +342,14 @@ html:not(.is-home) :is(
 .site-nav__link:hover  { transform: translateY(-1px); }
 .site-nav__link:active { transform: translateY(0); transition-duration: 60ms; }
 
-/* Dropdown caret — eased rotation when expanded */
+/* Dropdown caret - eased rotation when expanded */
 .site-nav__caret {
   transition:
     transform var(--dur-2) var(--ease),
     color     var(--dur-1) var(--ease);
 }
 
-/* Dropdown panels — override [hidden] (display:none) so we can transition
+/* Dropdown panels - override [hidden] (display:none) so we can transition
    open and close. The panel stays in layout while hidden, just invisible
    and inert. */
 .site-nav__menu[hidden] {
@@ -373,7 +373,7 @@ html:not(.is-home) :is(
     visibility 0s 0s;
 }
 
-/* Menu items — when the panel opens, items stagger in. animations.js
+/* Menu items - when the panel opens, items stagger in. animations.js
    sets --menu-item-delay per item so the count scales. */
 .site-nav__menu .site-nav__menu-link {
   transition:
@@ -392,7 +392,7 @@ html:not(.is-home) :is(
   transition-delay: var(--menu-item-delay, 0ms);
 }
 
-/* Role items — quiet hover state. Title nudges right 2px so the
+/* Role items - quiet hover state. Title nudges right 2px so the
    hover lives in the typography, not the chrome. Work titles are
    static text (no link), so they carry no hover. */
 .work-item, .role-item {
@@ -408,7 +408,7 @@ html:not(.is-home) :is(
   transform: translateX(2px);
 }
 
-/* Footer links — same micro-lift as nav so behaviour stays consistent. */
+/* Footer links - same micro-lift as nav so behaviour stays consistent. */
 .footer-links a {
   display: inline-block;
   transition:
@@ -418,10 +418,10 @@ html:not(.is-home) :is(
 .footer-links a:hover { transform: translateY(-1px); }
 
 /* =========================================================================
-   NAMED ACCENTS — small one-offs, used sparingly
+   NAMED ACCENTS - small one-offs, used sparingly
    ========================================================================= */
 
-/* Subtle underline draw on the lede meta — only on hover of the parent block */
+/* Subtle underline draw on the lede meta - only on hover of the parent block */
 .lede-meta::after {
   content: "";
   display: inline-block;
@@ -447,7 +447,7 @@ html:not(.is-home) :is(
 
    Opt-in per page: `read_progress: true` in front matter, which
    default.html reads to decide whether to emit the element at all. Not
-   every page earns one — the wiki entries are too short for a progress
+   every page earns one - the wiki entries are too short for a progress
    line to say anything.
 
    With no JS the scale stays at its 0 fallback, so the bar is simply
@@ -461,7 +461,7 @@ html:not(.is-home) :is(
   width: 100%;
   background: var(--accent);
   z-index: 100;
-  /* Scale, not width — setupReadProgress() in animations.js sets
+  /* Scale, not width - setupReadProgress() in animations.js sets
      --read-progress-scale on scroll, so this animates transform instead
      of triggering layout on every scroll tick. */
   transform: scaleX(var(--read-progress-scale, 0));
@@ -474,7 +474,7 @@ html:not(.is-home) :is(
    If JS somehow never runs (or IntersectionObserver isn't available),
    the .js-hidden elements still become visible after a generous timeout.
    Scoped to .js:not(.has-reveal) so it only fires when the reveal logic
-   in animations.js hasn't claimed responsibility — otherwise it would
+   in animations.js hasn't claimed responsibility - otherwise it would
    defeat the per-element scroll-triggered fades by popping everything in
    3s after page load (or gate open).
    ========================================================================= */
@@ -559,7 +559,7 @@ html:not(.is-home) :is(
 
    Layout: .search is position: relative; the input, chip tray, count
    row, and prev/next arrows are absolute-positioned children that
-   anchor to the right of the icon and grow leftward — so opening the
+   anchor to the right of the icon and grow leftward - so opening the
    search overlays neighbouring nav links instead of shifting them.
    ========================================================================= */
 .search {
@@ -569,7 +569,7 @@ html:not(.is-home) :is(
   line-height: var(--lh-ui);
 }
 
-/* Icon — button so click toggles via JS. 1em sizes the SVG to nav
+/* Icon - button so click toggles via JS. 1em sizes the SVG to nav
    text cap-height so it baselines with the surrounding links. */
 .search__icon {
   -webkit-appearance: none;
@@ -620,7 +620,7 @@ html:not(.is-home) :is(
 .search.is-open .search__icon .icon-glass { opacity: 0; transform: rotate(30deg); }
 .search.is-open .search__icon .icon-close { opacity: 1; transform: rotate(0); }
 
-/* Input — anchored right of the icon, grows leftward to 280px.
+/* Input - anchored right of the icon, grows leftward to 280px.
    Overlays neighbouring nav links instead of pushing them aside. */
 .search__input {
   position: absolute;
@@ -666,7 +666,7 @@ html:not(.is-home) :is(
   pointer-events: auto;
 }
 
-/* Match-count row — sits just under the input. Width matches the input's
+/* Match-count row - sits just under the input. Width matches the input's
    rendered width (border-box, so 280px end-to-end including padding) so
    the row tracks the underline exactly. Right-aligned so the arrows
    trail the count text. */
@@ -700,7 +700,7 @@ html:not(.is-home) :is(
 }
 .search__count-text { color: var(--fg-quiet); }
 
-/* Prev/next match arrows — share the icon's stroke language so they
+/* Prev/next match arrows - share the icon's stroke language so they
    read as siblings to the magnifying-glass mark. */
 .search__nav {
   -webkit-appearance: none;
@@ -740,7 +740,7 @@ html:not(.is-home) :is(
   cursor: default;
 }
 
-/* Chip tray — left edge aligns with the start of the input's underline.
+/* Chip tray - left edge aligns with the start of the input's underline.
    Because the site uses border-box globally, the input's `width: 280px`
    already includes its 32px of horizontal padding, so the underline is
    exactly 280px wide. Matching the chips' width here keeps the first
@@ -777,7 +777,7 @@ html:not(.is-home) :is(
   top: calc(100% + var(--space-8));
 }
 
-/* Chip — opaque editorial tag. Pill radius is the one place the system
+/* Chip - opaque editorial tag. Pill radius is the one place the system
    breaks its 0–4px radii rule (chips are the design language for
    "tappable keyword"). */
 .chip {
@@ -838,7 +838,7 @@ html:not(.is-home) :is(
 .search:not(.is-open) .search__chips { transition-delay: 0ms; }
 .search:not(.is-open) .search__input { transition-delay: 100ms, 100ms, 100ms, 0ms; }
 
-/* Highlight marks — wrap the original text exactly as it appears on
+/* Highlight marks - wrap the original text exactly as it appears on
    the page (normalisation is for comparison only). Inherit foreground
    colour so the text reads naturally on both themes; the accent-soft
    wash sits behind. */
@@ -856,7 +856,7 @@ mark.search-hit.active {
   border-bottom-color: var(--accent);
 }
 
-/* search__panel — transparent wrapper on desktop so nothing changes
+/* search__panel - transparent wrapper on desktop so nothing changes
    above the mobile breakpoint. Children participate in .search's layout
    exactly as before (absolute-positioned input, chips, count). */
 .search__panel { display: contents; }
@@ -865,15 +865,15 @@ mark.search-hit.active {
    to exact content height with no slack or jank.
 
    Architecture:
-   — .search becomes a CSS grid with one row; grid-template-rows animates
+   - .search becomes a CSS grid with one row; grid-template-rows animates
      0fr → 1fr (collapsed → open). The single grid item (.search__panel)
      has overflow: hidden + min-height: 0 so the grid clipping works.
-   — .search__icon escapes the grid via position: absolute and anchors to
+   - .search__icon escapes the grid via position: absolute and anchors to
      .site-header__row (position: relative), sitting flush top-right so it
      visually aligns with the nav link row. A static-parent's overflow:hidden
      does NOT clip absolutely-positioned descendants, so the icon is never
      clipped during the collapse.
-   — row-gap on .site-header__row is zeroed so the collapsed (0-height)
+   - row-gap on .site-header__row is zeroed so the collapsed (0-height)
      search row adds no space below the nav links. */
 @media (max-width: 40rem) {
   /* Zero out the row-gap so the collapsed panel row contributes no height */
@@ -890,7 +890,7 @@ mark.search-hit.active {
   }
   .search.is-open { grid-template-rows: 1fr; }
 
-  /* Panel is the single grid item — clipped at the grid boundary while
+  /* Panel is the single grid item - clipped at the grid boundary while
      collapsing. display: contents is overridden here to a real block. */
   .search__panel {
     display: block;
@@ -907,7 +907,7 @@ mark.search-hit.active {
     right: 0;
   }
 
-  /* Input/count/chips are now static inside the panel — no collapsed
+  /* Input/count/chips are now static inside the panel - no collapsed
      tricks needed since the panel itself handles collapse. */
   .search__input {
     position: static;

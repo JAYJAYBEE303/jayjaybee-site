@@ -2,7 +2,7 @@
 ---
 {%- comment -%}
 =============================================================================
-  wiki-app.html — the app page at /projects/wiki/<app>/.
+  wiki-app.html - the app page at /projects/wiki/<app>/.
 
   An app page holds no prose. It carries the app-level front matter that
   /projects/wiki/ lists and that every one of its section pages inherits
@@ -12,7 +12,7 @@
       layout:   wiki-app            (required)
       slug:     gaffer-iq           (must match the folder name)
       order:    10                  (sort position across the wiki)
-      group:    Tools               (the wiki-wide category — NOT a rail
+      group:    Tools               (the wiki-wide category - NOT a rail
                                      heading; a section's `group` is that,
                                      and the two are never read by one
                                      template)
@@ -23,12 +23,12 @@
       lede:     one italic sentence
       summary:  a paragraph describing the write-up
 
-  Four of those — group, kind, author, summary — are currently read by
+  Four of those - group, kind, author, summary - are currently read by
   nothing. They fed /projects/wiki/, which listed every write-up and is
   now a redirect to /projects/. Kept rather than deleted: they are
   accurate, they cost a build nothing, and an index that wants them
   back should not have to reconstruct them. title, slug, order, lede,
-  revised, status, app_url and info are all live — the section pages
+  revised, status, app_url and info are all live - the section pages
   and their rails read them.
       status:   draft               (optional)
       app_url:  /projects/apps/gaffer-iq/    (optional)
@@ -47,7 +47,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{ page.title }} — Wiki — Josh Bailey</title>
+<title>{{ page.title }} - Wiki - Josh Bailey</title>
 {%- if page.description %}
 <meta name="description" content="{{ page.description | escape }}">
 {%- endif %}

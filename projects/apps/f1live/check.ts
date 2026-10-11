@@ -226,6 +226,6 @@ quali.t = ms(190);
 assert.deepEqual(boardRows(quali).slice(0, 2).map((r) => [r.d, r.gap, r.int]), [[1, '1:15.000', ''], [11, '1:11.000', 'Q1']]);
 const fp = buildRace({ ...raceSession, session_name: 'Practice 1', session_type: 'Practice' }, { ...raceData, intervals: [] }, '#dim', 1);
 assert.equal(fp.chequer, -Infinity, 'no OUT outside races');
-assert.equal(standingsNote(fp, 'drivers'), 'Standings are shown for races and sprints — pick one of those.');
+assert.equal(standingsNote(fp, 'drivers'), 'Standings are shown for races and sprints - pick one of those.');
 
 console.log('race ok');

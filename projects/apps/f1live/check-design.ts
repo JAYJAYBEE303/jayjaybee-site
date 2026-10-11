@@ -154,9 +154,9 @@ const fp = buildRace({ ...raceSession, session_name: 'Practice 1', session_type:
 fp.t = fp.t1;
 const p = toSnapshot(fp, ui());
 assert.deepEqual([p.practice, p.quali, p.finished, p.banner, p.segment], [true, false, false, null, '']);
-assert.equal(p.standNote, 'Standings are shown for races and sprints — pick one of those.');
+assert.equal(p.standNote, 'Standings are shown for races and sprints - pick one of those.');
 // a stale fetch message from another race never shows on a non-race session
-assert.equal(toSnapshot(fp, ui({ standingsMsg: 'X' })).standNote, 'Standings are shown for races and sprints — pick one of those.');
+assert.equal(toSnapshot(fp, ui({ standingsMsg: 'X' })).standNote, 'Standings are shown for races and sprints - pick one of those.');
 // a race with empty standings says so (message only wins while the race has none loaded)
 {
   const empty = buildRace(raceSession, raceData, '#dim', 1);
