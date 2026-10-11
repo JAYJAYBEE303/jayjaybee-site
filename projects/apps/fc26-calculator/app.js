@@ -92,14 +92,24 @@
 
   /* ═════════ Squad data: seed (Squad_saves.js) + user saves ═════════ */
   const seedFolders = (window.SQUAD_SAVES && window.SQUAD_SAVES.folders) || [];
-  let userFolders = (store.get(KEY_SAVES, null) || {}).folders || [];
+  let userFolders = null; // set below, once sanitize() exists
   let entries = [];
 
   const genId = () => Math.random().toString(36).slice(2, 9);
   const clone = o => JSON.parse(JSON.stringify(o));
-  function ensureIds(folders) {
-    folders.forEach(f => { if (!f.id) f.id = genId(); if (!f.subfolders) f.subfolders = []; if (!f.players) f.players = []; ensureIds(f.subfolders); });
-    return folders;
+  // Coerce stored / imported folders into the shape the views rely on; drop players without a name.
+  const str = v => typeof v === 'string' ? v : '';
+  function sanitize(folders) {
+    return (Array.isArray(folders) ? folders : []).filter(f => f && typeof f === 'object').map(f => ({
+      ...f, id: f.id || genId(), name: str(f.name) || 'Folder',
+      players: (Array.isArray(f.players) ? f.players : []).filter(p => p && str(p.name).trim()).map(p => {
+        const state = p.state && typeof p.state === 'object' ? { ...p.state } : {};
+        state.activePS = Array.isArray(state.activePS) ? state.activePS.filter(k => typeof k === 'string') : [];
+        return { ...p, state, archetypePrimary: str(p.archetypePrimary), archetypeSecondary: str(p.archetypeSecondary),
+          roles: Array.isArray(p.roles) ? p.roles.filter(r => typeof r === 'string') : str(p.role) ? [p.role] : [] };
+      }),
+      subfolders: sanitize(f.subfolders),
+    }));
   }
   // Merge folder trees by name; players replace by (case-insensitive) name.
   function mergeFolders(into, from) {
@@ -116,6 +126,7 @@
     });
     return n;
   }
+  userFolders = sanitize((store.get(KEY_SAVES, null) || {}).folders);
   const countPlayers = fs => fs.reduce((a, f) => a + (f.players || []).length + countPlayers(f.subfolders || []), 0);
 
   function flatten(folders, src) {
@@ -123,9 +134,9 @@
     const walk = (f, path) => {
       const p = [...path, f.name];
       (f.players || []).forEach(pl => out.push({
-        id: (p.join('/') + '/' + pl.name).toLowerCase(), src, name: pl.name,
+        id: 'e:' + (p.join('/') + '/' + pl.name).toLowerCase(), src, name: pl.name,
         roles: pl.roles || (pl.role ? [pl.role] : []), arch1: pl.archetypePrimary || '', arch2: pl.archetypeSecondary || '',
-        group: p[0], state: pl.state || {}, res: null,
+        group: p[0], path: p, state: pl.state || {}, res: null,
       }));
       (f.subfolders || []).forEach(sf => walk(sf, p));
     };
@@ -154,7 +165,7 @@
 
   /* ═════════ State ═════════ */
   const S = {
-    ready: false, theme: html.dataset.theme === 'dark' ? 'dark' : 'light', view: 0, p: { ...E.DEFAULTS }, name: 'New player', fromId: null,
+    ready: false, theme: html.dataset.theme === 'dark' ? 'dark' : 'light', view: 0, p: { ...E.DEFAULTS }, name: 'New player', fromId: null, srcId: null,
     raw: {}, feelOpen: null, feelDet: null, feelRow: true, psHover: null, chemPreview: undefined,
     filt: { role: '', arch: '', primaryOnly: false, exclSecondary: false }, cmp: ['current'], cmpView: 'radar',
     form: { folder: 'My saves', newFolder: '', roles: [], arch: [] }, flash: '', ignite: false, mode: 'wide', short: false,
@@ -184,6 +195,17 @@
       const cur = getCur(), idx = Math.max(0, opts.findIndex(o => o.key === cur));
       btns.forEach((b, i) => { setAttr(b, 'aria-checked', i === idx); setAttr(b, 'tabindex', i === idx ? 0 : -1); });
       setStyle(thumb, 'transform', `translate3d(${idx * 100}%,0,0)`);
+    };
+  }
+  // innerHTML rebuilds destroy the focused control; the returned fn puts focus on its
+  // replacement (same data-* value), else the first of its kind, else `fallback`.
+  function focusKey(box, attrs, fallback) {
+    const a = document.activeElement, attr = a && box.contains(a) && attrs.find(k => a.dataset[k] !== undefined);
+    if (!attr) return () => {};
+    const v = a.dataset[attr];
+    return () => {
+      const all = [...box.querySelectorAll(`[data-${attr}]`)], el = all.find(x => x.dataset[attr] === v) || all[0] || fallback;
+      if (el) el.focus({ preventScroll: true });
     };
   }
   const switchHTML = label => `<button type="button" class="sw" role="switch" aria-checked="false" aria-label="${esc(label)}" data-deb="sm"><i class="sw-glow" aria-hidden="true"></i><i class="sw-thumb" aria-hidden="true" data-ext="sm"></i></button>`;
@@ -468,8 +490,10 @@
     const legSig = series.map(s => s.id + s.label).join('|');
     if (legSig !== cmpSig.legend) {
       cmpSig.legend = legSig;
+      const refocus = focusKey(legendEl, ['rm'], $('cmpAdd'));
       legendEl.querySelectorAll('li:not(.legend-hint)').forEach(li => li.remove());
       legendEl.insertAdjacentHTML('afterbegin', series.map(s => `<li><svg class="legend-line" aria-hidden="true" width="34" height="12" viewBox="0 0 34 12"><line x1="2" y1="6" x2="32" y2="6" stroke-linecap="round" style="stroke:${s.stroke};stroke-width:${s.w};stroke-dasharray:${s.dash};filter:${s.glow ? 'drop-shadow(0 0 5px rgba(var(--ac),.5))' : 'none'}"></line></svg><span class="legend-name">${esc(s.label)}</span><button type="button" class="round-btn" data-m="sm" data-rm="${esc(s.id)}" aria-label="${esc('Remove ' + s.label + ' from compare')}">${L_FACE}<svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></button></li>`).join(''));
+      refocus();
       setText($('cmpHint'), series.length ? (series.length < 2 ? 'Add a second player or an ideal profile.' : '') : 'Nothing to compare yet.');
     }
     // Chart: radar rebuilds on any change; bars keep their cells so fills animate.
@@ -548,14 +572,16 @@
       const res = entryRes(e), o = overall(res), inCmp = S.cmp.includes(e.id);
       return { e, o, inCmp, cur: S.fromId === e.id, meta: [(e.roles || []).join(' · '), [e.arch1, e.arch2].filter(Boolean).join(' / ')].filter(Boolean).join(' — ') || e.group };
     });
-    const sig = rows.map(r => [r.e.id, r.o, r.inCmp, r.cur].join(':')).join('|') + '|' + (S.cmp.length >= 6);
+    const sig = rows.map(r => [r.e.id, r.e.name, r.meta, r.o, r.inCmp, r.cur].join(':')).join('|') + '|' + (S.cmp.length >= 6);
     if (sig !== sqSig) {
       sqSig = sig;
+      const refocus = focusKey($('cards'), ['cmpid', 'load']);
       $('cards').innerHTML = rows.map(r => {
         const dis = !r.inCmp && S.cmp.length >= 6;
         return `<li><button type="button" class="card" data-m="sm" data-on="${r.cur}" data-load="${esc(r.e.id)}" aria-label="${esc(`Load ${r.e.name}, overall ${r.o}`)}">${L_FACE}<span class="card-name" data-name>${esc(r.e.name)}</span><span class="card-meta mute">${esc(r.meta)}</span><span class="card-ovr-row"><span class="card-ovr" data-ovr>${r.o}</span><span class="card-heat mute">${heat(r.o).word}</span></span></button>` +
           `<button type="button" class="card-cmp" data-m="sm" data-hov data-on="${r.inCmp}" aria-pressed="${r.inCmp}" aria-label="${esc((r.inCmp ? 'Remove ' : 'Add ') + r.e.name + (r.inCmp ? ' from compare' : ' to compare'))}" data-cmpid="${esc(r.e.id)}" title="Compare"${dis ? ' disabled' : ''}>${L_FACE}<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="${r.inCmp ? CHECK : PLUS}"></path></svg></button></li>`;
       }).join('');
+      refocus();
     }
     setText($('sqCount'), filtered.length ? `${filtered.length} shown · select a card to load it` : 'No saved players match these filters.');
     // Form
@@ -583,8 +609,15 @@
     e.preventDefault();
     const name = (S.name || '').trim() || 'Untitled';
     const folderName = S.form.folder === '__new' ? (S.form.newFolder.trim() || 'My saves') : S.form.folder;
-    let folder = userFolders.find(f => f.name === folderName);
-    if (!folder) { folder = { id: genId(), name: folderName, open: true, players: [], subfolders: [] }; userFolders.push(folder); }
+    // Re-saving the loaded player (same name, same top folder) updates it where it lives, subfolders included.
+    const src = entries.find(x => x.id === S.srcId);
+    const path = src && src.group === folderName && src.name.toLowerCase() === name.toLowerCase() ? src.path : [folderName];
+    let folder = null, list = userFolders;
+    path.forEach(n => {
+      folder = list.find(f => f.name === n);
+      if (!folder) { folder = { id: genId(), name: n, open: true, players: [], subfolders: [] }; list.push(folder); }
+      list = folder.subfolders;
+    });
     const state = pickState(S.p), i = folder.players.findIndex(p => p.name.toLowerCase() === name.toLowerCase());
     const entry = {
       name, roles: [...S.form.roles], archetypePrimary: S.form.arch[0] || '', archetypeSecondary: S.form.arch[1] || '',
@@ -592,12 +625,12 @@
     };
     if (i >= 0) folder.players[i] = entry; else folder.players.push(entry);
     persistUser(); rebuildEntries();
-    set({ name, fromId: (folderName + '/' + name).toLowerCase(), form: { ...S.form, folder: folderName, newFolder: '' } });
+    set({ name, fromId: 'e:' + (path.join('/') + '/' + name).toLowerCase(), srcId: 'e:' + (path.join('/') + '/' + name).toLowerCase(), form: { ...S.form, folder: folderName, newFolder: '' } });
     $('newFolderInput').value = '';
     flashMsg('Saved to ' + folderName);
   }
   function onExport() {
-    const folders = ensureIds(clone(seedFolders));
+    const folders = sanitize(clone(seedFolders));
     mergeFolders(folders, clone(userFolders));
     const stamp = fs => fs.forEach(f => { f.players.forEach(p => Object.assign(p, E.computeFeel(p.state || {}).flat)); stamp(f.subfolders); });
     stamp(folders);
@@ -614,8 +647,8 @@
       if (a < 0 || b < a) throw new Error('No saves found in file');
       const data = JSON.parse(text.slice(a, b + 1));
       if (!Array.isArray(data.folders)) throw new Error('No folders');
-      const n = mergeFolders(userFolders, ensureIds(data.folders));
-      persistUser(); rebuildEntries(); set({});
+      const next = clone(userFolders), n = mergeFolders(next, sanitize(data.folders));
+      userFolders = next; persistUser(); rebuildEntries(); set({});
       flashMsg(`Imported ${n} players`);
     } catch (err) { flashMsg('Could not read that file'); }
     e.target.value = '';
@@ -628,7 +661,7 @@
     if (can) { nameT(nm, pk ? 'pk-name' : ''); nameT(ov, po ? 'pk-ovr' : ''); }
     const p = { ...E.DEFAULTS, ...entry.state, activePS: [...(entry.state.activePS || [])] };
     const apply = () => {
-      commit({ p, name: entry.name, fromId: entry.id, raw: {}, ignite: false, form: { ...S.form, roles: [...(entry.roles || [])], arch: [entry.arch1, entry.arch2].filter(Boolean) } });
+      commit({ p, name: entry.name, fromId: entry.id, srcId: entry.id, raw: {}, ignite: false, form: { ...S.form, folder: entry.group, roles: [...(entry.roles || [])], arch: [entry.arch1, entry.arch2].filter(Boolean) } });
       if (can) { nameT(nm, ''); nameT(ov, ''); nameT(pk, 'pk-name'); nameT(po, 'pk-ovr'); }
     };
     const fin = () => { nameT(pk, ''); nameT(po, ''); nameT(nm, ''); nameT(ov, ''); saveDraft(); setTimeout(() => set({ ignite: true }), 60); };
