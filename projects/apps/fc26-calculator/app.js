@@ -679,7 +679,7 @@
     const H = heat(ovr);
     document.querySelectorAll('[data-puck-ovr]').forEach(el => setText(el, ovr));
     setText($('roName'), S.name); setText($('roHeat'), `${H.word} · ${H.range}`);
-    document.querySelectorAll('.ring-arc').forEach(el => setStyle(el, '--sweep', sweep));
+    document.querySelectorAll('.ring-glow, .ring-arc').forEach(el => setStyle(el, '--sweep', sweep));
     layersOf(res).forEach((L, i) => {
       const g = gauges[i], v = S.ignite ? L.avg : 0, h = heat(v), x = `translate3d(${(barPct(v) - 100).toFixed(2)}%,0,0)`;
       setText(g.avg, L.avg); setAttr(g.b, 'aria-label', `${L.title}, average ${L.avg}. Open details`);
