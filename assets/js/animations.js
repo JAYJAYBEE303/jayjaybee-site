@@ -1,13 +1,13 @@
 /* =========================================================================
-   jayjaybee.com — animations.js
+   jayjaybee.com - animations.js
    Vanilla JS, no build step. Two IIFEs, kept separate for clarity:
 
-     1. Core interactions — theme toggle, nav dropdowns.
-     2. Motion          — reveal-on-scroll, dropdown stagger, haptics,
+     1. Core interactions - theme toggle, nav dropdowns.
+     2. Motion          - reveal-on-scroll, dropdown stagger, haptics,
                           anchor-close behaviour, reading progress.
 
    Hidden-state CSS lives in style.css (scoped to .js) so it takes effect
-   at parse time — no flicker, no class-tagging race. This file just
+   at parse time - no flicker, no class-tagging race. This file just
    promotes elements to .is-visible as they enter the viewport.
    ========================================================================= */
 
@@ -78,7 +78,7 @@
     var cur  = currentState();
     var next = STATES[(STATES.indexOf(cur) + 1) % STATES.length];
 
-    // Respect reduced-motion users — swap immediately.
+    // Respect reduced-motion users - swap immediately.
     var prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (prefersReduced) { applyState(next); return; }
 
@@ -91,7 +91,7 @@
 
   // If the user is on 'system' and their OS preference changes, re-paint
   // the label so it stays honest. (The CSS already reacts to the media
-  // query — this just keeps the button in sync.)
+  // query - this just keeps the button in sync.)
   if (window.matchMedia) {
     var mq = window.matchMedia('(prefers-color-scheme: dark)');
     var onChange = function () {
@@ -106,7 +106,7 @@
   //
   // Click a trigger to open its panel; click again, click outside, or press
   // Escape to close. Only one open at a time. Buttons own aria-expanded;
-  // panels own [hidden]. No CSS-only :hover open — needs to work on touch.
+  // panels own [hidden]. No CSS-only :hover open - needs to work on touch.
   // -------------------------------------------------------------------------
   var triggers = document.querySelectorAll('[data-menu-trigger]');
   if (triggers.length) {
@@ -177,8 +177,8 @@
 
   // Mirror of the selector groups in style.css. Keep both in sync.
   // (Listed top-down so the boot cascade reveals in reading order.)
-  // ABOVE_GATE — hero/nav, revealed on boot regardless of scroll.
-  // BELOW_GATE — everything below the divider, gated until the header
+  // ABOVE_GATE - hero/nav, revealed on boot regardless of scroll.
+  // BELOW_GATE - everything below the divider, gated until the header
   // exits the viewport (see the inline pre-paint script in default.html).
   var ABOVE_GATE_SELECTOR = [
     '.site-wordmark',
@@ -189,7 +189,7 @@
     '.lede-line'
   ].join(', ');
 
-  // BELOW_GATE — everything below the divider EXCEPT the bio. The bio
+  // BELOW_GATE - everything below the divider EXCEPT the bio. The bio
   // has its own race-condition reveal (see setupBioRace) so we don't want
   // the cascade observer to also fight over it.
   var BELOW_GATE_SELECTOR = [
@@ -228,13 +228,13 @@
   // Two reasons it can't use the observer:
   //
   //   1. Order. The observer only orders the elements inside a single
-  //      callback batch, and .wk-body could never be in one — it's the
+  //      callback batch, and .wk-body could never be in one - it's the
   //      whole rest of the article, several viewport-heights tall, and
   //      the observer's 0.06 intersection ratio is a threshold an
   //      element that tall can fail to reach at all (from a deep link,
   //      or a restored scroll position). Revealing it outside the
   //      observer instead meant it landed at boot with no delay, ahead
-  //      of the title sitting above it — the page assembled out of
+  //      of the title sitting above it - the page assembled out of
   //      order, body first.
   //
   //   2. There is nothing to scroll-trigger. Every one of these starts
@@ -300,7 +300,7 @@
     var belowEls = document.querySelectorAll(BELOW_GATE_SELECTOR);
     if (!aboveEls.length && !belowEls.length) return;
 
-    // Tell the CSS "I'm running, suppress the failsafe" — otherwise the
+    // Tell the CSS "I'm running, suppress the failsafe" - otherwise the
     // 3s failsafe-reveal animation pops every observed element into view
     // before the user has had a chance to scroll to it.
     document.documentElement.classList.add('has-reveal');
@@ -333,7 +333,7 @@
   }
 
   // -------------------------------------------------------------------------
-  // a.2 Bio paragraph — race between two reveal triggers
+  // a.2 Bio paragraph - race between two reveal triggers
   //
   //   Trigger A (timed):  500ms after the headline's opacity transition
   //                       finishes → fade in over 650ms ease-in-out.
@@ -408,7 +408,7 @@
   }
 
   // -------------------------------------------------------------------------
-  // a.3 Wiki entry — the ordered entrance cascade
+  // a.3 Wiki entry - the ordered entrance cascade
   //
   // See WK_CASCADE_SELECTOR above for why a wiki entry reveals here
   // rather than through the observer. Everything still hidden is sorted
@@ -416,7 +416,7 @@
   //
   // Runs on EVERY arrival. On a continue-nav the CSS is already holding
   // the rails and breadcrumb at rest, so they arrive here at opacity 1
-  // and are filtered out — the cascade then covers the article panel
+  // and are filtered out - the cascade then covers the article panel
   // alone, and its first element starts at 0ms rather than inheriting a
   // gap where the frozen ones would have been.
   // -------------------------------------------------------------------------
@@ -448,7 +448,7 @@
       var diff = a.getBoundingClientRect().top - b.getBoundingClientRect().top;
       if (diff) return diff;
       // Level with each other (both rails and the breadcrumb share a
-      // top edge) — fall back to document order.
+      // top edge) - fall back to document order.
       var rel = a.compareDocumentPosition(b);
       return (rel & Node.DOCUMENT_POSITION_FOLLOWING) ? -1 : 1;
     });
@@ -458,7 +458,7 @@
     });
 
     // Defer one frame so the delays and the hidden starting state are
-    // committed before the class flip kicks off the transitions — same
+    // committed before the class flip kicks off the transitions - same
     // reasoning as the observer's own reveal above.
     requestAnimationFrame(function () {
       els.forEach(function (el) { el.classList.add('is-visible'); });
@@ -466,7 +466,7 @@
   }
 
   // -------------------------------------------------------------------------
-  // b. Dropdown menu — per-item stagger on open
+  // b. Dropdown menu - per-item stagger on open
   // -------------------------------------------------------------------------
   function setupMenuStagger() {
     document.querySelectorAll('[data-menu]').forEach(function (panel) {
@@ -503,7 +503,7 @@
   // d. Anchor navigation
   //
   // Intercept clicks on any link whose hash points to an element on the
-  // current page (handles both "#foo" and rooted "/#foo" forms — the
+  // current page (handles both "#foo" and rooted "/#foo" forms - the
   // layout uses the rooted form so the nav works from sub-pages too).
   //
   // For matched clicks we:
@@ -511,7 +511,7 @@
   //   2. Mark the target with .is-targeted so the design system's role
   //      highlight still fires once we strip the hash from the URL.
   //   3. Smooth-scroll to the target (respecting reduced-motion).
-  //   4. Replace the URL state so the address bar stays clean — no
+  //   4. Replace the URL state so the address bar stays clean - no
   //      "#exp-amf1" hanging off the end after the user clicks.
   //
   // The skip-link is excluded so screen-reader / keyboard users keep the
@@ -542,7 +542,7 @@
 
       e.preventDefault();
 
-      // Close any open dropdown — defer one tick so the core outside-click
+      // Close any open dropdown - defer one tick so the core outside-click
       // handler runs first without us double-toggling.
       var openTrigger = document.querySelector('.site-nav__trigger[aria-expanded="true"]');
       if (openTrigger) {
@@ -572,7 +572,7 @@
   }
 
   // -------------------------------------------------------------------------
-  // e. Role disclosures — toggle the .is-open class + measure height in JS.
+  // e. Role disclosures - toggle the .is-open class + measure height in JS.
   //
   // CSS owns the easing curve and duration; JS sets the inline max-height to
   // the panel's actual scrollHeight so the full transition duration is spent
@@ -657,7 +657,7 @@
   // longer exists.
   //
   // Deliberately NOT gated on REDUCED_MOTION. The bar is a position
-  // readout, not decoration — suppressing it would remove information,
+  // readout, not decoration - suppressing it would remove information,
   // not motion. global.css already flattens its transition to ~0ms for
   // those users, so it tracks the scroll exactly instead of easing.
   // -------------------------------------------------------------------------

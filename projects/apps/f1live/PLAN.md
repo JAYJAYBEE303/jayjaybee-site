@@ -1,4 +1,4 @@
-# F1 Race Replay — Foundational Feature Build Plan
+# F1 Race Replay - Foundational Feature Build Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -36,7 +36,7 @@
 | 4 | Championship overlays, settings, caching, map rotation | built + reviewed; awaiting user `node check.mjs` + preview check |
 | 5 | Tyre wear (option B); pre-2023 export dropped | built + reviewed; awaiting user `node check.mjs` + preview check |
 
-### Stage 1 — Race view parity
+### Stage 1 - Race view parity
 
 Python reference: `src/interfaces/race_replay.py`, `src/ui_components.py`, `src/f1_data.py`.
 
@@ -49,24 +49,24 @@ Python reference: `src/interfaces/race_replay.py`, `src/ui_components.py`, `src/
 - Speeds 0.1×–256×; `,` and `.` step 1 s; H opens a shortcuts dialog.
 - Event bar under the scrubber showing SC, VSC and red-flag periods (B toggles).
 
-### Stage 2 — Driver telemetry + insights panels
+### Stage 2 - Driver telemetry + insights panels
 
 - Click a leaderboard row (shift-click for several) to see live speed, gear, throttle, brake and DRS for those drivers (`car_data`, fetched per selected driver).
 - Insight panels, as tabs under the controls: lap time chart, sector times, tyre strategy timeline, track position chart. Race-control history is already covered by the Stage 1 feed.
 
-### Stage 3 — Qualifying / sprint qualifying / practice
+### Stage 3 - Qualifying / sprint qualifying / practice
 
 - The race picker also lists Q, SQ, FP1–3.
 - Session view: fastest-lap table plus a lap replay with a speed, gear, throttle and brake trace over distance (port of `src/interfaces/qualifying.py` and `practice.py`).
 
-### Stage 4 — Championship, settings, caching, rotation
+### Stage 4 - Championship, settings, caching, rotation
 
 - Drivers' and constructors' standings overlays (C / A). OpenF1 standings endpoints, if they exist; otherwise built from session results.
 - Settings dialog (default speed, labels, units) saved in `localStorage`.
 - Cache downloaded sessions in IndexedDB for instant reopen.
 - Map rotation: per-circuit table (MultiViewer values), keyed by `circuit_key`.
 
-### Stage 5 — Optional
+### Stage 5 - Optional
 
 - Pre-2023 seasons: a Python FastF1 export script, run by the user, that writes static JSON in OpenF1's shape.
 - Port `bayesian_tyre_model.py` once it has been read and judged worth it.

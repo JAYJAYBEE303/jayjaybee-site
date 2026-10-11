@@ -1,6 +1,6 @@
 {%- comment -%}
 =============================================================================
-  wiki-body.html — compiles the two wiki markup conventions at BUILD time.
+  wiki-body.html - compiles the two wiki markup conventions at BUILD time.
 
     [[slug|label]]   internal wiki link  ->  <a class="wl" href="/projects/wiki/slug/">label</a>
     ((text))         footnote            ->  <sup class="wk-fn">n</sup> + a numbered
@@ -8,8 +8,8 @@
 
   Carried forward from wiki-bundle/ds/pages/wiki.html, which did the same
   two transforms in the browser. Doing them at build time instead means the
-  finished prose is in the HTML source, so the site's own search.js — which
-  walks <main id="main"> — indexes wiki entries for free, and the page still
+  finished prose is in the HTML source, so the site's own search.js - which
+  walks <main id="main"> - indexes wiki entries for free, and the page still
   reads correctly with JavaScript off.
 
   Usage, from _layouts/wiki-entry.html:
@@ -22,7 +22,7 @@
   Authoring rules this relies on:
     * Every [[slug|…]] must name a slug that exists as an entry page.
       An unknown slug will not be matched and its trailing ]] will still
-      close, producing visibly broken markup — which is the point: it
+      close, producing visibly broken markup - which is the point: it
       fails loudly at build rather than silently linking nowhere.
     * A slug may name a section OR an app. An app slug resolves to that
       app's first section. Slugs are therefore globally unique across the

@@ -4,7 +4,7 @@
 
 **Goal:** Split each wiki write-up into independently-addressable section pages behind a grouped left rail, add click-to-open glossary popovers on infobox values, and add a right rail carrying On this page / Recently read / Entry status.
 
-**Architecture:** Two Jekyll page kinds. An *app* page (`layout: wiki-app`) holds app-level front matter and renders a bare redirect to its first section. A *section* page (`layout: wiki-entry`) declares `parent: <app-slug>`, `group` and `order`, and holds one section of prose. Every derived thing — rail, numbering, pager, backlinks, Entry status — is read from those pages at build time. There is no manifest. `wiki.js` stays progressive enhancement: it adds the TOC, the rail filter, Recently read, the hover peek and the glossary popovers, all on top of content already in the HTML.
+**Architecture:** Two Jekyll page kinds. An *app* page (`layout: wiki-app`) holds app-level front matter and renders a bare redirect to its first section. A *section* page (`layout: wiki-entry`) declares `parent: <app-slug>`, `group` and `order`, and holds one section of prose. Every derived thing - rail, numbering, pager, backlinks, Entry status - is read from those pages at build time. There is no manifest. `wiki.js` stays progressive enhancement: it adds the TOC, the rail filter, Recently read, the hover peek and the glossary popovers, all on top of content already in the HTML.
 
 **Tech Stack:** Jekyll 3.10 (Liquid 4), vanilla CSS with tokens from `assets/css/variables.css`, vanilla ES5-style JS in one IIFE. No build step beyond Jekyll, no dependencies.
 
@@ -25,7 +25,7 @@
 
 ## How verification works in this repo
 
-There is no test runner — this is a static Jekyll site. The equivalent of
+There is no test runner - this is a static Jekyll site. The equivalent of
 a unit test here is: build the site, then assert on the generated HTML in
 `_site/`. Every task below follows red-green with real commands:
 
@@ -42,17 +42,17 @@ The same command printing the expected count is green.
 
 | File | Responsibility |
 | --- | --- |
-| `_layouts/wiki-app.html` | **new** — app page: front matter only, renders a redirect to the first section |
-| `_layouts/wiki-entry.html` | rewrite — one section page: parent lookup, three-column shell, crumb, meta, notes, backlinks, pager |
-| `_includes/wiki-rail.html` | **new** — the left rail: grouped, numbered section index for one app |
-| `_includes/wiki-infobox.html` | **new** — the infobox, with glossary matching on each value |
-| `_includes/wiki-term.html` | **new** — one clickable glossary value, so the whole-value and split-part branches cannot drift |
-| `_includes/wiki-status.html` | **new** — the right rail's Entry status block |
-| `_includes/wiki-body.html` | modify — link resolution gains an app-slug fallback |
-| `_data/glossary.yml` | **new** — term → kind / text / ref |
-| `assets/css/wiki.css` | modify — three columns, right rail, filter, term, popover |
-| `assets/js/wiki.js` | modify — filter, Recently read, popover; TOC unchanged but now mounted right |
-| `projects/wiki/index.html` | modify — list apps, not sections |
+| `_layouts/wiki-app.html` | **new** - app page: front matter only, renders a redirect to the first section |
+| `_layouts/wiki-entry.html` | rewrite - one section page: parent lookup, three-column shell, crumb, meta, notes, backlinks, pager |
+| `_includes/wiki-rail.html` | **new** - the left rail: grouped, numbered section index for one app |
+| `_includes/wiki-infobox.html` | **new** - the infobox, with glossary matching on each value |
+| `_includes/wiki-term.html` | **new** - one clickable glossary value, so the whole-value and split-part branches cannot drift |
+| `_includes/wiki-status.html` | **new** - the right rail's Entry status block |
+| `_includes/wiki-body.html` | modify - link resolution gains an app-slug fallback |
+| `_data/glossary.yml` | **new** - term → kind / text / ref |
+| `assets/css/wiki.css` | modify - three columns, right rail, filter, term, popover |
+| `assets/js/wiki.js` | modify - filter, Recently read, popover; TOC unchanged but now mounted right |
+| `projects/wiki/index.html` | modify - list apps, not sections |
 | `projects/wiki/gaffer-iq/` | index becomes an app page; 12 section folders added |
 | `projects/wiki/fc26-calculator/` | index becomes an app page; 6 section folders added |
 
@@ -62,7 +62,7 @@ The same command printing the expected count is green.
 
 Splits the twelve sections out of the long article and turns the app's own
 `index.html` into a redirect. The existing `_layouts/wiki-entry.html` is
-untouched in this task — the section pages render through it as-is, with a
+untouched in this task - the section pages render through it as-is, with a
 flat rail and a two-level crumb. That transitional state builds and reads
 correctly, which is what makes this task independently committable.
 
@@ -73,7 +73,7 @@ correctly, which is what makes this task independently committable.
 
 **Interfaces:**
 - Consumes: nothing.
-- Produces: the front matter contract every later task reads —
+- Produces: the front matter contract every later task reads -
   app pages carry `layout: wiki-app`, `slug`, `order`, `title`, `kind`,
   `revised`, `steward`, `lede`, `summary`, `description`, `app_url`,
   `info`, optional `status`, and `group` (the wiki-wide category, e.g.
@@ -128,7 +128,7 @@ Run:
 bundle exec jekyll build && test -f _site/projects/wiki/gaffer-iq/calculations/index.html && echo PASS || echo FAIL
 ```
 
-Expected: `FAIL` — the folder does not exist yet.
+Expected: `FAIL` - the folder does not exist yet.
 
 - [ ] **Step 4: Create `_layouts/wiki-app.html`**
 
@@ -141,7 +141,7 @@ again would flash the header and footer on the way past.
 ---
 {%- comment -%}
 =============================================================================
-  wiki-app.html — the app page at /projects/wiki/<app>/.
+  wiki-app.html - the app page at /projects/wiki/<app>/.
 
   An app page holds no prose. It carries the app-level front matter that
   /projects/wiki/ lists and that every one of its section pages inherits
@@ -152,7 +152,7 @@ again would flash the header and footer on the way past.
       slug:     gaffer-iq           (must match the folder name)
       order:    10                  (sort position across the wiki)
       group:    Tools               (the wiki-wide category, shown on
-                                     /projects/wiki/ — NOT a rail heading;
+                                     /projects/wiki/ - NOT a rail heading;
                                      a section's `group` is that, and the
                                      two are never read by one template)
       title:    Gaffer IQ
@@ -178,7 +178,7 @@ again would flash the header and footer on the way past.
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{ page.title }} — Wiki — Josh Bailey</title>
+<title>{{ page.title }} - Wiki - Josh Bailey</title>
 {%- if page.description %}
 <meta name="description" content="{{ page.description | escape }}">
 {%- endif %}
@@ -203,7 +203,7 @@ again would flash the header and footer on the way past.
 
 Replace the whole of `projects/wiki/gaffer-iq/index.html` with front
 matter only. Every value below is copied verbatim from what the file
-already declares — nothing is invented:
+already declares - nothing is invented:
 
 ```html
 ---
@@ -216,9 +216,9 @@ kind: Application
 revised: 2026-08-25
 steward: Josh Bailey
 app_url: /projects/apps/gaffer-iq/
-description: Gaffer IQ — a Fantasy Premier League tool that replaces the official 1–5 fixture difficulty rating with a five-signal composite model, scored zero-sum so a fixture's two ratings always sum to 100.
+description: Gaffer IQ - a Fantasy Premier League tool that replaces the official 1–5 fixture difficulty rating with a five-signal composite model, scored zero-sum so a fixture's two ratings always sum to 100.
 lede: A Fantasy Premier League tool that stops treating fixture difficulty as a property of a team, and starts treating it as a property of a pairing.
-summary: Five views over one scoring engine — Matchups, Fixtures, Ranker, Dashboard and Planner — replacing FPL's 1–5 difficulty rating with a weighted composite of five sub-metrics, scored relative to the opponent so both sides of a fixture sum to 100.
+summary: Five views over one scoring engine - Matchups, Fixtures, Ranker, Dashboard and Planner - replacing FPL's 1–5 difficulty rating with a weighted composite of five sub-metrics, scored relative to the opponent so both sides of a fixture sum to 100.
 info:
   Status: Live · iterating
   Stack: HTML · JS · vanilla CSS
@@ -273,15 +273,15 @@ because the rail filter and the hover peek both read it.
 | --- | --- | --- | --- | --- | --- |
 | `what-is-this` | 10 | Overview | What is this? | Why a personal FPL tool exists at all, and what is wrong with a difficulty rating that belongs to a team rather than to a fixture. | 43–60 |
 | `approach` | 20 | Design Philosophy | Approach | Pull as much data as possible, process it into a new perspective, and keep the platform modular enough that the data can be parsed globally. | 63–72 |
-| `the-data` | 30 | Design Philosophy | The data | Two sources, one serverless function, and everything else running in the browser — plus a frank list of what the FPL API does not give you. | 75–97 |
+| `the-data` | 30 | Design Philosophy | The data | Two sources, one serverless function, and everything else running in the browser - plus a frank list of what the FPL API does not give you. | 75–97 |
 | `the-engine` | 40 | Design Philosophy | The engine | All the number-crunching in one place, the settings that control it in another, and a confidence level attached to every output. | 100–118 |
 | `the-interface` | 50 | Design Philosophy | The interface | Splitting dense data so it does not overwhelm, and offering more than one route to the same information. | 121–136 |
 | `the-analyser` | 60 | Matchups | The analyser | The deep dive on a single fixture, and the "view source" for any score anywhere else in the app. | 139–144 |
-| `scoring-philosophy` | 70 | Matchups | Scoring philosophy | Not "is this fixture hard" but "is this fixture hard for this player, doing this job, right now" — and how much to believe the answer. | 147–174 |
+| `scoring-philosophy` | 70 | Matchups | Scoring philosophy | Not "is this fixture hard" but "is this fixture hard for this player, doing this job, right now" - and how much to believe the answer. | 147–174 |
 | `calculations` | 80 | Matchups | Calculations | Five weighted sub-metrics, each with its own maturity curve, combined into one CompositeScore and mapped to five colour bands. | 177–265 |
 | `fixtures` | 90 | Pages | Fixtures | The schedule-level companion to Matchups, and the one view that carries no scoring of its own. | 268–283 |
 | `ranker` | 100 | Pages | Ranker | The bridge between team-level fixture scores and player-level decisions. | 286–298 |
-| `dashboard` | 110 | Pages | Dashboard | This week only — captaincy, bench order and risk flags, deliberately locked to a single-gameweek horizon. | 301–310 |
+| `dashboard` | 110 | Pages | Dashboard | This week only - captaincy, bench order and risk flags, deliberately locked to a single-gameweek horizon. | 301–310 |
 | `planner` | 120 | Pages | Planner | The most horizon-aware view: every candidate transfer evaluated for its change in projected score, with the four-point hit modelled rather than ignored. | 313–324 |
 
 - [ ] **Step 7: Run the assertion and the no-prose-lost check**
@@ -294,7 +294,7 @@ cat projects/wiki/gaffer-iq/*/index.html | sed '/^---$/,/^---$/d' | wc -w
 ```
 
 Expected: `PASS`; `13` (twelve section folders plus `index.html`); and a
-word count within a few words of `BEFORE` from Step 1 — the only
+word count within a few words of `BEFORE` from Step 1 - the only
 difference should be the ledes you just wrote.
 
 If the word count is materially lower, a line range was clipped. Diff the
@@ -310,7 +310,7 @@ grep -c '<h2' _site/projects/wiki/gaffer-iq/calculations/index.html
 
 Expected: `3` or more for the first (canonical, refresh, link); `1` or
 more for the second; and for the third, whatever the site chrome
-contributes — the point is that the *body* no longer opens with an `<h2>`,
+contributes - the point is that the *body* no longer opens with an `<h2>`,
 because the heading became the page title.
 
 - [ ] **Step 9: Commit**
@@ -328,7 +328,7 @@ and the hover preview.
 
 The app's own index.html keeps the app-level front matter that
 /projects/wiki/ reads and becomes a redirect to the first section, via a
-new wiki-app layout that deliberately does not nest in default.html —
+new wiki-app layout that deliberately does not nest in default.html -
 rendering the site chrome only to leave it again would flash.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
@@ -365,8 +365,8 @@ From `projects/wiki/fc26-calculator/index.html` (95 lines):
 | `what-it-taught-me` | 82–89 | `<h2>What it taught me</h2>` |
 | `still-to-write` | 93–95 | `<h2>Still to write</h2>` |
 
-`<h2>How it is built</h2>` at line 62 has no prose of its own — only its
-two h3s — so it contributes the group heading `Build` and no intro entry.
+`<h2>How it is built</h2>` at line 62 has no prose of its own - only its
+two h3s - so it contributes the group heading `Build` and no intro entry.
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"
@@ -399,7 +399,7 @@ revised: 2026-08-25
 steward: Josh Bailey
 status: draft
 app_url: /projects/apps/fc26-calculator/
-description: FC26 Feel Calculator — models what a player actually feels like on the pitch in EA FC 26, past the raw card numbers into chemistry, PlayStyles and the game's hidden curves.
+description: FC26 Feel Calculator - models what a player actually feels like on the pitch in EA FC 26, past the raw card numbers into chemistry, PlayStyles and the game's hidden curves.
 lede: The card says 87 pace. The player does not feel like 87 pace. This works out the difference.
 summary: About 2,500 lines of HTML and vanilla JS in a single file with no build step, rebuilt in Tailwind once the formulas stopped moving, with separate layouts for a focused mobile read and a comparison-heavy desktop one.
 info:
@@ -421,7 +421,7 @@ git show HEAD:projects/wiki/fc26-calculator/index.html > /tmp/fc26-src.html
 
 Then, for each row below: `mkdir -p`, write the front matter with a
 heredoc, and append the lines with `sed -n '<range>p' /tmp/fc26-src.html
->> <file>` — exactly the pattern Task 1 Step 6 shows.
+>> <file>` - exactly the pattern Task 1 Step 6 shows.
 
 | folder | order | group | title | lede | lines |
 | --- | --- | --- | --- | --- | --- |
@@ -430,7 +430,7 @@ heredoc, and append the lines with `sed -n '<range>p' /tmp/fc26-src.html
 | `one-file-no-build` | 30 | Build | One file, no build | Around 2,500 lines in a single document, so the thing that ships is the thing I edited. | 66–69 |
 | `two-layouts` | 40 | Build | Two layouts | A focused single-player read on mobile, a comparison view on desktop, and the styling deliberately done last. | 73–78 |
 | `what-it-taught-me` | 50 | Notes | What it taught me | More about state management in plain JavaScript than any framework tutorial has. | 82–89 |
-| `still-to-write` | 60 | Notes | Still to write | The formula-tuning log — what the first version got wrong, and where the model is still knowingly approximate. | 93–95 |
+| `still-to-write` | 60 | Notes | Still to write | The formula-tuning log - what the first version got wrong, and where the model is still knowingly approximate. | 93–95 |
 
 Note that `what-it-taught-me` contains `[[gaffer-iq|Gaffer IQ]]`. Leave it
 exactly as it is. Task 4 is what makes it resolve to Gaffer IQ's first
@@ -457,7 +457,7 @@ grep -c 'wk-draft' _site/projects/wiki/fc26-calculator/two-layouts/index.html
 
 Expected: `0` at this point. The current `_layouts/wiki-entry.html` reads
 `page.status`, which now lives on the app. Task 5 restores this by reading
-it from the parent. Note the `0` and move on — do not patch the old layout
+it from the parent. Note the `0` and move on - do not patch the old layout
 here.
 
 - [ ] **Step 7: Commit**
@@ -502,7 +502,7 @@ bundle exec jekyll build && grep -c 'work-item--featured' _site/projects/wiki/in
 
 - [ ] **Step 2: Run it to verify it fails**
 
-Expected: `18` — the page is still filtering on `layout == 'wiki-entry'`
+Expected: `18` - the page is still filtering on `layout == 'wiki-entry'`
 and has picked up all eighteen section pages.
 
 - [ ] **Step 3: Change the filter**
@@ -519,8 +519,8 @@ with:
 {%- assign wk_entries = site.pages | where_exp: "p", "p.layout == 'wiki-app'" | sort: "order" -%}
 ```
 
-Every field the loop reads — `kind`, `group`, `revised`, `status`,
-`title`, `url`, `lede`, `summary`, `steward` — exists on an app page, so
+Every field the loop reads - `kind`, `group`, `revised`, `status`,
+`title`, `url`, `lede`, `summary`, `steward` - exists on an app page, so
 nothing else in the markup changes.
 
 - [ ] **Step 4: Update the page's own comment**
@@ -529,8 +529,8 @@ The comment block at the top says the list is built from "every page whose
 layout is `wiki-entry`". Replace that paragraph with:
 
 ```html
-     The list is generated from the app pages themselves — every page
-     whose layout is `wiki-app` — sorted by their `order` front matter.
+     The list is generated from the app pages themselves - every page
+     whose layout is `wiki-app` - sorted by their `order` front matter.
      There is no separate manifest to keep in sync; adding an app folder
      under /projects/wiki/ adds a row here. The sections inside an app
      are not listed: they are the app's own rail, not wiki-wide entries.
@@ -574,7 +574,7 @@ EOF
 - Consumes: both page kinds.
 - Produces: `a.wl` links carrying `data-peek-kind` / `data-peek-title` /
   `data-peek-lede`, which `wiki.js` reads for the hover preview. Unchanged
-  contract — this task only widens what can be linked to.
+  contract - this task only widens what can be linked to.
 
 - [ ] **Step 1: Write the failing assertion**
 
@@ -587,7 +587,7 @@ bundle exec jekyll build && grep -c 'gaffer-iq/what-is-this/">Gaffer IQ' _site/p
 - [ ] **Step 2: Run it to verify it fails**
 
 Expected: `0`. `gaffer-iq` is no longer a `wiki-entry` slug, so pass 1
-never matches it and the `]]` still closes — leaving a visibly broken
+never matches it and the `]]` still closes - leaving a visibly broken
 `</a>` in the prose. That loud failure is the behaviour
 `_includes/wiki-body.html` documents and wants.
 
@@ -678,7 +678,7 @@ git commit -m "$(cat <<'EOF'
 feat(wiki): resolve an app slug in a wiki link
 
 [[gaffer-iq|Gaffer IQ]] stopped resolving when gaffer-iq became an app
-page rather than an entry, and failed the loud way the include intends —
+page rather than an entry, and failed the loud way the include intends -
 a dangling close tag in the prose. Pass 1 now matches app slugs too,
 resolving each to that app's first section so the link lands on prose
 rather than on a redirect.
@@ -706,10 +706,10 @@ to 8 fill them.
 **Interfaces:**
 - Consumes: both front matter contracts.
 - Produces, for Tasks 6–8 to `{% include %}` against:
-  - `wk_app` — the parent app page object
-  - `wk_sections` — this app's sections, sorted by `order`
-  - `wk_idx` — this section's 0-based index within `wk_sections`
-  - `wk_backs_count` — number of sections linking here
+  - `wk_app` - the parent app page object
+  - `wk_sections` - this app's sections, sorted by `order`
+  - `wk_idx` - this section's 0-based index within `wk_sections`
+  - `wk_backs_count` - number of sections linking here
   - Mount points: `<div class="wk-rail__block--filter" id="wk-rail-filter">`,
     `<nav class="wk-toc" id="wk-toc">`, `<div id="wk-recent">`
 
@@ -725,7 +725,7 @@ grep -c 'wk-draft' _site/projects/wiki/fc26-calculator/two-layouts/index.html
 
 - [ ] **Step 2: Run to verify current state**
 
-Expected: `1` for the crumb (but with only two levels above it — no app
+Expected: `1` for the crumb (but with only two levels above it - no app
 name); `Entry</b>08 / 18` (counting across both apps, wrong); `0` for the
 right rail; `0` for the draft flag.
 
@@ -740,7 +740,7 @@ layout: default
 ---
 {%- comment -%}
 =============================================================================
-  wiki-entry.html — the shell around one SECTION of a write-up, at
+  wiki-entry.html - the shell around one SECTION of a write-up, at
   /projects/wiki/<app>/<section>/.
 
   Nests inside _layouts/default.html, so the header, nav, search, footer,
@@ -749,7 +749,7 @@ layout: default
 
   Front matter a section page declares:
       layout:   wiki-entry          (required)
-      parent:   gaffer-iq           (required — the app's slug)
+      parent:   gaffer-iq           (required - the app's slug)
       slug:     calculations        (globally unique across the wiki)
       order:    80                  (sort position within the app)
       group:    Matchups            (rail heading)
@@ -760,8 +760,8 @@ layout: default
   are read from the parent app, so twelve pages do not restate the same
   three values. A section may still override any of them.
 
-  Everything derived below — the rail, numbering, backlinks, pager,
-  Entry status — is read from the section pages themselves at build time.
+  Everything derived below - the rail, numbering, backlinks, pager,
+  Entry status - is read from the section pages themselves at build time.
   There is no second manifest.
 
   Two markup conventions are available in a section's body and are
@@ -834,7 +834,7 @@ layout: default
   <div class="wk-layout">
 
     <!-- ===================================================================
-         Left rail — this app's sections, grouped and numbered. Scoped to
+         Left rail - this app's sections, grouped and numbered. Scoped to
          the app deliberately: the reader is navigating one write-up, and
          the other write-ups are a click away on /projects/wiki/.
          =================================================================== -->
@@ -909,7 +909,7 @@ layout: default
         <p class="wk-back__h mono-label">Referenced by</p>
         <div class="wk-back__list">
           {%- if wk_backs_count > 0 -%}{{ wk_backs_html }}
-          {%- else -%}<span class="wk-back__none mono">Nothing yet — an orphan entry.</span>
+          {%- else -%}<span class="wk-back__none mono">Nothing yet - an orphan entry.</span>
           {%- endif -%}
         </div>
       </div>
@@ -984,8 +984,7 @@ grep -o 'Next<span class="wk-pager__t">[^<]*' _site/projects/wiki/gaffer-iq/plan
 ```
 
 Expected: `Entry</b>08 / 12`; `1`; `1`; `>Gaffer IQ</a>` present in the
-crumb; `Previous…Scoring philosophy`; and on `planner`, `Next…The problem`
-— the pager crossing from the end of Gaffer IQ into the start of FC26.
+crumb; `Previous…Scoring philosophy`; and on `planner`, `Next…The problem` - the pager crossing from the end of Gaffer IQ into the start of FC26.
 
 - [ ] **Step 6: Confirm the infobox renders on the first section only**
 
@@ -1010,7 +1009,7 @@ app rather than across the wiki, and the infobox and launch button
 render on the app's first section only.
 
 The pager walks a list built app-first, so it crosses cleanly from the
-last section of one write-up into the first of the next — sorting the
+last section of one write-up into the first of the next - sorting the
 flat section list by order alone would have interleaved the two.
 
 Adds the third grid column and the mount points for the rails. The
@@ -1023,7 +1022,7 @@ EOF
 
 ---
 
-### Task 6: The left rail — `_includes/wiki-rail.html`
+### Task 6: The left rail - `_includes/wiki-rail.html`
 
 **Files:**
 - Modify: `_includes/wiki-rail.html` (stub → real)
@@ -1055,7 +1054,7 @@ Target: `6` blocks (4 groups + TOC + Recent); `wk-nav__n">12`; `1`.
 ```html
 {%- comment -%}
 =============================================================================
-  wiki-rail.html — the left rail: one app's sections, grouped and numbered.
+  wiki-rail.html - the left rail: one app's sections, grouped and numbered.
 
   Usage, from _layouts/wiki-entry.html:
       {% include wiki-rail.html app=wk_app sections=wk_sections %}
@@ -1064,7 +1063,7 @@ Target: `6` blocks (4 groups + TOC + Recent); `wk-nav__n">12`; `1`.
   section pages are the single control over the rail. There is no list of
   groups anywhere to keep in sync with them.
 
-  Numbering is continuous across groups — 01 … 12 — and identifies the
+  Numbering is continuous across groups - 01 … 12 - and identifies the
   section rather than its position in a filtered list, which is why
   wiki.js never renumbers when the filter narrows the rail.
 
@@ -1125,7 +1124,7 @@ grep -c 'gaffer-iq' _site/projects/wiki/fc26-calculator/two-layouts/index.html
 grep -o '<span class="mono-label">[A-Za-z ]*</span>' _site/projects/wiki/fc26-calculator/two-layouts/index.html | head -3
 ```
 
-Expected: `0` for the first — FC26's rail contains no Gaffer IQ links;
+Expected: `0` for the first - FC26's rail contains no Gaffer IQ links;
 and `Overview`, `Build`, `Notes`.
 
 - [ ] **Step 6: Commit**
@@ -1171,28 +1170,28 @@ bundle exec jekyll build && grep -c 'wk-term' _site/projects/wiki/gaffer-iq/what
 
 - [ ] **Step 2: Run to verify it fails**
 
-Expected: `0` — `_includes/wiki-infobox.html` is still the empty stub, so
+Expected: `0` - `_includes/wiki-infobox.html` is still the empty stub, so
 the first section has no infobox at all.
 
 - [ ] **Step 3: Write `_data/glossary.yml`**
 
 Keys are the infobox value, lowercased and trimmed, exactly as it appears
-in an app's `info` mapping — either a whole value or one `·`-separated
+in an app's `info` mapping - either a whole value or one `·`-separated
 part of one.
 
 ```yaml
 # =============================================================================
-# glossary.yml — definitions behind the clickable values in a wiki infobox.
+# glossary.yml - definitions behind the clickable values in a wiki infobox.
 #
 # A key is an infobox value, LOWERCASED and trimmed. _includes/wiki-infobox.html
 # tries each value whole first, then splits it on "·" and tries each part, so
 # both "live · iterating" as a whole and "live" on its own can be defined.
-# A part with no key here renders as plain text — that is the normal case,
+# A part with no key here renders as plain text - that is the normal case,
 # not a failure.
 #
 #   kind:  the small accent label at the top of the card
 #   text:  the definition
-#   ref:   optional — a SECTION slug. Renders "Full entry: <title> →".
+#   ref:   optional - a SECTION slug. Renders "Full entry: <title> →".
 #          An unresolvable slug renders no link rather than a broken one.
 # =============================================================================
 
@@ -1213,7 +1212,7 @@ part of one.
 "fpl api":
   kind: Source
   text: >
-    Supplies the spine — squads, prices, positions, fixtures, per-player
+    Supplies the spine - squads, prices, positions, fixtures, per-player
     histories and live gameweek scoring. It has no standings endpoint and
     no access to any season but the current one.
   ref: the-data
@@ -1231,7 +1230,7 @@ part of one.
   text: >
     Base difficulty, counter-matchup, team form, head-to-head and home
     and away. Each is scored separately, weighted, and combined into one
-    CompositeScore — because "hard fixture" and "hard fixture for a
+    CompositeScore - because "hard fixture" and "hard fixture for a
     winger" are different questions.
   ref: calculations
 
@@ -1246,12 +1245,12 @@ part of one.
   kind: Stack
   text: >
     Everything analytical runs in the browser. No framework, and no CSS
-    library — the tokens and components are the app's own.
+    library - the tokens and components are the app's own.
 
 "html · js · tailwind":
   kind: Stack
   text: >
-    Rebuilt in Tailwind once the formulas had stopped moving —
+    Rebuilt in Tailwind once the formulas had stopped moving -
     deliberately in that order, so styling effort was not spent on
     layouts the maths was about to invalidate.
   ref: two-layouts
@@ -1277,7 +1276,7 @@ part of one.
 ```html
 {%- comment -%}
 =============================================================================
-  wiki-infobox.html — the floated "at a glance" box, with glossary matching.
+  wiki-infobox.html - the floated "at a glance" box, with glossary matching.
 
   Usage, from _layouts/wiki-entry.html:
       {% include wiki-infobox.html app=wk_app %}
@@ -1292,7 +1291,7 @@ part of one.
   own search can see them.
 
   The "click an underlined value" hint renders only if the box actually
-  produced a term — an infobox with nothing clickable must not invite a
+  produced a term - an infobox with nothing clickable must not invite a
   click. wk_terms survives the loop because Liquid `assign` is not
   block-scoped.
 =============================================================================
@@ -1338,7 +1337,7 @@ drift apart:
 
 ```html
 {%- comment -%}
-  wiki-term.html — one clickable glossary value.
+  wiki-term.html - one clickable glossary value.
       {% include wiki-term.html g=<glossary entry> label=<text to show> %}
   A `ref` that names no section renders no link, rather than a link to
   nowhere.
@@ -1387,7 +1386,7 @@ git add _data/glossary.yml _includes/wiki-infobox.html _includes/wiki-term.html
 git commit -m "$(cat <<'EOF'
 feat(wiki): make infobox values open a definition
 
-Each infobox value is matched against a glossary at build time — the
+Each infobox value is matched against a glossary at build time - the
 whole value first, so a multi-word value matches as one key, then each
 dot-separated part. A hit becomes a real button carrying the definition
 in data attributes; a miss renders as text, which is the normal case.
@@ -1404,7 +1403,7 @@ EOF
 
 ---
 
-### Task 8: Entry status — `_includes/wiki-status.html`
+### Task 8: Entry status - `_includes/wiki-status.html`
 
 **Files:**
 - Modify: `_includes/wiki-status.html` (stub → real)
@@ -1429,13 +1428,13 @@ Expected: `0`.
 ```html
 {%- comment -%}
 =============================================================================
-  wiki-status.html — the right rail's Entry status block.
+  wiki-status.html - the right rail's Entry status block.
 
   Usage, from _layouts/wiki-entry.html:
       {% include wiki-status.html revised=wk_revised backs=wk_backs_count %}
 
   Every number here is computed at build time, so the block is complete
-  with JavaScript off — unlike the two blocks above it in the rail.
+  with JavaScript off - unlike the two blocks above it in the rail.
 
   Notes counts the ((…)) footnote markers in the source, which is the
   same convention _includes/wiki-body.html compiles. Splitting on the
@@ -1482,7 +1481,7 @@ git commit -m "$(cat <<'EOF'
 feat(wiki): add the Entry status block
 
 Words, Notes, Inbound links and Revised, all computed by Liquid, so the
-block is complete with JavaScript off — unlike On this page and Recently
+block is complete with JavaScript off - unlike On this page and Recently
 read above it in the same rail.
 
 The design sheet's "Locally edited" row is deliberately absent: it
@@ -1498,14 +1497,14 @@ EOF
 ### Task 9: Styles
 
 **Files:**
-- Modify: `assets/css/wiki.css` — `:root` block, `.wk-layout`,
+- Modify: `assets/css/wiki.css` - `:root` block, `.wk-layout`,
   `.wk-rail`, plus new sections for the right rail, the filter, the term
   and the popover
 
 **Interfaces:**
 - Consumes: the class names Tasks 5–8 emit.
 - Produces: `.is-built` as the reveal hook for both JS-built rail blocks,
-  and `.is-on` as the popover's open state — Task 10 toggles both.
+  and `.is-on` as the popover's open state - Task 10 toggles both.
 
 - [ ] **Step 1: Add the new structural measure**
 
@@ -1534,7 +1533,7 @@ Replace the `.wk-layout` rule and its media query:
 /* 74rem is the one new breakpoint in this file: below it the third
    column no longer leaves a readable measure for the prose. The right
    rail drops out of the grid and becomes a row of its three blocks
-   above the article — hidden entirely would lose Entry status, which
+   above the article - hidden entirely would lose Entry status, which
    needs no JS and is worth keeping at every width. */
 @media (max-width: 74rem) {
   .wk-layout { grid-template-columns: var(--wk-rail-w) minmax(0, 1fr); }
@@ -1552,7 +1551,7 @@ Replace the `.wk-layout` rule and its media query:
   }
 }
 
-/* 56rem is an existing site breakpoint (components.css) — reused rather
+/* 56rem is an existing site breakpoint (components.css) - reused rather
    than introducing a new one. Below it neither rail is a column. */
 @media (max-width: 56rem) {
   .wk-layout { grid-template-columns: minmax(0, 1fr); }
@@ -1566,7 +1565,7 @@ Add after the existing left-rail section:
 
 ```css
 /* =========================================================================
-   RIGHT RAIL — on this page, recently read, entry status
+   RIGHT RAIL - on this page, recently read, entry status
    ========================================================================= */
 
 .wk__rail {
@@ -1579,7 +1578,7 @@ Add after the existing left-rail section:
 
 /* Both JS-built blocks stay hidden until wiki.js adds .is-built, so
    neither leaves an empty ruled-off label hanging with JS disabled.
-   Entry status carries no such guard — it is compiled. */
+   Entry status carries no such guard - it is compiled. */
 .wk-rail__block--toc:not(.is-built),
 .wk-rail__block--recent:not(.is-built) { display: none; }
 
@@ -1681,7 +1680,7 @@ button.wk-term[aria-expanded="true"] {
 }
 button.wk-term:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* Above the hover peek (z 60) — a term click is deliberate, a hover is
+/* Above the hover peek (z 60) - a term click is deliberate, a hover is
    not, so the deliberate one wins. Still below the skip link (z 100). */
 .wk-pop {
   position: absolute;
@@ -1755,7 +1754,7 @@ grep -nE '#[0-9a-fA-F]{3,6}|[0-9]+ms|[0-9.]+rem|[0-9]+px' assets/css/wiki.css \
 
 Expected: no output. The exceptions grepped out are the four `--wk-*`
 declarations, the media-query breakpoints, and the hairline/outline
-widths — which are line weights, and which the file already writes
+widths - which are line weights, and which the file already writes
 literally in its existing `a.wl` and focus rules.
 
 - [ ] **Step 8: Build and commit**
@@ -1768,7 +1767,7 @@ feat(wiki): style the right rail, filter, terms and popover
 
 Adds the third grid column and one new breakpoint at 74rem, below which
 the right rail leaves the grid and becomes a row of its three blocks
-above the article rather than disappearing — Entry status needs no JS
+above the article rather than disappearing - Entry status needs no JS
 and is worth keeping at every width.
 
 The two JS-built rail blocks stay hidden until wiki.js marks them built,
@@ -1785,7 +1784,7 @@ EOF
 ### Task 10: Behaviour
 
 **Files:**
-- Modify: `assets/js/wiki.js` — extend the existing IIFE with three
+- Modify: `assets/js/wiki.js` - extend the existing IIFE with three
   sections; the TOC and hover-peek sections stay as they are
 
 **Interfaces:**
@@ -1812,7 +1811,7 @@ end of this task.
 
      Injected rather than authored into the rail, so with JS off there is
      no dead control. Filtering is over data attributes the build already
-     wrote onto each row — no index, no fetch.
+     wrote onto each row - no index, no fetch.
 
      Row numbers are NOT rewritten when the rail narrows: 07 identifies
      the section, not its position in a filtered list.
@@ -1873,7 +1872,7 @@ end of this task.
     }
 
     input.addEventListener('input', apply);
-    // Escape clears rather than closes — there is nothing to close.
+    // Escape clears rather than closes - there is nothing to close.
     input.addEventListener('keydown', function (ev) {
       if (ev.key === 'Escape' && input.value) {
         ev.preventDefault();
@@ -2071,7 +2070,7 @@ In the file's head comment, replace the "Two jobs:" list with:
      4. Open a definition when an infobox term is clicked.
      5. Show a small preview card when the reader hovers an internal wiki
         link. The card's content comes from data-peek-* attributes the
-        build already wrote onto each link — no manifest, no fetch.
+        build already wrote onto each link - no manifest, no fetch.
 ```
 
 - [ ] **Step 6: Call the new builders**
@@ -2106,7 +2105,7 @@ Create `.claude/launch.json` if it does not exist:
 Start it with the Browser pane's `preview_start` (never with Bash), open
 `/projects/wiki/gaffer-iq/what-is-this/`, then check:
 
-1. `read_console_messages` — no errors.
+1. `read_console_messages` - no errors.
 2. Click an underlined infobox value: the card opens under it, carries
    the right kind label, and the `Full entry` link points at a real
    section.
@@ -2147,7 +2146,7 @@ EOF
 ```
 
 Note: `.claude/` is gitignored, so `git add .claude/launch.json` will be
-a no-op. That is fine — the file is local tooling.
+a no-op. That is fine - the file is local tooling.
 
 ---
 
@@ -2192,7 +2191,7 @@ FC26's six. The first page has no Previous; the last has no Next.
 - [ ] **Step 4: The no-JavaScript pass**
 
 Disable JavaScript in the Browser pane
-(`javascript_tool` cannot do this — use the pane's own settings, or load
+(`javascript_tool` cannot do this - use the pane's own settings, or load
 the page and confirm each item below is present in `_site` HTML rather
 than injected):
 
@@ -2245,7 +2244,7 @@ item in the spec to Task 11.
 **Two things the spec left implicit, now pinned down here.** The spec
 said the right rail is hidden below 74rem; Task 9 keeps it as a row
 instead, because Entry status is compiled and worth keeping at every
-width — a behaviour change from the spec, called out in the CSS comment
+width - a behaviour change from the spec, called out in the CSS comment
 and the commit message. And the spec did not say what happens to the
 `?v=1` cache-buster on `wiki.js`; Task 5 moves it to `?v=2`, since Task
 10 changes that file.
@@ -2257,7 +2256,7 @@ that reason: the link loop in `wiki-body.html` uses `wk_lk_kind`, and
 `wiki-status.html` counts into `wk_note_count` rather than `wk_notes`,
 which `wiki-body.html` already uses for the notes markup. `wk_needle` is
 reused by both, which is safe only because the layout finishes with it
-before the body include runs — do not move the backlink block below the
+before the body include runs - do not move the backlink block below the
 include.
 
 **Type consistency.** `wk_app`, `wk_sections`, `wk_idx`,

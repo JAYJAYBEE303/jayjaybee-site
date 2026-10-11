@@ -1,12 +1,12 @@
 /* =========================================================================
-   jayjaybee.com — global.css
+   jayjaybee.com - global.css
    Entry point. Pulls in the three partials, then handles base/reset
    styles, body, typography defaults, and links.
 
    Every page links this one file:
      <link rel="stylesheet" href="/assets/css/global.css">
 
-   Cascade order matters — variables first (so role tokens exist before
+   Cascade order matters - variables first (so role tokens exist before
    anything tries to use them), then layout, then components, then the
    base rules below.
 
@@ -56,7 +56,7 @@ body {
   overflow-wrap: break-word;
 }
 
-/* Don't print the grain — it just wastes toner */
+/* Don't print the grain - it just wastes toner */
 @media print {
   body { background-image: none; }
 }
@@ -68,7 +68,7 @@ ol, ul { list-style: none; }
 
 img, svg { max-width: 100%; height: auto; display: block; }
 
-/* Accessibility — skip link visible only on focus */
+/* Accessibility - skip link visible only on focus */
 .skip-link {
   position: absolute;
   left: var(--space-4);
@@ -119,7 +119,7 @@ h3, .h3 {
   letter-spacing: var(--tr-headline);
 }
 
-/* Prose blocks — serif, comfortable measure */
+/* Prose blocks - serif, comfortable measure */
 .prose {
   font-family: var(--font-serif);
   font-size: var(--fs-lede);
@@ -130,7 +130,7 @@ h3, .h3 {
 .prose p { text-wrap: pretty; }
 .prose p + p { margin-top: var(--space-4); }
 
-/* Mono — the deliberate technical accent */
+/* Mono - the deliberate technical accent */
 .mono {
   font-family: var(--font-mono);
   font-weight: var(--fw-regular);
@@ -147,14 +147,14 @@ h3, .h3 {
   display: inline-block;
 }
 
-/* Accent inline emphasis — vermillion run inside prose (the About
+/* Accent inline emphasis - vermillion run inside prose (the About
    section's quoted headings). A class rather than a repeated inline
    `style="color: var(--accent);"` so the token is declared once. */
 .accent {
   color: var(--accent);
 }
 
-/* Links — accent colour, underline tracks on hover */
+/* Links - accent colour, underline tracks on hover */
 a {
   color: var(--link);
   text-decoration: underline;

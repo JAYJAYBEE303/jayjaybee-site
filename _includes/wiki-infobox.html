@@ -1,6 +1,6 @@
 {%- comment -%}
 =============================================================================
-  wiki-infobox.html — the floated "at a glance" box, with glossary matching.
+  wiki-infobox.html - the floated "at a glance" box, with glossary matching.
 
   Usage, from _layouts/wiki-entry.html:
       {% include wiki-infobox.html app=wk_app %}
@@ -14,7 +14,7 @@
   payload and puts the definitions in the HTML source, where the site's
   own search can see them.
 
-  An app may instead declare `shape:` — a list of {group, terms}, where
+  An app may instead declare `shape:` - a list of {group, terms}, where
   every term is a glossary key rather than the value half of a row. The
   box then reads as the write-up's vocabulary, grouped, one term per
   line, and each term carries its own definition. `shape` wins if both
@@ -22,11 +22,11 @@
   that declare it.
 
   A `shape` term with no glossary entry renders as plain text, exactly
-  as an unmatched `info` value does — a missing definition must not
+  as an unmatched `info` value does - a missing definition must not
   offer a click that opens nothing.
 
   The "click an underlined value" hint renders only if the box actually
-  produced a term — an infobox with nothing clickable must not invite a
+  produced a term - an infobox with nothing clickable must not invite a
   click. wk_terms survives the loop because Liquid `assign` is not
   block-scoped.
 =============================================================================

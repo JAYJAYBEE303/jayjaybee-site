@@ -1,6 +1,6 @@
 {%- comment -%}
 =============================================================================
-  projects-hero.html — the "ledger" hero variant: entry count on the left,
+  projects-hero.html - the "ledger" hero variant: entry count on the left,
   kicker/title/sub on the right. An alternate to the mono-label +
   .section-title--display header pattern used elsewhere on the site;
   this is the one /projects/index.html uses.
@@ -11,15 +11,15 @@
          kicker="Projects · shipped and written up"
          title="A short list, kept honest."
          sub="Everything below either runs in production or has a public
-              write-up — nothing half-built makes this page."
+              write-up - nothing half-built makes this page."
          heading_id="work-heading" %}
 
-  All params optional except `title` — pass one. Jekyll has no clean
+  All params optional except `title` - pass one. Jekyll has no clean
   build-time assertion to enforce that (no plugin here to add one), so
   an omitted `title` renders a real but empty <h1> rather than failing
   the build; treat that as a call-site bug if it ever shows up.
 
-  `heading_id` is optional — set it when the section wrapping this
+  `heading_id` is optional - set it when the section wrapping this
   include uses `aria-labelledby` and needs the id on the <h1> itself
   (as /projects/index.html's <section class="work"> does).
 =============================================================================
@@ -28,7 +28,7 @@
   {%- if include.count %}
   {%- comment -%}
     Three fixed-position character chunks, not a numerator/slash/
-    denominator split: for a "NN/NN" string (index 0..4) — chars 0-1,
+    denominator split: for a "NN/NN" string (index 0..4) - chars 0-1,
     then the slash (2) + the next digit (3), then the last digit (4).
     Each chunk is its own <span> so .proj-hero-b__n's flex column
     stacks them exactly as designed, not dependent on where the

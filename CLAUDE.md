@@ -1,7 +1,7 @@
-# jayjaybee.com — design-system directives
+# jayjaybee.com - design-system directives
 
 Jekyll static site, no build step beyond Jekyll itself. No npm, no
-`package.json`, no bundler — there is nothing to `npm install`, `lint`,
+`package.json`, no bundler - there is nothing to `npm install`, `lint`,
 or `type-check`. Verification is push-and-check-live (see
 `SKILL.md`), not a local build.
 
@@ -31,14 +31,14 @@ purpose: Vercel serves real files before rewrites, so any copy in
 Vercel project + a redirect/rewrite pair in `vercel.json`.
 
 The Ignored Build Step diffs `HEAD^` (first parent) against `HEAD`. A
-merge commit whose first parent already holds the changes — e.g. `main`
-merged *into* a branch, then that branch pushed to `main` — diffs empty
+merge commit whose first parent already holds the changes - e.g. `main`
+merged *into* a branch, then that branch pushed to `main` - diffs empty
 and the site build is **skipped**. Land work on `main` as a
 fast-forward or as a merge made *on* `main`, never the other way round.
 
 ## Scope boundary
 
-`projects/apps/**` is excluded — see `.claudeignore`. Each app under
+`projects/apps/**` is excluded - see `.claudeignore`. Each app under
 `/projects/apps/<slug>/` owns its entire document (own `<head>`,
 fonts, tokens, stylesheets) and shares no code with the site or with
 each other; `_config.yml`'s `layout: null` scope enforces the same
@@ -46,32 +46,31 @@ rule at build time. Nothing below applies inside that path.
 
 ## Token source
 
-`assets/css/variables.css` is the one token file — colour, type
+`assets/css/variables.css` is the one token file - colour, type
 family/scale, spacing steps, radii, shadows, motion (durations +
-easings). **These categories must always resolve through `var(--...)`
-— no raw hex, no raw font stacks, no literal `ms`/`cubic-bezier`, no
+easings). **These categories must always resolve through `var(--...)` - no raw hex, no raw font stacks, no literal `ms`/`cubic-bezier`, no
 inline `style="color: #..."` or similar.** Resolve to an existing `--`
 custom property, or add one to `variables.css` if the value is
 genuinely new and reusable.
 
-One-off *structural* dimensions — a grid-column width
+One-off *structural* dimensions - a grid-column width
 (`11rem 1fr`), a component's own `max-width` (`32ch`), a breakpoint
-(`@media (max-width: 56rem)`) — are legitimately literal in
+(`@media (max-width: 56rem)`) - are legitimately literal in
 `layout.css` and `components.css`; that is this repo's real
 convention (see e.g. `.role-item`'s `grid-template-columns: 11rem 1fr`,
 `.footer-portrait`'s `width: 6rem`), not debt to clean up. Only
-promote one to a `--` token when it is reused across multiple rules —
+promote one to a `--` token when it is reused across multiple rules -
 `wiki.css` does exactly this with its own `--wk-rail-w` etc. for
 measures with "no site-wide counterpart" (its own words).
 
 `wiki.css` alone holds itself to a stricter, file-scoped rule: *zero*
-literal values of any kind, including one-off structural ones — its
+literal values of any kind, including one-off structural ones - its
 own header states this explicitly. Match that stricter bar only
 inside `wiki.css`; don't import it into `layout.css`/`components.css`.
 
 Approved exceptions (checked, not tokens, not violations):
 - `assets/css/layout.css`'s `.footer-portrait` mask-image gradients
-  use literal `#000`/`transparent` — mask **luminance**, not painted
+  use literal `#000`/`transparent` - mask **luminance**, not painted
   colour. A `--` token would misrepresent what the value does.
 - HTML numeric character references (`&#8617;`, `&#8599;`, …) are
   glyphs, not colours, even though they match a `#[0-9a-f]+`-shaped
@@ -83,12 +82,12 @@ Reusable pieces (buttons, chips, cards, nav, disclosure panels) live
 in `assets/css/components.css`; wiki-specific ones in `wiki.css`.
 Before writing a new one-off, check whether an existing class already
 does the job (`.mono-label`, `.chip`, `.role-disclosure-summary`,
-`a.wk-launch`, `.accent`, …) — an inline `style` attribute is a sign
+`a.wk-launch`, `.accent`, …) - an inline `style` attribute is a sign
 one is missing, not licence to skip the primitive.
 
 `assets/css/buttons.css` from the design-system export (`.btn`,
 `.btn--primary/secondary/ghost/link/mono`) is **not yet wired into
-`global.css`** — nothing on the live site currently duplicates a
+`global.css`** - nothing on the live site currently duplicates a
 generic CTA button badly enough to justify importing unused CSS. If a
 future page needs one, wire it in then, matching `a.wk-launch`'s
 existing `.btn--primary` styling rather than inventing a second one.

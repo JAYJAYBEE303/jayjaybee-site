@@ -146,7 +146,7 @@ export function useReplay() {
       const [s] = key ? await api<Session>(`sessions?session_key=${encodeURIComponent(key)}`) : [];
       const y = s ? s.year : thisYear;
       const found = await loadSeason(y, s?.session_key);
-      // Early in a season there may be nothing finished yet — fall back a year.
+      // Early in a season there may be nothing finished yet - fall back a year.
       if (!found && y === thisYear) await loadSeason(thisYear - 1);
     } catch (err) {
       if (id === loadId.current) fail(`Couldn't reach OpenF1 (${msg(err)})`, boot); // not over a race the user already picked

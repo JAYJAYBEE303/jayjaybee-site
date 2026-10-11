@@ -1,4 +1,4 @@
-// Pure replay helpers — no DOM, no network — so check.ts can run them in node.
+// Pure replay helpers - no DOM, no network - so check.ts can run them in node.
 
 export type Pt = { x: number; y: number };
 export type Sample = Pt & { t: number };

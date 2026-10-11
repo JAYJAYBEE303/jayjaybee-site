@@ -1,5 +1,5 @@
 /* =========================================================================
-   jayjaybee.com — variables.css
+   jayjaybee.com - variables.css
    Design tokens for the whole site. Every colour, font family, type scale
    step, spacing value, radius, shadow, and timing lives here.
 
@@ -20,7 +20,7 @@
   --font-sans:  'Hanken Grotesk', -apple-system, 'Helvetica Neue', Arial, sans-serif;
   --font-mono:  'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
 
-  /* Type scale — roles, not sizes */
+  /* Type scale - roles, not sizes */
   --fs-display:   clamp(3.25rem, 5.6vw + 1rem, 5.5rem);
   --fs-headline:  clamp(2.25rem, 2.8vw + 1rem, 3.25rem);
   --fs-subhead:   clamp(1.5rem, 1.2vw + 1rem, 1.875rem);
@@ -45,7 +45,7 @@
   /* Weights */
   --fw-light: 300; --fw-regular: 400; --fw-medium: 500; --fw-semibold: 600; --fw-bold: 700;
 
-  /* Colour — light (default) */
+  /* Colour - light (default) */
   --paper:        #F4EFE6;
   --paper-2:      #ECE5D7;
   --paper-3:      #E2DAC8;
@@ -61,7 +61,7 @@
   --selection-bg: #E8C8BD;
   --selection-fg: #1A1714;
 
-  /* Role tokens — refer to these, not the raw palette */
+  /* Role tokens - refer to these, not the raw palette */
   --bg:          var(--paper);
   --bg-recessed: var(--paper-2);
   --fg:          var(--ink);
@@ -72,7 +72,7 @@
   --link-hover:  var(--accent-hover);
   --hairline:    var(--rule);
 
-  /* Spacing — 4px base. --baseline is 24px and everything snaps to it. */
+  /* Spacing - 4px base. --baseline is 24px and everything snaps to it. */
   --space-1: 0.25rem; --space-2: 0.5rem; --space-3: 0.75rem;
   --space-4: 1rem;    --space-5: 1.5rem; --space-6: 2rem;
   --space-7: 3rem;    --space-8: 4rem;   --space-9: 6rem;
@@ -89,7 +89,7 @@
   --measure-ui:    34rem;
   --container:     72rem;
 
-  /* Borders + radii — almost none */
+  /* Borders + radii - almost none */
   --radius-0: 0;
   --radius-1: 2px;
   --radius-2: 4px;
@@ -106,7 +106,7 @@
   --ease:    cubic-bezier(.2, 0, 0, 1);
   --ease-in: cubic-bezier(.4, 0, .8, .2);
 
-  /* Paper grain — subtle SVG noise, layered over --bg.
+  /* Paper grain - subtle SVG noise, layered over --bg.
      Light mode = dark specks; the dark-mode override below swaps in
      light specks at lower opacity so the contrast feels consistent.
      Tile is 640px with asymmetric baseFrequency + 4 octaves so the
@@ -136,7 +136,7 @@
   }
 }
 
-/* Manual override — wins over system preference */
+/* Manual override - wins over system preference */
 :root[data-theme="dark"] {
   --paper:   #14110E;
   --paper-2: #1C1814;

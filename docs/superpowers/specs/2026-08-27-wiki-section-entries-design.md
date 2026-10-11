@@ -7,7 +7,7 @@ Status: approved, not yet implemented
 
 The wiki today is one long article per project. `/projects/wiki/gaffer-iq/`
 is a single page carrying twelve sections of prose, read by scrolling. The
-rail lists projects, not the thing the reader is actually navigating —
+rail lists projects, not the thing the reader is actually navigating -
 sections.
 
 The design sheet supplied as `Website front page (1).zip`
@@ -27,7 +27,7 @@ Explicitly out of scope, though present in the design sheet:
 
 - The masthead (`The Handbook`, entry count).
 - The `Search /` command palette. The site already has its own search in
-  `_layouts/default.html`, which indexes `<main id="main">` — every section
+  `_layouts/default.html`, which indexes `<main id="main">` - every section
   page feeds it for free.
 - The `Random` button.
 - The `Edit E` in-browser edit mode, and therefore the `Locally edited`
@@ -40,7 +40,7 @@ Explicitly out of scope, though present in the design sheet:
 
 ### Two page kinds
 
-**App** — `_layouts/wiki-app.html`, at `projects/wiki/<app>/index.html`.
+**App** - `_layouts/wiki-app.html`, at `projects/wiki/<app>/index.html`.
 
 Front matter, all of it app-level:
 
@@ -62,7 +62,7 @@ info:                         # infobox rows
 ```
 
 Body is empty. The layout emits a bare redirect document to the app's
-first section — `<meta http-equiv="refresh">`, `<link rel="canonical">`
+first section - `<meta http-equiv="refresh">`, `<link rel="canonical">`
 pointing at the target, a `<script>` `location.replace` for speed, and a
 visible fallback link for anything that honours none of those. It does
 **not** nest inside `_layouts/default.html`; rendering the full site
@@ -72,12 +72,12 @@ chrome only to leave immediately is waste, and it would flash.
 `projects/`. Front matter overrides a default, so `layout: wiki-app`
 wins with no config change.
 
-**Section** — `_layouts/wiki-entry.html`, at
+**Section** - `_layouts/wiki-entry.html`, at
 `projects/wiki/<app>/<section>/index.html`.
 
 ```yaml
 layout: wiki-entry
-parent: gaffer-iq             # NEW — the app's slug
+parent: gaffer-iq             # NEW - the app's slug
 slug: calculations            # globally unique across the wiki
 order: 80                     # sort position within the app
 group: Matchups               # rail grouping
@@ -117,7 +117,7 @@ titles.
 | 110 | Pages | Dashboard | `dashboard` | `<h2>Dashboard</h2>` |
 | 120 | Pages | Planner | `planner` | `<h2>Planner</h2>` |
 
-The two group intros — `approach` and `the-analyser` — exist because
+The two group intros - `approach` and `the-analyser` - exist because
 those paragraphs describe their whole group rather than any one
 subsection. Folding them into the next section would misattribute them.
 
@@ -139,7 +139,7 @@ untouched; it remains flagged `status: draft`.
 | 50 | Notes | What it taught me | `what-it-taught-me` |
 | 60 | Notes | Still to write | `still-to-write` |
 
-`<h2>How it is built</h2>` has no prose of its own — only its two h3s —
+`<h2>How it is built</h2>` has no prose of its own - only its two h3s -
 so it contributes a group and no intro entry.
 
 ### /projects/wiki/ index
@@ -150,8 +150,8 @@ Switches its filter from `p.layout == 'wiki-entry'` to
 on the app page, so the markup is otherwise unchanged. `e.url` now points
 at a redirect, which lands the reader on the first section.
 
-`group` on an app page keeps its current meaning — the wiki-wide
-category shown in the index's meta strip (`Tools`) — and is unrelated to
+`group` on an app page keeps its current meaning - the wiki-wide
+category shown in the index's meta strip (`Tools`) - and is unrelated to
 a section's `group`, which is a rail heading within one app. The two are
 never read by the same template.
 
@@ -162,15 +162,15 @@ Scoped to the current app. Order of blocks:
 1. **Filter entries.** A text input. On each keystroke, hide rail rows
    whose title or lede does not contain the query, hide a group whose
    rows are all hidden, and update each group's count to the number
-   shown. Row numbers do **not** renumber under a filter — `07` stays
-   `07` — because the number identifies the section, not its position in
+   shown. Row numbers do **not** renumber under a filter - `07` stays
+   `07` - because the number identifies the section, not its position in
    a filtered list. Empty query restores everything. Filtering is over
-   data already in the DOM — no index, no fetch. With JS off the input
+   data already in the DOM - no index, no fetch. With JS off the input
    is not rendered at all: `wiki.js` injects it, so there is no dead
    control.
 2. **One block per group.** Uppercase group name on the left, count on
    the right, hairline under, then the numbered rows. Numbering is
-   continuous across groups — `01` … `12` — matching the design sheet.
+   continuous across groups - `01` … `12` - matching the design sheet.
 3. Current section carries `aria-current="page"` and the accent colour.
 
 The `On this page` block moves out of this rail. See below.
@@ -209,7 +209,7 @@ The `On this page` block moves out of this rail. See below.
   text: >
     Base difficulty, counter-matchup, team form, head-to-head and
     home/away, combined into one CompositeScore.
-  ref: calculations        # optional — a section slug
+  ref: calculations        # optional - a section slug
 ```
 
 `kind` is the small accent label at the top of the card. `text` is the
@@ -257,17 +257,17 @@ nothing. The infobox still reads correctly.
 
 A third grid column. Three blocks, top to bottom:
 
-- **On this page** — the existing TOC and scrollspy, moved here from the
+- **On this page** - the existing TOC and scrollspy, moved here from the
   left rail. Most sections will now have no `h2`s at all, so the block
   keeps its current `.is-built` guard and stays hidden rather than
   render an empty ruled-off label. Built from `h2, h3` as today.
-- **Recently read** — the last five sections visited, newest first,
+- **Recently read** - the last five sections visited, newest first,
   from `localStorage`. Written on load, read on load. Every access is
   wrapped in `try`/`catch`, and the block stays hidden until it has at
   least one row, so a private window or a first visit shows nothing
   rather than an empty list. Titles are stored alongside slugs so a
   visited page's title survives without a manifest.
-- **Entry status** — `Words`, `Notes`, `Inbound links`, `Revised`. All
+- **Entry status** - `Words`, `Notes`, `Inbound links`, `Revised`. All
   four are computed by Liquid at build time, so the block is complete
   with JS off. `Locally edited` from the design sheet is dropped: it
   reports on an edit mode this site does not have.
@@ -290,10 +290,10 @@ three `--wk-*` properties `wiki.css` already declares and documents.
 
 | File | Change |
 | --- | --- |
-| `_layouts/wiki-app.html` | new — redirect document |
-| `_layouts/wiki-entry.html` | rewrite — parent lookup, three columns, new crumb/meta/pager |
-| `_includes/wiki-rail.html` | new — left rail |
-| `_includes/wiki-infobox.html` | new — infobox + glossary matching |
+| `_layouts/wiki-app.html` | new - redirect document |
+| `_layouts/wiki-entry.html` | rewrite - parent lookup, three columns, new crumb/meta/pager |
+| `_includes/wiki-rail.html` | new - left rail |
+| `_includes/wiki-infobox.html` | new - infobox + glossary matching |
 | `_includes/wiki-body.html` | link resolution over sections, with app-slug fallback |
 | `_data/glossary.yml` | new |
 | `assets/css/wiki.css` | three-column layout, right rail, filter, term, popover |
@@ -317,7 +317,7 @@ These are the existing rules of the files being edited, and they hold:
   backlinks, pager, infobox and Entry status are all compiled at build
   time. With JS off the wiki reads and navigates correctly; what is lost
   is the TOC, the filter, Recently read, the hover peek and the
-  popovers — every one of them an enhancement over content that is
+  popovers - every one of them an enhancement over content that is
   already on the page.
 - There is no second manifest. The rail, numbering, backlinks and pager
   are all derived from the section pages themselves.

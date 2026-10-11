@@ -1,7 +1,7 @@
 # =============================================================================
-# jayjaybee.com — Jekyll config
+# jayjaybee.com - Jekyll config
 # Vercel builds this on every push that touches the site (not projects/apps/)
-# and serves the resulting _site/ — see CLAUDE.md "Deploy". Edit site-wide
+# and serves the resulting _site/ - see CLAUDE.md "Deploy". Edit site-wide
 # defaults here; per-page details live in each page's front matter.
 # =============================================================================
 
@@ -14,7 +14,7 @@ repository: JAYJAYBEE303/jayjaybee-site
 encoding: utf-8
 
 # No theme. The github-pages gem otherwise injects jekyll-theme-primer's
-# assets/css/style.scss — unused by any layout here, and the one file whose
+# assets/css/style.scss - unused by any layout here, and the one file whose
 # non-ASCII byte breaks the build on hosts without a UTF-8 locale (Vercel).
 theme: null
 
@@ -27,12 +27,12 @@ theme: null
 #                   needing `layout: default` in its own front matter, so new
 #                   write-ups pick up the jayjaybee.com look for free.
 #
-#   projects/apps/  self-contained sub-projects — FC26 calculator, Gaffer IQ.
+#   projects/apps/  self-contained sub-projects - FC26 calculator, Gaffer IQ.
 #                   Each owns its entire document: own <head>, fonts, tokens,
 #                   and stylesheets. They must NOT inherit anything from the
 #                   site layout. This is belt-and-braces: none of them have
 #                   front matter, so Jekyll already treats them as static
-#                   assets and copies them verbatim — a layout default cannot
+#                   assets and copies them verbatim - a layout default cannot
 #                   reach a file Jekyll never renders. The override is here so
 #                   the rule survives someone later adding front matter.
 # -----------------------------------------------------------------------------
@@ -50,7 +50,7 @@ defaults:
 # -----------------------------------------------------------------------------
 # Files Jekyll should ignore entirely (not copied to the live site).
 # README.md and SKILL.md are repo meta. templates/ is a developer reference,
-# not site content. node_modules/ etc. are defensive — none currently exist.
+# not site content. node_modules/ etc. are defensive - none currently exist.
 # -----------------------------------------------------------------------------
 exclude:
   - README.md
@@ -64,7 +64,7 @@ exclude:
   # -----------------------------------------------------------------------
   # Sub-project internals. GitHub Pages ships jekyll-optional-front-matter,
   # which promotes EVERY .md file to a rendered page whether or not it has
-  # front matter — so project docs were both being published at
+  # front matter - so project docs were both being published at
   # jayjaybee.com and run through Liquid. A JSDoc `@returns {{a: number}}`
   # in a plan doc reads as an unterminated Liquid variable and fails the
   # build for the whole site. These are engineering notes, not site
@@ -88,7 +88,7 @@ exclude:
   # front-matter promotes every .md file to a rendered page and runs it
   # through Liquid regardless of front matter, so those examples parse as
   # real tags and fail the build for the whole site. These are internal
-  # engineering notes, not site content — leaving them unexcluded would
+  # engineering notes, not site content - leaving them unexcluded would
   # also publish them at jayjaybee.com/docs/superpowers/.
   # -----------------------------------------------------------------------
   - docs
