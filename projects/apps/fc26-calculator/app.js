@@ -770,7 +770,6 @@
     tabBtns.forEach((el, i) => el.animate([{ opacity: 0, transform: 'scale(.6)' }, { opacity: 1, transform: 'none' }], { duration: 900, delay: 200 + i * 70, easing: SPRING_EASE, fill: 'backwards' }));
     $('stage').animate([{ opacity: 0 }, { opacity: 1 }], { duration: 700, easing: SOFT, fill: 'backwards' });
     $('readout').animate([{ opacity: 0, transform: 'translate3d(28px,0,0)' }, { opacity: 1, transform: 'none' }], { duration: 1200, delay: 900, easing: SOFT, fill: 'backwards' });
-    document.querySelectorAll('[data-breathe]').forEach(el => el.animate([{ opacity: 1 }, { opacity: 0.6 }], { duration: 3600, direction: 'alternate', iterations: Infinity, easing: 'ease-in-out' }));
     mechCur(S.view); mechSet('flat'); stagger(S.view, 520 * 1);
     setTimeout(() => { mechSet('rise'); setTimeout(() => { mechSet(null); mechCur(); }, 1900); }, 350);
     setTimeout(() => set({ ignite: true }), 1100);
