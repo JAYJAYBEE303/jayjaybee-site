@@ -8,7 +8,7 @@
  * Lazy-loads player summaries on click. The "Avg Pts/GW source" switch is the
  * one exception to "never bulk-fetch": an explicit click on "Last season"
  * triggers a chunked, staggered load of every player's summary
- * (FEATURE_ENGINE.md §10.1) — deliberate and user-triggered, never automatic.
+ * (FEATURE_ENGINE.md §10.1) - deliberate and user-triggered, never automatic.
  * No analytical logic lives here; all scoring delegated to engine/composite.js.
  * See ARCHITECTURE.md §10, FEATURE_ENGINE.md §11, ROADMAP.md Phase 2B.
  *
@@ -59,7 +59,7 @@ const SORTS = [
 ];
 const SORT_LABEL = Object.fromEntries(SORTS);
 
-/** How each sortable figure reads as a big numeral. name/team have none — the
+/** How each sortable figure reads as a big numeral. name/team have none - the
  *  Top pick then shows Value. */
 const FMT = {
   value: {}, nextFixtureScore: {}, totalPoints: {},
@@ -88,9 +88,9 @@ const EASE = 'cubic-bezier(.2,.7,.2,1)';
 
 let _root      = null;   // .rk
 let _cmd       = null;   // #rk-cmd
-let _top       = null;   // #rk-top — Top pick / Head to head / Fixture run
+let _top       = null;   // #rk-top - Top pick / Head to head / Fixture run
 let _topSec    = null;
-let _head      = null;   // #rk-head — the wide list's column header
+let _head      = null;   // #rk-head - the wide list's column header
 let _list      = null;   // #rk-rows
 let _more      = null;
 let _msg       = null;
@@ -101,7 +101,7 @@ let _sortSelect  = null;
 let _teamSelect  = null;
 let _priceSelect = null;
 
-// 'current' | 'lastSeason' — explicit, user-toggled Avg Pts/GW source
+// 'current' | 'lastSeason' - explicit, user-toggled Avg Pts/GW source
 // (FEATURE_ENGINE.md §10.1). Never switches itself; the switch is the only
 // way this changes.
 let _avgPtsMode = 'current';
@@ -112,7 +112,7 @@ let _avgPtsMode = 'current';
 // the previous run rather than racing it.
 let _summaryLoadRunId = 0;
 
-// True while a last-season bulk load is running — the drawer and list header
+// True while a last-season bulk load is running - the drawer and list header
 // show its progress until it finishes or is cancelled.
 let _lsActive = false;
 
@@ -129,7 +129,7 @@ let _progress = null;
 
 // Active filter / sort / display state.
 // Empty set = no filter on that axis (every position / every playtime level
-// shows) — selecting a pill narrows to just the selected ones, rather than
+// shows) - selecting a pill narrows to just the selected ones, rather than
 // the old "all selected by default" scheme where narrowing to one position
 // meant deselecting the other three.
 let _activePosSet    = new Set();
@@ -153,7 +153,7 @@ let _infoReturn = null;
 let _filtersOpen = false;
 let _listWide   = true;            // grid rows (wide) or cards (narrow)
 let _listShown  = false;           // first reveal of real rows has played
-let _lastLayout = '';              // list layout signature — FLIP only within one layout
+let _lastLayout = '';              // list layout signature - FLIP only within one layout
 let _raf        = 0;
 const _cuLast   = new Map();       // big numeral slot → value it last showed
 
@@ -198,7 +198,7 @@ function buildCtx() {
 /**
  * What the Player column shows.
  *
- * FPL's `web_name` is a surname or a nickname — "Szoboszlai", "Gakpo" — which
+ * FPL's `web_name` is a surname or a nickname - "Szoboszlai", "Gakpo" - which
  * is compact but ambiguous across a 700-player pool. `fullName` is first_name
  * and second_name joined by normalise.js.
  *
@@ -220,16 +220,16 @@ const POSITION_LABELS = { GKP: 'goalkeepers', DEF: 'defenders', MID: 'midfielder
  * Tooltip text for a rank-tier chip. positionElite/positionStrong's counts
  * are PER-POSITION (RANK_ELITE_COUNT_BY_POS/RANK_STRONG_COUNT_BY_POS), so the
  * text must read the player's own position rather than a single fixed string
- * — built from the live config constants, not hardcoded numbers, so this
+ * - built from the live config constants, not hardcoded numbers, so this
  * never goes stale if either table is retuned. topPercentile/bottomPercentile
- * are POOL-WIDE (not per-position — see calcRankTier's JSDoc), so their text
+ * are POOL-WIDE (not per-position - see calcRankTier's JSDoc), so their text
  * doesn't mention a position; midPercentile's implied width (100% minus the
  * other two) is likewise derived from config, not a hardcoded "35%".
  *
  * `metric` names WHICH column's ranking this is. Three columns now carry these
  * chips and each is ranked on its own number, so a tooltip that only said "top
  * 5 defenders in the game" would be the same sentence under three different
- * colourings — and wrong for two of them.
+ * colourings - and wrong for two of them.
  */
 function rankTierTitle(rankTier, position, metric = 'rating') {
   const posLabel = POSITION_LABELS[position] ?? 'players';
@@ -261,7 +261,7 @@ function rankTierShort(rankTier, position) {
 /**
  * Hover text for the Playtime badge. The column shows one word; the model has
  * four inputs, and which of them is dragging a player down is exactly what the
- * user needs to know — "Rotation because his club plays seven midfielders" is
+ * user needs to know - "Rotation because his club plays seven midfielders" is
  * a different decision from "Rotation because he is carrying a knock".
  *
  * @param {object} pt  breakdown.playtime from scorePlayer (§7.3b)
@@ -281,7 +281,7 @@ function playtimeTitle(pt) {
     parts.push(`${Math.round(pt.availability)}% chance of playing`);
   }
   if (pt.estimated) {
-    parts.push('early season — still weighted toward the price-implied role');
+    parts.push('early season - still weighted toward the price-implied role');
   }
   return parts.join(' · ');
 }
@@ -297,7 +297,7 @@ function playtimeOf(score) {
 }
 
 /**
- * Price filter — `band` is either 'all' (unrestricted — includes players both
+ * Price filter - `band` is either 'all' (unrestricted - includes players both
  * below PRICE_FILTER_MIN and above PRICE_FILTER_MAX) or a numeric-string
  * maximum-price threshold, e.g. '9.0' meaning "£9.0m and below".
  */
@@ -309,7 +309,7 @@ function priceInBand(price, band) {
 /**
  * Populate the price <select> with 'All prices' plus a generated run of
  * maximum-price thresholds from PRICE_FILTER_MIN to PRICE_FILTER_MAX in
- * PRICE_FILTER_STEP increments (config-driven — see config.js §11).
+ * PRICE_FILTER_STEP increments (config-driven - see config.js §11).
  */
 function populatePriceFilter() {
   if (!_priceSelect) return;
@@ -333,7 +333,7 @@ function getNextFixtureForTeam(teamId) {
 }
 
 /**
- * The gameweek window the scores cover, as "GW8–12" — the same window
+ * The gameweek window the scores cover, as "GW8–12" - the same window
  * scorePlayer reads (buildCtx's currentGw + the active horizon's length).
  */
 function horizonRange() {
@@ -348,7 +348,7 @@ function horizonRange() {
  * Score all players over `horizon` in chunks of RANKER_CHUNK_SIZE, yielding
  * back to the browser between chunks so the UI stays responsive. Shows a live
  * progress indicator while working. Any in-flight run whose `computeId` no
- * longer matches `_computeId` is silently abandoned — this happens when the
+ * longer matches `_computeId` is silently abandoned - this happens when the
  * user changes the horizon or data refreshes mid-compute.
  *
  * Never renders partial results: `_rows` and `render()` are only touched
@@ -358,14 +358,14 @@ async function rebuildRowsChunked() {
   const computeId = ++_computeId;
 
   // Every score in this table blends counter-matchup, which needs the whole
-  // league's Understat payloads — the pool spans all 20 teams, so unlike the
+  // league's Understat payloads - the pool spans all 20 teams, so unlike the
   // Matchup Analyser there is no smaller set to wait on. Until the prefetch
   // settles, rank nothing and show placeholders.
   //
   // WHY THE WHOLE LIST AND NOT JUST THE SCORES. This list is SORTED by the
   // number that is still settling. Withholding the scores alone would leave
   // every other figure readable but in an order that reshuffles itself the
-  // moment the last Understat payload lands — a row the reader was about to
+  // moment the last Understat payload lands - a row the reader was about to
   // click moves out from under them.
   //
   // This is also the cheaper path, not just the more honest one: data:ready
@@ -421,14 +421,14 @@ async function rebuildRowsChunked() {
     renderProgress();
   }
 
-  // Final stale-check before committing — a horizon change could have fired
+  // Final stale-check before committing - a horizon change could have fired
   // during the last chunk's execution.
   if (computeId !== _computeId) return;
 
   // Sort descending by value, matching rankPlayers ordering.
   pending.sort((a, b) => b.score.value - a.score.value);
   // Rank tier (FEATURE_ENGINE.md §13) is computed against the FULL unfiltered
-  // pool, before applyFilters() ever runs — "top 30 in the game" must mean the
+  // pool, before applyFilters() ever runs - "top 30 in the game" must mean the
   // same thing regardless of which position/price/team pills are active, and
   // must match what Dashboard/Planner (which have no filters at all) compute
   // for the same players.
@@ -441,13 +441,13 @@ async function rebuildRowsChunked() {
 // ─── Filter and sort ──────────────────────────────────────────────────────────
 
 /**
- * One row against the active filters. `skip` leaves one axis out — the
+ * One row against the active filters. `skip` leaves one axis out - the
  * position and playtime pills show how many players each would add given
  * every OTHER filter, so their counts never read zero just because that
  * axis is narrowed elsewhere.
  */
 function passes({ player, score }, skip = null) {
-  // Empty set = axis not filtered (see _activePosSet's declaration) — only
+  // Empty set = axis not filtered (see _activePosSet's declaration) - only
   // a non-empty set narrows the list down to its members.
   if (skip !== 'pos' && _activePosSet.size > 0 &&
       !_activePosSet.has(player.position))            return false;
@@ -465,7 +465,7 @@ function applyFilters(rows) {
 
 /**
  * Rank every row in `rows` by nextFixtureScore (descending), independent of
- * whatever column the list is currently sorted by — "next-fixture rank" is a
+ * whatever column the list is currently sorted by - "next-fixture rank" is a
  * standing among the CURRENTLY-FILTERED players, not the whole ~700-player
  * pool, since that's the set the user is actually choosing among.
  * @returns {Map<number, number>} playerId → 1-based rank
@@ -481,15 +481,15 @@ function buildNextFixtureRanks(rows) {
 /**
  * @param {Array} rows
  * @param {Map<number,{avg:number|null,cost:number|null}>} [lastSeasonByPlayerId]
- *   from buildLastSeasonLookup — present only when _avgPtsMode==='lastSeason'.
+ *   from buildLastSeasonLookup - present only when _avgPtsMode==='lastSeason'.
  *   When present, sorting by 'avgPointsPerGw'/'costPerPoint' follows the
  *   DISPLAYED (last-season) values instead of the current-season ones, so the
  *   sort arrow never contradicts what's actually on screen.
  */
 function applySort(rows, lastSeasonByPlayerId = null) {
   return rows.slice().sort((a, b) => {
-    // costPerPoint can be null (no scoring record, or — in 'lastSeason' mode —
-    // no past-season data / not loaded yet) — nulls always sort last,
+    // costPerPoint can be null (no scoring record, or - in 'lastSeason' mode -
+    // no past-season data / not loaded yet) - nulls always sort last,
     // regardless of sort direction, rather than comparing as 0.
     if (_sortBy === 'costPerPoint') {
       const av = lastSeasonByPlayerId
@@ -515,7 +515,7 @@ function applySort(rows, lastSeasonByPlayerId = null) {
     }
     // String columns use localeCompare, not subtraction. Same descending-first
     // convention as every numeric column, for consistency (first click = 'Z'
-    // first) — the sort-arrow indicator shows the direction either way.
+    // first) - the sort-arrow indicator shows the direction either way.
     if (_sortBy === 'name' || _sortBy === 'team') {
       const av = _sortBy === 'name' ? displayName(a.player) : (a.team?.name ?? '');
       const bv = _sortBy === 'name' ? displayName(b.player) : (b.team?.name ?? '');
@@ -560,7 +560,7 @@ function applySort(rows, lastSeasonByPlayerId = null) {
 
 /**
  * Precompute each player's 'lastSeason' avg/cost ONCE per render (not once
- * per sort comparison, and not once per row) — cheap lookups thereafter for
+ * per sort comparison, and not once per row) - cheap lookups thereafter for
  * both applySort and the row builders. Only built while _avgPtsMode==='lastSeason'.
  * @param {Array} rows
  * @param {object} ctx
@@ -584,7 +584,7 @@ function buildLastSeasonLookup(rows, ctx) {
 }
 
 /**
- * The figure a sort key ranks a row by, as displayed — last season's when the
+ * The figure a sort key ranks a row by, as displayed - last season's when the
  * source switch says so. Read by the Top pick numeral and the head to head.
  */
 function metricOf({ player, score }, key, ls) {
@@ -613,7 +613,7 @@ function fmtMetric(v, key, intOnly = false) {
 }
 
 /**
- * Thousands-separated integer for the transfer figures — 45231 → "45,231".
+ * Thousands-separated integer for the transfer figures - 45231 → "45,231".
  * Deliberately NOT the "45.2k" shortening engine/prices.js uses in its
  * reasoning strings: this is read as a magnitude to compare across rows.
  * @param {number} n
@@ -630,7 +630,7 @@ function chipHTML(band, text, { size = '', est = false, title = '' } = {}) {
     + `${band ? ` data-band="${band}"` : ''}${title ? ` title="${esc(title)}"` : ''}>${text}</span>`;
 }
 
-/** A figure with no tier — still loading, or no record. */
+/** A figure with no tier - still loading, or no record. */
 function plainHTML(text, title = '') {
   return `<span class="chip chip--plain chip--sm muted"${title ? ` title="${esc(title)}"` : ''}>${text}</span>`;
 }
@@ -664,12 +664,12 @@ function statusHTML(player) {
 /**
  * Season price change. ↑ (green) = risen since the season opened, ↓ (red) =
  * fallen, no arrow (muted) = unmoved. This is banked FACT, not the
- * transfer-flow forecast that calcPriceChangeRisk produces — that prediction
+ * transfer-flow forecast that calcPriceChangeRisk produces - that prediction
  * was removed from the Ranker; the Transfer Planner still carries it.
  */
 function priceChangeHTML(player) {
   const change = calcSeasonPriceChange(player);
-  // Flat is a real reading, not missing data — it shows "£0.0m" muted rather
+  // Flat is a real reading, not missing data - it shows "£0.0m" muted rather
   // than a dash, so an unmoved player is visibly distinct from missing data.
   if (change.direction === 'flat') {
     return `<span class="pc" title="Unchanged since the start of the season">£0.0m</span>`;
@@ -694,13 +694,13 @@ function playtimeHTML(score) {
  * See FEATURE_ENGINE.md §9.1.
  *
  * @param {Array} perGw   from scoreOverHorizon
- * @param {Array} pending from pendingFixturesForTeam — postponed, no gameweek
+ * @param {Array} pending from pendingFixturesForTeam - postponed, no gameweek
  * @param {{small?:boolean, values?:boolean}} [o]  values: print each fixture's
  *   score under its opponent (the Fixture run view)
  */
 function stripHTML(perGw, pending = [], o = {}) {
   const slots = groupPerGwSlots(perGw);
-  if (slots.length === 0) return '<span class="muted">—</span>';
+  if (slots.length === 0) return '<span class="muted">-</span>';
 
   const said = [];
   const slotHtml = slots.map(slot => {
@@ -709,10 +709,10 @@ function stripHTML(perGw, pending = [], o = {}) {
       // blank gameweek is a known fact, not an absence of one.
       if (entry.isBlank) {
         said.push(`GW${entry.gw} blank`);
-        return `<span class="cell cell--blank" title="GW${entry.gw} — blank (no fixture)">∅</span>`;
+        return `<span class="cell cell--blank" title="GW${entry.gw} - blank (no fixture)">∅</span>`;
       }
       const v = Math.round(entry.value);
-      const title = `GW${entry.gw} ${entry.opponent ?? ''} (${entry.venue ?? ''}) — ${v} ${BAND_LABEL[entry.band] ?? ''}`
+      const title = `GW${entry.gw} ${entry.opponent ?? ''} (${entry.venue ?? ''}) - ${v} ${BAND_LABEL[entry.band] ?? ''}`
         + `${entry.provisional ? ', estimated' : ''}${entry.provisionalKickoff ? ', kickoff TBC' : ''}`;
       said.push(title);
       return `<span class="cell${entry.provisional ? ' is-est' : ''}${entry.provisionalKickoff ? ' is-tbc' : ''}"`
@@ -731,7 +731,7 @@ function stripHTML(perGw, pending = [], o = {}) {
     + `<span class="strip${cls}" aria-hidden="true">${slotHtml}${pend}</span>`;
 }
 
-/** Next fixture as [slot entry] — first gameweek that is not a blank. */
+/** Next fixture as [slot entry] - first gameweek that is not a blank. */
 function nextEntry(score) {
   return groupPerGwSlots(score.perGw).find(s => !s.isBlank)?.fixtures[0] ?? null;
 }
@@ -753,41 +753,41 @@ function viewOf(row, rank, c) {
   const est = isScoreEstimated(score);
 
   // Avg Pts/GW and Cost/Pt each get their OWN per-position ranking, on their
-  // own number — not the Value tier repeated across the row.
+  // own number - not the Value tier repeated across the row.
   let avg, cost;
   if (c.ls) {
-    // 'lastSeason' mode (FEATURE_ENGINE.md §10.1) — three distinct states per
+    // 'lastSeason' mode (FEATURE_ENGINE.md §10.1) - three distinct states per
     // player, not just loaded/unloaded: still loading (bulk fetch in flight),
-    // loaded but no past-season record at all (a definitive "—", not an
+    // loaded but no past-season record at all (a definitive "-", not an
     // estimate), or loaded with a real last-season figure (always flagged ~,
     // since by definition it isn't this season's number).
     const ls = c.ls.get(player.id);
     if (!ls?.loaded) {
       avg = cost = plainHTML('…', 'Loading last season’s data…');
     } else if (ls.avg === null) {
-      avg = cost = plainHTML('—', 'No past-season data for this player');
+      avg = cost = plainHTML('-', 'No past-season data for this player');
     } else {
       const season = ls.seasonName ?? 'last season';
       const at = c.ranks.avg.get(player.id), ct = c.ranks.cost.get(player.id);
       avg = chipHTML(TIER_BAND[at], `${ls.avg.toFixed(1)}~`, { size: 'sm',
-        title: `${rankTierTitle(at, player.position, `Avg Pts/GW (${season})`)} — ${season}'s average, not this season's` });
+        title: `${rankTierTitle(at, player.position, `Avg Pts/GW (${season})`)} - ${season}'s average, not this season's` });
       cost = ls.cost !== null
         ? chipHTML(TIER_BAND[ct], `£${ls.cost.toFixed(2)}m~`, { size: 'sm',
-            title: `${rankTierTitle(ct, player.position, `Cost/Pt (${season})`)} — derived from ${season}'s average` })
-        : plainHTML('—', 'No past-season data for this player');
+            title: `${rankTierTitle(ct, player.position, `Cost/Pt (${season})`)} - derived from ${season}'s average` })
+        : plainHTML('-', 'No past-season data for this player');
     }
   } else {
     const a = score.avgPointsPerGw;
     const at = c.ranks.avg.get(player.id), ct = c.ranks.cost.get(player.id);
-    const estNote = ' · Estimated — season totals ÷ estimated games played, no per-GW history loaded yet';
+    const estNote = ' · Estimated - season totals ÷ estimated games played, no per-GW history loaded yet';
     avg = chipHTML(TIER_BAND[at], `${a.value.toFixed(1)}${a.estimated ? '~' : ''}`, { size: 'sm',
       title: rankTierTitle(at, player.position, 'Avg Pts/GW') + (a.estimated ? estNote : '') });
-    // Cost/Pt is DERIVED from avgPointsPerGw (price ÷ avgPointsPerGw.value) —
+    // Cost/Pt is DERIVED from avgPointsPerGw (price ÷ avgPointsPerGw.value) -
     // when that input is estimated, flag the derived figure too.
     cost = score.costPerPoint !== null
       ? chipHTML(TIER_BAND[ct], `£${score.costPerPoint.toFixed(2)}m${a.estimated ? '~' : ''}`, { size: 'sm',
           title: rankTierTitle(ct, player.position, 'Cost/Pt') + (a.estimated ? ' · Derived from an estimated Avg Pts/GW' : '') })
-      : plainHTML('—');
+      : plainHTML('-');
   }
 
   const valueBand = TIER_BAND[rankTier] ?? score.band;
@@ -798,11 +798,11 @@ function viewOf(row, rank, c) {
   return {
     row, rank, player, team, score, name, est, avg, cost, rankTier, valueBand, nfBand,
     id: player.id,
-    aria: `${name}, ${team?.name ?? ''} ${player.position}${player.statusNote ? ` — ${player.statusNote}` : ''}. Value ${Math.round(score.value)}. Open in Matchup Analyser`,
+    aria: `${name}, ${team?.name ?? ''} ${player.position}${player.statusNote ? ` - ${player.statusNote}` : ''}. Value ${Math.round(score.value)}. Open in Matchup Analyser`,
     value: (size = '') => chipHTML(valueBand, String(Math.round(score.value)), { size, est,
-      title: rankTierTitle(rankTier, player.position, 'rating') + (est ? ' · Estimated — early data' : '') }),
+      title: rankTierTitle(rankTier, player.position, 'rating') + (est ? ' · Estimated - early data' : '') }),
     nf: (size = '') => chipHTML(nfBand, String(Math.round(score.nextFixtureScore.value)), { size, est: nfEst,
-      title: `Fixture + counter-matchup favourability, excluding form — ${BAND_LABEL[nfBand]}${nfEst ? ', estimated' : ''}` }),
+      title: `Fixture + counter-matchup favourability, excluding form - ${BAND_LABEL[nfBand]}${nfEst ? ', estimated' : ''}` }),
     nfRank: c.nfRank.get(player.id),
     strip: o => stripHTML(score.perGw, pendingFixturesForTeam(player.teamId, c.pendingCtx), o),
   };
@@ -814,7 +814,7 @@ function nameBtnHTML(v) {
 }
 
 function metaHTML(v) {
-  return `<span class="meta">${badgeHTML(v.team)}${esc(v.team?.shortName ?? '—')}`
+  return `<span class="meta">${badgeHTML(v.team)}${esc(v.team?.shortName ?? '-')}`
     + `<span class="pos pos--${v.player.position}">${v.player.position}</span></span>`;
 }
 
@@ -825,7 +825,7 @@ function vsHTML(v, pair) {
     + ` aria-label="${side ? `${esc(v.name)} is in the head to head` : `Compare ${esc(v.name)} head to head`}">${side ?? 'vs'}</button>`;
 }
 
-/** List column widths, in order — the grid template and the "fits?" test. */
+/** List column widths, in order - the grid template and the "fits?" test. */
 function columnWidths() {
   return [36, 140, 104, 80]
     .concat(_hidden.has('outlook') ? [] : [_view === 'run' ? 200 : 176, 76])
@@ -885,7 +885,7 @@ function headHTML() {
       + ` aria-label="Sort by ${esc(SORT_LABEL[col])}${on ? `, ${dir}` : ''}">${label}${on ? (_sortDesc ? ' ↓' : ' ↑') : ''}</button>`;
   };
   // Cost/Pt and Avg Pts/GW both switch source with the toggle (FEATURE_ENGINE.md
-  // §10.1) — marked here so the meaning is clear scrolled away from the drawer.
+  // §10.1) - marked here so the meaning is clear scrolled away from the drawer.
   const ls = _avgPtsMode === 'lastSeason' ? '~' : '';
   const cell = (inner, cls = '') => `<div${cls ? ` class="${cls}"` : ''}>${inner}</div>`;
   return `<div class="head" style="--cols:${gridCols()}">`
@@ -908,18 +908,18 @@ function gridCols() {
   return columnWidths().map((w, i) => (i === 1 ? 'minmax(140px,1fr)' : `${w}px`)).join(' ');
 }
 
-/** Copy for the "i" popovers — the gameweek window is live, so it's built per call. */
+/** Copy for the "i" popovers - the gameweek window is live, so it's built per call. */
 function INFO() {
   const R = horizonRange();
   return {
-    value:             { k: 'Rating', t: 'Value', b: `Projected FPL value over ${R} — form, fixtures and minutes folded into one 0–100 number. The colour is his rank against the whole game, not the number: gold is the best in his position.` },
+    value:             { k: 'Rating', t: 'Value', b: `Projected FPL value over ${R} - form, fixtures and minutes folded into one 0–100 number. The colour is his rank against the whole game, not the number: gold is the best in his position.` },
     nextFixtureScore:  { k: 'Rating', t: 'Next fixture', b: 'Fixture plus counter-matchup favourability for his next game, excluding form, on the 0–100 band scale. #n is its rank among the players shown.' },
     fixtures:          { k: 'Outlook', t: R, b: 'One cell per gameweek, coloured on the band scale. Dashed = estimated, hatched = blank gameweek, a grouped pair = double gameweek, amber dot = kickoff TBC.' },
-    playtime:          { k: 'Outlook', t: 'Playtime', b: 'Will he play — start rate, share of minutes, squad crowding and availability. Hover the pill for his numbers.' },
+    playtime:          { k: 'Outlook', t: 'Playtime', b: 'Will he play - start rate, share of minutes, squad crowding and availability. Hover the pill for his numbers.' },
     price:             { k: 'Price', t: 'Price & change', b: 'Current price, and how far it has moved since the season opened. Banked fact, not a forecast.' },
     costPerPoint:      { k: 'Price', t: 'Cost per point', b: 'Price ÷ average points per gameweek. Lower is better, so the cheapest points in the game are gold.' },
-    avgPointsPerGw:    { k: 'Points', t: 'Avg pts / GW', b: 'Season points ÷ games played. Filters can switch this to last season — loaded player by player, marked ~.' },
-    fplForm:           { k: 'Points', t: 'Form', b: 'FPL’s own form figure — points per match over the last 30 days.' },
+    avgPointsPerGw:    { k: 'Points', t: 'Avg pts / GW', b: 'Season points ÷ games played. Filters can switch this to last season - loaded player by player, marked ~.' },
+    fplForm:           { k: 'Points', t: 'Form', b: 'FPL’s own form figure - points per match over the last 30 days.' },
     transfersInEvent:  { k: 'Market', t: 'Transfers', b: 'Managers moving him in and out this gameweek.' },
   };
 }
@@ -999,7 +999,7 @@ function h2hHTML(A, B, c) {
     ['totalPoints', 'Total pts', {}, 1], ['costPerPoint', '£ per point', { dec: 2, prefix: '£' }, -1],
     ['playtime', 'Playtime', { suffix: '%', mul: 100 }, 1], ['transfersInEvent', 'Transfers in', { dec: 1, suffix: 'k', div: 1000 }, 1],
   ];
-  const fmt = (x, o) => (x == null ? '—'
+  const fmt = (x, o) => (x == null ? '-'
     : `${o.prefix ?? ''}${o.dec ? (x * (o.mul ?? 1) / (o.div ?? 1)).toFixed(o.dec) : Math.round(x * (o.mul ?? 1) / (o.div ?? 1))}${o.suffix ?? ''}`);
   // Bars are scaled to the best figure in the whole pool, so their length
   // says where each player sits in the game, not just against the other.
@@ -1020,7 +1020,7 @@ function h2hHTML(A, B, c) {
     + '</article>';
 
   if (!B) {
-    return `<div class="hh">${side(A, false, false)}<p class="muted">Only one player matches — widen the filters to compare.</p></div>`;
+    return `<div class="hh">${side(A, false, false)}<p class="muted">Only one player matches - widen the filters to compare.</p></div>`;
   }
 
   let winsA = 0, winsB = 0;
@@ -1056,8 +1056,8 @@ function h2hHTML(A, B, c) {
 
 /**
  * Best fixture run among the players shown. A club's run is its
- * breakdown.fixture.value — scoreOverHorizon's own score for that club over
- * the window, identical for every player at the club — read as-is.
+ * breakdown.fixture.value - scoreOverHorizon's own score for that club over
+ * the window, identical for every player at the club - read as-is.
  */
 function runHTML(views) {
   const byTeam = new Map();
@@ -1075,12 +1075,12 @@ function runHTML(views) {
   const tile = (slot, i) => {
     const d = `--d:${140 + i * 70}ms`;
     if (slot.isBlank) {
-      return `<div class="tile tile--blank" role="listitem" aria-label="GW${slot.gw} — blank (no fixture)" style="${d}">`
+      return `<div class="tile tile--blank" role="listitem" aria-label="GW${slot.gw} - blank (no fixture)" style="${d}">`
         + `<span class="tile__gw">GW${slot.gw}</span><span class="tile__big">Blank</span><span class="muted">No fixture</span></div>`;
     }
     const half = e => {
       const v = Math.round(e.value);
-      const title = `GW${e.gw} ${e.opponent ?? ''} (${e.venue ?? ''}) — ${v} ${BAND_LABEL[e.band] ?? ''}${e.provisional ? ', estimated' : ''}${e.provisionalKickoff ? ', kickoff TBC' : ''}`;
+      const title = `GW${e.gw} ${e.opponent ?? ''} (${e.venue ?? ''}) - ${v} ${BAND_LABEL[e.band] ?? ''}${e.provisional ? ', estimated' : ''}${e.provisionalKickoff ? ', kickoff TBC' : ''}`;
       return { title, html: `<div class="half${e.provisional ? ' is-est' : ''}${e.provisionalKickoff ? ' is-tbc' : ''}" data-band="${e.band}" title="${esc(title)}">`
         + `<span class="half__opp"><b>${esc(e.opponent ?? '?')}</b><span>${e.venue ?? ''}</span></span>`
         + `<span class="half__v">${v}<span>${BAND_LABEL[e.band] ?? ''}</span></span></div>` };
@@ -1121,7 +1121,7 @@ function runHTML(views) {
 
 // ─── Render ───────────────────────────────────────────────────────────────────
 
-/** Update the progress readout in place — one ranking chunk at a time. */
+/** Update the progress readout in place - one ranking chunk at a time. */
 function renderProgress() {
   const t = _top?.querySelector('.prog__t');
   if (!t || !_progress) { render(); return; }
@@ -1173,11 +1173,11 @@ function render(animate = false) {
   const filtered = applyFilters(_rows);
 
   // Only built in 'lastSeason' mode. buildCtx() is safe to call unconditionally
-  // here — _rows is only ever populated after rebuildRowsChunked has already
+  // here - _rows is only ever populated after rebuildRowsChunked has already
   // built (and required a non-null) ctx once, so the season is guaranteed loaded.
   //
   // Built over _rows, not `filtered`: the rank tiers below are computed from it,
-  // and they follow the same full-pool rule as the Value column — "best forward
+  // and they follow the same full-pool rule as the Value column - "best forward
   // for Cost/Pt" has to mean the same thing whichever filter pills are active.
   const ls = _avgPtsMode === 'lastSeason' ? buildLastSeasonLookup(_rows, buildCtx()) : null;
 
@@ -1213,7 +1213,7 @@ function render(animate = false) {
     // Ranked among the filtered set, independent of the active sort column.
     nfRank: buildNextFixtureRanks(filtered),
     ls, ranks,
-    // Read once per render, not once per row — the pending-fixture index is the
+    // Read once per render, not once per row - the pending-fixture index is the
     // same for every row.
     pendingCtx: store.getSeason(),
     teamByShort: new Map(store.getTeams().map(t => [t.shortName, t])),
@@ -1460,12 +1460,12 @@ async function ensurePlayerSummary(playerId) {
 
 /**
  * Fetch every player's element-summary in chunks of SUMMARY_FETCH_CHUNK_SIZE,
- * yielding between chunks — mirrors rebuildRowsChunked's chunk/yield pattern,
+ * yielding between chunks - mirrors rebuildRowsChunked's chunk/yield pattern,
  * reusing the same `ensurePlayerSummary` lazy-loader the row-click path uses
  * (so a player already loaded via a click is not re-fetched). Re-renders after
  * every chunk so rows fill in progressively instead of all at once at the end.
  *
- * This IS an explicit bulk fetch of all ~700 players — but triggered only by
+ * This IS an explicit bulk fetch of all ~700 players - but triggered only by
  * the user clicking "Last season" on the Avg Pts/GW source switch, not
  * automatically on load, which is what ARCHITECTURE.md's no-bulk-fetch rule
  * actually targets. See FEATURE_ENGINE.md §10.1.
@@ -1505,7 +1505,7 @@ async function loadAllSummariesChunked() {
 
 /**
  * Open a player. Shows loading state on everything showing that player while
- * the element-summary is fetched (first click only — subsequent clicks use the
+ * the element-summary is fetched (first click only - subsequent clicks use the
  * cached summary). On completion emits player:selected so the Matchup
  * Analyser pre-selects the player's next fixture, then navigates there.
  */
@@ -1537,7 +1537,7 @@ async function onPlayerClick(playerId) {
  * 'lastSeason' re-renders immediately (showing the loading placeholder for
  * every row) then kicks off the chunked bulk load. Switching back to
  * 'current' just bumps _summaryLoadRunId to cancel any in-flight load and
- * re-renders — no fetch needed, current-season data is already in `_rows`.
+ * re-renders - no fetch needed, current-season data is already in `_rows`.
  */
 function setSource(src) {
   if (src === _avgPtsMode) return;
@@ -1787,7 +1787,7 @@ function onDataReady() {
   // Ranking the full pool is by far the most expensive thing this module does
   // (~920ms for 604 players, measured). data:ready fires once per team-xG
   // payload at boot, so doing this off screen burned seconds ranking a list
-  // nobody was looking at. Defer to activation — store.js's activeModule note
+  // nobody was looking at. Defer to activation - store.js's activeModule note
   // has the full measurement.
   if (store.getActiveModule() !== 'ranker') {
     _pendingRebuild = true;
@@ -1864,7 +1864,7 @@ export function initRanker() {
   window.addEventListener('resize', onResize);
 
   // The list header sticks under the command bar, which wraps onto two rows
-  // at some widths — track its real height rather than assuming one.
+  // at some widths - track its real height rather than assuming one.
   new ResizeObserver(() => {
     _root.style.setProperty('--rk-cmd-h', `${_cmd.offsetHeight}px`);
   }).observe(_cmd);
@@ -1878,7 +1878,7 @@ export function initRanker() {
   // If the store already has data (hydrated from sessionStorage, or data:ready
   // fired before this module registered its subscription), render right now
   // rather than waiting for an event that won't fire again. Routed through
-  // onDataReady so the off-screen guard applies here too — on a cold load of
+  // onDataReady so the off-screen guard applies here too - on a cold load of
   // any other tab this now marks the rebuild pending instead of running it.
   if (store.isFresh()) onDataReady();
 }

@@ -20,7 +20,7 @@ import { canonicalClubKey } from './normalise.js';
 // modules resolve this correctly because every binding involved is a hoisted
 // `function` declaration, bound at call time rather than module-evaluation
 // time. If any of them is ever converted to `const fn = () => …` the cycle
-// breaks — keep them as `function` declarations.
+// breaks - keep them as `function` declarations.
 import { buildRoleSignature, classifyRole } from './counter.js';
 
 /**
@@ -28,7 +28,7 @@ import { buildRoleSignature, classifyRole } from './counter.js';
  * is already loaded rather than a hardcoded table.
  *
  * MODEL: matched by NAME via canonicalClubKey, never by Understat's numeric
- * team id — FPL reassigns ids every season as clubs are promoted and
+ * team id - FPL reassigns ids every season as clubs are promoted and
  * relegated, which is exactly what silently broke the previous id-keyed
  * UNDERSTAT_TEAM_SLUGS table (see engine/style.js buildXgProfilesByTeamId).
  * The slug is Understat's own convention: the team title with spaces replaced
@@ -64,7 +64,7 @@ export function buildUnderstatSlugsByTeamId(leagueXg, teamsById) {
 // absent. MODEL: a neutral-looking 0.5 is indistinguishable from a genuine
 // mid-table reading, and the scoring below would multiply it into a
 // confident-looking edge. hasChannelAxes is the single flag every consumer
-// checks — same policy as NO_STYLE_AXES in engine/style.js.
+// checks - same policy as NO_STYLE_AXES in engine/style.js.
 const NO_CHANNEL_AXES = Object.freeze({
   hasChannelAxes: false,
   setPieceThreat: Object.freeze({ for: null, against: null }),
@@ -100,14 +100,14 @@ function share(part, rest) {
  * Build the three-axis channel profile for one team from its Understat
  * `statistics` block.
  *
- * MODEL: penalties are excluded from the set-piece denominator — a penalty is
+ * MODEL: penalties are excluded from the set-piece denominator - a penalty is
  * a restart, not evidence about how a team plays in open field. Same reasoning
  * as the npxG choice in engine/style.js. Own goals are excluded from the shot
  * zone denominator for the same reason.
  *
  * MODEL: the shares are not perfectly quality-neutral. Across the 2025 league,
  * corr(boxShare_for, npxG_for) = +0.408 and corr(setPieceShare_for, npxG_for)
- * = −0.370 — better teams take more of their shots inside the box and rely
+ * = −0.370 - better teams take more of their shots inside the box and rely
  * less on dead balls. At |r| ≤ 0.46 that is ~20% shared variance, far better
  * than raw totals but not zero, and CHANNEL_WEIGHTS leans away from the most
  * confounded axis accordingly.
@@ -131,7 +131,7 @@ export function buildChannelProfile(statistics, matchesPlayed = 0) {
   const DEAD = ['FromCorner', 'SetPiece', 'DirectFreekick'];
   const BOX  = ['shotSixYardBox', 'shotPenaltyArea'];
 
-  // Kept as a diagnostic — it no longer drives maturity (see below), but it is
+  // Kept as a diagnostic - it no longer drives maturity (see below), but it is
   // the quantity that actually governs how noisy the shares are, so it is worth
   // having to hand when a profile looks wrong.
   let shots = 0;
@@ -147,15 +147,15 @@ export function buildChannelProfile(statistics, matchesPlayed = 0) {
   //
   // MODEL (revised): the ramp counts MATCHES PLAYED, not shots. It used to
   // divide the shot total by CHANNEL_MATURITY_FULL_SHOTS (120), which is the
-  // statistically tighter reading — what makes a share stable is the number of
+  // statistically tighter reading - what makes a share stable is the number of
   // events in its thinnest bucket, and shot volume varies by roughly 67% across
   // the league (measured on a completed season: Man City reached 120 shots in
   // 7.7 matches, Burnley in 12.8). It was dropped anyway, deliberately:
   //
-  //   — The error it corrects is small where it matters. The gap between the
+  //   - The error it corrects is small where it matters. The gap between the
   //     two readings is a percentage point or two of a 0.25-weight metric, i.e.
-  //     well under half a composite point — invisible on the card.
-  //   — What it cost was legibility, which is not small. A counter driven by
+  //     well under half a composite point - invisible on the card.
+  //   - What it cost was legibility, which is not small. A counter driven by
   //     shots ticks 0, 1 or 2 in a given week and needs a "matches' WORTH of
   //     shot data, not matches played" caveat to be read correctly at all. One
   //     per match, full at ten, needs no caveat.
@@ -176,7 +176,7 @@ export function buildChannelProfile(statistics, matchesPlayed = 0) {
 
   // MODEL: axes exist only when every share has a denominator. A missing share
   // is a structurally absent axis (no shots of that kind at all), which is a
-  // different condition from a THIN one — thin is handled by maturity above.
+  // different condition from a THIN one - thin is handled by maturity above.
   const complete = [f.setPiece, f.box, f.fast, a.setPiece, a.box, a.fast]
     .every(v => typeof v === 'number');
   if (!complete) return { ...NO_CHANNEL_AXES, shots, matches: matchesPlayed };
@@ -201,7 +201,7 @@ export function buildChannelProfile(statistics, matchesPlayed = 0) {
  * rather than included with null axes. Presence in this map is exactly the
  * condition calcChannelCounter tests for, so an unusable profile and an absent
  * one behave identically and there is only one degradation path to reason about.
- * THIN profiles are NOT omitted — they are included and carry a low `maturity`,
+ * THIN profiles are NOT omitted - they are included and carry a low `maturity`,
  * which engine/composite.js uses to scale their weight (revised 2026-08-21).
  *
  * @param {Object<string,object>|null} teamXgBySlug   store.getAllTeamXg()
@@ -217,7 +217,7 @@ export function buildChannelProfilesByTeamId(teamXgBySlug, slugsByTeamId) {
     if (!payload) continue;
     // datesData is this TEAM's fixture list; isResult marks the ones played.
     // Absent or empty leaves matchesPlayed at 0, so the profile is built but
-    // carries no weight — abstaining on an unknown depth rather than claiming
+    // carries no weight - abstaining on an unknown depth rather than claiming
     // a confidence we cannot evidence.
     const matchesPlayed = (payload.datesData || []).filter(m => m?.isResult).length;
     const profile = buildChannelProfile(payload.statistics, matchesPlayed);
@@ -230,13 +230,13 @@ export function buildChannelProfilesByTeamId(teamXgBySlug, slugsByTeamId) {
  * Channel counter-matchup: team A's threat profile against team B's
  * conceding profile, axis by axis.
  *
- * Asymmetric by design, exactly like calcCounterMatchup — A's attack against
+ * Asymmetric by design, exactly like calcCounterMatchup - A's attack against
  * B's defence is a different number from B's attack against A's defence.
  *
  * MODEL: the league baseline cancels out of the edge. Every team's xG-for in
  * an axis is another team's xG-against, so league-mean-for equals
  * league-mean-against to within 0.004 on all three axes (2025, n=20).
- * Subtracting the two shares therefore removes the baseline automatically —
+ * Subtracting the two shares therefore removes the baseline automatically -
  * which is what makes a two-teams-at-a-time fetch viable, since no league-wide
  * sweep is needed to centre the score.
  *
@@ -251,14 +251,14 @@ export function buildChannelProfilesByTeamId(teamXgBySlug, slugsByTeamId) {
  * @returns {{value: number, estimated: boolean, pairings: Object,
  *            mode: 'channel'} | null}
  *          0–100, higher = better for teamA. null when either team has no
- *          usable profile — the caller falls through to the role tier.
+ *          usable profile - the caller falls through to the role tier.
  */
 export function calcChannelCounter(teamA, teamB, ctx) {
   const profiles = ctx?.channelProfilesByTeamId;
   const a = profiles?.[teamA?.id];
   const b = profiles?.[teamB?.id];
   // MODEL: a BLANK SHELL, not null. The role/element fallback was retired
-  // (2026-08-21), so there is nothing to hand off to — returning null would
+  // (2026-08-21), so there is nothing to hand off to - returning null would
   // leave the UI with no rows at all. The shell keeps the three channel rows
   // on the card with null values, which render as em-dashes and fill in once
   // Understat publishes. maturity 0 means it contributes nothing to the
@@ -266,11 +266,11 @@ export function calcChannelCounter(teamA, teamB, ctx) {
   if (!a?.hasChannelAxes || !b?.hasChannelAxes) return blankChannelCounter();
 
   // MODEL: the LOWER of the two maturities governs. A pairing is only as
-  // trustworthy as its weaker side — a mature attacking profile scored against
+  // trustworthy as its weaker side - a mature attacking profile scored against
   // one match of conceding data is still one match of evidence.
   const maturity = Math.min(a.maturity ?? 1, b.maturity ?? 1);
 
-  // Roles for A only — the factor scales A's attacking share, and B's
+  // Roles for A only - the factor scales A's attacking share, and B's
   // conceding share needs no personnel read.
   const rolesA = {};
   for (const p of ctx.playersByTeamId?.[teamA.id] || []) {
@@ -285,7 +285,7 @@ export function calcChannelCounter(teamA, teamB, ctx) {
   for (const key of Object.keys(CHANNEL_WEIGHTS)) {
     const attackShare  = a[key]?.for;
     const concedeShare = b[key]?.against;
-    // Guarded even though hasChannelAxes implies both are numbers — a future
+    // Guarded even though hasChannelAxes implies both are numbers - a future
     // axis added to CHANNEL_WEIGHTS but not to buildChannelProfile would
     // otherwise silently score NaN.
     if (typeof attackShare !== 'number' || typeof concedeShare !== 'number') continue;
@@ -340,7 +340,7 @@ function blankChannelCounter() {
  * How much of an axis's usual chain contribution is actually available this
  * week, as a multiplier on that axis's attacking share.
  *
- * MODEL: self-normalising — availability-weighted chain over total chain for
+ * MODEL: self-normalising - availability-weighted chain over total chain for
  * the SAME unit. No league constant is needed, and a team whose whole unit is
  * fit scores exactly 1.0 regardless of how good that unit is, so the factor
  * corrects for availability without smuggling in a second quality term.
@@ -370,7 +370,7 @@ export function channelPersonnelFactor(players, roles, axisKey, ctx) {
     const seasonChain = sig.chain90 * (minutes / 90);
     totalChain += seasonChain;
 
-    // chanceOfPlayingNext is null for most players — FPL populates it only
+    // chanceOfPlayingNext is null for most players - FPL populates it only
     // when there is news, so null means "no doubt reported" (FEATURE_ENGINE
     // §7.3), never "no data".
     const availability = (p.chanceOfPlayingNext ?? 100) / 100;
@@ -385,7 +385,7 @@ export function channelPersonnelFactor(players, roles, axisKey, ctx) {
  * Find the Understat match id for one FPL fixture.
  *
  * MODEL: matched by the two clubs' NAMES via canonicalClubKey, never by either
- * feed's numeric team ids — those are unrelated between the two sources (see
+ * feed's numeric team ids - those are unrelated between the two sources (see
  * buildUnderstatSlugsByTeamId above, same reasoning). Home + away already
  * identify a meeting almost uniquely, since each pairing occurs once per venue
  * per season; kickoff time is a tiebreak and a sanity bound, so a rescheduled
@@ -418,7 +418,7 @@ export function findUnderstatMatchId(fixture, leagueXg, teamsById) {
     if (canonicalClubKey(d.a.title) !== awayKey) continue;
 
     // Understat serves 'YYYY-MM-DD HH:MM:SS' in UTC, the same instant FPL's
-    // ISO kickoff_time describes — so the two are directly comparable once
+    // ISO kickoff_time describes - so the two are directly comparable once
     // the space is turned into the ISO 'T' and the zone made explicit.
     const theirMs = Date.parse(String(d.datetime).replace(' ', 'T') + 'Z');
     const gap = (Number.isNaN(kickoffMs) || Number.isNaN(theirMs))

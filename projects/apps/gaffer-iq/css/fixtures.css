@@ -1,5 +1,5 @@
 /* css/fixtures.css
-   FIXTURES — ported from the design export's FINAL - Fixtures.dc.html (with
+   FIXTURES - ported from the design export's FINAL - Fixtures.dc.html (with
    its embedded "Fixtures Table" component, variant c). Behaviour in
    js/modules/fixtures.js; the shell markup in index.html.
 
@@ -32,7 +32,7 @@
   --pad: clamp(16px, 3vw, 40px);
   --ease: cubic-bezier(.2, .7, .2, 1);
   --shadow-pop: 0 16px 40px rgba(1, 4, 9, .6);
-  --fc-neutral-ink: #a2abb5;   /* neutral band text — grey is too dark on its tint */
+  --fc-neutral-ink: #a2abb5;   /* neutral band text - grey is too dark on its tint */
   --fc-hatch: rgba(139, 148, 158, .07);
   --fc-scrim: rgba(1, 4, 9, .6);
   --none: 0 0 0 0 transparent;
@@ -73,7 +73,7 @@
   .cr--16 { --s: 16px; } .cr--18 { --s: 18px; } .cr--36 { --s: 36px; }
   .cr-none { flex: none; display: inline-block; width: var(--s, 22px); height: var(--s, 22px); border-radius: 50%; box-shadow: inset 0 0 0 1px var(--color-border); }
 
-  /* score chip — one rule for every band: tint + hue ring. Only excellent is solid. */
+  /* score chip - one rule for every band: tint + hue ring. Only excellent is solid. */
   .chip { display: inline-grid; place-items: center; min-width: 30px; height: 22px; padding: 0 4px; border-radius: var(--radius-sm); background: var(--bb); color: var(--bt); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--b) 60%, transparent); font: 700 12px/1 var(--font-sans); font-variant-numeric: tabular-nums; white-space: nowrap; }
   .chip[data-band=excellent] { background: var(--band-excellent); color: var(--color-bg); box-shadow: 0 0 0 1px var(--band-excellent), 0 0 14px color-mix(in srgb, var(--band-excellent) 40%, transparent); }
   .chip[data-band=extreme] { background: var(--band-extreme); }
@@ -83,7 +83,7 @@
   .chip.is-est { outline: 1px dashed var(--color-estimated); outline-offset: 2px; }
   .bandname { font: 700 10px/1 var(--font-sans); letter-spacing: .12em; text-transform: uppercase; color: var(--bt); }
 
-  /* Still settling — the value is withheld, the footprint kept. */
+  /* Still settling - the value is withheld, the footprint kept. */
   .chip.is-pending, .sk-t { position: relative; overflow: hidden; background: var(--color-skeleton); color: transparent; box-shadow: none; outline: 0; }
   .sk-t { display: inline-block; border-radius: 2px; }
   .chip.is-pending::after, .sk::after, .sk-t::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, var(--color-skeleton-highlight), transparent); transform: translateX(-100%); animation: fc-sk 1.3s ease-in-out infinite; }
@@ -384,7 +384,7 @@
   .notable dd { margin: 0; font-weight: 600; }
   .notable dd em { font-style: normal; font-weight: 400; color: var(--color-muted); }
 
-  /* ─── Match report drawer — above the app nav (100) and phone tab bar (200) ── */
+  /* ─── Match report drawer - above the app nav (100) and phone tab bar (200) ── */
 
   .scrim { position: fixed; inset: 0; z-index: 205; background: var(--fc-scrim); animation: fc-fade 200ms ease-out both; }
   .drawer { position: fixed; z-index: 210; top: 0; right: 0; bottom: 0; width: min(560px, 100vw); display: grid; grid-template-rows: auto minmax(0, 1fr); background: var(--color-surface); border-left: 1px solid var(--color-border); box-shadow: var(--shadow-pop); animation: fc-drawer 260ms var(--ease) both; }
@@ -442,7 +442,7 @@
   .mini__t--d b { color: var(--color-muted); }
   .mini .pips { padding-bottom: 3px; }
 
-  /* ─── Entrances (render the reader caused only — see header) ──────────── */
+  /* ─── Entrances (render the reader caused only - see header) ──────────── */
 
   [data-anim] {
     .gw__n { animation: fc-in 420ms var(--ease) both; }

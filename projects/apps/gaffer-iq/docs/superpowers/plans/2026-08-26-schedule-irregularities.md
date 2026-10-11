@@ -12,16 +12,16 @@
 
 ## Global Constraints
 
-- **No new API calls.** Every field used here is already on the bootstrap-static or fixtures payload the app fetches. If a field appears missing, extend the existing normalise step — never add a second request. (ARCHITECTURE §3 rule 1: only `api.js` calls `fetch()`.)
+- **No new API calls.** Every field used here is already on the bootstrap-static or fixtures payload the app fetches. If a field appears missing, extend the existing normalise step - never add a second request. (ARCHITECTURE §3 rule 1: only `api.js` calls `fetch()`.)
 - **Colour never encodes schedule structure; schedule structure never encodes fixture quality.** The five `--band-…` colours mean fixture quality in all four modules (CONVENTIONS §5.2).
 - **Dashed borders mean model confidence**, not schedule state. `--estimated-border-style` is already taken by `pgw-cell--estimated` / `score-chip--estimated`.
 - **No raw hex, no new colour prefix.** All colours are `--band-…` / `--color-…` tokens declared in `css/base.css` `:root` (CONVENTIONS §5.3).
 - **`season.pendingFixtures` is display-only.** No aggregation may read it. `fixturesForTeamInWindow` keeps its `if (f.gw === null) continue;` guard.
-- **`DGW_UPLIFT = 0.35`** and **`DGW_EXPECTED_PTS_FACTOR = 0.9`** — exact values, `js/config.js`.
-- **`scoreOverHorizon`'s `perGw` stays one entry per FIXTURE, and no existing field is removed or renamed.** Task 3 adds `provisionalKickoff` to each entry — additive only, so every current consumer keeps working untouched. The gameweek fold is a derived view (`groupPerGwSlots`), never a change to the engine's output.
+- **`DGW_UPLIFT = 0.35`** and **`DGW_EXPECTED_PTS_FACTOR = 0.9`** - exact values, `js/config.js`.
+- **`scoreOverHorizon`'s `perGw` stays one entry per FIXTURE, and no existing field is removed or renamed.** Task 3 adds `provisionalKickoff` to each entry - additive only, so every current consumer keeps working untouched. The gameweek fold is a derived view (`groupPerGwSlots`), never a change to the engine's output.
 - **`colCount()` in `ranker.js` stays the single source of truth** for anything spanning that table.
 - **Docs and code stay in sync in the same commit** (project convention).
-- **This environment cannot run tests.** SentinelOne EDR quarantines test runners and local servers. Every task below gives the real command; if you are Claude Code running in this environment, do not execute it — write the test, write the code, and hand the command to the user. If you are a human or an unrestricted environment, run it.
+- **This environment cannot run tests.** SentinelOne EDR quarantines test runners and local servers. Every task below gives the real command; if you are Claude Code running in this environment, do not execute it - write the test, write the code, and hand the command to the user. If you are a human or an unrestricted environment, run it.
 
 ---
 
@@ -30,7 +30,7 @@
 Implements spec §4.
 
 **Files:**
-- Modify: `js/engine/normalise.js` — `normaliseFixture` (~line 250), `normaliseSeason` (~line 350)
+- Modify: `js/engine/normalise.js` - `normaliseFixture` (~line 250), `normaliseSeason` (~line 350)
 - Test: `tests/engine/normalise.test.js` (create)
 
 **Interfaces:**
@@ -51,7 +51,7 @@ import assert from 'node:assert/strict';
 import { normaliseFixture } from '../../js/engine/normalise.js';
 
 test('normaliseFixture flags a provisional kickoff time', () => {
-  // FPL sets provisional_start_time when the kickoff is TBC — often the
+  // FPL sets provisional_start_time when the kickoff is TBC - often the
   // precursor to a postponement, so it must survive normalisation.
   const f = normaliseFixture({
     id: 1, event: 24, team_h: 1, team_a: 2, provisional_start_time: true,
@@ -68,7 +68,7 @@ test('normaliseFixture treats a missing provisional flag as confirmed', () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `node --test tests/engine/normalise.test.js`
-Expected: FAIL — `provisionalKickoff` is `undefined`, not `true`.
+Expected: FAIL - `provisionalKickoff` is `undefined`, not `true`.
 
 - [ ] **Step 3: Add the field**
 
@@ -77,7 +77,7 @@ In `normaliseFixture`, directly after the `kickoff:` line:
 ```js
     kickoff: raw.kickoff_time,       // ISO string; engine never reformats
     // FPL sets provisional_start_time while a kickoff is unconfirmed. It is a
-    // schedule-confidence signal, NOT a model-confidence one — do not render it
+    // schedule-confidence signal, NOT a model-confidence one - do not render it
     // with --estimated-border-style, which already means `provisional` in the
     // scoring sense (see composite.js). See FEATURE_ENGINE §9.1.
     provisionalKickoff: Boolean(raw.provisional_start_time),
@@ -93,7 +93,7 @@ Expected: PASS, 2/2.
 In `normaliseSeason`, after `sortedFixtures` is built and before `teams` is assembled:
 
 ```js
-  // Fixtures with no gameweek assigned — postponed, awaiting a rearranged date.
+  // Fixtures with no gameweek assigned - postponed, awaiting a rearranged date.
   // Held in a DISPLAY-ONLY channel: they are deliberately NOT appended to
   // `fixtures`, because fixturesForTeamInWindow (and every other aggregation)
   // keys off a gameweek these do not have. See the spec's §4 invariant.
@@ -127,7 +127,7 @@ Implements spec §5's formula, isolated so it is testable without running the wh
 
 **Files:**
 - Modify: `js/config.js` (~line 788, beside `BLANK_GW_VALUE`)
-- Modify: `js/engine/composite.js` — new export near `scoreOverHorizon`
+- Modify: `js/engine/composite.js` - new export near `scoreOverHorizon`
 - Test: `tests/engine/composite.test.js` (append)
 
 **Interfaces:**
@@ -152,7 +152,7 @@ test('applyDgwUplift lifts a poor double above a single poor fixture', () => {
 });
 
 test('applyDgwUplift lifts a good double toward the ceiling', () => {
-  // 70 + 30*0.35 = 80.5 — better than a single 70, still short of 100.
+  // 70 + 30*0.35 = 80.5 - better than a single 70, still short of 100.
   assert.equal(applyDgwUplift(70, 2), 80.5);
 });
 
@@ -178,7 +178,7 @@ test('applyDgwUplift returns a blank gameweek value unchanged', () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `node --test tests/engine/composite.test.js`
-Expected: FAIL — `applyDgwUplift` is not exported.
+Expected: FAIL - `applyDgwUplift` is not exported.
 
 - [ ] **Step 3: Add the constant**
 
@@ -187,9 +187,9 @@ In `js/config.js`, beside `BLANK_GW_VALUE`:
 ```js
 // MODEL: a double gameweek is two chances at a return, not one week that
 // matters twice. The uplift is a fraction of the REMAINING headroom to 100, so
-// it is asymptotic — a double can never overflow the 0-100 band scale. At 0.35
+// it is asymptotic - a double can never overflow the 0-100 band scale. At 0.35
 // a double at 30 lands on 54.5: clearly better than a single 30, clearly worse
-// than a single 55. REASONED, NOT FITTED — see the spec's §11 deferred item.
+// than a single 55. REASONED, NOT FITTED - see the spec's §11 deferred item.
 export const DGW_UPLIFT = 0.35;
 ```
 
@@ -237,11 +237,11 @@ git commit -m "feat(engine): add the double-gameweek uplift"
 Implements spec §5. **This task changes numbers users see.**
 
 **Files:**
-- Modify: `js/engine/composite.js` — `scoreOverHorizon`, the `for` loop (~line 790) and the aggregation loop (~line 831)
+- Modify: `js/engine/composite.js` - `scoreOverHorizon`, the `for` loop (~line 790) and the aggregation loop (~line 831)
 
 **Interfaces:**
 - Consumes: `applyDgwUplift` (Task 2).
-- Produces: unchanged public shape — `{ value, band, confidence, provisional, perGw, breakdown }`. `perGw` entries keep `{ gw, value, band, opponent, venue, isBlank, provisional }`.
+- Produces: unchanged public shape - `{ value, band, confidence, provisional, perGw, breakdown }`. `perGw` entries keep `{ gw, value, band, opponent, venue, isBlank, provisional }`.
 
 - [ ] **Step 1: Restructure the entries loop**
 
@@ -253,7 +253,7 @@ Implements spec §5. **This task changes numbers users see.**
     const fixtures = teamFixturesByGw.get(gw) ?? [];
 
     if (fixtures.length === 0) {
-      // MODEL: blank GW — BLANK_GW_VALUE (40) reflects zero return for assets;
+      // MODEL: blank GW - BLANK_GW_VALUE (40) reflects zero return for assets;
       // mildly bad rather than neutral, never silently skipped. FEATURE_ENGINE §9.
       entries.push({ gwOffset, value: BLANK_GW_VALUE, fixtureScores: [] });
       perGw.push({
@@ -273,7 +273,7 @@ Implements spec §5. **This task changes numbers users see.**
 
     entries.push({ gwOffset, value: gwValue, fixtureScores: scores });
 
-    // perGw stays ONE ENTRY PER FIXTURE — its shape is unchanged and renderers
+    // perGw stays ONE ENTRY PER FIXTURE - its shape is unchanged and renderers
     // depend on it. groupPerGwSlots (engine/fixtures.js) is what folds it into
     // gameweeks for display.
     fixtures.forEach((f, fi) => {
@@ -296,7 +296,7 @@ Implements spec §5. **This task changes numbers users see.**
 
 - [ ] **Step 2: Update the aggregation and confidence loops**
 
-`minVal` now tracks the ADJUSTED per-GW value, which is the point — see spec §5.
+`minVal` now tracks the ADJUSTED per-GW value, which is the point - see spec §5.
 
 ```js
   for (const e of entries) {
@@ -339,7 +339,7 @@ Expected: no remaining singular `fixtureScore` references inside `scoreOverHoriz
 - [ ] **Step 5: Run the full suite**
 
 Run: `npm test`
-Expected: PASS. If `tests/engine/composite.test.js` has tests asserting horizon values for a double, they will now fail — that is the intended recalibration, so update the expected values and note why in the test comment.
+Expected: PASS. If `tests/engine/composite.test.js` has tests asserting horizon values for a double, they will now fail - that is the intended recalibration, so update the expected values and note why in the test comment.
 
 - [ ] **Step 6: Commit**
 
@@ -356,12 +356,12 @@ Implements spec §6.
 
 **Files:**
 - Modify: `js/config.js` (beside `EXPECTED_PTS_FIXTURE_SWING`, ~line 817)
-- Modify: `js/engine/composite.js` — `calcExpectedPoints` (~line 991), call sites at ~1047 and ~1125
+- Modify: `js/engine/composite.js` - `calcExpectedPoints` (~line 991), call sites at ~1047 and ~1125
 - Test: `tests/engine/composite.test.js` (append)
 
 **Interfaces:**
 - Consumes: nothing.
-- Produces: `calcExpectedPoints(avgPointsPerGw, nextFixtureScore, playing, fixtureCount)` — **fourth parameter added**, defaults to `1`.
+- Produces: `calcExpectedPoints(avgPointsPerGw, nextFixtureScore, playing, fixtureCount)` - **fourth parameter added**, defaults to `1`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -377,7 +377,7 @@ test('calcExpectedPoints is unchanged for a single-fixture gameweek', () => {
 });
 
 test('calcExpectedPoints nearly doubles for a double gameweek', () => {
-  // 1 + 0.9*(2-1) = 1.9 — a haircut on a straight doubling, because the second
+  // 1 + 0.9*(2-1) = 1.9 - a haircut on a straight doubling, because the second
   // fixture of a double carries rotation risk.
   const r = calcExpectedPoints({ value: 5, estimated: false }, NEUTRAL, FULL, 2);
   assert.equal(r.value, 9.5);
@@ -399,13 +399,13 @@ test('calcExpectedPoints defaults to a single fixture when count is omitted', ()
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `node --test tests/engine/composite.test.js`
-Expected: FAIL — the double case returns 5, not 9.5.
+Expected: FAIL - the double case returns 5, not 9.5.
 
 - [ ] **Step 3: Add the constant**
 
 ```js
 // MODEL: a double gameweek is nearly two gameweeks of return for captaincy
-// purposes — but not exactly two. 0.9 is a rotation-risk haircut on the second
+// purposes - but not exactly two. 0.9 is a rotation-risk haircut on the second
 // fixture: managers rest players across a congested double far more often than
 // across a single. Applied ONLY to expectedPoints; `value` handles the same
 // fact through DGW_UPLIFT. See FEATURE_ENGINE §10.2.
@@ -439,11 +439,11 @@ At `js/engine/composite.js:1125`, inside `scorePlayer`, `teamFixturesByGw` is al
     ),
 ```
 
-Leave the early-return call at line ~1047 alone — it has no fixture context and correctly defaults to 1.
+Leave the early-return call at line ~1047 alone - it has no fixture context and correctly defaults to 1.
 
 - [ ] **Step 6: Run and commit**
 
-Run: `npm test` — Expected: PASS.
+Run: `npm test` - Expected: PASS.
 
 ```bash
 git add js/config.js js/engine/composite.js tests/engine/composite.test.js
@@ -454,7 +454,7 @@ git commit -m "fix(engine): project double-gameweek captains at ~2x and blanks a
 
 ### Task 5: groupPerGwSlots
 
-Implements spec §7. Pure, non-breaking — this is what makes the strips truthful.
+Implements spec §7. Pure, non-breaking - this is what makes the strips truthful.
 
 **Files:**
 - Modify: `js/engine/fixtures.js` (append export)
@@ -514,7 +514,7 @@ test('groupPerGwSlots marks a blank slot and keeps it in sequence', () => {
 });
 
 test('groupPerGwSlots preserves gameweek order', () => {
-  // perGw is built in window order, but never rely on it — the slot sequence is
+  // perGw is built in window order, but never rely on it - the slot sequence is
   // what the strip renders left to right.
   const slots = groupPerGwSlots([
     { gw: 27, isBlank: false }, { gw: 24, isBlank: false }, { gw: 24, isBlank: false },
@@ -531,7 +531,7 @@ test('groupPerGwSlots returns an empty array for empty input', () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `node --test tests/engine/fixtures.test.js`
-Expected: FAIL — `groupPerGwSlots` is not exported.
+Expected: FAIL - `groupPerGwSlots` is not exported.
 
 - [ ] **Step 3: Implement**
 
@@ -566,7 +566,7 @@ export function groupPerGwSlots(perGw) {
     .map(([gw, fixtures]) => ({
       gw,
       fixtures,
-      // A blank is ONE entry flagged isBlank, never two — so these are mutually
+      // A blank is ONE entry flagged isBlank, never two - so these are mutually
       // exclusive by construction, not by assertion.
       isDouble: fixtures.length > 1,
       isBlank:  fixtures.length === 1 && Boolean(fixtures[0].isBlank),
@@ -600,7 +600,7 @@ Implements the remaining two helpers in spec §7.
 - Consumes: `Season.pendingFixturesByTeam` (Task 1).
 - Produces:
   - `pendingFixturesForTeam(teamId, ctx) => Fixture[]`
-  - `summariseGwIrregularities(ctx, fromGw, count) => Array<{ gw, doubleTeams: number, blankTeams: number }>` — only gameweeks that are irregular appear; an ordinary window returns `[]`.
+  - `summariseGwIrregularities(ctx, fromGw, count) => Array<{ gw, doubleTeams: number, blankTeams: number }>` - only gameweeks that are irregular appear; an ordinary window returns `[]`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -619,7 +619,7 @@ test('pendingFixturesForTeam returns the team postponed fixtures', () => {
 });
 
 test('summariseGwIrregularities returns nothing for an ordinary window', () => {
-  // Two teams, one fixture each per gameweek — the context bar must stay hidden.
+  // Two teams, one fixture each per gameweek - the context bar must stay hidden.
   const ctx = { fixtures: [
     { gw: 23, homeTeamId: 1, awayTeamId: 2 },
     { gw: 24, homeTeamId: 2, awayTeamId: 1 },
@@ -644,14 +644,14 @@ test('summariseGwIrregularities counts doubling and idle teams', () => {
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `node --test tests/engine/fixtures.test.js`
-Expected: FAIL — neither function is exported.
+Expected: FAIL - neither function is exported.
 
 - [ ] **Step 3: Implement**
 
 ```js
 /**
  * Postponed fixtures awaiting a rearranged date for one team.
- * Display-only — these have no gameweek, so nothing that aggregates over a
+ * Display-only - these have no gameweek, so nothing that aggregates over a
  * gameweek window may read them. See the spec's §4 invariant.
  *
  * @param {number} teamId
@@ -665,7 +665,7 @@ export function pendingFixturesForTeam(teamId, ctx) {
 /**
  * Which gameweeks in a window are irregular, and how many teams each affects.
  *
- * Returns ONLY irregular gameweeks — an ordinary window returns an empty array,
+ * Returns ONLY irregular gameweeks - an ordinary window returns an empty array,
  * which is the signal the schedule bar uses to render nothing at all. Most of
  * the season is ordinary, so this is the common case, not the edge case.
  *
@@ -700,7 +700,7 @@ export function summariseGwIrregularities(ctx, fromGw, count) {
 
 - [ ] **Step 4: Run and commit**
 
-Run: `node --test tests/engine/fixtures.test.js` — Expected: PASS, 9/9.
+Run: `node --test tests/engine/fixtures.test.js` - Expected: PASS, 9/9.
 
 ```bash
 git add js/engine/fixtures.js tests/engine/fixtures.test.js
@@ -711,10 +711,10 @@ git commit -m "feat(engine): summarise gameweek irregularities and pending fixtu
 
 ### Task 7: The shared visual vocabulary (CSS)
 
-Implements spec §8's four treatments. No JS in this task — the classes land first so Tasks 8–12 consume a vocabulary that already exists.
+Implements spec §8's four treatments. No JS in this task - the classes land first so Tasks 8–12 consume a vocabulary that already exists.
 
 **Files:**
-- Modify: `css/components.css` — beside the existing `.pgw-cell` block
+- Modify: `css/components.css` - beside the existing `.pgw-cell` block
 
 **Interfaces:**
 - Produces these classes, consumed by Tasks 8, 9, 12:
@@ -782,7 +782,7 @@ Implements spec §8's four treatments. No JS in this task — the classes land f
 
 /* Kickoff TBC: a corner dot in --band-tough. Deliberately NOT a dashed border,
    which already means low MODEL confidence (--estimated-border-style). This is
-   schedule confidence — a different axis that must stay legible alongside it. */
+   schedule confidence - a different axis that must stay legible alongside it. */
 .pgw-cell--tbc {
   position: relative;
 }
@@ -837,7 +837,7 @@ In `.ranker-fixtures` (currently `align-items: center`):
   display: inline-flex;
   flex-wrap: nowrap;
   gap: 2px;
-  align-items: flex-start;   /* was center — see .pgw-strip above */
+  align-items: flex-start;   /* was center - see .pgw-strip above */
 }
 ```
 
@@ -858,8 +858,8 @@ git commit -m "style(strip): add the gameweek-slot visual vocabulary"
 ### Task 8: Ranker strip → gameweek slots
 
 **Files:**
-- Modify: `js/modules/ranker.js` — `buildFixtureStrip`, and its call site in `buildRow`
-- Modify: `css/components.css` — the `[data-col="fixtures"]` width may need widening
+- Modify: `js/modules/ranker.js` - `buildFixtureStrip`, and its call site in `buildRow`
+- Modify: `css/components.css` - the `[data-col="fixtures"]` width may need widening
 
 **Interfaces:**
 - Consumes: `groupPerGwSlots`, `pendingFixturesForTeam` (Tasks 5, 6).
@@ -879,17 +879,17 @@ git commit -m "style(strip): add the gameweek-slot visual vocabulary"
 function buildFixtureStrip(perGw, pending = []) {
   const slots = groupPerGwSlots(perGw);
   if (slots.length === 0) {
-    return '<span class="ranker-no-fixtures">—</span>';
+    return '<span class="ranker-no-fixtures">-</span>';
   }
 
   const slotHtml = slots.map(slot => {
     const cells = slot.fixtures.map(entry => {
       const band = entry.isBlank ? 'neutral' : entry.band;
       const tooltip = entry.isBlank
-        ? `GW${entry.gw} (blank — no fixture)`
-        : `GW${entry.gw} ${entry.opponent ?? ''} (${entry.venue ?? ''}) — ${Math.round(entry.value)}`
+        ? `GW${entry.gw} (blank - no fixture)`
+        : `GW${entry.gw} ${entry.opponent ?? ''} (${entry.venue ?? ''}) - ${Math.round(entry.value)}`
           + `${entry.provisional ? ' ~est' : ''}`
-          + `${entry.provisionalKickoff ? ' — kickoff TBC' : ''}`;
+          + `${entry.provisionalKickoff ? ' - kickoff TBC' : ''}`;
       const label    = entry.isBlank ? '∅' : (entry.opponent ?? '?');
       const estClass = (!entry.isBlank && entry.provisional) ? ' pgw-cell--estimated' : '';
       const blkClass = entry.isBlank ? ' pgw-cell--blank' : '';
@@ -927,7 +927,7 @@ In `buildRow`, replace `${buildFixtureStrip(score.perGw)}` with:
         ${buildFixtureStrip(score.perGw, pendingFixturesForTeam(player.teamId, buildCtx()))}
 ```
 
-**Performance note:** `buildCtx()` is called once per row here, which is wrong at ~700 rows. Hoist it: `renderTable` already builds a ctx for `buildLastSeasonLookup` — pass the pending list down through `buildRow`'s existing parameter list instead, the same way `nextFixtureRankById` is passed.
+**Performance note:** `buildCtx()` is called once per row here, which is wrong at ~700 rows. Hoist it: `renderTable` already builds a ctx for `buildLastSeasonLookup` - pass the pending list down through `buildRow`'s existing parameter list instead, the same way `nextFixtureRankById` is passed.
 
 - [ ] **Step 3: Widen the fixtures column**
 
@@ -955,14 +955,14 @@ git commit -m "feat(ranker): render the fixture strip as gameweek slots"
 ### Task 9: Matchup strip → gameweek slots
 
 **Files:**
-- Modify: `js/modules/matchup.js` — `buildPerGwStrip` (~line 647), `resolveFixtureId` (~line 619)
+- Modify: `js/modules/matchup.js` - `buildPerGwStrip` (~line 647), `resolveFixtureId` (~line 619)
 
 **Interfaces:**
 - Consumes: `groupPerGwSlots`, `pendingFixturesForTeam` (Tasks 5, 6).
 
 - [ ] **Step 1: Wrap the existing cells in slots**
 
-`buildPerGwStrip` currently maps `perGw` directly to cells. Keep every existing cell attribute — the click-through `data-fixture-id`, `pgw-cell--estimated`, `pgw-cell--static`, and the `.pgw-cell__extra` hover block — and wrap the map in the same slot structure Task 8 introduced:
+`buildPerGwStrip` currently maps `perGw` directly to cells. Keep every existing cell attribute - the click-through `data-fixture-id`, `pgw-cell--estimated`, `pgw-cell--static`, and the `.pgw-cell__extra` hover block - and wrap the map in the same slot structure Task 8 introduced:
 
 ```js
 function buildPerGwStrip(team, perGw, pending = []) {
@@ -980,9 +980,9 @@ function buildPerGwStrip(team, perGw, pending = []) {
       const idAttr     = fixtureId !== null ? ` data-fixture-id="${fixtureId}"` : '';
       const tabAttr    = fixtureId !== null ? ' tabindex="0"' : '';
       const label = entry.isBlank
-        ? `GW${entry.gw} — blank (no fixture)`
-        : `GW${entry.gw} ${entry.opponent ?? ''} (${entry.venue ?? ''}) — ${Math.round(entry.value)}`
-          + `${entry.provisionalKickoff ? ' — kickoff TBC' : ''}`;
+        ? `GW${entry.gw} - blank (no fixture)`
+        : `GW${entry.gw} ${entry.opponent ?? ''} (${entry.venue ?? ''}) - ${Math.round(entry.value)}`
+          + `${entry.provisionalKickoff ? ' - kickoff TBC' : ''}`;
       const display = entry.isBlank ? '∅' : Math.round(entry.value);
       const oppText = entry.isBlank ? '–' : esc(String(entry.opponent ?? '').toUpperCase());
       const venText = entry.isBlank ? '' : esc(entry.venue ?? '');
@@ -1006,7 +1006,7 @@ function buildPerGwStrip(team, perGw, pending = []) {
     ? `<div class="pgw-pending" title="${pending.length} postponed fixture${pending.length > 1 ? 's' : ''} awaiting a rearranged date">+${pending.length} TBD</div>`
     : '';
 
-  // Keep the .pgw-strip wrapper — components.css lays the strip out through it,
+  // Keep the .pgw-strip wrapper - components.css lays the strip out through it,
   // and the delegated click handler in initMatchup() is scoped to it.
   return `<div class="pgw-strip">${slotHtml}${pendingHtml}</div>`;
 }
@@ -1014,9 +1014,9 @@ function buildPerGwStrip(team, perGw, pending = []) {
 
 Three details that are easy to lose in this rewrite:
 
-1. `findFixtureId(team, entry)` is the existing private helper at `js/modules/matchup.js:618` — **not** `resolveFixtureId`. It already disambiguates a double's two same-gameweek fixtures by matching on `gw` + venue + opponent short name, so it needs no change.
+1. `findFixtureId(team, entry)` is the existing private helper at `js/modules/matchup.js:618` - **not** `resolveFixtureId`. It already disambiguates a double's two same-gameweek fixtures by matching on `gw` + venue + opponent short name, so it needs no change.
 2. The blank cell's `display` changes from `'–'` to `'∅'`, matching Task 8. The dash is what currently makes a blank indistinguishable from a load failure.
-3. Both strip containers need `align-items: flex-start` — see Task 7 Step 3. `.pgw-strip` currently sets none (defaults to `stretch`) and `.ranker-fixtures` sets `center`. Neither works once the children are column-flex slots of differing height: the `.pgw-pending` pill has no gameweek label under it, so it is shorter than a slot and would float to the middle instead of sitting level with the cell rows.
+3. Both strip containers need `align-items: flex-start` - see Task 7 Step 3. `.pgw-strip` currently sets none (defaults to `stretch`) and `.ranker-fixtures` sets `center`. Neither works once the children are column-flex slots of differing height: the `.pgw-pending` pill has no gameweek label under it, so it is shorter than a slot and would float to the middle instead of sitting level with the cell rows.
 
 - [ ] **Step 2: Pass pending fixtures at the call site**
 
@@ -1026,16 +1026,16 @@ At `js/modules/matchup.js:717`, `${buildPerGwStrip(team, horizonScore.perGw)}` b
       ${buildPerGwStrip(team, horizonScore.perGw, pendingFixturesForTeam(team.id, ctx))}
 ```
 
-Use whatever `ctx` variable is already in scope at that point — do not build a new one.
+Use whatever `ctx` variable is already in scope at that point - do not build a new one.
 
 - [ ] **Step 3: Confirm the click-through still resolves**
 
 Run: `grep -n "data-fixture-id" js/modules/matchup.js`
-Expected: still present inside the cell body. The slot wrapper must not swallow the click — the delegated handler uses `closest('[data-fixture-id]')`, which still matches.
+Expected: still present inside the cell body. The slot wrapper must not swallow the click - the delegated handler uses `closest('[data-fixture-id]')`, which still matches.
 
 - [ ] **Step 4: Run and commit**
 
-Run: `node --check js/modules/matchup.js` — Expected: exit 0.
+Run: `node --check js/modules/matchup.js` - Expected: exit 0.
 
 ```bash
 git add js/modules/matchup.js
@@ -1044,19 +1044,19 @@ git commit -m "feat(matchup): render the horizon strip as gameweek slots"
 
 ---
 
-### Task 10: Dashboard — show both fixtures of a double
+### Task 10: Dashboard - show both fixtures of a double
 
 Fixes spec §1 D2.
 
 **Files:**
-- Modify: `js/modules/dashboard.js` — `buildFixtureContextLabel` (~line 189)
+- Modify: `js/modules/dashboard.js` - `buildFixtureContextLabel` (~line 189)
 
 **Interfaces:**
 - Consumes: `groupPerGwSlots` (Task 5).
 
 - [ ] **Step 1: Write the failing test**
 
-`buildFixtureContextLabel` is module-private. Export it for testing — the module already exports `initDashboard`, and a second named export costs nothing.
+`buildFixtureContextLabel` is module-private. Export it for testing - the module already exports `initDashboard`, and a second named export costs nothing.
 
 ```js
 /**
@@ -1090,21 +1090,21 @@ test('buildFixtureContextLabel marks a blank gameweek', () => {
   const label = buildFixtureContextLabel({ perGw: [
     { gw: 26, opponent: null, venue: null, isBlank: true },
   ] });
-  assert.equal(label, 'GW26 — Blank');
+  assert.equal(label, 'GW26 - Blank');
 });
 ```
 
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `node --test tests/modules/dashboard.test.js`
-Expected: FAIL — the double case returns `GW24 vs EVE (H)`.
+Expected: FAIL - the double case returns `GW24 vs EVE (H)`.
 
 - [ ] **Step 3: Implement**
 
 ```js
 /**
  * Build the "which fixture is this" context line for a breakdown panel.
- * Dashboard is GW1-locked, so score.perGw covers exactly one gameweek — but
+ * Dashboard is GW1-locked, so score.perGw covers exactly one gameweek - but
  * that gameweek may hold TWO fixtures. This previously read perGw[0] and
  * discarded the second, which is precisely the information a user opens this
  * line to check on a double.
@@ -1113,7 +1113,7 @@ export function buildFixtureContextLabel(score) {
   const slots = groupPerGwSlots(score?.perGw ?? []);
   const slot  = slots[0];
   if (!slot) return HORIZON.label;
-  if (slot.isBlank) return `GW${slot.gw} — Blank`;
+  if (slot.isBlank) return `GW${slot.gw} - Blank`;
 
   const fixtures = slot.fixtures
     .map(f => `${f.opponent ?? '?'} (${f.venue ?? '?'})`)
@@ -1127,7 +1127,7 @@ Add `import { groupPerGwSlots } from '../engine/fixtures.js';` to the module imp
 
 - [ ] **Step 4: Run and commit**
 
-Run: `node --test tests/modules/dashboard.test.js` — Expected: PASS, 3/3.
+Run: `node --test tests/modules/dashboard.test.js` - Expected: PASS, 3/3.
 
 ```bash
 git add js/modules/dashboard.js tests/modules/dashboard.test.js
@@ -1142,9 +1142,9 @@ Implements spec §8's shell row. This is what makes the feature reach Dashboard,
 
 **Files:**
 - Create: `js/modules/scheduleBar.js`
-- Modify: `index.html` — above `<main class="app-main">` (~line 49)
-- Modify: `js/main.js` — import and init
-- Modify: `css/components.css` — bar styles
+- Modify: `index.html` - above `<main class="app-main">` (~line 49)
+- Modify: `js/main.js` - import and init
+- Modify: `css/components.css` - bar styles
 
 **Interfaces:**
 - Consumes: `summariseGwIrregularities` (Task 6), `store.getCurrentGw`, `store.subscribe`.
@@ -1156,7 +1156,7 @@ In `index.html`, immediately before `<main class="app-main">`:
 
 ```html
       <!-- Schedule context bar. Hidden unless the next six gameweeks contain a
-           double or a blank — see js/modules/scheduleBar.js. -->
+           double or a blank - see js/modules/scheduleBar.js. -->
       <div class="schedule-bar" id="schedule-bar" hidden></div>
 ```
 
@@ -1169,7 +1169,7 @@ In `index.html`, immediately before `<main class="app-main">`:
  * Side effects: DOM writes only. Reads from store; calls engine functions.
  * Renders a one-line summary of which gameweeks in the next six are doubles or
  * blanks. Hidden entirely when the window is ordinary, which is most of the
- * season — the bar must never cost vertical space it has nothing to say in.
+ * season - the bar must never cost vertical space it has nothing to say in.
  * See FEATURE_ENGINE §9.1.
  *
  * Subscriptions: data:ready
@@ -1232,7 +1232,7 @@ export function initScheduleBar() {
 }
 ```
 
-`esc` is unused in the current body but kept for the moment team names are added — **delete it instead** if you are not adding names, per the project's no-dead-code convention.
+`esc` is unused in the current body but kept for the moment team names are added - **delete it instead** if you are not adding names, per the project's no-dead-code convention.
 
 - [ ] **Step 3: Wire it into main.js**
 
@@ -1297,8 +1297,8 @@ git commit -m "feat(shell): add the app-wide schedule context bar"
 ### Task 12: Planner and Fixtures tabs
 
 **Files:**
-- Modify: `js/modules/planner.js` — `renderTransferCard` (~line 510)
-- Modify: `js/modules/fixtures.js` — `renderGameweekPane` (~line 815)
+- Modify: `js/modules/planner.js` - `renderTransferCard` (~line 510)
+- Modify: `js/modules/fixtures.js` - `renderGameweekPane` (~line 815)
 
 **Interfaces:**
 - Consumes: `groupPerGwSlots`, `pendingFixturesForTeam` (Tasks 5, 6).
@@ -1312,13 +1312,13 @@ In `renderTransferCard`, for the incoming player, derive the slot for the curren
   const inSlot   = inSlots[0];
   const scheduleMark = !inSlot ? ''
     : inSlot.isDouble
-      ? '<span class="planner-schedule-mark planner-schedule-mark--double" title="Double gameweek — plays twice">··</span>'
+      ? '<span class="planner-schedule-mark planner-schedule-mark--double" title="Double gameweek - plays twice">··</span>'
       : inSlot.isBlank
-        ? '<span class="planner-schedule-mark planner-schedule-mark--blank" title="Blank gameweek — does not play">∅</span>'
+        ? '<span class="planner-schedule-mark planner-schedule-mark--blank" title="Blank gameweek - does not play">∅</span>'
         : '';
 ```
 
-Interpolate `${scheduleMark}` after the incoming player's name. Do the same for the outgoing player — transferring OUT of a double is the mistake this is meant to catch.
+Interpolate `${scheduleMark}` after the incoming player's name. Do the same for the outgoing player - transferring OUT of a double is the mistake this is meant to catch.
 
 Add to `css/components.css`:
 
@@ -1340,7 +1340,7 @@ At the end of `renderGameweekPane`, after the fixture list:
   const pending = store.getSeason()?.pendingFixtures ?? [];
   const pendingHtml = pending.length === 0 ? '' : `
     <section class="fixtures-pending">
-      <h3 class="fixtures-pending__heading">Postponed — awaiting a date</h3>
+      <h3 class="fixtures-pending__heading">Postponed - awaiting a date</h3>
       <ul class="fixtures-pending__list">
         ${pending.map(f => {
           const h = store.getTeam(f.homeTeamId);
@@ -1372,15 +1372,15 @@ git commit -m "feat(planner,fixtures): flag doubles, blanks and postponements"
 Project convention: docs and code land in the same commit. This task exists because Tasks 3 and 4 made two FEATURE_ENGINE claims false.
 
 **Files:**
-- Modify: `FEATURE_ENGINE.md` — §9, §10.2, new §9.1
-- Modify: `ARCHITECTURE.md` — §9's blank/double paragraph
-- Modify: `docs/superpowers/specs/2026-08-26-schedule-irregularities-design.md` — the `**Plan:**` header line
+- Modify: `FEATURE_ENGINE.md` - §9, §10.2, new §9.1
+- Modify: `ARCHITECTURE.md` - §9's blank/double paragraph
+- Modify: `docs/superpowers/specs/2026-08-26-schedule-irregularities-design.md` - the `**Plan:**` header line
 
 - [ ] **Step 1: Correct FEATURE_ENGINE §9's double-gameweek claim**
 
-The current text — "both fixtures are scored and included; the team effectively gets two entries in the window, naturally boosting its horizon score" — describes behaviour that did not exist and no longer describes the implementation. Replace with the collapse-then-uplift model, including the worked table from spec §5 and the `DGW_UPLIFT` constant.
+The current text - "both fixtures are scored and included; the team effectively gets two entries in the window, naturally boosting its horizon score" - describes behaviour that did not exist and no longer describes the implementation. Replace with the collapse-then-uplift model, including the worked table from spec §5 and the `DGW_UPLIFT` constant.
 
-- [ ] **Step 2: Add FEATURE_ENGINE §9.1 — schedule irregularities**
+- [ ] **Step 2: Add FEATURE_ENGINE §9.1 - schedule irregularities**
 
 Document all four states (double, blank, postponed, TBC), the geometry-not-colour rule, the four CSS treatments, and `groupPerGwSlots`' role as a derived view that leaves `perGw` unchanged.
 
@@ -1395,7 +1395,7 @@ The blank/double paragraph says `engine/fixtures.js` "is responsible for resolvi
 - [ ] **Step 5: Confirm the spec points at this plan**
 
 Run: `grep -n '^\*\*Plan:\*\*' docs/superpowers/specs/2026-08-26-schedule-irregularities-design.md`
-Expected: `**Plan:** \`docs/superpowers/plans/2026-08-26-schedule-irregularities.md\`` — already set when the plan was written. If it still reads "not yet written", set it.
+Expected: `**Plan:** \`docs/superpowers/plans/2026-08-26-schedule-irregularities.md\`` - already set when the plan was written. If it still reads "not yet written", set it.
 
 - [ ] **Step 6: Commit**
 
@@ -1408,18 +1408,18 @@ git commit -m "docs: sync the engine docs with the schedule-irregularity work"
 
 ## Final verification
 
-Run these before calling the work done. **None of them can be run by Claude Code in this environment** — SentinelOne EDR quarantines test runners and local servers.
+Run these before calling the work done. **None of them can be run by Claude Code in this environment** - SentinelOne EDR quarantines test runners and local servers.
 
 ```bash
 npm test
 ```
 
-Expected: all suites pass — `composite`, `fixtures`, `normalise`, `dashboard`, `channel`, `counter`, `roleThresholds`, `prices`.
+Expected: all suites pass - `composite`, `fixtures`, `normalise`, `dashboard`, `channel`, `counter`, `roleThresholds`, `prices`.
 
 Then, in a browser:
 
-1. **Ranker** — open a gameweek containing a real double. Confirm the strip shows six slots for a 6-GW horizon, the double is grouped and outlined, and the row does not wrap inside the fixtures column.
-2. **Matchup** — same strip, and confirm clicking a cell still opens that fixture.
-3. **Dashboard** — on a double, confirm the fixture-context line names both fixtures.
-4. **Schedule bar** — confirm it is absent on an ordinary week and present on an irregular one.
-5. **Recalibration sanity check** — compare the Ranker's band distribution before and after Task 3. A large shift in how many players sit in each band means `DGW_UPLIFT` needs revisiting. This is the check that cannot be automated and matters most; the constant is reasoned, not fitted.
+1. **Ranker** - open a gameweek containing a real double. Confirm the strip shows six slots for a 6-GW horizon, the double is grouped and outlined, and the row does not wrap inside the fixtures column.
+2. **Matchup** - same strip, and confirm clicking a cell still opens that fixture.
+3. **Dashboard** - on a double, confirm the fixture-context line names both fixtures.
+4. **Schedule bar** - confirm it is absent on an ordinary week and present on an irregular one.
+5. **Recalibration sanity check** - compare the Ranker's band distribution before and after Task 3. A large shift in how many players sit in each band means `DGW_UPLIFT` needs revisiting. This is the check that cannot be automated and matters most; the constant is reasoned, not fitted.

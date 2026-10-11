@@ -4,7 +4,7 @@ A personal Fantasy Premier League (FPL) analysis tool that replaces the official
 
 ## Local development
 
-**Option A — `vercel dev` (recommended; full stack including the proxy function):**
+**Option A - `vercel dev` (recommended; full stack including the proxy function):**
 
 ```bash
 cd projects/gaffer-iq
@@ -13,7 +13,7 @@ vercel dev
 
 Open `http://localhost:3000`. The `/api/fpl` proxy function is live, so FPL data loads correctly.
 
-**Option B — `npx serve` (static files only; proxy unavailable):**
+**Option B - `npx serve` (static files only; proxy unavailable):**
 
 ```bash
 cd projects/gaffer-iq
@@ -24,11 +24,11 @@ Open `http://localhost:3000`. API calls will fail because the proxy is not runni
 
 ## Deploy
 
-Push to the repository. Vercel is configured with the root directory set to `projects/gaffer-iq/`. There is no build step — files are served exactly as authored.
+Push to the repository. Vercel is configured with the root directory set to `projects/gaffer-iq/`. There is no build step - files are served exactly as authored.
 
 ## Documentation
 
-- [`ARCHITECTURE.md`](ARCHITECTURE.md) — system design, file structure, layering rules
-- [`FEATURE_ENGINE.md`](FEATURE_ENGINE.md) — every metric, formula, weight, and constant
-- [`CONVENTIONS.md`](CONVENTIONS.md) — coding standards, naming, commenting
-- [`ROADMAP.md`](ROADMAP.md) — phased build plan with exit criteria
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) - system design, file structure, layering rules
+- [`FEATURE_ENGINE.md`](FEATURE_ENGINE.md) - every metric, formula, weight, and constant
+- [`CONVENTIONS.md`](CONVENTIONS.md) - coding standards, naming, commenting
+- [`ROADMAP.md`](ROADMAP.md) - phased build plan with exit criteria

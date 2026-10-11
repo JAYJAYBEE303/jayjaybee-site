@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gaffer IQ</title>
 
-  <!-- Display fonts — three self-hosted roles (--font-head, --font-team,
+  <!-- Display fonts - three self-hosted roles (--font-head, --font-team,
        --font-score), declared with their metric overrides in assets/fonts.css.
        The team face's latin file is preloaded because the landing intro waits
        on it (capped) so the headline can't reflow mid-animation. -->
@@ -36,7 +36,7 @@
 
     <header class="app-nav">
       <!-- The brand is the only route back to the landing page from inside a
-           module — the landing carries no nav of its own by design. It was
+           module - the landing carries no nav of its own by design. It was
            already styled as a link (text-decoration, colour); now it is one. -->
       <a class="app-nav__brand" href="#landing">
         <span class="app-nav__logo">⚡</span>
@@ -55,7 +55,7 @@
 
     <!-- Schedule context bar. Sits outside .app-main so it shows on every view,
          including the three tabs that render no fixture strip. Stays hidden
-         unless the next six gameweeks contain a double or a blank — see
+         unless the next six gameweeks contain a double or a blank - see
          js/modules/scheduleBar.js. -->
     <div class="schedule-bar" id="schedule-bar" hidden></div>
 
@@ -66,7 +66,7 @@
         <button class="app-error-banner__retry" id="app-error-retry" type="button">Retry</button>
       </div>
 
-      <!-- LANDING — the front page at /projects/apps/gaffer-iq/ ("Matchnight
+      <!-- LANDING - the front page at /projects/apps/gaffer-iq/ ("Matchnight
            Scoreboard"; styles css/landing.css, behaviour js/modules/landing.js).
            A module view like any other, so hash routing, deep links and the
            render-when-visible contract are unchanged; main.js just defaults to
@@ -90,7 +90,7 @@
             <p class="top__meta">Fixture analysis for FPL</p>
           </header>
 
-          <div class="ticker" id="ticker" role="region" aria-label="Sample fixtures — choose one to put it on the scoreboard">
+          <div class="ticker" id="ticker" role="region" aria-label="Sample fixtures - choose one to put it on the scoreboard">
             <span class="ticker__tag" data-landing-gw>Sample fixtures</span>
             <div class="ticker__view"><div class="ticker__track" id="track"></div></div>
             <button class="ticker__pause" id="pause" type="button" aria-pressed="false">Pause</button>
@@ -134,7 +134,7 @@
 
             <div class="lower">
               <div class="intro">
-                <p class="sub">Every Premier League fixture, broken into six metrics — base difficulty, counter-matchup, form, home/away, style clash and head-to-head — then one <span class="nowrap">0–100</span> score for each side.</p>
+                <p class="sub">Every Premier League fixture, broken into six metrics - base difficulty, counter-matchup, form, home/away, style clash and head-to-head - then one <span class="nowrap">0–100</span> score for each side.</p>
                 <div class="actions">
                   <span class="magnet"><a class="btn btn--primary" href="#matchup">Get started</a></span>
                   <button class="btn btn--ghost" type="button" id="how-open" aria-haspopup="dialog">See how the score works</button>
@@ -158,23 +158,23 @@
         <dialog id="how" aria-labelledby="how-title">
           <div class="dlg">
             <h2 id="how-title">How the score works</h2>
-            <p>Each side of a fixture gets six sub-scores from 0 to 100. The composite blends them into one number — higher means a kinder fixture for that side.</p>
+            <p>Each side of a fixture gets six sub-scores from 0 to 100. The composite blends them into one number - higher means a kinder fixture for that side.</p>
             <ol>
-              <li><b>Base difficulty</b> — the opponent's overall strength, the starting point.</li>
-              <li><b>Counter-matchup</b> — this side's attack against that defence, and the reverse.</li>
-              <li><b>Team form</b> — recent results and underlying numbers, weighted to the last few games.</li>
-              <li><b>Home/away split</b> — how each side actually performs at this venue type.</li>
-              <li><b>Style clash</b> — whether the two styles of play suit or stifle each other.</li>
-              <li><b>Head-to-head</b> — recent meetings between the two clubs.</li>
+              <li><b>Base difficulty</b> - the opponent's overall strength, the starting point.</li>
+              <li><b>Counter-matchup</b> - this side's attack against that defence, and the reverse.</li>
+              <li><b>Team form</b> - recent results and underlying numbers, weighted to the last few games.</li>
+              <li><b>Home/away split</b> - how each side actually performs at this venue type.</li>
+              <li><b>Style clash</b> - whether the two styles of play suit or stifle each other.</li>
+              <li><b>Head-to-head</b> - recent meetings between the two clubs.</li>
             </ol>
-            <p>The model isn't yet calibrated against live results — treat the score as structured context, not a forecast.</p>
+            <p>The model isn't yet calibrated against live results - treat the score as structured context, not a forecast.</p>
             <button class="dlg__close" type="button" id="how-close">Close</button>
           </div>
         </dialog>
       </section>
 
       <!-- MATCHUP ANALYSER (js/modules/matchup.js, styles css/matchup.css).
-           The .mx block is the redesign — containers only, the module fills
+           The .mx block is the redesign - containers only, the module fills
            them. The Full Season strip below it is a SIBLING, outside .mx, so
            none of the redesign's styles can reach it: it renders exactly as it
            always has, just positioned at the foot of the page. -->
@@ -197,7 +197,7 @@
         </div>
 
         <div class="matchup-shell">
-          <!-- FULL SEASON — GW1-38 planning strip (js/modules/fullSeason.js).
+          <!-- FULL SEASON - GW1-38 planning strip (js/modules/fullSeason.js).
                Container only; the module fills it. Untouched by the Matchup
                redesign; it sits below the Horizon outlook at the foot of the
                page, and .matchup-shell still gives it the full window width. -->
@@ -216,7 +216,7 @@
         </div>
       </section>
 
-      <!-- FIXTURES — design export FINAL - Fixtures.dc.html (css/fixtures.css).
+      <!-- FIXTURES - design export FINAL - Fixtures.dc.html (css/fixtures.css).
            The mode tabs are static; js/modules/fixtures.js fills #fc-panel
            for the active mode and #fc-drawer with a fixture's match report. -->
       <section class="module-view" data-module="fixtures" aria-label="Fixtures">
@@ -235,7 +235,7 @@
         </div>
       </section>
 
-      <!-- PLAYER RANKER — design export FINAL - Ranker.dc.html (css/ranker.css).
+      <!-- PLAYER RANKER - design export FINAL - Ranker.dc.html (css/ranker.css).
            The command bar, list header and filters drawer are static;
            js/modules/ranker.js fills #rk-top (Top pick / Head to head /
            Fixture run), #rk-head + #rk-rows (the ranked list) and #rk-info. -->
@@ -294,7 +294,7 @@
             <div id="rk-head"></div>
             <ol class="rows" id="rk-rows" aria-label="Ranked players"></ol>
             <button type="button" class="more" id="rk-more" hidden></button>
-            <p class="note">Value, Avg and £/pt are coloured by rank against the whole game — gold is the best in position. Next and the GW strip use the 0–100 band scale. Dashed = estimated, hatched = blank GW, grouped = double GW, amber dot = kickoff TBC. Each column’s “i” explains it.</p>
+            <p class="note">Value, Avg and £/pt are coloured by rank against the whole game - gold is the best in position. Next and the GW strip use the 0–100 band scale. Dashed = estimated, hatched = blank GW, grouped = double GW, amber dot = kickoff TBC. Each column’s “i” explains it.</p>
           </section>
 
           <div class="scrim" id="rk-scrim" hidden></div>
@@ -321,10 +321,10 @@
                 <label class="lbl" for="rk-team">Team</label>
                 <select id="rk-team"><option value="all">All teams</option></select>
               </div>
-              <!-- Avg Pts/GW source: explicit switch, not automatic — see
+              <!-- Avg Pts/GW source: explicit switch, not automatic - see
                    FEATURE_ENGINE.md §10.1. "Last season" triggers a chunked
                    background load of every player's summary (bounded,
-                   staggered — see SUMMARY_FETCH_CHUNK_SIZE). -->
+                   staggered - see SUMMARY_FETCH_CHUNK_SIZE). -->
               <div class="dr__grp" role="group" aria-labelledby="rk-src-t">
                 <span class="lbl" id="rk-src-t">Avg pts/GW source</span>
                 <div class="dr__two">
@@ -343,7 +343,7 @@
         </div>
       </section>
 
-      <!-- GW DASHBOARD — design export FINAL - Dashboard.dc.html (css/dashboard.css).
+      <!-- GW DASHBOARD - design export FINAL - Dashboard.dc.html (css/dashboard.css).
            The command bar, import/help rows and panel frames are static;
            js/modules/dashboard.js fills the board (#db-board) and the three
            aside panels (#db-cap, #db-why, #db-risk). -->
@@ -390,7 +390,7 @@
                 <span class="drop__t">Finding your FPL Team ID</span>
                 <span class="drop__step"><b>1</b> Sign in at fantasy.premierleague.com.</span>
                 <span class="drop__step"><b>2</b> Open the Points tab.</span>
-                <span class="drop__step"><b>3</b> Read the address bar — it ends /entry/1234567/event/5.</span>
+                <span class="drop__step"><b>3</b> Read the address bar - it ends /entry/1234567/event/5.</span>
                 <span class="drop__step"><b>4</b> The number after /entry/ is your Team ID.</span>
                 <span class="drop__step"><b>5</b> Paste it here and press Import.</span>
               </div>
@@ -434,7 +434,7 @@
         </div>
       </section>
 
-      <!-- TRANSFER PLANNER — design export FINAL - Planner.dc.html (css/planner.css).
+      <!-- TRANSFER PLANNER - design export FINAL - Planner.dc.html (css/planner.css).
            The run settings, tray header and squad drawer frame are static;
            js/modules/planner.js fills the verdict hero (#pl-hero), the six
            weeks of the run (#pl-weeks), the move tray (#pl-tray) and the

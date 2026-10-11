@@ -25,19 +25,19 @@ import { canonicalClubKey } from './normalise.js';
  * "home club|away club" name pair, so buildResultsByTeam can attach xG to
  * each result with an O(1) lookup instead of scanning datesData per fixture.
  * The distinction matters at scale: 380 played fixtures against 380 dates
- * rows is 380 lookups this way, not up to 380×380 — see the boot-performance
+ * rows is 380 lookups this way, not up to 380×380 - see the boot-performance
  * note in ARCHITECTURE.md for what an unnoticed per-fixture scan costs here.
  *
  * MODEL: matched by NAME via canonicalClubKey, never by either feed's numeric
- * team id — FPL's and Understat's ids are unrelated (same convention as
+ * team id - FPL's and Understat's ids are unrelated (same convention as
  * h2h.js / channel.js). Keyed on the ordered pair alone, with no date
  * tiebreak: within one season a given pairing plays at a given venue at most
  * once, so the pair is already unique. Only ctx.leagueXg (current season) is
- * consulted — calcTeamForm's window can never reach further back than a
+ * consulted - calcTeamForm's window can never reach further back than a
  * season has been running, so there is nothing earlier seasons could answer.
  *
  * @param {object} leagueXg  Understat league payload, or null/absent (Understat
- *   down, or not yet loaded — non-fatal; every result simply falls back to
+ *   down, or not yet loaded - non-fatal; every result simply falls back to
  *   actual goal difference in rawTeamForm below).
  * @returns {Map<string, {xgH: number, xgA: number}>}
  */
@@ -59,7 +59,7 @@ function buildXgIndex(leagueXg) {
  * Internal: for every team, the chronological list of their played results,
  * each enriched with the opponent's overall strength prior so calcTeamForm
  * can opponent-adjust without re-reading the fixtures array, and with that
- * match's xG from both ends where Understat has it (null/null otherwise —
+ * match's xG from both ends where Understat has it (null/null otherwise -
  * rawTeamForm falls back to actual goal difference per match, not as an
  * all-or-nothing switch for the whole team).
  *
@@ -129,11 +129,11 @@ function rawTeamForm(results, leagueAvgStrength) {
 
     // Opponent-adjustment is SYMMETRIC here, unlike the points line above.
     // Points floor at 0, so oppAdj only ever amplifies credit for beating a
-    // strong side — a loss is 0 regardless of opponent, the sign case never
+    // strong side - a loss is 0 regardless of opponent, the sign case never
     // arises. perf can go negative, and applying the SAME multiplier would
     // invert the intended read: oppAdj>1 for a strong opponent would make a
     // bad loss to a title contender look worse than the identical margin lost
-    // to a relegation side, when the opposite is the more honest signal —
+    // to a relegation side, when the opposite is the more honest signal -
     // losing badly to a weak side says more about a team's own quality. So a
     // bad performance (perf < 0) is scaled by the RECIPROCAL instead: pulled
     // further negative against a weak opponent, pulled toward zero against a
@@ -178,7 +178,7 @@ function formTrend(results) {
  *
  * MODEL (revised): a thin window is a RAMP, not a gate. This used to flag
  * `estimated: true` below half the window, which engine/composite.js reads as
- * "discard entirely" — so a team's first two matches counted for nothing and
+ * "discard entirely" - so a team's first two matches counted for nothing and
  * the third suddenly counted for all 15%. Form is the metric most worth having
  * early, and that cliff was exactly backwards. `maturity` now scales the weight
  * continuously (1 game = 1/5 of the window = 3% of the composite rather than
@@ -189,7 +189,7 @@ function formTrend(results) {
  * `estimated` is now reserved for its literal meaning: no games at all.
  *
  * MODEL: the 20% overlay term (W_FORM_PERFORMANCE, config.js) blends xG
- * rather than actual goal difference wherever Understat has the match —
+ * rather than actual goal difference wherever Understat has the match -
  * results are noisy over a 5-game window (a single deflection or red card
  * can dominate it), and xG is the standard industry answer to exactly that:
  * a less noisy read on performance than the scoreline alone. Falls back to
@@ -234,7 +234,7 @@ export function calcTeamForm(team, ctx) {
   return {
     value: normaliseLinear(raw, min, max),
     trend: formTrend(results),
-    // There ARE games, so this is a real reading, not a fallback — how much of
+    // There ARE games, so this is a real reading, not a fallback - how much of
     // one is what `maturity` says. See the MODEL note in the doc block.
     estimated: false,
     games: results.length,
@@ -262,7 +262,7 @@ function anchorsFor(mode) {
  * Pure helper invoked once per ctx by buildScoreContext so calcPlayerForm
  * never pays an O(N) scan per player. Returns null when Understat is absent.
  *
- * MODEL: name-based matching is best-effort — Understat names usually match
+ * MODEL: name-based matching is best-effort - Understat names usually match
  * FPL `fullName` exactly for EPL regulars, but accents, suffixes (Jr.) and
  * cup/loan moves can mismatch. Any miss simply falls back to the FPL overlay.
  */
@@ -301,7 +301,7 @@ function understatXgPer90(player, ctx) {
  * Flagged estimated so confidence drops everywhere this player is consumed.
  *
  * Phase 3A: even in this fallback we use Understat's season per-90 xG when
- * available — it's strictly better than the neutral-50 placeholder we used
+ * available - it's strictly better than the neutral-50 placeholder we used
  * before. `xgEstimated` still tracks the underlying-numbers provenance.
  */
 function fallbackPlayerForm(player, mode, ctx) {
@@ -313,14 +313,14 @@ function fallbackPlayerForm(player, mode, ctx) {
   const per90Norm = normaliseLinear(per90, per90A.min, per90A.max);
 
   // MODEL: without per-GW data we proxy minutesSecurity by season minutes over
-  // the minutes that have actually BEEN AVAILABLE so far — elapsed gameweeks,
+  // the minutes that have actually BEEN AVAILABLE so far - elapsed gameweeks,
   // not the full 38. Dividing by SEASON_GWS * 90 (as this did) meant an
   // ever-present player scored 90/3420 = 0.03 after GW1 and only 0.53 by GW20,
   // so essentially the entire pool read as a rotation risk for most of the
   // season, and the W_MINUTES term below dragged every form score down with
   // it. ctx.elapsedGws is derived from the data itself (composite.js) rather
   // than from a gameweek counter, so it stays correct through blanks and
-  // doubles. Still crude — flagged estimated below.
+  // doubles. Still crude - flagged estimated below.
   const elapsedGws = Math.max(1, ctx?.elapsedGws ?? 1);
   const minutesSecurity = clamp(0, 1, safeDiv(minutes, elapsedGws * 90, 0));
 
@@ -330,14 +330,14 @@ function fallbackPlayerForm(player, mode, ctx) {
   let xgSource;
   let xgEstimated;
   if (upXg !== null) {
-    // MODEL: using Understat xG — season per-90 underlying. Sharper than the
+    // MODEL: using Understat xG - season per-90 underlying. Sharper than the
     // FPL totals fallback even before any element-summary loads.
     xgOverlay = upXg;
     xgNorm = normaliseLinear(upXg, xgA.min, xgA.max);
     xgSource = 'understat';
     xgEstimated = false;
   } else {
-    // MODEL: using FPL proxy (no Understat data) — no per-GW history and no
+    // MODEL: using FPL proxy (no Understat data) - no per-GW history and no
     // Understat overlay either, so the underlying term contributes neutral 50
     // to avoid silently re-weighting the rest.
     xgOverlay = 0;
@@ -404,7 +404,7 @@ export function calcPlayerForm(player, ctx) {
   const xgSum   = window.reduce((s, g) => s + (g.xG || 0) + (g.xA || 0), 0);
 
   if (minutes === 0) {
-    // Player on the pitch for zero minutes across the window — treat as the
+    // Player on the pitch for zero minutes across the window - treat as the
     // season fallback. Flagged estimated.
     return { ...fallbackPlayerForm(player, mode, ctx), estimated: true, mode };
   }
@@ -422,13 +422,13 @@ export function calcPlayerForm(player, ctx) {
   let xgSource;
   let xgEstimated;
   if (upXg !== null) {
-    // MODEL: using Understat xG — supplements the FPL window with the season
+    // MODEL: using Understat xG - supplements the FPL window with the season
     // underlying read. Same formula (W_UNDERLYING term), better input.
     xgOverlay = upXg;
     xgSource = 'understat';
     xgEstimated = false;
   } else {
-    // MODEL: using FPL proxy (no Understat data) — FPL-exposed element-summary
+    // MODEL: using FPL proxy (no Understat data) - FPL-exposed element-summary
     // xG/xA over the same window. Flag estimated:true on the breakdown.
     xgOverlay = safeDiv(xgSum, minutes / 90, 0);
     xgSource = 'fpl';
@@ -465,22 +465,22 @@ export function calcPlayerForm(player, ctx) {
  *
  * MODEL: two independent necessary conditions, combined with min() rather than a
  * weighted blend, because either one alone can rule a player out:
- *   startShare   — backward evidence. Has he been starting? (minutesSecurity)
- *   availability — forward evidence. Is he fit and permitted to play?
+ *   startShare   - backward evidence. Has he been starting? (minutesSecurity)
+ *   availability - forward evidence. Is he fit and permitted to play?
  * A nailed starter who is injured cannot play (min → ~0). A fully fit squad
  * player still will not start (min → his low start share). Averaging the two
  * would wrongly rescue both cases, which is exactly the failure the Ranker
  * showed: fringe players carrying high scores they could not deliver on.
  *
  * MODEL: availability prefers FPL's own chance_of_playing_next_round, which is a
- * real percentage FPL sets from press-conference news — a genuine forward-looking
+ * real percentage FPL sets from press-conference news - a genuine forward-looking
  * signal, not a proxy. It is null for the majority of players (FPL populates it
  * only when there IS news), so a null falls back to STATUS_PLAY_CHANCE keyed on
  * the player's status. Null therefore means "no news", not "no data".
  *
  * @param {Player} player
  * @param {{minutesSecurity: number, estimated: boolean}} formResult
- *   an already-computed calcPlayerForm result — passed in rather than recomputed
+ *   an already-computed calcPlayerForm result - passed in rather than recomputed
  *   so callers that already hold one (scorePlayer, chips.js) don't double the work.
  * @returns {{value: number, estimated: boolean, startShare: number,
  *            availability: number, availabilitySource: 'fpl'|'status'}}
@@ -511,7 +511,7 @@ export function calcPlayingLikelihood(player, formResult) {
 
 /**
  * Map a 0–1 playtime security value onto its display band.
- * Single source of truth for the label — the Ranker's Playtime column renders
+ * Single source of truth for the label - the Ranker's Playtime column renders
  * it and its filter pills match on it, so neither can drift from the other.
  *
  * @param {number} value  0–1
@@ -531,14 +531,14 @@ export function playtimeBand(value) {
  * Answers the forward-looking question the Ranker's Playtime column asks,
  * which the single backward ratio in calcPlayerForm never could. Built from
  * pool-wide data only (bootstrap totals + squad composition), never from
- * element-summary history — that is lazily fetched, so a model needing it
+ * element-summary history - that is lazily fetched, so a model needing it
  * would have nothing to work with for almost every row the Ranker draws.
  *
  * Four inputs, combined as three positive terms and one penalty:
  *
  *   startRate   starts ÷ elapsed GWs. The binary that matters most in FPL.
  *   minShare    minutes ÷ minutes available. Catches the nailed-on starter who
- *               is nonetheless hooked on 60 every week — start rate alone
+ *               is nonetheless hooked on 60 every week - start rate alone
  *               scores him identically to a player finishing matches.
  *   completion  minutes ÷ (starts × 90). Small tiebreaker; being subbed late
  *               is ordinary squad management, not insecurity.
@@ -551,7 +551,7 @@ export function playtimeBand(value) {
  *               position group rather than the player.
  *
  * MODEL: both rate terms are shrunk toward a price-derived prior worth
- * PLAYTIME_PRIOR_GWS gameweeks of evidence. This is what makes GW1 behave —
+ * PLAYTIME_PRIOR_GWS gameweeks of evidence. This is what makes GW1 behave -
  * with one match played, a raw start rate is either 0.0 or 1.0 and neither is
  * believable, so early on the prior dominates and by roughly GW10 the observed
  * record has fully taken over. Price is the only pool-wide forward-looking
@@ -578,7 +578,7 @@ export function calcPlaytimeSecurity(player, ctx) {
   const starts  = player?.totals?.starts  ?? 0;
 
   // Price-derived expected role. Falls back to the midpoint of the prior range
-  // when the pool context is missing, rather than to zero — an unknown player
+  // when the pool context is missing, rather than to zero - an unknown player
   // is an average one, not a certain non-starter.
   const prior = entry?.prior ?? ((PLAYTIME_PRIOR_MIN + PLAYTIME_PRIOR_MAX) / 2);
 

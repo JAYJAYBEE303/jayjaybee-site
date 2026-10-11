@@ -1,4 +1,4 @@
-/* Gaffer IQ — base.css
+/* Gaffer IQ - base.css
    Reset, CSS variables (design tokens), typography.
    All colour, spacing, radius, font, and band tokens live here.
    Components reference var(--…) only; no raw hex or px literals elsewhere. */
@@ -28,8 +28,8 @@
   /* --- Band colours: PRIMITIVES ------------------------------------------
      A hue, named after itself and nothing else. Nothing outside this block
      should reference one directly unless it genuinely means "this colour"
-     rather than "this rating" — the semantic layer below is what components
-     read. The split exists so a scale can be re-pointed — either wholesale
+     rather than "this rating" - the semantic layer below is what components
+     read. The split exists so a scale can be re-pointed - either wholesale
      (the five-tier scale became seven by editing the semantics below, not
      every component) or in a scope. A scoped block cannot define --band-good
      in terms of --band-great: both resolve against the scope's OWN values and
@@ -39,7 +39,7 @@
   --band-green:      #3fb950;
   /* Down to a single consumer, --band-deep-blue, and therefore to a single
      job: the league table's Champions zone. It is no longer any kind of
-     "blue" the reader is asked to interpret — --band-light-blue below is the
+     "blue" the reader is asked to interpret - --band-light-blue below is the
      app's blue, on both the 0-100 band scale and the ranker's rank-relative
      chips. Do not reach for this one for anything new. */
   --band-blue:       #1f6feb;
@@ -47,7 +47,7 @@
      --color-accent, and deliberately NOT that token: a rating is not chrome,
      and the day the accent moves this band must not move with it. #1f6feb,
      the blue it replaced, was the darkest hue in the scale and the only one
-     that had to be hunted for at chip size — backwards for the second-best
+     that had to be hunted for at chip size - backwards for the second-best
      tier. */
   --band-light-blue: #58a6ff;
   --band-gold:       #ffc83d;
@@ -57,17 +57,17 @@
   --band-orange:     #f0883e;
   --band-red:        #f85149;
   --band-dark-red:   #b62324;
-  /* Not a hue — a void. Below every surface in the palette (--color-bg is
+  /* Not a hue - a void. Below every surface in the palette (--color-bg is
      #0d1117), so a tile filled with it reads as a hole punched in the page
      rather than as one more coloured chip. It is the bottom tier's fill, the
      mirror of what gold does at the top. */
   --band-black:      #0c0c0c;
-  /* Not a rating hue — the INK the top tier's digits are set in, on top of its
+  /* Not a rating hue - the INK the top tier's digits are set in, on top of its
      gold. Cooler and brighter than --color-text (#e6edf3) so it reads as
      silver against a warm ground rather than as ordinary body text that
      happens to be sitting there. */
   --band-silver:     #f4f8fd;
-  /* Soft/desaturated rather than a true lime — lime read too bright against
+  /* Soft/desaturated rather than a true lime - lime read too bright against
      this dark palette. */
   --band-light-green: #6fcf78;
 
@@ -112,7 +112,7 @@
      seen. Lifting it stays clear of the green above (hue 212 against 132,
      which separates at 14px on the Full Season ribbon, where two adjacent
      greens did not). The ranker's rank-relative chip followed it off the deep
-     blue for a different reason — see .score-chip--rank-light-green — reading
+     blue for a different reason - see .score-chip--rank-light-green - reading
      the same PRIMITIVE rather than this semantic, so the two axes stay free
      to move apart while the app still has exactly one blue. --band-blue keeps
      the league table's Champions zone via --band-deep-blue, which never meant
@@ -138,12 +138,12 @@
   /* The two tiers the seven-tier scale added at the ends. Gold is deliberately
      outside the green family: "exceptional" is not "one tick greener than
      great", and at 14px on the Full Season ribbon a fourth green would simply
-     lose to the third. Checked against --band-yellow beside it — measurably
+     lose to the third. Checked against --band-yellow beside it - measurably
      brighter and more saturated, so the two never blur. */
   --band-excellent:       var(--band-gold);
   --band-excellent-bg:    var(--band-gold-bg);
   /* The top tier is the one place the scale splits chrome from ink. Gold on
-     gold is the lowest-contrast text on the page — the tint that makes the
+     gold is the lowest-contrast text on the page - the tint that makes the
      tier unmistakable at a glance is the same thing that dims the number
      inside it, and the number is what is actually being read. So the border,
      fill and glow stay gold and the digits go silver, lit by their own glow so
@@ -153,18 +153,18 @@
   --band-excellent-ink: var(--band-silver);
   /* The bottom tier splits fill from ink for the same reason the top one
      does, and mirrors its shape: a fill that names the tier at a glance and
-     an ink that is not the fill. Where gold is a lamp, this is a void — the
+     an ink that is not the fill. Where gold is a lamp, this is a void - the
      fill goes black and the digits are the darkest red in the palette, with
      the border drawn in that same dark red so the black reads as bounded
      rather than as a hole in the card. That border is the mirror of the one
      gold carries where the middle five tiers have none. No glow: the top tier
      glows because it is the thing to look for, and the bottom tier is not.
-     Dark red on black is a deliberate ~3:1 read — it is the one tier meant to
+     Dark red on black is a deliberate ~3:1 read - it is the one tier meant to
      look like somewhere you do not want to be.
 
      --band-extreme is now black, so it is the fill and nothing else. A surface
-     that paints a bare band-coloured mark with no fill behind it — a bar, a
-     card's accent stripe — must read the INK instead, or it paints black on
+     that paints a bare band-coloured mark with no fill behind it - a bar, a
+     card's accent stripe - must read the INK instead, or it paints black on
      near-black and shows nothing. */
   --band-extreme:      var(--band-black);
   --band-extreme-bg:   var(--band-black-bg);
@@ -177,8 +177,8 @@
      top-20%-percentile tier (FEATURE_ENGINE.md §13); the two below are the
      league table's Champions and Europa zones (Conference takes the primitive
      --band-green directly, so the table carries one green instead of three
-     meaning nothing in particular). --band-elite lived here too — the Full
-     Season strip's gold — and is gone: the seven-tier scale gave that gold a
+     meaning nothing in particular). --band-elite lived here too - the Full
+     Season strip's gold - and is gone: the seven-tier scale gave that gold a
      band of its own, so the strip reads --band-excellent like everything else
      and the alias had no consumers left. */
   --band-deep-blue: var(--band-blue);
@@ -191,7 +191,7 @@
   --space-6: 24px;
   --space-8: 32px;
   /* Rungs 5, 7 and the 40px+ page-scale steps were absent because nothing in
-     the app shell needed them — the landing page does (section padding, hero
+     the app shell needed them - the landing page does (section padding, hero
      cluster offset, card padding). Same 4-point grid, no new system. */
   --space-5:  20px;
   --space-7:  28px;
@@ -228,7 +228,7 @@
   --radius-pill: 999px;
 
   /* --- Layout metrics ---------------------------------------------------- */
-  /* Height of the sticky app nav. Was a 52px literal in three places — the nav
+  /* Height of the sticky app nav. Was a 52px literal in three places - the nav
      itself, its items, and the offset the matchup navigators stick below it.
      Named because a fourth consumer now needs it as an arithmetic input: the
      team navigator's list is capped at the viewport height MINUS this, so the
@@ -240,7 +240,7 @@
   /* --- Elevation --------------------------------------------------------- */
   /* First --shadow-* tokens in the system. Two raw drop-shadow recipes
      already exist inline (.dash-search-results, .squad-import-panel); those
-     are left alone deliberately — retrofitting them is a separate change
+     are left alone deliberately - retrofitting them is a separate change
      with its own visual review. See CONVENTIONS.md §5.3. */
   --shadow-float:      0 16px 40px rgba(0, 0, 0, 0.45);
   --shadow-float-soft: 0 16px 40px rgba(0, 0, 0, 0.40);
@@ -253,7 +253,7 @@
   --estimated-border-style: dashed;    /* applied as border-style for estimated indicators */
 
   /* --- Skeleton placeholders --------------------------------------------- */
-  /* Shown in place of any value that is still being computed — most of all a
+  /* Shown in place of any value that is still being computed - most of all a
      CompositeScore whose counter-matchup component is waiting on an Understat
      team payload. Deliberately DARKER than --color-surface-raised: a skeleton
      has to read as an absence, so it recedes rather than competing with the

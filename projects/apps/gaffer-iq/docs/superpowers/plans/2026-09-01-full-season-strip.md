@@ -4,23 +4,23 @@
 
 **Goal:** Add a full-width GW1–38 planning strip to the foot of the Matchup page, showing each gameweek's top 3 matchups and top 5 players, its schedule irregularities, and a chip window per half-season.
 
-**Architecture:** One new pure engine (`js/engine/season.js`) computes a whole-season model from the existing `buildScoreContext` output; one new module (`js/modules/fullSeason.js`) owns the strip's DOM and its expand/collapse choreography. Nothing existing changes behaviour — `index.html`, `config.js` and `main.js` gain additive entries only.
+**Architecture:** One new pure engine (`js/engine/season.js`) computes a whole-season model from the existing `buildScoreContext` output; one new module (`js/modules/fullSeason.js`) owns the strip's DOM and its expand/collapse choreography. Nothing existing changes behaviour - `index.html`, `config.js` and `main.js` gain additive entries only.
 
 **Tech Stack:** Vanilla ES modules, no build step, no dependencies. Tests use `node:test` + `node:assert/strict`. CSS is hand-written BEM-lite against the tokens in `css/base.css`.
 
 **Spec:** `docs/superpowers/specs/2026-09-01-full-season-strip-design.md`
 
-**Motion reference:** `docs/superpowers/specs/2026-09-01-full-season-strip-prototype.html` — a working, browser-verified prototype of the ribbon and its choreography. Tasks 8–11 port from it. It is the source of truth for timing and geometry; where this plan and the prototype disagree, the plan wins.
+**Motion reference:** `docs/superpowers/specs/2026-09-01-full-season-strip-prototype.html` - a working, browser-verified prototype of the ribbon and its choreography. Tasks 8–11 port from it. It is the source of truth for timing and geometry; where this plan and the prototype disagree, the plan wins.
 
 ## Global Constraints
 
 - **Engine files are pure** (`ARCHITECTURE.md` §3): no DOM, no `fetch`, no store access, no mutation of inputs. Same inputs → same outputs.
 - **Modules own DOM only** (`ARCHITECTURE.md` §3 hard rule 2): no analytical logic in `js/modules/*`. Anything that computes a number belongs in the engine.
 - **Render only while on screen** (`CONVENTIONS.md` §8): `data:ready` does cheap bookkeeping unconditionally; expensive work defers to `route:changed` when the view is hidden.
-- **CSS is BEM-lite** (`CONVENTIONS.md` §5.1): `block`, `block__element`, `block--modifier`. Lowercase kebab-case, no IDs for styling, **no hard-coded colours** — every colour via `var(--…)` from `css/base.css`.
+- **CSS is BEM-lite** (`CONVENTIONS.md` §5.1): `block`, `block__element`, `block--modifier`. Lowercase kebab-case, no IDs for styling, **no hard-coded colours** - every colour via `var(--…)` from `css/base.css`.
 - **Block prefix for all new CSS is `season-`.** e.g. `.season-strip`, `.season-gw__tile`, `.season-gw--hot`.
 - **Postponed fixtures never feed a score** (`ARCHITECTURE.md` §9). `fixturesForTeamInWindow`'s `f.gw === null` guard stays untouched. The attribution added here is display-only.
-- **Node is not installed on this machine.** `npm test` cannot be run locally. Write the tests anyway — they are the deliverable and run in CI/elsewhere. Behavioural verification is live in the browser via `.claude/devserver.py` (see `README` of that file), navigating to `http://localhost:3000/#matchup`.
+- **Node is not installed on this machine.** `npm test` cannot be run locally. Write the tests anyway - they are the deliverable and run in CI/elsewhere. Behavioural verification is live in the browser via `.claude/devserver.py` (see `README` of that file), navigating to `http://localhost:3000/#matchup`.
 - **Motion budget: 3 phases × 330ms = 990ms**, chained by `transition-delay`, easing `cubic-bezier(.32,.72,0,1)`.
 - Commit after every task. Conventional Commits, lowercase subject ≤72 chars.
 
@@ -44,7 +44,7 @@ Append to `js/config.js`:
 // See docs/superpowers/specs/2026-09-01-full-season-strip-design.md.
 
 // Matchup rows and player rows shown per gameweek. Three and five are what the
-// collapsed column has room for at 54px — the tiles and dots are the collapsed
+// collapsed column has room for at 54px - the tiles and dots are the collapsed
 // summary of exactly these lists, so changing either number changes both the
 // panel and the ribbon glyph.
 export const SEASON_TOP_MATCHUPS = 3;
@@ -86,7 +86,7 @@ git commit -m "feat(config): add Full Season strip constants"
 - Test: `tests/engine/season.test.js`
 
 **Interfaces:**
-- Consumes: `scoreFixture(team, fixture, ctx)` from `js/engine/composite.js` — returns `{ value: number, band: string, … }`. `ctx` from `buildScoreContext(season, opts)` carries `{ teamsById, fixtures, currentGw, … }`.
+- Consumes: `scoreFixture(team, fixture, ctx)` from `js/engine/composite.js` - returns `{ value: number, band: string, … }`. `ctx` from `buildScoreContext(season, opts)` carries `{ teamsById, fixtures, currentGw, … }`.
 - Produces:
   - `buildGameweekMatchups(gw, ctx, opts?) -> Array<Matchup>` where
     `Matchup = { fixtureId: number, homeId: number, awayId: number, favouredId: number, value: number, band: string, isDouble: boolean, postponed: false }`,
@@ -184,9 +184,9 @@ test('buildGameweekMatchups leaves a single-fixture week unflagged', () => {
 - [ ] **Step 2: Run the test to verify it fails**
 
 Run: `npm test` (or `node --test tests/engine/season.test.js`)
-Expected: FAIL — `Cannot find module '../../js/engine/season.js'`.
+Expected: FAIL - `Cannot find module '../../js/engine/season.js'`.
 
-*(Node is unavailable locally — see Global Constraints. If you cannot run it, confirm the file does not exist yet and proceed.)*
+*(Node is unavailable locally - see Global Constraints. If you cannot run it, confirm the file does not exist yet and proceed.)*
 
 - [ ] **Step 3: Write the implementation**
 
@@ -212,7 +212,7 @@ export const LAST_GW = 38;
  * The top matchups of one gameweek.
  *
  * A fixture carries TWO composite scores, one per side. The matchup's score is
- * the higher of them and the side that produced it is the favoured side — so
+ * the higher of them and the side that produced it is the favoured side - so
  * the UI's "which team does this fixture favour" ring falls out of the same
  * calculation rather than needing a second rule.
  *
@@ -272,7 +272,7 @@ export function isLoadedWeek(matchups) {
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `npm test`
-Expected: PASS — 6 tests.
+Expected: PASS - 6 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -291,7 +291,7 @@ git commit -m "feat(season): score each gameweek's top matchups"
 
 **Interfaces:**
 - Consumes: `LAST_GW` from Task 2. Reads `ctx.fixtures` (scheduled, `gw` a number) and a separate list of pending fixtures (`gw === null`).
-- Produces: `attributePostponements(pending, ctx) -> Map<number, Array<Fixture>>` — gameweek number → the pending fixtures inferred to belong to it.
+- Produces: `attributePostponements(pending, ctx) -> Map<number, Array<Fixture>>` - gameweek number → the pending fixtures inferred to belong to it.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -368,7 +368,7 @@ test('attributePostponements returns an empty map when nothing is pending', () =
 });
 
 test('attributePostponements ignores weeks with no fixtures at all', () => {
-  // GW7 has no scheduled fixtures anywhere — an unplayed part of the season,
+  // GW7 has no scheduled fixtures anywhere - an unplayed part of the season,
   // not a hole. Every club is "blank", which must not swallow every pending tie.
   const ctx = scheduleCtx([{ id: 20, gw: 5, homeTeamId: 1, awayTeamId: 2 }], [1, 2, 3, 4]);
   const pending = [{ id: 99, gw: null, homeTeamId: 3, awayTeamId: 4 }];
@@ -380,7 +380,7 @@ test('attributePostponements ignores weeks with no fixtures at all', () => {
 - [ ] **Step 2: Run the test to verify it fails**
 
 Run: `npm test`
-Expected: FAIL — `attributePostponements is not a function`.
+Expected: FAIL - `attributePostponements is not a function`.
 
 - [ ] **Step 3: Write the implementation**
 
@@ -401,7 +401,7 @@ Append to `js/engine/season.js`:
  * states that the attribution is inferred, so a wrong guess reads as a guess.
  *
  * Earliest match wins: a rearranged date is always later than the hole.
- * A gameweek with NO scheduled fixtures at all is skipped — that is an unplayed
+ * A gameweek with NO scheduled fixtures at all is skipped - that is an unplayed
  * stretch of the season, not a hole, and every club is trivially "blank" in it.
  *
  * @param {Array<object>} pending  fixtures with gw === null
@@ -440,7 +440,7 @@ export function attributePostponements(pending, ctx) {
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `npm test`
-Expected: PASS — 12 tests total.
+Expected: PASS - 12 tests total.
 
 - [ ] **Step 5: Commit**
 
@@ -459,7 +459,7 @@ git commit -m "feat(season): infer which gameweek a postponement left"
 
 **Interfaces:**
 - Consumes: `buildGameweekMatchups` (Task 2), `attributePostponements` (Task 3).
-- Produces: `fillMatchupSlots(live, postponed) -> Array<Matchup>` — length ≤ `SEASON_TOP_MATCHUPS`. Postponed entries carry `{ postponed: true, value: null, band: 'neutral', favouredId: null }`.
+- Produces: `fillMatchupSlots(live, postponed) -> Array<Matchup>` - length ≤ `SEASON_TOP_MATCHUPS`. Postponed entries carry `{ postponed: true, value: null, band: 'neutral', favouredId: null }`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -520,7 +520,7 @@ test('fillMatchupSlots marks postponed rows as unscored', () => {
 - [ ] **Step 2: Run the test to verify it fails**
 
 Run: `npm test`
-Expected: FAIL — `fillMatchupSlots is not a function`.
+Expected: FAIL - `fillMatchupSlots is not a function`.
 
 - [ ] **Step 3: Write the implementation**
 
@@ -533,7 +533,7 @@ Append to `js/engine/season.js`:
  * Slot 1 always holds the week's genuine best fixture whenever one exists, no
  * matter how much of the schedule has fallen over. Two postponements therefore
  * read as "one real fixture left to plan around", which is the signal worth
- * acting on — where sorting them in among the live rows would just look like a
+ * acting on - where sorting them in among the live rows would just look like a
  * thin week.
  *
  * @param {Array<object>} liveRows   buildGameweekMatchups output, descending
@@ -575,7 +575,7 @@ export function fillMatchupSlots(liveRows, postponed) {
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `npm test`
-Expected: PASS — 18 tests total.
+Expected: PASS - 18 tests total.
 
 - [ ] **Step 5: Commit**
 
@@ -595,7 +595,7 @@ git commit -m "feat(season): fill postponed matchup slots from the bottom"
 **Interfaces:**
 - Consumes: `calcPlayerForm(player, ctx)` and `calcPlayingLikelihood(player, formResult)` from `js/engine/form.js`; `calcAvgPointsPerGw(player, ctx)` and `calcExpectedPoints(avgPointsPerGw, nextFixtureScore, playing, fixtureCount)` from `js/engine/composite.js`. `calcExpectedPoints` returns `{ value: number, estimated: boolean }`.
 - Produces:
-  - `buildPlayerFormCache(ctx) -> Map<number, object>` — player id → `calcPlayerForm` result. Computed once, reused for all 38 gameweeks.
+  - `buildPlayerFormCache(ctx) -> Map<number, object>` - player id → `calcPlayerForm` result. Computed once, reused for all 38 gameweeks.
   - `buildGameweekPlayers(gw, ctx, formCache, opts?) -> Array<PlayerRow>` where
     `PlayerRow = { playerId, name, position, teamId, price, points }`, sorted by `points` descending, length ≤ `SEASON_TOP_PLAYERS`.
 
@@ -677,7 +677,7 @@ test('buildGameweekPlayers returns nothing for a gameweek with no fixtures', () 
 - [ ] **Step 2: Run the test to verify it fails**
 
 Run: `npm test`
-Expected: FAIL — `buildGameweekPlayers is not a function`.
+Expected: FAIL - `buildGameweekPlayers is not a function`.
 
 - [ ] **Step 3: Write the implementation**
 
@@ -775,7 +775,7 @@ export function buildGameweekPlayers(gw, ctx, formCache, opts = {}) {
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `npm test`
-Expected: PASS — 23 tests total.
+Expected: PASS - 23 tests total.
 
 - [ ] **Step 5: Commit**
 
@@ -796,7 +796,7 @@ git commit -m "feat(season): rank the league per gameweek"
 - Consumes: `CHIP_RESET_AFTER_GW` (19), `WC_WINDOW`, `WC_TOP_TEAMS` from `js/config.js`; `LAST_GW` from Task 2.
 - Produces: `buildChipWindows(gwStats, opts?) -> Array<ChipWindow>` where
   `ChipWindow = { chip: 'wildcard'|'freehit'|'triplecaptain', from: number, to: number, half: 1|2 }`.
-  `gwStats` is `Array<{ gw, matchupTotal, blankCount, bestPlayerPoints }>` — one entry per gameweek, produced by Task 7.
+  `gwStats` is `Array<{ gw, matchupTotal, blankCount, bestPlayerPoints }>` - one entry per gameweek, produced by Task 7.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -865,7 +865,7 @@ test('buildChipWindows skips a half with no gameweeks left', () => {
 - [ ] **Step 2: Run the test to verify it fails**
 
 Run: `npm test`
-Expected: FAIL — `buildChipWindows is not a function`.
+Expected: FAIL - `buildChipWindows is not a function`.
 
 - [ ] **Step 3: Write the implementation**
 
@@ -890,7 +890,7 @@ Then append:
  * spanning it would be advice you cannot take.
  *
  * SQUAD-AGNOSTIC. Triple Captain reads the best available captain in the league
- * that week rather than a player you own, and Bench Boost is absent entirely —
+ * that week rather than a player you own, and Bench Boost is absent entirely -
  * a bench you do not own carries no information. This is what lets the strip
  * work on a first visit.
  *
@@ -910,7 +910,7 @@ export function buildChipWindows(gwStats, opts = {}) {
   for (const { half, rows } of halves) {
     if (rows.length === 0) continue;
 
-    // Wildcard — the best run of wcWindow consecutive weeks by fixture quality.
+    // Wildcard - the best run of wcWindow consecutive weeks by fixture quality.
     // Runs must sit wholly inside the half, so they cannot cross the reset.
     let bestSum = -Infinity, bestStart = null;
     for (let i = 0; i + wcWindow <= rows.length; i++) {
@@ -924,12 +924,12 @@ export function buildChipWindows(gwStats, opts = {}) {
       out.push({ chip: 'wildcard', from: bestStart, to: bestStart + wcWindow - 1, half });
     }
 
-    // Free Hit — the single most damaged week: the one where the squad you own
+    // Free Hit - the single most damaged week: the one where the squad you own
     // is least able to field an XI, so renting a different one pays.
     const fh = rows.reduce((best, s) => (s.blankCount > best.blankCount ? s : best), rows[0]);
     out.push({ chip: 'freehit', from: fh.gw, to: fh.gw, half });
 
-    // Triple Captain — the single best captain week available anywhere.
+    // Triple Captain - the single best captain week available anywhere.
     const tc = rows.reduce((best, s) =>
       (s.bestPlayerPoints > best.bestPlayerPoints ? s : best), rows[0]);
     out.push({ chip: 'triplecaptain', from: tc.gw, to: tc.gw, half });
@@ -941,7 +941,7 @@ export function buildChipWindows(gwStats, opts = {}) {
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `npm test`
-Expected: PASS — 29 tests total.
+Expected: PASS - 29 tests total.
 
 - [ ] **Step 5: Commit**
 
@@ -1029,7 +1029,7 @@ test('buildSeasonModel notes a postponement in the week it was taken from', () =
 - [ ] **Step 2: Run the test to verify it fails**
 
 Run: `npm test`
-Expected: FAIL — `buildSeasonModel is not a function`.
+Expected: FAIL - `buildSeasonModel is not a function`.
 
 - [ ] **Step 3: Write the implementation**
 
@@ -1038,12 +1038,12 @@ Append to `js/engine/season.js`:
 ```js
 /**
  * Plain-English note for one gameweek. The panel shows this under its rows.
- * Postponement wording says the attribution is INFERRED, because it is — see
+ * Postponement wording says the attribution is INFERRED, because it is - see
  * attributePostponements.
  */
 function gameweekNote(ppCount, isDouble, loaded) {
   if (ppCount > 1) {
-    return `${ppCount} fixtures look postponed out of this week — only one matchup `
+    return `${ppCount} fixtures look postponed out of this week - only one matchup `
          + `left to plan around. Inferred from the clubs left without a game.`;
   }
   if (ppCount === 1) {
@@ -1052,7 +1052,7 @@ function gameweekNote(ppCount, isDouble, loaded) {
   }
   if (isDouble) return 'Double gameweek. The strongest captaincy week of this stretch.';
   if (loaded)   return 'Several heavily one-sided fixtures land together here.';
-  return 'An ordinary week — nothing worth holding a transfer for.';
+  return 'An ordinary week - nothing worth holding a transfer for.';
 }
 
 /**
@@ -1064,7 +1064,7 @@ function gameweekNote(ppCount, isDouble, loaded) {
  * computations. `skipPlayers` is that path; it is also what the unit tests use.
  *
  * @param {object} ctx      from buildScoreContext
- * @param {object} season   from normaliseSeason — read for pendingFixtures
+ * @param {object} season   from normaliseSeason - read for pendingFixtures
  * @param {{skipPlayers?: boolean}} [opts]
  * @returns {object} SeasonModel
  */
@@ -1112,7 +1112,7 @@ export function buildSeasonModel(ctx, season, opts = {}) {
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `npm test`
-Expected: PASS — 34 tests total.
+Expected: PASS - 34 tests total.
 
 - [ ] **Step 5: Commit**
 
@@ -1133,14 +1133,14 @@ git commit -m "feat(season): assemble the whole-season model"
 
 **Interfaces:**
 - Consumes: `buildSeasonModel(ctx, season, opts)` from Task 7; `store` from `js/store.js` (`store.getSeason()`, `store.isFresh()`, `store.subscribe(event, fn)`).
-- Produces: `initFullSeason()` — called once from `main.js`.
+- Produces: `initFullSeason()` - called once from `main.js`.
 
 - [ ] **Step 1: Add the markup**
 
 In `index.html`, immediately after the `</div>` that closes `.matchup-shell` and before `</section>`:
 
 ```html
-        <!-- FULL SEASON — GW1-38 planning strip (js/modules/fullSeason.js).
+        <!-- FULL SEASON - GW1-38 planning strip (js/modules/fullSeason.js).
              Container only; the module fills it. Sits below the matchup shell
              and runs the full page width. -->
         <section class="season-strip" aria-label="Full season outlook">
@@ -1168,7 +1168,7 @@ Create `js/modules/fullSeason.js`:
  * js/modules/fullSeason.js
  * Layer: module. Owns the DOM for the Full Season strip on the Matchup page.
  * Side effects: DOM writes only. Reads from store; calls engine/season.js.
- * No analytical logic lives here — every number comes from engine/season.js
+ * No analytical logic lives here - every number comes from engine/season.js
  * (ARCHITECTURE.md §3 hard rule 2).
  *
  * Subscriptions: data:ready, route:changed
@@ -1197,7 +1197,7 @@ function columnHTML(g) {
     return `<div class="season-gw season-gw--past" data-gw="${g.gw}">`
          + `<span class="season-gw__n">${g.gw}</span></div>`;
   }
-  // Tile is the BAND TINT alone — no club swatches. The prototype drew two
+  // Tile is the BAND TINT alone - no club swatches. The prototype drew two
   // colour chips per tile from a hard-coded palette, but a normalised Team
   // carries no club colour (only name, shortName, code, badgeUrl), and a 70px
   // badge shrunk to 9px is mud. Spec §9 asks the tile to encode one-sidedness,
@@ -1235,7 +1235,7 @@ function render() {
 function rebuild() {
   const season = store.getSeason();
   if (!season) return;
-  // The SAME options matchup.js passes (js/modules/matchup.js buildCtx) — all
+  // The SAME options matchup.js passes (js/modules/matchup.js buildCtx) - all
   // six, not a subset. Omitting teamXgBySlug alone makes
   // buildChannelProfilesByTeamId return {}, which silently degrades the
   // counter-matchup sub-metric, so a fixture would band and COLOUR differently
@@ -1303,7 +1303,7 @@ Append to `css/components.css`. Port the collapsed-column rules from the prototy
 | `.fx` / `.fx--great` … | `.season-gw__tile` / `.season-gw__tile--great` … |
 | `.fx--dgw` / `.fx--pp` | `.season-gw__tile--double` / `.season-gw__tile--postponed` |
 | `.dots` / `.dot` | `.season-gw__dots` / `.season-gw__dot` |
-| `.swatch` | *dropped* — no club colour exists on a Team (see `columnHTML`) |
+| `.swatch` | *dropped* - no club colour exists on a Team (see `columnHTML`) |
 | `.ribbon` / `.scroller` / `.track` | `.season-ribbon` / `.season-scroller` / `.season-track` |
 | `.split` | `.season-split` |
 
@@ -1312,7 +1312,7 @@ Replace every literal colour in the ported rules with its token (`#0d1117` → `
 - [ ] **Step 5: Verify in the browser**
 
 Run: start the dev server, open `http://localhost:3000/#matchup`.
-Expected: 38 columns below the matchup cards, a 1px divider between GW19 and GW20, played weeks as dashed stubs, no console errors, and — critically — `document.body.scrollHeight` unchanged by anything the strip does.
+Expected: 38 columns below the matchup cards, a 1px divider between GW19 and GW20, played weeks as dashed stubs, no console errors, and - critically - `document.body.scrollHeight` unchanged by anything the strip does.
 
 - [ ] **Step 6: Commit**
 
@@ -1349,7 +1349,7 @@ const CHIP_CLASS = {
  * The chip rail: one cell per gameweek, mirroring the ribbon's widths and gap
  * exactly, so a band's left edge IS its gameweek's left edge.
  *
- * Consecutive weeks of one chip are CONJOINED — bridged across the flex gap by
+ * Consecutive weeks of one chip are CONJOINED - bridged across the flex gap by
  * an overlay (see .season-rail__cell--bridge::after), never by a negative
  * margin. A negative margin consumes layout width and drifts every later cell
  * leftward: 32px of accumulated error by GW38 when the prototype tried it.
@@ -1397,7 +1397,7 @@ function renderKey() {
     ]),
     group('Players', [
       ['season-key__swatch--player',   "In the week's top five"],
-      ['season-key__swatch--standout', 'Standout — captaincy shout'],
+      ['season-key__swatch--standout', 'Standout - captaincy shout'],
       ['season-key__swatch--favoured', 'Favoured side of a matchup'],
     ]),
     group('Chip windows', [
@@ -1406,7 +1406,7 @@ function renderKey() {
       ['season-key__swatch--freehit',       'Free Hit'],
     ]),
     group('Week strength', [
-      ['season-key__swatch--loaded', 'Loaded — several one-sided ties'],
+      ['season-key__swatch--loaded', 'Loaded - several one-sided ties'],
     ]),
   ].join('');
 }
@@ -1466,7 +1466,7 @@ Port the `bezier`, `EASE`, `scrollShiftFor`, `animateScroll`, `placeFloats`, `he
 **Five constraints that must survive the port.** Each produced a visible defect during prototyping and is easy to reintroduce:
 
 1. **Never set a transitioned value inside a `setTimeout` whose delay matches that property's own `transition-delay`.** They compound: the phase starts at 2×delay and is cut off when the node is removed. This broke both the expand (shooting) and the collapse (delayed, then sharp).
-2. **Measure the collapsed height before injecting the panel content.** Measuring after gives the detail's height at 54px wide — huge and wrapped — and the box snaps to it on frame 0.
+2. **Measure the collapsed height before injecting the panel content.** Measuring after gives the detail's height at 54px wide - huge and wrapped - and the box snaps to it on frame 0.
 3. **One float element per open action.** A shared element cannot collapse the old week and expand the new one at once; the loser aborts mid-animation and strands its column at 268px.
 4. **`collapse()` never aborts.** It owns its float from the moment it is called. An early return leaves the float in the DOM and the column widened under it.
 5. **`animateScroll`'s rAF loop runs even when `from === to`.** Its real job is re-gluing panels to their columns each frame, and a column moves during that window whether or not the track scrolls.
@@ -1484,13 +1484,13 @@ Port `.gw--float`, `.body`, `.fxrow*`, `.prow*`, `.side*` and the `is-open` / ch
 
 /* The accent chrome is its OWN class, not .is-open. .is-open carries layout
    (the summary's positioning) and `position` cannot transition, so it can only
-   be dropped at the start of phase 3 — while the chrome must be dropped at the
+   be dropped at the start of phase 3 - while the chrome must be dropped at the
    START of the collapse for its 2x-phase delay to schedule the fade. */
 .season-gw--float.season-gw--chrome { /* accent border, shadow, padding */ }
 ```
 
 The panel is pinned by its **bottom** edge so it grows upward over the matchup
-cards — using `document.documentElement.clientHeight - colRect.bottom`, NOT
+cards - using `document.documentElement.clientHeight - colRect.bottom`, NOT
 `innerHeight`. `innerHeight` includes the horizontal scrollbar's thickness while
 a fixed element's containing block excludes it, so `innerHeight` floats the
 panel above its column by the scrollbar's height on any page with horizontal
@@ -1510,7 +1510,7 @@ document.addEventListener('transitionend', rec, true);
 document.querySelector('.season-gw[data-gw="17"]').click();
 ```
 
-Expected after ~1.2s: `height@~0, height:end@~330, width@~330, width:end@~660, opacity@~660, opacity:end@~990`. The handoffs must share a timestamp — a gap of more than ~2ms means the phases are being chained in JS rather than by `transition-delay`.
+Expected after ~1.2s: `height@~0, height:end@~330, width@~330, width:end@~660, opacity@~660, opacity:end@~990`. The handoffs must share a timestamp - a gap of more than ~2ms means the phases are being chained in JS rather than by `transition-delay`.
 
 Also confirm nothing moves:
 
@@ -1535,18 +1535,18 @@ git commit -m "feat(season): expand a gameweek into a floating panel"
 
 **Interfaces:**
 - Consumes: `buildPlayerFormCache(ctx)` and `buildGameweekPlayers(gw, ctx, formCache)` (Task 5); `buildChipWindows(gwStats)` (Task 6).
-- Produces: `recomputeChipWindows(model) -> Array<ChipWindow>` (new export in `js/engine/season.js`); `runPlayerPass(ctx)` in the module — an async pass over gameweeks that fills `_model.gameweeks[i].players`, repaints the dots, and refreshes the chip rail when it finishes.
+- Produces: `recomputeChipWindows(model) -> Array<ChipWindow>` (new export in `js/engine/season.js`); `runPlayerPass(ctx)` in the module - an async pass over gameweeks that fills `_model.gameweeks[i].players`, repaints the dots, and refreshes the chip rail when it finishes.
 
 - [ ] **Step 1: Add the chip-window recompute to the engine**
 
 `buildSeasonModel` is called with `skipPlayers: true` so the ribbon can paint
 immediately, which means `bestPlayerPoints` is `0` for every gameweek when the
 chip windows are first computed. Triple Captain's `reduce` therefore never
-beats its seed and lands on the first gameweek of each half — a visibly wrong
+beats its seed and lands on the first gameweek of each half - a visibly wrong
 band. Once the player pass has run, the windows have to be computed again from
 real numbers.
 
-Add to `js/engine/season.js` (it stays in the engine — a module may not compute
+Add to `js/engine/season.js` (it stays in the engine - a module may not compute
 a number, `ARCHITECTURE.md` §3 hard rule 2):
 
 ```js
@@ -1554,7 +1554,7 @@ a number, `ARCHITECTURE.md` §3 hard rule 2):
  * Recompute the chip windows from a model whose players have since arrived.
  *
  * buildSeasonModel runs first with `skipPlayers` so the ribbon can paint from
- * fixtures alone, and at that point every gameweek's `bestPlayerPoints` is 0 —
+ * fixtures alone, and at that point every gameweek's `bestPlayerPoints` is 0 -
  * which silently pins Triple Captain to the first gameweek of each half,
  * because its `reduce` never finds a value greater than its seed. The module
  * calls this once its background pass has filled `players`.
@@ -1602,7 +1602,7 @@ async function runPlayerPass(ctx) {
   // The chip windows were first computed against players that had not arrived
   // yet, which pins Triple Captain to each half's opening gameweek. Now that
   // every week has its five, they can be computed for real and the rail
-  // repainted — renderRail() is written to be safe to call twice.
+  // repainted - renderRail() is written to be safe to call twice.
   _model.chipWindows = recomputeChipWindows(_model);
   renderRail();
 }
@@ -1722,4 +1722,4 @@ git commit -m "docs(season): document the Full Season engine and strip"
 
 **Spec coverage.** §5 layout → Tasks 8–10. §6.1 matchups → Task 2. §6.2 week strength → Task 2 (`isLoadedWeek`). §6.3 postponements → Tasks 3–4. §6.4 players → Tasks 5, 11. §6.5 chip windows → Task 6. §7 module and loading → Tasks 8, 11. §8 motion → Task 10. §9 visual language → Tasks 8–10. §10 config → Task 1. §11 risks → Task 11's performance gate.
 
-**Type consistency.** `Matchup` shape is fixed in Task 2 and reused unchanged in Tasks 4 and 7 — `postponed` rows differ only in carrying `value: null` and `favouredId: null`. `PlayerRow` is fixed in Task 5 and consumed in Task 11. `ChipWindow` is fixed in Task 6 and consumed in Task 9. `gwStats` is produced in Task 7 and consumed in Task 6 — Task 6 is written first, so its test defines the shape Task 7 must emit.
+**Type consistency.** `Matchup` shape is fixed in Task 2 and reused unchanged in Tasks 4 and 7 - `postponed` rows differ only in carrying `value: null` and `favouredId: null`. `PlayerRow` is fixed in Task 5 and consumed in Task 11. `ChipWindow` is fixed in Task 6 and consumed in Task 9. `gwStats` is produced in Task 7 and consumed in Task 6 - Task 6 is written first, so its test defines the shape Task 7 must emit.

@@ -5,7 +5,7 @@
  *
  * Renders a one-line summary of which gameweeks in the next six are doubles or
  * blanks. It exists because the per-team fixture strip only appears in the
- * Ranker and the Matchup Analyser — the Dashboard, Transfer Planner and
+ * Ranker and the Matchup Analyser - the Dashboard, Transfer Planner and
  * Fixtures tabs render no strip at all, so without this they say nothing about
  * the shape of the schedule.
  *
@@ -32,7 +32,7 @@ function render() {
   if (!_root) return;
 
   const season    = store.getSeason();
-  // The window starts at the round still to be played, not FPL's is_current —
+  // The window starts at the round still to be played, not FPL's is_current -
   // otherwise a bar whose whole job is to warn about what is COMING spends the
   // days between rounds warning about a gameweek already in the record books.
   const currentGw = store.getUpcomingGw();
@@ -43,7 +43,7 @@ function render() {
 
   const rows = summariseGwIrregularities(season, currentGw, WINDOW_GWS);
   if (rows.length === 0) {
-    // Nothing to say — render nothing at all rather than an empty bar.
+    // Nothing to say - render nothing at all rather than an empty bar.
     _root.innerHTML = '';
     _root.hidden = true;
     return;

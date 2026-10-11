@@ -2,7 +2,7 @@
  * js/modules/fullSeason.js
  * Layer: module. Owns the DOM for the Full Season strip on the Matchup page.
  * Side effects: DOM writes only. Reads from store; calls engine/season.js.
- * No analytical logic lives here — every number comes from engine/season.js
+ * No analytical logic lives here - every number comes from engine/season.js
  * (ARCHITECTURE.md §3 hard rule 2).
  *
  * Subscriptions: data:ready, route:changed
@@ -24,7 +24,7 @@ import {
   buildSeasonModel, buildPlayerFormCache, buildGameweekPlayers, recomputeChipWindows,
 } from '../engine/season.js';
 
-/* ─── Display vocabulary (presentation only — no thresholds live here) ───── */
+/* ─── Display vocabulary (presentation only - no thresholds live here) ───── */
 
 /** Rank drives the tile's rank-rule length (css: --lv) and "best band" pick. */
 const RANK = { excellent: 6, great: 5, good: 4, neutral: 3, tough: 2, brutal: 1, extreme: 1 };
@@ -41,7 +41,7 @@ const BAND_ABBR = {
 const LANES = ['wildcard', 'freehit', 'triplecaptain'];
 const CHIP_LABEL = { wildcard: 'Wildcard', freehit: 'Free Hit', triplecaptain: 'Triple Captain' };
 
-/* Motion — WAAPI can't read var(), so the eases live here; colours/shadows are
+/* Motion - WAAPI can't read var(), so the eases live here; colours/shadows are
    read from the css tokens at animation time (tok()). */
 const RM = matchMedia('(prefers-reduced-motion: reduce)');
 const SHEET_MQ = matchMedia('(max-width: 640px)');
@@ -78,7 +78,7 @@ const windowLabel = w =>
   `${CHIP_LABEL[w.chip] ?? w.chip} GW${w.from}${w.to !== w.from ? `–${w.to}` : ''}`;
 
 /** Matchups arrive value-descending with postponements filled from the
- *  bottom, so the first live row is the best — but don't rely on order. */
+ *  bottom, so the first live row is the best - but don't rely on order. */
 function bestBand(g) {
   let best = null;
   for (const m of g.matchups) {
@@ -134,7 +134,7 @@ function cellHTML(g) {
     const b = bestBand(g);
     inner += b
       ? `<span class="season-cell__band" data-band="${b}">${BAND_ABBR[b]}</span>`
-      : '<span class="season-cell__band">—</span>';
+      : '<span class="season-cell__band">-</span>';
     // Always SEASON_TOP_MATCHUPS tiles so every cell keeps one footprint; an
     // absent slot is drawn as "no data", never guessed.
     for (let k = 0; k < SEASON_TOP_MATCHUPS; k++) inner += tileHTML(g.matchups[k]);
@@ -148,7 +148,7 @@ function cellHTML(g) {
  * The same cell before the strip has anything final to say. The WHOLE strip
  * waits for all 38 weeks (CONVENTIONS.md §5.4 "withhold orderings, not just
  * numbers": the standout dots and chip windows rank across weeks), so loading
- * cells carry the GW number — the column's identity — and nothing else real.
+ * cells carry the GW number - the column's identity - and nothing else real.
  */
 function skeletonCellHTML(g) {
   const n = `<span class="season-cell__n">${g.gw}</span>`;
@@ -195,7 +195,7 @@ function halfHTML(gs, note) {
     + '</div>';
 }
 
-/** Static key — every mark on the strip is named here. */
+/** Static key - every mark on the strip is named here. */
 function keyHTML() {
   const item = (sw, text) => `<span class="season-key__item"><span class="season-key__sw">${sw}</span>${text}</span>`;
   const row = (label, items) =>
@@ -288,7 +288,7 @@ function ensurePop() {
   _pop.className = 'season-pop';
   _pop.setAttribute('role', 'dialog');
   _pop.setAttribute('aria-labelledby', 'season-pop-t');
-  // Fixed to body, not inside .module-view — onRouteChanged closes it so it
+  // Fixed to body, not inside .module-view - onRouteChanged closes it so it
   // can't float over another page.
   document.body.append(_scrim, _pop);
   _pop.addEventListener('click', e => { if (e.target.closest('.season-pop__x')) closePop(true); });
@@ -337,7 +337,7 @@ function playerRowHTML(p, i) {
     + `<b>${p.points.toFixed(1)}</b></div>`;
 }
 
-/** Backstop for a week whose player computation threw — see runPlayerPass. */
+/** Backstop for a week whose player computation threw - see runPlayerPass. */
 function skeletonPlayerRowsHTML() {
   return Array.from({ length: SEASON_TOP_PLAYERS }, () =>
     '<div class="season-pop__p" aria-hidden="true">'
@@ -353,7 +353,7 @@ function popHTML(g) {
   ].filter(Boolean).join(' · ');
   let h = `<div class="season-pop__t" id="season-pop-t">GW ${g.gw}<small>${tags}</small></div>`;
   if (g.played) {
-    return h + '<p class="season-pop__note">Played. The strip keeps played weeks as numbers only — results live on Fixtures.</p>';
+    return h + '<p class="season-pop__note">Played. The strip keeps played weeks as numbers only - results live on Fixtures.</p>';
   }
   if (!g.matchups.length) {
     return h + '<p class="season-pop__note">No fixtures scheduled for this week yet. Nothing is drawn rather than a guess.</p>';
@@ -537,7 +537,7 @@ function closePop(refocus) {
     // Contents fade (90ms), then the box shrinks back into the cell.
     for (const k of _pop.children) k.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 90, fill: 'forwards' });
     setTimeout(() => {
-      if (_openGw !== null) return;          // reopened meanwhile — leave it
+      if (_openGw !== null) return;          // reopened meanwhile - leave it
       const P = _pop.getBoundingClientRect();
       hidePop();
       if (document.contains(cell)) morph(cell, P, cell.getBoundingClientRect(), false);
@@ -546,7 +546,7 @@ function closePop(refocus) {
   if (refocus && cell) cell.focus({ preventScroll: true });
 }
 
-/** Instant close with no animation — used when the DOM underneath is about to
+/** Instant close with no animation - used when the DOM underneath is about to
  *  be replaced (render) or the page is navigated away from. */
 function forceClose() {
   _openGw = null;
@@ -570,7 +570,7 @@ function onBodyClick(e) {
   else openPop(cell);
 }
 
-/** Arrows ±1, PageUp/Down ±10, Home/End. Move focus only — never open. */
+/** Arrows ±1, PageUp/Down ±10, Home/End. Move focus only - never open. */
 function onBodyKeydown(e) {
   const cell = e.target.closest?.('button.season-cell');
   if (!cell) return;
@@ -629,7 +629,7 @@ async function runPlayerPass(ctx) {
     }
     if (my !== _passId) return;
     // First computed before players existed (pins Triple Captain to each
-    // half's opening week) — recompute for real before the one reveal.
+    // half's opening week) - recompute for real before the one reveal.
     _model.chipWindows = recomputeChipWindows(_model);
   } finally {
     // Reveal even if a week threw; a strip shimmering forever is worse than
@@ -673,10 +673,10 @@ function rebuild() {
   runPlayerPass(ctx);
 }
 
-let _pendingRender = false;   // data changed while off screen — render on activation
+let _pendingRender = false;   // data changed while off screen - render on activation
 
 function onDataReady() {
-  // Rebuilding scores all 38 gameweeks — expensive. Defer it when hidden
+  // Rebuilding scores all 38 gameweeks - expensive. Defer it when hidden
   // (CONVENTIONS §8).
   if (store.getActiveModule() !== 'matchup') {
     _pendingRender = true;

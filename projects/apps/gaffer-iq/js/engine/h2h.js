@@ -1,12 +1,12 @@
 /**
  * js/engine/h2h.js
  * Layer: engine (pure). No DOM, no network, no store mutation.
- * Builds the full head-to-head record between two clubs — every meeting the
+ * Builds the full head-to-head record between two clubs - every meeting the
  * app can see, plus the tallies derived from them.
  *
  * WHY THIS IS SEPARATE FROM engine/fixtures.js: calcFixtureHistory there
- * answers one narrow question for the composite — "what share of the available
- * league points has A taken off B lately" — and reduces each meeting to three
+ * answers one narrow question for the composite - "what share of the available
+ * league points has A taken off B lately" - and reduces each meeting to three
  * numbers on the way. The Head-to-head view needs the meetings THEMSELVES:
  * date, season, venue, both scorelines, and (where known) the fixture the rest
  * of the tab navigates by. Same source data, a strictly richer output, so
@@ -38,8 +38,8 @@ import { canonicalClubKey } from './normalise.js';
  * @property {number} goalsAgainstA
  * @property {'W'|'D'|'L'} outcomeA
  * @property {'fpl'|'understat'} source
- * @property {number|null} fixtureId   FPL fixture id — 'fpl' meetings only
- * @property {number|null} gw          gameweek — 'fpl' meetings only
+ * @property {number|null} fixtureId   FPL fixture id - 'fpl' meetings only
+ * @property {number|null} gw          gameweek - 'fpl' meetings only
  */
 
 // ─── Dates ───────────────────────────────────────────────────────────────────
@@ -107,7 +107,7 @@ function makeMeeting(base) {
  * Identity of a meeting, for de-duplication.
  *
  * Each pairing occurs once per venue per league season, so club + club + which
- * way round + season is unique WITHOUT the exact date — deliberately, because
+ * way round + season is unique WITHOUT the exact date - deliberately, because
  * a rescheduled fixture can carry a different date in each feed and must still
  * collapse to one row. The date is only the fallback key for a record whose
  * date won't parse into a season.
@@ -120,10 +120,10 @@ function meetingKey(m) {
 
 /**
  * Cross-season meetings drawn from Understat's datesData (full-league fixture
- * lists — every match, not just one team's), across ctx.leagueXg,
+ * lists - every match, not just one team's), across ctx.leagueXg,
  * ctx.leagueXgPrev and every payload in ctx.leagueXgHistory. How far back that
  * reaches is UNDERSTAT_HISTORY_SEASONS (config.js), currently five seasons in
- * total — clubs meet twice a season, so a shallower window leaves a pairing
+ * total - clubs meet twice a season, so a shallower window leaves a pairing
  * with too few meetings to read anything from.
  *
  * MODEL: matched by team NAME via canonicalClubKey, never by Understat's own
@@ -235,7 +235,7 @@ export function collectFplMeetings(teamAId, teamBId, ctx) {
  * history merged with this season's FPL fixtures.
  *
  * Both feeds cover the CURRENT season, so the merge de-duplicates (see
- * meetingKey) and resolves a collision in FPL's favour — that record carries
+ * meetingKey) and resolves a collision in FPL's favour - that record carries
  * the fixture id and gameweek, and is the feed the rest of the tab navigates
  * by. Older seasons exist only in Understat and merge in untouched.
  *
@@ -256,7 +256,7 @@ export function buildH2hMeetings(teamAId, teamBId, ctx) {
 }
 
 /**
- * The most recent `limit` meetings — the window the Head-to-head view works in.
+ * The most recent `limit` meetings - the window the Head-to-head view works in.
  *
  * Applied ONCE, before summarising, so the tallies, the venue split, the run of
  * form and the table all describe the same set. Summarising the full list and
@@ -282,12 +282,12 @@ function emptyVenue() {
 /**
  * Fold the meeting list down to the numbers the view reports.
  *
- * Everything is read FROM TEAM A'S PERSPECTIVE — `aWins`, `trend`, `streak`
+ * Everything is read FROM TEAM A'S PERSPECTIVE - `aWins`, `trend`, `streak`
  * and the venue split all answer "how has A fared", with B's totals given
  * alongside. Swapping the two teams mirrors the whole summary, which is
  * exactly what the pane's swap button does.
  *
- * Summarises exactly what it is handed and applies no window of its own — pass
+ * Summarises exactly what it is handed and applies no window of its own - pass
  * it through takeRecentMeetings first if you want one.
  *
  * @param {Meeting[]} meetings  oldest → newest
@@ -303,7 +303,7 @@ export function summariseH2h(meetings) {
     seasons: 0,
     first: null, last: null,
     trend: [],            // A's outcomes for these meetings, oldest → newest
-    streak: null,         // {outcome, count} — A's current unbroken run
+    streak: null,         // {outcome, count} - A's current unbroken run
     biggestA: null,       // A's widest win; null if A has never won
     biggestB: null,       // B's widest win
     venue: { aHome: emptyVenue(), aAway: emptyVenue() },
@@ -353,7 +353,7 @@ export function summariseH2h(meetings) {
   summary.trend    = meetings.map(m => m.outcomeA);
 
   // The current run, counted backwards from the most recent meeting. Always at
-  // least 1 — the latest result is itself a run of one.
+  // least 1 - the latest result is itself a run of one.
   const latest = summary.last.outcomeA;
   let count = 0;
   for (let i = meetings.length - 1; i >= 0 && meetings[i].outcomeA === latest; i--) count++;

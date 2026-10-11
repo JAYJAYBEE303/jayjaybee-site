@@ -3,7 +3,7 @@
  * Layer: engine (pure). No DOM, no network, no store mutation.
  * Scores Wildcard / Free Hit / Bench Boost / Triple Captain timing across the
  * coming gameweek window. All four exports are pure: same inputs → same outputs.
- * See ROADMAP.md Phase 4-3 and FEATURE_ENGINE.md §9 (horizon aggregation —
+ * See ROADMAP.md Phase 4-3 and FEATURE_ENGINE.md §9 (horizon aggregation -
  * blank/double GW handling is the analytical backbone here).
  *
  * Output direction (all scoring functions): higher score = better chip timing.
@@ -26,8 +26,8 @@ import { calcCounterMatchup } from './counter.js';
 // ─── Internal helpers ────────────────────────────────────────────────────────
 
 /**
- * Memoised scoreFixture. Result depends only on (team, fixture, ctx) — none of
- * which vary across chip-window candidate offsets — so a per-call Map cache
+ * Memoised scoreFixture. Result depends only on (team, fixture, ctx) - none of
+ * which vary across chip-window candidate offsets - so a per-call Map cache
  * collapses ~O(GWs × teams × fixtures) scoreFixture invocations into one per
  * unique (team, fixture) pair. Pure: cache is local to one chip computation.
  */
@@ -75,7 +75,7 @@ function aggregateWindow(team, startGw, windowGws, ctx, cached) {
     const fixtures = teamFixturesInGw(team, gw, ctx);
 
     if (fixtures.length === 0) {
-      // MODEL: blank GW contributes BLANK_GW_VALUE — see FEATURE_ENGINE.md §9.
+      // MODEL: blank GW contributes BLANK_GW_VALUE - see FEATURE_ENGINE.md §9.
       wSum   += BLANK_GW_VALUE * w;
       wTotal += w;
       if (BLANK_GW_VALUE < minVal) minVal = BLANK_GW_VALUE;
@@ -111,7 +111,7 @@ function findPlayer(playerId, ctx) {
 
 /**
  * Score every candidate Wildcard activation GW in [currentGw, currentGw + CHIP_PLAN_HORIZON).
- * MODEL: a good WC activation is the GW BEFORE a long run of good fixtures —
+ * MODEL: a good WC activation is the GW BEFORE a long run of good fixtures -
  * so for each candidate activation `x`, we score the WC_WINDOW-GW run starting
  * at `x + 1`, then take the mean horizon score of the WC_TOP_TEAMS strongest
  * teams (you wildcard *into* the teams whose fixtures look great).
@@ -164,8 +164,8 @@ export function scoreWildcardTiming(horizon, ctx) {
 
 /**
  * Pick the single best Free Hit GW.
- * MODEL: FH is best when either (a) lots of teams blank — so a one-week rental
- * of a non-blanking XI is huge — or (b) a single GW has exceptionally strong
+ * MODEL: FH is best when either (a) lots of teams blank - so a one-week rental
+ * of a non-blanking XI is huge - or (b) a single GW has exceptionally strong
  * fixtures across a handful of sides. The composite score blends both signals
  * via FH_BLANK_WEIGHT.
  *
@@ -216,7 +216,7 @@ export function scoreFreeHitTiming(horizon, ctx) {
 
   let reasoning;
   if (best.blankCount >= FH_BLANK_THRESHOLD) {
-    reasoning = `${best.blankCount} teams blank in GW${best.gw} — Free Hit fields an XI from outside the blank pool`;
+    reasoning = `${best.blankCount} teams blank in GW${best.gw} - Free Hit fields an XI from outside the blank pool`;
   } else {
     const names = best.top.slice(0, 3)
       .map(t => t.shortName + (t.isDgw ? ' (DGW)' : ''))
@@ -241,7 +241,7 @@ export function scoreFreeHitTiming(horizon, ctx) {
  * Pick the single best Bench Boost GW.
  * MODEL: BB pays out when as many bench players as possible have DGWs in the
  * activation GW. Bench must be supplied via `ctx.benchPlayerIds` (the planner
- * derives this from the current squad — engine stays pure and squad-agnostic).
+ * derives this from the current squad - engine stays pure and squad-agnostic).
  * Tiebreaker on DGW count: the GW where bench fixtures project highest.
  *
  * @returns {null | { gw, dgwCount, totalProjected, reasoning, candidates }}
@@ -285,9 +285,9 @@ export function scoreBenchBoostTiming(horizon, ctx) {
   if (best.dgwCount >= BB_MIN_DOUBLES) {
     reasoning = `${best.dgwCount} of your ${benchPlayers.length} bench players have double GWs in GW${best.gw}`;
   } else if (best.dgwCount === 1) {
-    reasoning = `Only 1 bench DGW available (GW${best.gw}) — Bench Boost is better held for a bigger DGW`;
+    reasoning = `Only 1 bench DGW available (GW${best.gw}) - Bench Boost is better held for a bigger DGW`;
   } else {
-    reasoning = `No bench DGWs in the next ${CHIP_PLAN_HORIZON} GWs — hold Bench Boost`;
+    reasoning = `No bench DGWs in the next ${CHIP_PLAN_HORIZON} GWs - hold Bench Boost`;
   }
 
   return {
@@ -309,13 +309,13 @@ export function scoreBenchBoostTiming(horizon, ctx) {
  *
  * Cheap shortcut: calcPlayerForm doesn't vary by GW (already a rolling window),
  * so we evaluate it once and only re-score the fixture component per candidate
- * GW — keeps this function fast enough to run inline on every squad change.
+ * GW - keeps this function fast enough to run inline on every squad change.
  *
  * @param {Player} player
  * @param {{label: string, gws: number}} horizon  passed for API symmetry; unused.
  * @param {object} ctx
  * @returns {null | { gw, score, dgw, reasoning }}
- *   score: 0–200ish — a DGW sums two fixtures so it can exceed 100 on purpose
+ *   score: 0–200ish - a DGW sums two fixtures so it can exceed 100 on purpose
  *   (that's the whole point of TC into a DGW).
  */
 export function scoreTripleCaptainTiming(player, horizon, ctx) {
@@ -328,7 +328,7 @@ export function scoreTripleCaptainTiming(player, horizon, ctx) {
   const cached    = makeFxCache();
   const startGw   = ctx.currentGw;
   const playerForm = calcPlayerForm(player, ctx);
-  // Must mirror scorePlayer's blend exactly — this function inlines the same
+  // Must mirror scorePlayer's blend exactly - this function inlines the same
   // four-term projection for a SINGLE fixture rather than a horizon, so any
   // change to the PROJ_* set has to land here too or chip advice silently
   // diverges from the Ranker/Dashboard/Planner. See FEATURE_ENGINE.md §10.
@@ -377,7 +377,7 @@ export function scoreTripleCaptainTiming(player, horizon, ctx) {
   if (!best) return null;
 
   const reasoning = best.dgw
-    ? `${player.name} has a double GW in GW${best.gw} — combined projected score ${Math.round(best.score)}`
+    ? `${player.name} has a double GW in GW${best.gw} - combined projected score ${Math.round(best.score)}`
     : `${player.name}'s strongest single fixture is GW${best.gw} (projected ${Math.round(best.score)})`;
 
   return { gw: best.gw, score: best.score, dgw: best.dgw, reasoning };

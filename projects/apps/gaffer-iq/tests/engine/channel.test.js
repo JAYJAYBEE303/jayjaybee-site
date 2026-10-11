@@ -93,7 +93,7 @@ test('buildChannelProfile reports hasChannelAxes true above the shot floor', () 
   assert.equal(buildChannelProfile(statistics).hasChannelAxes, true);
 });
 
-test('buildChannelProfile no longer nulls a thin profile — it scales it', () => {
+test('buildChannelProfile no longer nulls a thin profile - it scales it', () => {
   // SUPERSEDED 2026-08-21: this used to assert that under 120 shots every axis
   // came back null. That gate is gone; thin data now scores at low maturity so
   // the signal is usable from GW1 instead of ~GW10.
@@ -135,7 +135,7 @@ test('buildChannelProfilesByTeamId omits teams with no cached payload', () => {
 
 test('buildChannelProfilesByTeamId omits teams with no usable axes at all', () => {
   // SUPERSEDED 2026-08-21: thin profiles are no longer omitted (see the
-  // maturity ramp). Only a STRUCTURALLY unusable block drops out — here the
+  // maturity ramp). Only a STRUCTURALLY unusable block drops out - here the
   // shotZone and attackSpeed partitions are missing entirely.
   const out = buildChannelProfilesByTeamId(
     { Leeds: { statistics: { situation: statistics.situation } } }, { 3: 'Leeds' });
@@ -196,7 +196,7 @@ test('calcChannelCounter clamps into 0-100 on an extreme mismatch', () => {
 test('calcChannelCounter no longer returns null when a profile is missing', () => {
   // SUPERSEDED 2026-08-21: it returned null so calcCounterMatchup could fall
   // through to the role tier. That tier is retired, so there is nothing to fall
-  // through to — it returns a blank shell instead (asserted in detail below).
+  // through to - it returns a blank shell instead (asserted in detail below).
   for (const ctx of [{ channelProfilesByTeamId: { 1: profileA } }, { channelProfilesByTeamId: {} }, {}]) {
     const out = calcChannelCounter(teamA, teamB, ctx);
     assert.notEqual(out, null);
@@ -283,7 +283,7 @@ test('buildChannelProfile reports maturity 0 for a missing statistics block', ()
 });
 
 test('buildChannelProfile has no axes when a share has no denominator', () => {
-  // Real block shape, but every xG is zero — no shares can be formed.
+  // Real block shape, but every xG is zero - no shares can be formed.
   const empty = { situation: { OpenPlay: { shots: 0, xG: 0, against: { xG: 0 } } },
                   shotZone: { shotOboxTotal: { xG: 0, against: { xG: 0 } } },
                   attackSpeed: { Fast: { xG: 0, against: { xG: 0 } } } };
@@ -305,7 +305,7 @@ test('buildChannelProfilesByTeamId keeps thin profiles now that they score', () 
 
 // ─── Blank shell instead of null (2026-08-21) ────────────────────────────────
 // The role/element fallback is retired, so calcChannelCounter can no longer
-// return null to hand off — it returns a channel-SHAPED result with null
+// return null to hand off - it returns a channel-SHAPED result with null
 // values, which the UI renders as em-dashes until Understat publishes.
 
 test('calcChannelCounter returns a blank channel shell when a profile is missing', () => {

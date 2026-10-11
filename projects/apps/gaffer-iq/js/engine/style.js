@@ -5,14 +5,14 @@
  * See FEATURE_ENGINE.md §6.
  *
  * Phase 3A: when ctx.xgProfilesByTeamId is populated (Understat league xG is
- * loaded) the three axes — attackDirectness, defensiveHeight, tempo — come from
+ * loaded) the three axes - attackDirectness, defensiveHeight, tempo - come from
  * real per-game xG / xGA min-max normalised across all 20 PL teams. Without
  * Understat data the function falls back to the Phase 1 FPL-derivable proxies
  * (goals-for, clean-sheet rate, total goals per game), flagged estimated.
  *
  * Phase 3B: the clash itself no longer runs on those three axes. They measure
  * how GOOD a team is, and team quality is already priced into the composite
- * twice over (baseDifficulty 0.30, teamForm 0.16) — deriving a "style" verdict
+ * twice over (baseDifficulty 0.30, teamForm 0.16) - deriving a "style" verdict
  * from them mostly re-stated who the better side was. The clash now runs on
  * five quality-neutral axes built from Understat PPDA and deep completions
  * (pressIntensity, buildUpControl, territorialThreat, defensiveCompactness,
@@ -48,7 +48,7 @@ const NO_STYLE_AXES = Object.freeze({
  * league/EPL payload. Pure helper consumed by buildScoreContext so the
  * min-max normalisation runs once per ctx, not once per fixture.
  *
- * MODEL: using Understat xG — real underlying-numbers feed every axis. xGA is
+ * MODEL: using Understat xG - real underlying-numbers feed every axis. xGA is
  * inverted (higher xGA = leakier defence) so the defensiveHeight axis keeps
  * the "higher = better" convention universal across the engine (§1).
  *
@@ -61,7 +61,7 @@ export function buildXgProfilesByTeamId(leagueXg, teamsById) {
 
   const understatTeams = Object.values(leagueXg.teamsData);
   // Matched by NAME (canonicalClubKey, shared with buildPlTenure), never by
-  // FPL's numeric team.id — ids are reassigned every season as clubs are
+  // FPL's numeric team.id - ids are reassigned every season as clubs are
   // promoted/relegated (engine/normalise.js buildPlTenure's doc block), which
   // is exactly what silently broke the previous id-keyed UNDERSTAT_TEAM_SLUGS
   // table season over season. Index Understat's teams by canonical key once;
@@ -88,12 +88,12 @@ export function buildXgProfilesByTeamId(leagueXg, teamsById) {
     let xgaSum = 0;
     // Phase 3B style inputs. Accumulated separately from the xG-quality sums
     // above because they can be absent (older Understat seasons omit ppda /
-    // deep) without invalidating the xG axes — see hasStyleInputs below.
+    // deep) without invalidating the xG axes - see hasStyleInputs below.
     let npxgSum = 0;
     let deepSum = 0;
     let deepAllowedSum = 0;
     // PPDA is a RATIO of two counts. Aggregate the numerators and denominators
-    // separately and divide once at the end — a mean of per-match ratios would
+    // separately and divide once at the end - a mean of per-match ratios would
     // let a single low-possession match dominate the season figure.
     let ppdaAtt = 0, ppdaDef = 0;
     let ppdaAllowedAtt = 0, ppdaAllowedDef = 0;
@@ -133,7 +133,7 @@ export function buildXgProfilesByTeamId(leagueXg, teamsById) {
       xgaPerGame:   xgaSum / games,
       tempoPerGame: (xgSum + xgaSum) / games,
       hasStyleInputs,
-      // null (not 0) when unavailable — 0 is a legitimate reading for deep
+      // null (not 0) when unavailable - 0 is a legitimate reading for deep
       // completions and must not be confused with "no data". The min-max pass
       // below skips null teams entirely rather than dragging a floor down.
       ppda:                hasStyleInputs ? ppdaAtt / ppdaDef                : null,
@@ -153,7 +153,7 @@ export function buildXgProfilesByTeamId(leagueXg, teamsById) {
   const raws = Object.values(rawByTeamId);
   if (raws.length === 0) return null;
 
-  // Min-max across the 20 PL teams (or however many we matched) — FEATURE_ENGINE.md §1.
+  // Min-max across the 20 PL teams (or however many we matched) - FEATURE_ENGINE.md §1.
   let xgMin = raws[0].xgPerGame,    xgMax = raws[0].xgPerGame;
   let xgaMin = raws[0].xgaPerGame,  xgaMax = raws[0].xgaPerGame;
   let tMin = raws[0].tempoPerGame,  tMax = raws[0].tempoPerGame;
@@ -169,7 +169,7 @@ export function buildXgProfilesByTeamId(leagueXg, teamsById) {
   // Style-axis ranges are taken over ONLY the teams that have style inputs, so
   // a partially-populated league doesn't skew the scale. When fewer than two
   // such teams exist there is no spread to normalise against and every style
-  // axis is suppressed — normaliseLinear would return a flat 50 anyway, but
+  // axis is suppressed - normaliseLinear would return a flat 50 anyway, but
   // suppressing explicitly keeps `hasStyleAxes` honest rather than emitting
   // fifty-fifty numbers that look like real readings.
   const styleRaws = raws.filter(r => r.hasStyleInputs);
@@ -188,11 +188,11 @@ export function buildXgProfilesByTeamId(leagueXg, teamsById) {
     const hasStyleAxes = Boolean(styleRanges) && r.hasStyleInputs;
 
     profilesByTeamId[teamId] = {
-      // MODEL: using Understat xG — directness ≈ sustained scoring threat per game.
+      // MODEL: using Understat xG - directness ≈ sustained scoring threat per game.
       attackDirectness: normaliseLinear(r.xgPerGame, xgMin, xgMax),
-      // MODEL: using Understat xG — invert xGA so higher = stronger defensive resistance.
+      // MODEL: using Understat xG - invert xGA so higher = stronger defensive resistance.
       defensiveHeight:  invert(normaliseLinear(r.xgaPerGame, xgaMin, xgaMax)),
-      // MODEL: using Understat xG — combined xG involvement proxies match tempo.
+      // MODEL: using Understat xG - combined xG involvement proxies match tempo.
       tempo:            normaliseLinear(r.tempoPerGame, tMin, tMax),
 
       // ─── Phase 3B style axes (STYLE_RULES consume only these) ───────────
@@ -200,35 +200,35 @@ export function buildXgProfilesByTeamId(leagueXg, teamsById) {
       // can never mistake a missing axis for a neutral one.
       hasStyleAxes,
 
-      // MODEL: using Understat PPDA — passes the opponent completes per
+      // MODEL: using Understat PPDA - passes the opponent completes per
       // defensive action we make. LOW ppda = we press hard, so invert to keep
       // the engine's universal higher-is-more convention (§1).
       pressIntensity: hasStyleAxes
         ? invert(normaliseLinear(r.ppda, styleRanges.ppda.min, styleRanges.ppda.max))
         : null,
 
-      // MODEL: using Understat PPDA-allowed — passes WE complete per defensive
+      // MODEL: using Understat PPDA-allowed - passes WE complete per defensive
       // action the opponent makes. HIGH = opponents cannot disrupt our
       // build-up, i.e. we are press-resistant. Already higher-is-more.
       buildUpControl: hasStyleAxes
         ? normaliseLinear(r.ppdaAllowed, styleRanges.ppdaAllowed.min, styleRanges.ppdaAllowed.max)
         : null,
 
-      // MODEL: using Understat deep completions — passes completed within ~20m
+      // MODEL: using Understat deep completions - passes completed within ~20m
       // of the opponent goal. HIGH = we manufacture sustained territory rather
       // than living off transitions.
       territorialThreat: hasStyleAxes
         ? normaliseLinear(r.deepPerGame, styleRanges.deep.min, styleRanges.deep.max)
         : null,
 
-      // MODEL: using Understat deep completions conceded — LOW = opponents
+      // MODEL: using Understat deep completions conceded - LOW = opponents
       // rarely get the ball into our danger zone at all, the signature of a
       // compact block. Inverted so higher = more compact.
       defensiveCompactness: hasStyleAxes
         ? invert(normaliseLinear(r.deepAllowedPerGame, styleRanges.deepAllowed.min, styleRanges.deepAllowed.max))
         : null,
 
-      // MODEL: using npxG per deep completion — how much genuine threat each
+      // MODEL: using npxG per deep completion - how much genuine threat each
       // final-third entry yields. HIGH = few entries, lots of danger, i.e. a
       // direct / transition side. LOW = needs sustained pressure to create.
       transitionDirectness: hasStyleAxes
@@ -240,7 +240,7 @@ export function buildXgProfilesByTeamId(leagueXg, teamsById) {
       xgaPerGame:       r.xgaPerGame,
       tempoPerGame:     r.tempoPerGame,
       // Raw style inputs surfaced for the matchup module's transparency
-      // requirement (ARCHITECTURE.md §8) — null when unavailable.
+      // requirement (ARCHITECTURE.md §8) - null when unavailable.
       ppda:               r.ppda,
       ppdaAllowed:        r.ppdaAllowed,
       deepPerGame:        r.deepPerGame,
@@ -256,7 +256,7 @@ export function buildXgProfilesByTeamId(leagueXg, teamsById) {
 /**
  * Read Understat's PPDA shape into {att, def}. Understat publishes it as an
  * object ({att, def}) on league/EPL, but the same field appears as a plain
- * pre-divided number on some season/endpoint variants — accept both rather
+ * pre-divided number on some season/endpoint variants - accept both rather
  * than silently zeroing an entire team's style profile on a shape change.
  *
  * @param {object|number|string} raw
@@ -297,18 +297,18 @@ function minMaxOf(rows, key) {
  * for the team in question.
  *
  * QUALITY axes (xG-derived, retained for display and for callers that predate
- * Phase 3B — STYLE_RULES no longer consume these):
- *   attackDirectness — sustained scoring threat per game.
- *   defensiveHeight  — resistance to conceding chances (xGA inverted).
- *   tempo            — total xG / goals per game in the team's matches.
+ * Phase 3B - STYLE_RULES no longer consume these):
+ *   attackDirectness - sustained scoring threat per game.
+ *   defensiveHeight  - resistance to conceding chances (xGA inverted).
+ *   tempo            - total xG / goals per game in the team's matches.
  *
- * STYLE axes (Phase 3B, PPDA/deep-completion derived — these are what a style
+ * STYLE axes (Phase 3B, PPDA/deep-completion derived - these are what a style
  * clash is actually computed from). Number when hasStyleAxes, else null:
- *   pressIntensity       — how high and hard the team presses (PPDA inverted).
- *   buildUpControl       — resistance to being pressed (PPDA-allowed).
- *   territorialThreat    — deep completions created per game.
- *   defensiveCompactness — deep completions conceded per game, inverted.
- *   transitionDirectness — npxG per deep completion: threat per entry.
+ *   pressIntensity       - how high and hard the team presses (PPDA inverted).
+ *   buildUpControl       - resistance to being pressed (PPDA-allowed).
+ *   territorialThreat    - deep completions created per game.
+ *   defensiveCompactness - deep completions conceded per game, inverted.
+ *   transitionDirectness - npxG per deep completion: threat per entry.
  *
  * The split matters. The quality axes measure how GOOD a team is, which the
  * composite already prices in via baseDifficulty and teamForm; the style axes
@@ -316,7 +316,7 @@ function minMaxOf(rows, key) {
  * the latter belongs in a clash calculation. See FEATURE_ENGINE.md §6.1.
  *
  * Data source: Understat when ctx.xgProfilesByTeamId is populated, otherwise
- * the Phase 1 FPL-derivable proxies — which carry no style axes at all
+ * the Phase 1 FPL-derivable proxies - which carry no style axes at all
  * (hasStyleAxes: false), because goals and clean sheets say nothing about
  * pressing or territory.
  *
@@ -331,7 +331,7 @@ function minMaxOf(rows, key) {
 export function calcStyleProfile(team, ctx) {
   const understatProfile = ctx.xgProfilesByTeamId?.[team.id];
   if (understatProfile) {
-    // MODEL: using Understat xG — real underlying-numbers feed the three axes.
+    // MODEL: using Understat xG - real underlying-numbers feed the three axes.
     // Estimated only when the team has too few matches to be reliable; the xG
     // numbers themselves are league-relative so the metric self-calibrates.
     return {
@@ -340,7 +340,7 @@ export function calcStyleProfile(team, ctx) {
     };
   }
 
-  // MODEL: using FPL proxy (no Understat data) — fall back to goals-for,
+  // MODEL: using FPL proxy (no Understat data) - fall back to goals-for,
   // clean-sheet rate, and total-goals-per-game proxies as in Phase 1. Flagged
   // estimated so confidence drops everywhere this profile feeds the composite.
   const fixtures = (ctx.playedFixtures || []).filter(
@@ -348,7 +348,7 @@ export function calcStyleProfile(team, ctx) {
   );
 
   if (fixtures.length === 0) {
-    // MODEL: using FPL proxy (no Understat data) — no games either → neutral 50, flagged.
+    // MODEL: using FPL proxy (no Understat data) - no games either → neutral 50, flagged.
     return {
       attackDirectness: 50,
       defensiveHeight:  50,
@@ -378,7 +378,7 @@ export function calcStyleProfile(team, ctx) {
   }
 
   if (counted === 0) {
-    // MODEL: using FPL proxy (no Understat data) — no completed matches yet.
+    // MODEL: using FPL proxy (no Understat data) - no completed matches yet.
     return {
       attackDirectness: 50,
       defensiveHeight:  50,
@@ -395,7 +395,7 @@ export function calcStyleProfile(team, ctx) {
   const totalGoalsPerGame = totalGoals   / counted;
 
   const a = STYLE_ANCHORS;
-  // MODEL: using FPL proxy (no Understat data) — anchors come from config STYLE_ANCHORS.
+  // MODEL: using FPL proxy (no Understat data) - anchors come from config STYLE_ANCHORS.
   return {
     attackDirectness: normaliseLinear(goalsPerGame,      a.attackDirectness.min, a.attackDirectness.max),
     defensiveHeight:  normaliseLinear(cleanSheetRate,    a.defensiveHeight.min,  a.defensiveHeight.max),
@@ -421,7 +421,7 @@ export function calcStyleProfile(team, ctx) {
 
 /**
  * Apply STYLE_RULES in one direction: how `profileA`'s way of playing fares
- * against `profileB`'s. Not exported — a one-directional delta is not a usable
+ * against `profileB`'s. Not exported - a one-directional delta is not a usable
  * score on its own (see calcStyleClash's mirroring step for why).
  *
  * MODEL: each rule is a SIGNED product of the two sides' deviations from the
@@ -429,7 +429,7 @@ export function calcStyleProfile(team, ctx) {
  * high press is worth something against a side that cannot play out and costs
  * something against a side that can, and both readings fall out of the same
  * term. The pre-Phase-3B version multiplied `Math.max(0, …)` of each deviation,
- * which discarded three of the four quadrants — including every case where one
+ * which discarded three of the four quadrants - including every case where one
  * team's strength is precisely the other team's weakness, which is the only
  * thing a style clash exists to find.
  *
@@ -462,13 +462,13 @@ function applyStyleRules(profileA, profileB) {
 }
 
 /**
- * Style-clash score from team A's point of view, RELATIVE to team B — the two
+ * Style-clash score from team A's point of view, RELATIVE to team B - the two
  * sides of one fixture always total exactly 100.
  *
  * MODEL (mirroring): running the rules once, from A's side, gives an absolute
  * read that cannot be compared across a fixture. A's rules ask "does A's press
  * trouble B's build-up?"; B's rules ask a different question about different
- * axes, so the two independent reads do not complement each other — two
+ * axes, so the two independent reads do not complement each other - two
  * awkward-to-play-against sides both score well and the fixture looks good for
  * everyone. The fix is the engine's standing idiom, "derive, don't
  * independently compute" (§7.2 mirrored pairings, §8.7 relative composite):
@@ -481,15 +481,15 @@ function applyStyleRules(profileA, profileB) {
  * Halving the gap is what puts the pair on a shared 100. calcStyleClash(B, A)
  * computes the identical pair in swapped order, so its value is always
  * 50 − (deltaOwn − deltaOpp) / 2, and `clamp(0,100,v) + clamp(0,100,100−v) ≡ 100`
- * for every real v — the totals hold exactly, including at the rails. Worked
- * example: raw reads of 50 and 80 become 35 and 65 — the 30-point gap between
+ * for every real v - the totals hold exactly, including at the rails. Worked
+ * example: raw reads of 50 and 80 become 35 and 65 - the 30-point gap between
  * the sides survives intact, it is only re-centred on 50.
  *
  * MODEL (neutral fallback): the score is forced to a flagged 50 unless BOTH
  * sides have real PPDA/deep-completion axes and enough matches behind them.
  * The FPL-proxy profile has no style axes at all, so on an Understat outage
  * every fixture returns a neutral 50 rather than a style verdict inferred from
- * goals — absence of information is not evidence (FEATURE_ENGINE.md §1 rule 3).
+ * goals - absence of information is not evidence (FEATURE_ENGINE.md §1 rule 3).
  * A flagged 50 also costs nothing in the composite: §8.6 skips estimated
  * metrics entirely and §8.3 drops confidence to match.
  *

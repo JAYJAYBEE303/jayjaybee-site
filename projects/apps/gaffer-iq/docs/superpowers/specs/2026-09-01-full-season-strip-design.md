@@ -1,4 +1,4 @@
-# Full Season — a GW1–38 planning strip on the Matchup page
+# Full Season - a GW1–38 planning strip on the Matchup page
 
 **Date:** 2026-09-01
 **Status:** design approved, implementation plan pending
@@ -16,8 +16,8 @@ transfers. `engine/chips.js` searches `CHIP_PLAN_HORIZON` (6) gameweeks ahead of
 
 Nothing answers the question a manager actually asks in August: **which weeks of
 this season are worth waiting for?** Which gameweeks are loaded with one-sided
-fixtures, where do the schedule irregularities cluster, and when — in each half
-of the season — is a chip best spent. That read requires seeing GW1 and GW38 at
+fixtures, where do the schedule irregularities cluster, and when - in each half
+of the season - is a chip best spent. That read requires seeing GW1 and GW38 at
 the same time, which no current view can do.
 
 ## 2. Goals
@@ -25,7 +25,7 @@ the same time, which no current view can do.
 - One graphic covering **GW1–38**, readable at a glance, that shows where the
   season's good weeks are.
 - Per gameweek: the **top 3 matchups** and the **top 5 players**, on demand.
-- Make schedule irregularities — doubles, postponements — impossible to miss.
+- Make schedule irregularities - doubles, postponements - impossible to miss.
 - Name a **chip window per half-season**, respecting the GW19 chip reset.
 - Encode strength **graphically** (colour, glow, geometry), not as labels.
 
@@ -41,7 +41,7 @@ the same time, which no current view can do.
 
 | Question | Decision |
 |---|---|
-| Placement | Foot of the **Matchup** page, full page width — not a Fixtures sub-view |
+| Placement | Foot of the **Matchup** page, full page width - not a Fixtures sub-view |
 | Shape | Horizontal ribbon of 38 columns in a scroller, one per gameweek |
 | Expansion | Click a week; a panel expands **upward** over the page |
 | Player pool | **Whole league**, ranked for that specific gameweek, skeleton-loaded |
@@ -63,7 +63,7 @@ Matchup page
     └── key      colour legend
 ```
 
-Column widths are fixed — **54px** collapsed, **268px** expanded, **22px** for a
+Column widths are fixed - **54px** collapsed, **268px** expanded, **22px** for a
 played stub, with a 4px gap. `GROW` (§8) is the difference the expansion covers,
 214px. Fixed widths rather than flexing to the page: 38 weeks squeezed into one
 viewport width made every tile unreadable, and the scroller was never the
@@ -77,7 +77,7 @@ chip-reset marker the Matchup team navigator uses.
 **An expanded column** floats as a `position: fixed` panel, pinned by its bottom
 edge to its column and growing upward over the matchup cards. Fixed positioning
 is load-bearing: the ribbon lives in an `overflow-x: auto` scroller, and per spec
-a non-visible overflow on one axis forces the other to `auto` — an in-flow panel
+a non-visible overflow on one axis forces the other to `auto` - an in-flow panel
 would be clipped or spawn a second scrollbar rather than floating over the page.
 
 ## 6. Engine (`engine/season.js`, pure)
@@ -97,7 +97,7 @@ A week is **loaded** when at least `SEASON_LOADED_MIN_GREAT` (2) of its top thre
 matchups land in the `great` band. Threshold lives in `config.js`; the UI renders
 it as the column's glow.
 
-### 6.3 Postponement attribution — an inference, and labelled as one
+### 6.3 Postponement attribution - an inference, and labelled as one
 
 FPL sets `event: null` on a postponed fixture and does **not** retain the
 gameweek it was scheduled for. `season.pendingFixtures` holds these with
@@ -109,7 +109,7 @@ The gameweek is therefore derived from the hole the postponement left:
 1. For each gameweek, collect the clubs with no fixture.
 2. A pending fixture whose **both** clubs are blank in that gameweek is a
    candidate for it.
-3. Attribute it to the **earliest** matching gameweek — a rearranged date is
+3. Attribute it to the **earliest** matching gameweek - a rearranged date is
    always later than the hole it left.
 4. Competing pending fixtures resolve in fixture order.
 
@@ -134,7 +134,7 @@ that week's projected points.
 
 ### 6.5 Chip windows
 
-Each half is searched **independently** — GW1–19 and GW20–38 — which is also why
+Each half is searched **independently** - GW1–19 and GW20–38 - which is also why
 a band can never straddle the reset.
 
 | Chip | Window | Chosen by |
@@ -183,14 +183,14 @@ must preserve:
   off when the node is removed. This produced both the "shooting" expand and the
   "delayed then sharp" collapse.
 - **Measure the collapsed height before injecting content.** Measuring after
-  gives the detail's height at 54px wide — huge and wrapped — and the box snaps
+  gives the detail's height at 54px wide - huge and wrapped - and the box snaps
   to it on frame 0.
 - **The header is not one element.** The small number belongs to `.summary` and
   the "GW n" title to `.body`, so each fades with its own group. A single
   retitled element stays fully lit while everything around it fades.
 
 **Switching weeks** runs both animations in parallel, each with its own float
-element — a shared one cannot collapse the old week and expand the new one at
+element - a shared one cannot collapse the old week and expand the new one at
 once. The clicked column is the fixed reference: the scroll resolves to a single
 target of `scrollLeft + flowDelta + shift`, where `flowDelta` is `−GROW` if the
 collapsing week sits earlier in the ribbon and drags everything after it.
@@ -217,7 +217,7 @@ the CSS width transition beside it.
 
 Conjoined chip bands bridge the flex gap with an **overlay**, never a negative
 margin: a negative margin consumes layout width and drifts every later cell
-leftward — 32px of accumulated error by GW38 in the prototype.
+leftward - 32px of accumulated error by GW38 in the prototype.
 
 ## 10. Config additions
 

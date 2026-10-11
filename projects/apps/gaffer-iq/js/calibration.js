@@ -60,7 +60,7 @@ function saveSnapshot(gw) {
       awayPredValue:   awayScore?.value   ?? null,
       fplFdrHome:      fixture.fplDifficulty?.home ?? null,
       fplFdrAway:      fixture.fplDifficulty?.away ?? null,
-      // filled when the fixture is played — allows calibration comparison
+      // filled when the fixture is played - allows calibration comparison
       result:          fixture.played && fixture.result
         ? { homeGoals: fixture.result.homeGoals, awayGoals: fixture.result.awayGoals }
         : null,
@@ -98,7 +98,7 @@ export function getCalibrationHistory() {
       if (parsed && typeof parsed.gw === 'number') {
         snapshots.push(parsed);
       }
-    } catch { /* corrupt entry — skip */ }
+    } catch { /* corrupt entry - skip */ }
   }
   snapshots.sort((a, b) => a.gw - b.gw);
   return snapshots;
@@ -135,7 +135,7 @@ function outcomeDirection(goalsFor, goalsAgainst) {
 /**
  * Return whether a band prediction was correct given an actual outcome.
  * Everything above 'neutral' predicts a win, everything below predicts a loss,
- * 'neutral' predicts a draw — a conservative but interpretable mapping.
+ * 'neutral' predicts a draw - a conservative but interpretable mapping.
  *
  * Covers all seven current tiers AND the five the old scale used, because the
  * snapshots this reads are persisted: history recorded before BANDS_V2 still
@@ -243,12 +243,12 @@ function renderCalibration() {
   for (const snap of snapshots) {
     const savedDate = snap.savedAt
       ? new Date(snap.savedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
-      : '—';
+      : '-';
 
     for (const f of snap.fixtures) {
-      let resultStr = '—';
-      let homeCallStr = '—';
-      let awayCallStr = '—';
+      let resultStr = '-';
+      let homeCallStr = '-';
+      let awayCallStr = '-';
       let homeCallClass = '';
       let awayCallClass = '';
 
@@ -260,8 +260,8 @@ function renderCalibration() {
         const homeCorrect = isBandCorrect(f.homePredBand, homeOutcome);
         const awayCorrect = isBandCorrect(f.awayPredBand, awayOutcome);
 
-        homeCallStr  = homeCorrect === true ? '✓' : homeCorrect === false ? '✗' : '—';
-        awayCallStr  = awayCorrect === true ? '✓' : awayCorrect === false ? '✗' : '—';
+        homeCallStr  = homeCorrect === true ? '✓' : homeCorrect === false ? '✗' : '-';
+        awayCallStr  = awayCorrect === true ? '✓' : awayCorrect === false ? '✗' : '-';
         homeCallClass = homeCorrect === true ? 'calib-call--correct' : homeCorrect === false ? 'calib-call--wrong' : '';
         awayCallClass = awayCorrect === true ? 'calib-call--correct' : awayCorrect === false ? 'calib-call--wrong' : '';
       }
@@ -273,9 +273,9 @@ function renderCalibration() {
       html += `<td>${snap.gw}</td>`;
       html += `<td>${savedDate}</td>`;
       html += `<td class="calib-fixture">${f.homeTeam} vs ${f.awayTeam}</td>`;
-      html += `<td>${f.homePredBand ? `<span class="${homeBandClass}">${f.homePredBand}</span>` : '—'}</td>`;
-      html += `<td>${f.awayPredBand ? `<span class="${awayBandClass}">${f.awayPredBand}</span>` : '—'}</td>`;
-      html += `<td>${f.fplFdrHome ?? '—'} / ${f.fplFdrAway ?? '—'}</td>`;
+      html += `<td>${f.homePredBand ? `<span class="${homeBandClass}">${f.homePredBand}</span>` : '-'}</td>`;
+      html += `<td>${f.awayPredBand ? `<span class="${awayBandClass}">${f.awayPredBand}</span>` : '-'}</td>`;
+      html += `<td>${f.fplFdrHome ?? '-'} / ${f.fplFdrAway ?? '-'}</td>`;
       html += `<td>${resultStr}</td>`;
       html += `<td class="${homeCallClass}">${homeCallStr}</td>`;
       html += `<td class="${awayCallClass}">${awayCallStr}</td>`;

@@ -1,5 +1,5 @@
 /* css/dashboard.css
-   GW DASHBOARD — ported from the design export's FINAL - Dashboard.dc.html
+   GW DASHBOARD - ported from the design export's FINAL - Dashboard.dc.html
    (Draft D, with src/dash-core.js). Behaviour in js/modules/dashboard.js; the
    shell markup in index.html.
 
@@ -25,9 +25,9 @@
   --pad: clamp(16px, 3vw, 40px);
   --ease: cubic-bezier(.2, .7, .2, 1);
   --shadow-pop: 0 16px 40px rgba(1, 4, 9, .6);
-  --db-neutral-ink: #a2abb5;   /* neutral band text — grey is too dark on its tint */
+  --db-neutral-ink: #a2abb5;   /* neutral band text - grey is too dark on its tint */
   --db-hatch: repeating-linear-gradient(-45deg, transparent 0 3px, color-mix(in srgb, var(--band-grey) 30%, transparent) 3px 5px);
-  --db-cmd-h: 56px;            /* measured by dashboard.js — the command bar wraps */
+  --db-cmd-h: 56px;            /* measured by dashboard.js - the command bar wraps */
   --band-tough: var(--band-orange);
   --band-tough-bg: var(--band-orange-bg);
 
@@ -58,13 +58,13 @@
 
   /* ─── Shared primitives ─────────────────────────────────────────────────── */
 
-  /* score chip — tint + 60% hue ring; only excellent is solid gold. */
+  /* score chip - tint + 60% hue ring; only excellent is solid gold. */
   .chip { display: inline-flex; align-items: center; justify-content: center; flex: none; height: 24px; min-width: 34px; padding: 0 6px; border-radius: 4px; background: var(--bb); color: var(--bt); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--b) 60%, transparent); font: 700 13px/1 var(--font-sans); font-variant-numeric: tabular-nums; white-space: nowrap; }
   .chip[data-band=excellent] { background: var(--band-gold); color: var(--color-bg); box-shadow: 0 0 0 1px var(--band-gold), 0 0 14px color-mix(in srgb, var(--band-gold) 40%, transparent); }
   .chip.is-est { box-shadow: none; border: 1px dashed var(--b); }
   .chip--sm { height: 20px; min-width: 28px; padding: 0 4px; font-size: 12px; }
   .chip--lg { height: 32px; min-width: 46px; padding: 0 8px; font-size: 16px; }
-  /* Still settling — the value is withheld, the footprint kept. */
+  /* Still settling - the value is withheld, the footprint kept. */
   .chip.is-pending { position: relative; overflow: hidden; background: var(--color-skeleton); color: transparent; box-shadow: none; border: 0; }
   .chip.is-pending::after, .sk::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, var(--color-skeleton-highlight), transparent); transform: translateX(-100%); animation: db-sk 1.3s linear infinite; }
   .sk { position: relative; overflow: hidden; display: block; height: 12px; width: var(--w, 70%); background: var(--color-skeleton); }
@@ -298,7 +298,7 @@
   .risk button > span:nth-child(2) { display: flex; align-items: center; gap: 6px; min-width: 0; }
   .risk button > span:last-child { max-width: 140px; color: var(--color-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-  /* ─── Entrances — reader-caused renders only ────────────────────────────── */
+  /* ─── Entrances - reader-caused renders only ────────────────────────────── */
 
   [data-anim] {
     .row, .tok, .bn, .sheet { animation: db-in 300ms var(--ease) both; animation-delay: var(--d, 0ms); }

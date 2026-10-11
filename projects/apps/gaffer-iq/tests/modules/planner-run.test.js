@@ -26,7 +26,7 @@ test('free transfers roll over, one new each week', () => {
   assert.equal(r.gain, 1);
 });
 
-test('a second move in one week is a hit — refused unless hits are on', () => {
+test('a second move in one week is a hit - refused unless hits are on', () => {
   const two = [mv('a', 4, 6, 8), mv('b', 1, 6 + 100, 8)];
   const off = evaluateRun(two, {}, base);
   assert.equal(off.valid, false);

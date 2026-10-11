@@ -4,19 +4,19 @@
  * Computes fixture-level metrics: base difficulty, home/away split performance,
  * and fixture history (head-to-head). See FEATURE_ENGINE.md §2–§4.
  * All outputs: 0–100. Higher = easier/better for the team being scored, EXCEPT
- * calcBaseDifficulty, which is stored higher = HARDER — see its own doc block
+ * calcBaseDifficulty, which is stored higher = HARDER - see its own doc block
  * and FEATURE_ENGINE.md §1 rule 2 / §2 for why.
  *
  * Phase 3B: calcHomeAwaySplit's venue split prefers a rolling cross-season
  * window built from Understat match history (buildRollingVenueStatsByTeamId)
- * over the current-season-only FPL-fixtures reading, when available — see
+ * over the current-season-only FPL-fixtures reading, when available - see
  * that function's doc and FEATURE_ENGINE.md §3.1.
  */
 
 import {
   FDR_DIFFICULTY_VALUES, FDR_MISSING_VALUE,
   // Still imported for calcTenurePenalty, which stays exported on main.js's
-  // debug surface but no longer feeds any score — see calcBaseDifficulty.
+  // debug surface but no longer feeds any score - see calcBaseDifficulty.
   TENURE_MAX_PENALTY, TENURE_CURVE,
   MIN_VENUE_GAMES, VENUE_ROLLING_GAMES, W_VENUE_EFFECT,
   N_H2H,
@@ -32,7 +32,7 @@ import { collectUnderstatMeetings } from './h2h.js';
  * recent Premier League history that opponent has.
  *
  * MODEL: FPL's strength_* priors systematically over-rate newly promoted sides,
- * because they are seeded rather than earned. Tenure is a pure punishment — it
+ * because they are seeded rather than earned. Tenure is a pure punishment - it
  * only ever lowers a reading, and only ever the reading of the side that lacks
  * history. An established club's own numbers are never touched.
  *
@@ -53,12 +53,12 @@ export function calcTenurePenalty(opponent) {
 /**
  * Base fixture difficulty facing `team`: FPL's own 1–5 fixture difficulty for
  * this fixture, mapped onto the engine's 0–100 scale via FDR_DIFFICULTY_VALUES
- * (1→10, 2→30, 3→50, 4→70, 5→90). Always available — never estimated.
+ * (1→10, 2→30, 3→50, 4→70, 5→90). Always available - never estimated.
  *
  * MODEL (revised): this is now a straight LOOKUP, not a derivation. It used to
- * compute a strength read of its own — a weighted blend of the opponent's
+ * compute a strength read of its own - a weighted blend of the opponent's
  * attack/defence ratings, normalised across a fixed 1000–1400 band, then
- * reduced by a promoted-team tenure penalty — and consulted FPL's FDR only when
+ * reduced by a promoted-team tenure penalty - and consulted FPL's FDR only when
  * those strength fields came back unpublished.
  *
  * Two reasons it changed:
@@ -66,8 +66,8 @@ export function calcTenurePenalty(opponent) {
  *   1. HONESTY. The row is labelled "Base FPL Difficulty" and sits on a card
  *      that also prints the raw FDR. A 2/5 fixture reading 29 rather than 30
  *      invited the reasonable question of what the number actually was, and the
- *      honest answer — "FPL's rating, plus a strength blend, minus a tenure
- *      curve, normalised against a hardcoded band" — is not what the label
+ *      honest answer - "FPL's rating, plus a strength blend, minus a tenure
+ *      curve, normalised against a hardcoded band" - is not what the label
  *      promised. A fixed map means every 2/5 fixture reads 30 on every card.
  *
  *   2. THE DERIVATION ADDED LESS THAN IT LOOKED. Its inputs were FPL's own
@@ -79,24 +79,24 @@ export function calcTenurePenalty(opponent) {
  *
  * COST, stated plainly: the output is now five discrete values, so every 3/5
  * fixture reads exactly 50 regardless of opponent, and the promoted-team tenure
- * penalty no longer applies here. The second matters less than it sounds —
+ * penalty no longer applies here. The second matters less than it sounds -
  * FPL's FDR already rates promoted sides as easy fixtures, which is what the
  * penalty existed to force. calcTenurePenalty is kept (exported, still on
  * main.js's debug surface) but is no longer wired into any score.
  *
- * @param {Team} team       team being scored — unused, kept so the signature
+ * @param {Team} team       team being scored - unused, kept so the signature
  *   still reads as "difficulty facing THIS team" and so restoring the strength
  *   path is a one-function change.
  * @param {Team} opponent   likewise unused; see above.
  * @param {boolean} isHome  likewise unused: venue is already baked in, because
  *   the caller picks fplDifficulty.home or .away per side.
- * @param {number} [fdrForTeam]  `team`'s own FPL FDR (1–5) for this fixture —
+ * @param {number} [fdrForTeam]  `team`'s own FPL FDR (1–5) for this fixture -
  *   fixture.fplDifficulty.home/away, picked by the caller per `isHome`. THE
  *   input now; absent only if FPL has published no rating for the fixture.
  * @returns {{value: number, estimated: boolean, fdr: number|null,
  *            fdrMissing: boolean}}
  *   value: 0–100.
- *   Direction: **higher = HARDER for `team`** — the one metric in the engine
+ *   Direction: **higher = HARDER for `team`** - the one metric in the engine
  *   stored inverted relative to FEATURE_ENGINE.md §1 rule 2, because the UI
  *   surfaces it directly as "how tough is this opponent". engine/composite.js
  *   applies invert() before weighting it. See FEATURE_ENGINE.md §2.
@@ -108,7 +108,7 @@ export function calcBaseDifficulty(team, opponent, isHome, fdrForTeam) {
   return {
     // A fixture FPL has not rated sits neutral rather than being flagged. This
     // metric is the ONE the confidence denominator (§8.3) relies on always
-    // being present — letting it go estimated would let confidence reach 0.
+    // being present - letting it go estimated would let confidence reach 0.
     value: fdrMissing ? FDR_MISSING_VALUE : mapped,
     estimated: false,
     fdr: fdrMissing ? null : fdrForTeam,
@@ -153,7 +153,7 @@ function buildVenueStats(playedFixtures) {
 }
 
 /**
- * Whether `stats` clears MIN_VENUE_GAMES at BOTH venues — venue sensitivity is
+ * Whether `stats` clears MIN_VENUE_GAMES at BOTH venues - venue sensitivity is
  * a comparison of home vs away form, so a thin sample on either side makes the
  * comparison meaningless, not just one half of it.
  * @param {object|undefined} stats
@@ -164,34 +164,34 @@ function hasUsableVenueSplit(stats) {
 }
 
 /**
- * Builds each team's rolling VENUE_ROLLING_GAMES-match (default 38 — one full
+ * Builds each team's rolling VENUE_ROLLING_GAMES-match (default 38 - one full
  * PL season) home/away split from real Understat match history, spanning the
- * current season and, once that runs out, last season's tail — so the window
+ * current season and, once that runs out, last season's tail - so the window
  * reads as roughly "a full season" all year round instead of resetting to
  * nothing every August. Pure helper consumed once by buildScoreContext, same
  * precompute-once idiom as buildXgProfilesByTeamId (engine/style.js).
  *
- * MODEL: matched by NAME (canonicalClubKey), never FPL's numeric team.id —
+ * MODEL: matched by NAME (canonicalClubKey), never FPL's numeric team.id -
  * same reasoning as buildXgProfilesByTeamId and buildPlTenure
  * (engine/normalise.js): ids are REASSIGNED every season as clubs are
  * promoted/relegated, so an id join silently drifts wrong the next close
  * season with no error to catch it. Small duplication of the "index Understat
- * teams by canonical key" step against buildXgProfilesByTeamId's own version —
+ * teams by canonical key" step against buildXgProfilesByTeamId's own version -
  * kept separate because this one merges TWO seasons' entries per team before
  * indexing, which that one never needs to.
  *
  * MODEL: a team's current- and prior-season Understat records arrive as two
  * separate objects (Understat keys a "team" by team+season, not by club
- * alone) — merged into one match list per club before the window is cut.
+ * alone) - merged into one match list per club before the window is cut.
  * `scored`/`missed` are already this team's own goals for/against per Understat
- * match (not home/away goals — h_a only marks venue), so points-per-match
+ * match (not home/away goals - h_a only marks venue), so points-per-match
  * follows directly: scored>missed→3, equal→1, else→0.
  *
  * @param {object|null} leagueXg      current season's Understat payload
  * @param {object|null} leagueXgPrev  last season's Understat payload
  * @param {object} teamsById          FPL team id → Team
  * @returns {Object<number,{homePPG:number,awayPPG:number,homeGames:number,awayGames:number}>}
- *   Keyed by FPL team id. A team absent here (no Understat match to its name —
+ *   Keyed by FPL team id. A team absent here (no Understat match to its name -
  *   a genuine newcomer, or an Understat outage) simply has no entry; the
  *   caller falls back to the current-season FPL-fixtures path for it.
  */
@@ -218,7 +218,7 @@ export function buildRollingVenueStatsByTeamId(leagueXg, leagueXgPrev, teamsById
     }
     if (!merged || merged.length === 0) continue;
 
-    // Understat dates are 'YYYY-MM-DD HH:mm:ss' — directly Date-parseable.
+    // Understat dates are 'YYYY-MM-DD HH:mm:ss' - directly Date-parseable.
     // Chronological ascending, then keep only the most recent window.
     const sorted = merged.slice().sort((a, b) => new Date(a.date) - new Date(b.date));
     const window = sorted.slice(-VENUE_ROLLING_GAMES);
@@ -245,8 +245,8 @@ export function buildRollingVenueStatsByTeamId(leagueXg, leagueXgPrev, teamsById
 /**
  * Resolves one team's venue stats: the Understat rolling window when it
  * clears MIN_VENUE_GAMES at both venues, else the current-season FPL-fixtures
- * fallback (same shape either way — {homePPG, awayPPG, homeGames, awayGames}
- * — so calcHomeAwaySplit never needs to know which source it got).
+ * fallback (same shape either way - {homePPG, awayPPG, homeGames, awayGames}
+ * - so calcHomeAwaySplit never needs to know which source it got).
  * @param {number} teamId
  * @param {object} rollingByTeamId  buildRollingVenueStatsByTeamId output
  * @param {object} fplByTeamId      buildVenueStats output
@@ -261,33 +261,33 @@ function resolveVenueStats(teamId, rollingByTeamId, fplByTeamId) {
  * Venue-sensitivity profile for `team`: how much its home form diverges from
  * its away form. Prefers a rolling VENUE_ROLLING_GAMES-match window sourced
  * from real Understat match history (spans last season's tail once this
- * season runs low — see buildRollingVenueStatsByTeamId), falling back to the
+ * season runs low - see buildRollingVenueStatsByTeamId), falling back to the
  * current-season-only FPL-fixtures path (buildVenueStats) for any team it
- * doesn't cover — a genuine newcomer to the top flight, or an Understat
- * outage. This is a standalone read of ONE team, not a fixture read of two —
+ * doesn't cover - a genuine newcomer to the top flight, or an Understat
+ * outage. This is a standalone read of ONE team, not a fixture read of two -
  * see calcVenueEffect below for the fixture-level combination.
  *
- * MODEL: rawSplit = homePPG − awayPPG, SIGNED — a team can be stronger away
+ * MODEL: rawSplit = homePPG − awayPPG, SIGNED - a team can be stronger away
  * (negative) as easily as at home. `value` (baseSensitivity) is the
  * league-relative normalisation of |rawSplit|: it answers "how much does
  * venue matter for this team", not "which way". Direction is preserved
  * separately as `sign` for transparency, but calcVenueEffect deliberately
- * ignores it (see that function's doc) — the fixture-level effect is
+ * ignores it (see that function's doc) - the fixture-level effect is
  * magnitude-only by design, so `sign` is diagnostic, not consumed downstream.
  *
  * MODEL: below MIN_VENUE_GAMES at EITHER venue (true of both sources tried) →
- * neutral 50, value only — NOT flagged estimated. Deliberately the one
+ * neutral 50, value only - NOT flagged estimated. Deliberately the one
  * exception to this engine's usual thin-sample guard (calcTeamForm,
  * calcFixtureHistory both DO flag estimated below their thresholds): home
  * advantage is treated as a standing structural fact about football, not a
- * per-team read that can be "missing" — a team with no usable split just
+ * per-team read that can be "missing" - a team with no usable split just
  * reads as no additional edge over the baseline (neutral 50) rather than
  * "unreliable, discard". composite.js's confidence renormalisation (§8.3)
  * would otherwise silently drop this metric out of the score entirely for
  * every promoted side, which is the behaviour being deliberately avoided.
  *
  * MODEL: the league-relative normalisation pool below mixes teams resolved
- * from either source — a genuine simplification. Both sources report the same
+ * from either source - a genuine simplification. Both sources report the same
  * unit (points-per-game delta), just over different sample depths (up to 38
  * cross-season Understat games vs whatever's been played of the current FPL
  * season), so a team on the thinner fallback reads slightly noisier against
@@ -295,7 +295,7 @@ function resolveVenueStats(teamId, rollingByTeamId, fplByTeamId) {
  *
  * @param {Team} team
  * @param {object} ctx  must contain { playedFixtures: Fixture[], teamsById: object,
- *   rollingVenueStatsByTeamId?: object } — the last is precomputed by
+ *   rollingVenueStatsByTeamId?: object } - the last is precomputed by
  *   buildScoreContext; absent/empty ctx.rollingVenueStatsByTeamId degrades
  *   this to exactly its pre-Phase-3B behaviour (FPL fixtures only).
  * @returns {{value: number, estimated: boolean, homePPG: number, awayPPG: number,
@@ -311,7 +311,7 @@ export function calcHomeAwaySplit(team, ctx) {
   const awayGames = stats?.awayGames ?? 0;
 
   if (!hasUsableVenueSplit(stats)) {
-    // estimated:false is deliberate here — see the MODEL note above.
+    // estimated:false is deliberate here - see the MODEL note above.
     return {
       value: 50, estimated: false,
       homePPG: stats?.homePPG ?? 0, awayPPG: stats?.awayPPG ?? 0,
@@ -325,7 +325,7 @@ export function calcHomeAwaySplit(team, ctx) {
 
   // League-relative: normalise this team's |rawSplit| against the spread of
   // |rawSplit| across every OTHER team that also clears the threshold at both
-  // venues (whichever source each resolves from — see MODEL note above).
+  // venues (whichever source each resolves from - see MODEL note above).
   // team's own magnitude is always included (it passed the guard above), so
   // this list is never empty.
   const magnitudes = [];
@@ -354,7 +354,7 @@ export function calcHomeAwaySplit(team, ctx) {
  * sensitivity (calcHomeAwaySplit) into a symmetric home boost / away penalty.
  *
  * MODEL: combinedMagnitude is a plain average of the two teams' baseSensitivity
- * regardless of whether their signs agree — a team with a huge split paired
+ * regardless of whether their signs agree - a team with a huge split paired
  * with a perfectly neutral opponent (0) still produces a real, non-zero
  * effect. This is a deliberate reading: "how much does venue matter in THIS
  * fixture" is answered by either side being sensitive to venue, not by both.
@@ -363,7 +363,7 @@ export function calcHomeAwaySplit(team, ctx) {
  * this function): each team's own `sign` is IGNORED when sizing the
  * boost/penalty. A team that is actually stronger away than home still
  * contributes its full magnitude to the HOME side's boost, exactly as a
- * traditionally home-strong team would. This is magnitude-only by design —
+ * traditionally home-strong team would. This is magnitude-only by design -
  * the model is "large home/away splits amplify the standard structural home
  * advantage", not "which way does each team's split point". `sign` remains
  * on each team's profile (homeBase.sign / awayBase.sign) for transparency and
@@ -375,7 +375,7 @@ export function calcHomeAwaySplit(team, ctx) {
  * @returns {{homeBoost: number, awayPenalty: number, combinedMagnitude: number,
  *            estimated: boolean, homeBase: object, awayBase: object}}
  *   homeBoost: points to ADD to the home side's neutral 50 (>= 0).
- *   awayPenalty: points to ADD to the away side's neutral 50 (<= 0) —
+ *   awayPenalty: points to ADD to the away side's neutral 50 (<= 0) -
  *   always exactly −homeBoost, so the two sides' venue.value totals mirror
  *   the same neutral-50 gap on both cards. See FEATURE_ENGINE.md §3.
  */
@@ -390,7 +390,7 @@ export function calcVenueEffect(homeTeam, awayTeam, ctx) {
     homeBoost,
     awayPenalty: -homeBoost,
     combinedMagnitude,
-    // Always false — calcHomeAwaySplit never flags estimated (see its MODEL
+    // Always false - calcHomeAwaySplit never flags estimated (see its MODEL
     // note); a thin sample on either side just reads as neutral 50 for that
     // side, not "discard the whole fixture-level effect". Kept as an OR over
     // both sides (rather than a hardcoded false) so this stays correct
@@ -402,8 +402,8 @@ export function calcVenueEffect(homeTeam, awayTeam, ctx) {
 }
 
 /**
- * Pure symmetric-diff modifier: each side's OWN venue-dependence — how much
- * its scoring differs between home and away — expressed as a percentage of
+ * Pure symmetric-diff modifier: each side's OWN venue-dependence - how much
+ * its scoring differs between home and away - expressed as a percentage of
  * the maximum reachable score (60, i.e. full points from 20 matches), then
  * averaged across both sides of the fixture. Split out from
  * calcVenueStrengthModifier below so this arithmetic can be exercised
@@ -411,7 +411,7 @@ export function calcVenueEffect(homeTeam, awayTeam, ctx) {
  *
  * MODEL: unlike calcVenueEffect (league-normalised, weighted by
  * W_VENUE_EFFECT), this modifier is a plain, unweighted average of two raw
- * percentages — deliberately simpler, so no single side's split can push the
+ * percentages - deliberately simpler, so no single side's split can push the
  * fixture past a 50-point swing on its own without the other side agreeing.
  *
  * @param {number} homeTeamHomeScore  home team's own home-venue score, /60
@@ -419,7 +419,7 @@ export function calcVenueEffect(homeTeam, awayTeam, ctx) {
  * @param {number} awayTeamHomeScore  away team's own home-venue score, /60
  * @param {number} awayTeamAwayScore  away team's own away-venue score, /60
  * @returns {{homeStrength: number, awayStrength: number, modifier: number}}
- *   homeStrength + awayStrength always sum to exactly 100 — the clamp runs
+ *   homeStrength + awayStrength always sum to exactly 100 - the clamp runs
  *   BEFORE homeStrength is rounded, and awayStrength is then derived as
  *   100 − homeStrength rather than rounded independently, so the two can
  *   never drift apart at the 0/100 boundary.
@@ -439,11 +439,11 @@ function calcVenueStrengthSplit(homeTeamHomeScore, homeTeamAwayScore, awayTeamHo
 /**
  * Fixture-level home/away strength split, mirrored around a neutral 50/50
  * baseline. Replaces calcVenueEffect (above) as the model behind the
- * matchup page's Home vs Away strength read — same two-team shape, but a
+ * matchup page's Home vs Away strength read - same two-team shape, but a
  * plain symmetric-diff modifier instead of a league-normalised, weighted one.
  *
  * calcHomeAwaySplit reads points-per-game over its own rolling window
- * (VENUE_ROLLING_GAMES, not this model's 20) — × 20 is the closest existing
+ * (VENUE_ROLLING_GAMES, not this model's 20) - × 20 is the closest existing
  * read to "score out of 60 from the last 20 matches at that venue".
  *
  * @param {Team} homeTeam
@@ -463,7 +463,7 @@ export function calcVenueStrengthModifier(homeTeam, awayTeam, ctx) {
 
   return {
     ...split,
-    // Always false — same reasoning as calcVenueEffect's estimated field
+    // Always false - same reasoning as calcVenueEffect's estimated field
     // above: calcHomeAwaySplit never flags estimated, it just reads neutral.
     estimated: homeBase.estimated || awayBase.estimated,
     homeBase,
@@ -478,7 +478,7 @@ export function calcVenueStrengthModifier(homeTeam, awayTeam, ctx) {
  * datesData across ctx.leagueXg, ctx.leagueXgPrev and ctx.leagueXgHistory.
  *
  * Delegates to engine/h2h.js, which owns the collection and the name-matching
- * (by canonicalClubKey, never by Understat's numeric ids — see that module).
+ * (by canonicalClubKey, never by Understat's numeric ids - see that module).
  * The Head-to-head VIEW needs each meeting's date, season, venue and both
  * scorelines; this scorer needs only A's end of the result, so it narrows the
  * shared record down here rather than the two keeping separate collectors.
@@ -494,7 +494,7 @@ function buildCrossSeasonH2hMeetings(teamAId, teamBId, ctx) {
 }
 
 /**
- * This-season-only fallback, sourced from ctx.playedFixtures (FPL fixtures) —
+ * This-season-only fallback, sourced from ctx.playedFixtures (FPL fixtures) -
  * used only when buildCrossSeasonH2hMeetings finds nothing, e.g. a promoted
  * side Understat can't name-match yet. season.fixtures is already
  * chronologically sorted (composite.js buildScoreContext doc), so no
@@ -526,18 +526,18 @@ function buildFplH2hMeetings(teamAId, teamBId, ctx) {
 /**
  * Head-to-head nudge: how A has fared against B in their recent meetings,
  * expressed as the % of available league points A actually took across those
- * meetings (win=3, draw=1, loss=0, out of 3 per game) — NOT a mirrored/zero-
+ * meetings (win=3, draw=1, loss=0, out of 3 per game) - NOT a mirrored/zero-
  * sum split like calcStyleClash or calcVenueEffect. Two unevenly-matched
  * sides' H2H values do not need to sum to 100: e.g. across 10 meetings where
  * A won once and the other 9 were draws, A took 12/30 points (40) and B took
- * 9/30 (30) — both numbers independently true, nothing to balance.
+ * 9/30 (30) - both numbers independently true, nothing to balance.
  *
  * MODEL: draws from real cross-season Understat fixture lists (up to N_H2H
  * meetings, config.js) via buildCrossSeasonH2hMeetings, falling back to
  * this-season-only FPL fixtures when Understat has no name match for either
  * team (promoted side, outage). historyPast in element-summary is per-player
  * and noisy to aggregate to club level, so it's not used here. The weight on
- * this metric is deliberately tiny (§8.1) — football H2H is weakly
+ * this metric is deliberately tiny (§8.1) - football H2H is weakly
  * predictive even with real data.
  *
  * @param {number} teamAId
@@ -585,7 +585,7 @@ export function calcFixtureHistory(teamAId, teamBId, ctx) {
  *
  * perGw carries one entry per FIXTURE, so a double gameweek appears as two
  * entries sharing a `gw`. Rendered flat, a 6-GW horizon containing a double
- * shows seven cells with nothing tying two of them together — the gameweek
+ * shows seven cells with nothing tying two of them together - the gameweek
  * number survives only in a tooltip. This is the fold that makes the strip say
  * what it means.
  *
@@ -624,7 +624,7 @@ export function groupPerGwSlots(perGw) {
  * Postponed fixtures awaiting a rearranged date, for one team.
  *
  * Display-only. These fixtures have no gameweek, so nothing that aggregates
- * over a gameweek window may read them — composite.js's fixturesForTeamInWindow
+ * over a gameweek window may read them - composite.js's fixturesForTeamInWindow
  * skips them through its `f.gw === null` guard, and that guard stays.
  *
  * @param {number} teamId
@@ -638,7 +638,7 @@ export function pendingFixturesForTeam(teamId, ctx) {
 /**
  * Which gameweeks in a window are irregular, and how many teams each affects.
  *
- * Returns ONLY irregular gameweeks — an ordinary window returns an empty array,
+ * Returns ONLY irregular gameweeks - an ordinary window returns an empty array,
  * which is the signal the schedule bar uses to render nothing at all. Most of
  * the season is ordinary, so that is the common case, not the edge case.
  *

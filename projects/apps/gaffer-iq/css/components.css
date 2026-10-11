@@ -1,14 +1,14 @@
-/* Gaffer IQ — components.css
+/* Gaffer IQ - components.css
    Reusable component styles: score pill, score chip, and each module's
    own blocks. The Matchup Analyser's styles
    live in css/matchup.css (only its Full Season wrapper stays here), and the
    Fixtures, Ranker and Dashboard pages' in their own css/<page>.css.
    BEM-lite per CONVENTIONS.md §5.1. All values via var(--…) from base.css.
    Band modifier classes (--great, --good, --neutral, --tough, --brutal) map
-   directly from CompositeScore.band — see CONVENTIONS.md §5.2. */
+   directly from CompositeScore.band - see CONVENTIONS.md §5.2. */
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   MATCHUP SHELL — now only the Full Season strip's full-width wrapper
+   MATCHUP SHELL - now only the Full Season strip's full-width wrapper
    The rest of the Matchup page moved to css/matchup.css. The notes below
    explain why the strip sits in its own box; they predate that move.
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -20,7 +20,7 @@
    team-nav spanned both rows beside it. Widening that span to the full width
    is not something the single grid can express: .team-nav is position: sticky,
    and Chrome constrains a sticky grid item to the whole grid container rather
-   than to its own grid area — so the pinned panel slid 343px down over the
+   than to its own grid area - so the pinned panel slid 343px down over the
    strip as soon as the strip stopped sitting beside it. Splitting the two rows
    into two boxes puts the strip outside the sticky element's containing block
    entirely, which is a structural answer rather than a z-index one. */
@@ -28,14 +28,14 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
-  /* Break out of .app-main's max-width:1400px + centering (layout.css) —
+  /* Break out of .app-main's max-width:1400px + centering (layout.css) -
      same escape .ranker-shell uses below, for the same reason: the fixed-
      width side navigators were squeezing the middle column's two team cards
      into well under half the viewport. width:100vw + these negative margins
      is the standard technique for escaping a centred ancestor's max-width;
      the side navigators land further out toward the viewport edges as a
      direct result, and the middle column (both nav columns are fixed-width)
-     absorbs the rest — roughly doubling the cards' width on a typical
+     absorbs the rest - roughly doubling the cards' width on a typical
      desktop viewport. Padding restores the horizontal inset app-main's own
      padding provided before this element escaped its box. */
   width: 100vw;
@@ -47,7 +47,7 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   SCORE PILL — main composite score display
+   SCORE PILL - main composite score display
    Band modifiers key off CompositeScore.band (CONVENTIONS.md §5.2).
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -67,7 +67,7 @@
 .score-pill--neutral { background: var(--band-neutral-bg); border-color: var(--band-neutral); color: var(--band-neutral); }
 .score-pill--tough   { background: var(--band-tough-bg);   border-color: var(--band-tough);   color: var(--band-tough); }
 .score-pill--brutal  { background: var(--band-brutal-bg);  border-color: var(--band-brutal);  color: var(--band-brutal); }
-/* Top tier carries a glow the other six do not — the pill is the card's
+/* Top tier carries a glow the other six do not - the pill is the card's
    headline, and 80+ is the one reading the page exists to spot. Gold chrome,
    silver ink: see --band-excellent-ink in base.css for why this tier alone
    splits the two. The text glow is warm-white rather than pure white so the
@@ -84,7 +84,7 @@
 }
 /* The bottom tier is the top tier's mirror: a fill that names it, an ink that
    is not the fill, and an edge where the middle five have none. Black where
-   gold has gold, the darkest red in the palette where gold has silver — and
+   gold has gold, the darkest red in the palette where gold has silver - and
    the border takes that same ink, since a black border on a black fill is no
    border at all and this tier has to read as bounded rather than as a hole in
    the card. No glow, unlike the top tier: gold glows because 80+ is the thing
@@ -95,7 +95,7 @@
   color: var(--band-extreme-ink);
 }
 
-/* Provisional: muted + hatched — score still shown, never hidden */
+/* Provisional: muted + hatched - score still shown, never hidden */
 .score-pill--provisional {
   opacity: 0.6;
   background-image: repeating-linear-gradient(
@@ -107,9 +107,9 @@
   );
 }
 
-/* Estimated: low-confidence score — dashed border, never hidden. Combined
+/* Estimated: low-confidence score - dashed border, never hidden. Combined
    with a band modifier: score-pill--good score-pill--estimated. No separate
-   "~" marker — the dashed border + reduced opacity already carry the signal
+   "~" marker - the dashed border + reduced opacity already carry the signal
    (matchup page's no-symbol convention). See ARCHITECTURE.md §11,
    FEATURE_ENGINE.md §8.3. */
 .score-pill--estimated {
@@ -133,7 +133,7 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   SCORE CHIP — compact inline score used in counter-matchup pairings
+   SCORE CHIP - compact inline score used in counter-matchup pairings
    Same band modifiers, no double-line layout.
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -156,11 +156,11 @@
 .score-chip--neutral { background: var(--band-neutral-bg); color: var(--band-neutral); }
 .score-chip--tough   { background: var(--band-tough-bg);   color: var(--band-tough); }
 .score-chip--brutal  { background: var(--band-brutal-bg);  color: var(--band-brutal); }
-/* Same gold-chrome/silver-ink split as the pill, at chip scale — where it
+/* Same gold-chrome/silver-ink split as the pill, at chip scale - where it
    matters more, not less: these digits are 11px and were the hardest gold
    text on the page to read. Glow radii scale down with the type.
    The gold edge is an INSET ring, not a border: .score-chip has none, and a
-   real 1px border would grow this tier's chips by 2px in each axis — enough
+   real 1px border would grow this tier's chips by 2px in each axis - enough
    to jog the row it sits in, and only for the rows that happen to be 80+. The
    ring follows --radius-sm on its own, and the outer glow still reads as the
    pill's does because both come off the same box-shadow. */
@@ -175,27 +175,27 @@
     0 0 12px color-mix(in srgb, var(--band-excellent) 50%, transparent);
 }
 /* The mirror of .score-chip--excellent above: black fill, dark red ink, and a
-   ring in that same ink — INSET for the same reason gold's is, since
+   ring in that same ink - INSET for the same reason gold's is, since
    .score-chip has no border and a real 1px one would grow only this tier's
    chips by 2px in each axis and jog the rows they sit in. The ring is what
    makes the tier visible here at all: a black fill on a dark card is
-   otherwise just a gap in the row. No glow — see .score-pill--extreme. */
+   otherwise just a gap in the row. No glow - see .score-pill--extreme. */
 .score-chip--extreme {
   background: var(--band-extreme-bg);
   color: var(--band-extreme-ink);
   box-shadow: inset 0 0 0 1px var(--band-extreme-ink);
 }
 
-/* Rank-relative tiers (pool-percentile, NOT the 0-100 band above — see
+/* Rank-relative tiers (pool-percentile, NOT the 0-100 band above - see
    FEATURE_ENGINE.md §13). Rendered ALONGSIDE a .score-chip--{band} class, never
-   instead of it — these rules come after the seven band rules above so they win
+   instead of it - these rules come after the seven band rules above so they win
    the cascade at equal specificity, without needing !important or JS to strip
    the band class. Every player now gets exactly one of these six (calcRankTier
    no longer returns null except for a malformed/empty pool), so in practice
    this block fully determines colour, not just for a handful of standouts.
    rank-neutral/rank-yellow are their OWN classes (not a reuse of .score-chip--
    neutral/.score-chip--tough directly) specifically so their cascade position
-   here — after ALL SEVEN band classes, not just some — is guaranteed regardless
+   here - after ALL SEVEN band classes, not just some - is guaranteed regardless
    of which band a given player's own absolute score happens to carry.
 
    These are named after their COLOUR, not their tier, so they read the
@@ -211,19 +211,19 @@
    "the blue one" has to be ONE blue app-wide, or a reader carrying a colour
    from the Matchup page to this table finds a second, darker blue here and
    has to ask whether the difference means something. The deep #1f6feb this
-   used to be lost that argument for the same reason it lost it as a band —
+   used to be lost that argument for the same reason it lost it as a band -
    at 11px on this ground it is the one hue that has to be hunted for. */
 /* Clearing the band's CHROME is as much a part of taking over the colour as
    setting background and color is. Two of the seven bands paint more than
    those two properties: --excellent carries an inset gold ring plus a gold
    outer glow and a silver-on-gold text-shadow, and --extreme an inset dark-red
    ring. Those are not colour properties, so the five rules below were not
-   overriding them — an 80+ player who was not also rank 1 of his position
+   overriding them - an 80+ player who was not also rank 1 of his position
    rendered as a GOLD-ringed, gold-glowing chip filled and lettered in his
    rank tier's green or blue, reading as a chip that could not decide which
    tier it was, with the leftover glow smearing the digits. Reset here rather
    than by narrowing the band rules, because the band is right to paint chrome
-   when nothing overrides it — this block is the thing doing the overriding.
+   when nothing overrides it - this block is the thing doing the overriding.
    .score-chip--rank-gold below is deliberately absent: it sets both shadows
    itself, being the gold tier's own twin. */
 .score-chip--rank-green,
@@ -241,7 +241,7 @@
 .score-chip--rank-neutral     { background: var(--band-neutral-bg);    color: var(--band-neutral); }
 .score-chip--rank-yellow      { background: var(--band-amber-bg);      color: var(--band-amber); }
 
-/* Rank 1 of a position — the gold the 0-100 scale gives its top tier, on the
+/* Rank 1 of a position - the gold the 0-100 scale gives its top tier, on the
    one rank tier scarce enough to earn it: exactly four chips on the whole
    table, one per position, however the pool moves (calcRankTier,
    'positionBest'). Same gold-chrome/silver-ink split and the same glow as
@@ -259,7 +259,7 @@
     0 0 12px color-mix(in srgb, var(--band-excellent) 50%, transparent);
 }
 
-/* Estimated compact chip — dashed border in the band's own colour, ~ prefix. */
+/* Estimated compact chip - dashed border in the band's own colour, ~ prefix. */
 .score-chip--estimated {
   border: 1px var(--estimated-border-style) currentColor;
   opacity: 0.82;
@@ -272,7 +272,7 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   CALIBRATION VIEW  (#calibration — developer tool)
+   CALIBRATION VIEW  (#calibration - developer tool)
    ═══════════════════════════════════════════════════════════════════════════ */
 
 .calib-header {
@@ -387,9 +387,9 @@
 /* ── Transfer Planner: price change footer on transfer cards ───────────────── */
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   MOBILE COMPONENTS  ≤ 768px — Phase 4-5
+   MOBILE COMPONENTS  ≤ 768px - Phase 4-5
    Purely additive overrides. Desktop rules are completely untouched.
-   No new hardcoded values — all tokens from base.css.
+   No new hardcoded values - all tokens from base.css.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 @media (max-width: 768px) {
@@ -453,7 +453,7 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   FULL SEASON STRIP — GW1-38 planning strip (Matchup page), "Refine" (R2)
+   FULL SEASON STRIP - GW1-38 planning strip (Matchup page), "Refine" (R2)
    js/modules/fullSeason.js. Two halves split at the chip reset, one <button>
    cell per gameweek, chip-window lanes, and a click-to-pin popover (bottom
    sheet ≤640px) the cell morphs into. Motion is WAAPI in the module; nothing
@@ -461,7 +461,7 @@
 
    The popover, its scrim and the morph box are appended to document.body
    (position: fixed), so the values they read live on :root rather than on
-   .season-strip — a custom property scoped to the strip would not inherit
+   .season-strip - a custom property scoped to the strip would not inherit
    onto them.
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -470,7 +470,7 @@
   --season-shadow-pop: 0 16px 40px rgba(1, 4, 9, .6);
   --season-shadow-lift: 0 8px 20px rgba(1, 4, 9, .5);
   --season-scrim: rgba(1, 4, 9, .55);
-  --season-neutral-ink: #a2abb5;   /* neutral band text — grey is too dark on its tint */
+  --season-neutral-ink: #a2abb5;   /* neutral band text - grey is too dark on its tint */
   --season-dur-fast: 120ms;
 }
 
@@ -522,7 +522,7 @@
   border-bottom: 1px solid var(--color-border-subtle);
 }
 
-/* Micro-label — 11px / 700 / .1em caps, the system's one label style. */
+/* Micro-label - 11px / 700 / .1em caps, the system's one label style. */
 .season-strip__lbl,
 .season-key__lbl,
 .season-half__title,
@@ -1090,7 +1090,7 @@
 /* WHERE THIS LIVES, AND WHY IT IS LAST IN THE FILE.
    A skeleton is composed onto the real component's class
    (`class="breakdown-row__bar skeleton"`), and several of those components set
-   `background` at the same specificity this block does — .breakdown-row__bar
+   `background` at the same specificity this block does - .breakdown-row__bar
    paints itself --color-muted, for one. Equal specificity means source order
    decides, so the skeleton fill only reliably wins from the bottom of the
    file. Keep this block last; moving it up silently returns those skeletons to
@@ -1103,12 +1103,12 @@
    today. Append new sections ABOVE it. */
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   SKELETON — placeholder for a value that is still settling
+   SKELETON - placeholder for a value that is still settling
    ---------------------------------------------------------------------------
    WHAT IT IS FOR. A CompositeScore is a weighted blend, and one of its
    components (counter-matchup) cannot be computed until that team's Understat
    payload lands during the boot-time prefetch. Before this existed the score
-   rendered anyway and then silently rewrote itself a second or two later — a
+   rendered anyway and then silently rewrote itself a second or two later - a
    number that looks final and is not. A skeleton says "not yet" for exactly as
    long as that is true, and is replaced by the settled number.
 
@@ -1120,15 +1120,15 @@
        <div class="score-pill skeleton">…</div>
        <div class="pgw-cell skeleton"></div>
 
-   The structural class keeps the element's exact footprint — padding, min-width,
-   line-height — so the settled value drops in with no layout shift, and there
+   The structural class keeps the element's exact footprint - padding, min-width,
+   line-height - so the settled value drops in with no layout shift, and there
    is no second set of sizes here to keep in step with the real components.
    Skeletons keep their placeholder text (rendered transparent) for the same
    reason: it is what gives a text-sized box its height.
 
    The band modifier is what must be left off. Band backgrounds and the
    skeleton fill are the same specificity, so emitting both would leave the
-   winner decided by source order — an unsettled score would read as a real
+   winner decided by source order - an unsettled score would read as a real
    band-coloured chip. Omitting it makes that unrepresentable rather than
    merely discouraged.
 
@@ -1140,12 +1140,12 @@
   /* Transparent text, not empty markup: the placeholder characters size the
      box to the same line height the real value will occupy. */
   color: transparent;
-  /* The placeholder text is a sizing device, not content — never let it be
+  /* The placeholder text is a sizing device, not content - never let it be
      selected or copied as if it were a real value. */
   user-select: none;
   /* Deliberately NOT pointer-events:none. Some skeletons sit on elements that
-     are navigation as well as value — a per-gameweek strip cell is a link to
-     that fixture's card whether or not its score has settled — and disabling
+     are navigation as well as value - a per-gameweek strip cell is a link to
+     that fixture's card whether or not its score has settled - and disabling
      the element wholesale would take the navigation away for the few seconds
      the number is still arriving. Withhold the VALUE, not the affordance. */
   /* Deliberately no border rule: each composed element keeps its own, so a
@@ -1176,7 +1176,7 @@
 
 /* The shimmer is the only thing that distinguishes a skeleton from an empty
    box, so when motion is unwelcome it becomes a flat tone that still reads as
-   a filled placeholder — not simply an animation switched off. */
+   a filled placeholder - not simply an animation switched off. */
 @media (prefers-reduced-motion: reduce) {
   .skeleton {
     animation: none;
@@ -1186,7 +1186,7 @@
 }
 
 /* A standalone placeholder line, for regions with no existing element to
-   compose onto — a loading pane, a recommendation panel, a table row. Fills
+   compose onto - a loading pane, a recommendation panel, a table row. Fills
    its container's width, so the container chooses how wide a line reads. */
 .skeleton--text {
   display: block;

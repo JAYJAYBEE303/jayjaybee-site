@@ -11,7 +11,7 @@ import {
 } from '../../js/engine/normalise.js';
 
 test('normaliseFixture flags a provisional kickoff time', () => {
-  // FPL sets provisional_start_time while a kickoff is unconfirmed — often the
+  // FPL sets provisional_start_time while a kickoff is unconfirmed - often the
   // precursor to a postponement, so it must survive normalisation.
   const f = normaliseFixture({
     id: 1, event: 24, team_h: 1, team_a: 2, provisional_start_time: true,
@@ -20,7 +20,7 @@ test('normaliseFixture flags a provisional kickoff time', () => {
 });
 
 test('normaliseFixture treats a missing provisional flag as confirmed', () => {
-  // Absent means confirmed, not unknown — FPL only sets the field when the
+  // Absent means confirmed, not unknown - FPL only sets the field when the
   // kickoff is actually in doubt.
   const f = normaliseFixture({ id: 1, event: 24, team_h: 1, team_a: 2 });
   assert.equal(f.provisionalKickoff, false);
@@ -51,7 +51,7 @@ test('deriveUpcomingGw moves past a current gameweek that has finished', () => {
 });
 
 test('deriveUpcomingGw stays on a current gameweek still being played', () => {
-  // Mid-round the current gameweek IS the upcoming one — there is football
+  // Mid-round the current gameweek IS the upcoming one - there is football
   // left in it, and its remaining fixtures still belong in a horizon.
   const events = [
     { id: 2, finished: false, isCurrent: true, isNext: false },
@@ -86,7 +86,7 @@ test('deriveUpcomingGw falls back to gameweek 1 with no events at all', () => {
 
 test('deriveEventCompletion marks a round complete once every match has been played', () => {
   // THE DEFECT. FPL's event.finished waits for BONUS CONFIRMATION, not full
-  // time — on 2026-09-07 all ten GW3 matches read finished_provisional with
+  // time - on 2026-09-07 all ten GW3 matches read finished_provisional with
   // event 3 still finished:false. The rails, which read fixture-level `played`,
   // had already moved to GW4 while the Full Season strip and the Outlook
   // window, anchored on the event flag, were still offering GW3.
@@ -122,7 +122,7 @@ test('deriveEventCompletion ignores postponed fixtures with no gameweek', () => 
 
 test('deriveEventCompletion falls back to the raw flag for a round with no fixtures', () => {
   // An empty every() is true, which would report a round nobody has played as
-  // finished — e.g. before the fixtures payload lands.
+  // finished - e.g. before the fixtures payload lands.
   const events = [
     { id: 3, finished: false, isCurrent: true,  isNext: false },
     { id: 2, finished: true,  isCurrent: false, isNext: false },

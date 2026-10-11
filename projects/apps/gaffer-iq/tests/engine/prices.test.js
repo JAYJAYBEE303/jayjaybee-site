@@ -17,7 +17,7 @@ test('calcSeasonPriceChange reports a rise for a positive cost change', () => {
 });
 
 test('calcSeasonPriceChange reports a fall for a negative cost change', () => {
-  // The minus sign belongs to the number, not the currency symbol —
+  // The minus sign belongs to the number, not the currency symbol -
   // "-£0.1m", never "£-0.1m".
   const result = calcSeasonPriceChange({ costChangeStart: -1 });
   assert.equal(result.value, -0.1);
@@ -27,7 +27,7 @@ test('calcSeasonPriceChange reports a fall for a negative cost change', () => {
 
 test('calcSeasonPriceChange reports flat for a zero cost change', () => {
   // The edge case that decides the styling: a player who has not moved must
-  // read "£0.0m" with NO sign and a neutral direction — never blank, and
+  // read "£0.0m" with NO sign and a neutral direction - never blank, and
   // never "+£0.0m", which would read as a rise.
   const result = calcSeasonPriceChange({ costChangeStart: 0 });
   assert.equal(result.value, 0);
@@ -55,7 +55,7 @@ test('calcSeasonPriceChange handles a change of a full million or more', () => {
 });
 
 test('calcSeasonPriceChange keeps one decimal place for a whole-million fall', () => {
-  // toFixed(1), not a bare number — "-£1.0m", never "-£1m".
+  // toFixed(1), not a bare number - "-£1.0m", never "-£1m".
   const result = calcSeasonPriceChange({ costChangeStart: -10 });
   assert.equal(result.value, -1);
   assert.equal(result.direction, 'fall');

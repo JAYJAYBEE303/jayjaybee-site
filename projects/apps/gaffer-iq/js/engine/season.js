@@ -22,7 +22,7 @@ export const LAST_GW = 38;
  * The top matchups of one gameweek.
  *
  * A fixture carries TWO composite scores, one per side. The matchup's score is
- * the higher of them and the side that produced it is the favoured side — so
+ * the higher of them and the side that produced it is the favoured side - so
  * the UI's "which team does this fixture favour" ring falls out of the same
  * calculation rather than needing a second rule.
  *
@@ -72,7 +72,7 @@ export function buildGameweekMatchups(gw, ctx, opts = {}) {
  * ordinary week with a good fixture in it; several together is a different
  * thing.
  *
- * The bar is a NUMBER, not "whatever the top band starts at" — it stayed put
+ * The bar is a NUMBER, not "whatever the top band starts at" - it stayed put
  * when the tiles moved onto the seven-tier scale, where 75 sits inside 'great'
  * (65-79) rather than at its foot. Following the band would have quietly
  * loosened the bar to 65 and lit up half the season. So a loaded week is not
@@ -100,7 +100,7 @@ export function isLoadedWeek(matchups) {
  * states that the attribution is inferred, so a wrong guess reads as a guess.
  *
  * Earliest match wins: a rearranged date is always later than the hole.
- * A gameweek with NO scheduled fixtures at all is skipped — that is an unplayed
+ * A gameweek with NO scheduled fixtures at all is skipped - that is an unplayed
  * stretch of the season, not a hole, and every club is trivially "blank" in it.
  *
  * @param {Array<object>} pending  fixtures with gw === null
@@ -141,7 +141,7 @@ export function attributePostponements(pending, ctx) {
  * Slot 1 always holds the week's genuine best fixture whenever one exists, no
  * matter how much of the schedule has fallen over. Two postponements therefore
  * read as "one real fixture left to plan around", which is the signal worth
- * acting on — where sorting them in among the live rows would just look like a
+ * acting on - where sorting them in among the live rows would just look like a
  * thin week.
  *
  * @param {Array<object>} liveRows   buildGameweekMatchups output, descending
@@ -267,7 +267,7 @@ export function buildGameweekPlayers(gw, ctx, formCache, opts = {}) {
  * spanning it would be advice you cannot take.
  *
  * SQUAD-AGNOSTIC. Triple Captain reads the best available captain in the league
- * that week rather than a player you own, and Bench Boost is absent entirely —
+ * that week rather than a player you own, and Bench Boost is absent entirely -
  * a bench you do not own carries no information. This is what lets the strip
  * work on a first visit.
  *
@@ -287,7 +287,7 @@ export function buildChipWindows(gwStats, opts = {}) {
   for (const { half, rows } of halves) {
     if (rows.length === 0) continue;
 
-    // Wildcard — the best run of wcWindow consecutive weeks by fixture quality.
+    // Wildcard - the best run of wcWindow consecutive weeks by fixture quality.
     // Runs must sit wholly inside the half, so they cannot cross the reset.
     let bestSum = -Infinity, bestStart = null;
     for (let i = 0; i + wcWindow <= rows.length; i++) {
@@ -301,9 +301,9 @@ export function buildChipWindows(gwStats, opts = {}) {
       out.push({ chip: 'wildcard', from: bestStart, to: bestStart + wcWindow - 1, half });
     }
 
-    // Free Hit — the single most damaged week: the one where the squad you own
+    // Free Hit - the single most damaged week: the one where the squad you own
     // is least able to field an XI, so renting a different one pays. A flat
-    // blankCount (every row 0 — no blank is known yet) has no discriminating
+    // blankCount (every row 0 - no blank is known yet) has no discriminating
     // signal: the reduce below would then just return its own seed, rows[0],
     // making "gameweek one" look like a confident pick when it is really an
     // arbitrary one. A confidently-wrong recommendation is worse than none,
@@ -313,7 +313,7 @@ export function buildChipWindows(gwStats, opts = {}) {
       out.push({ chip: 'freehit', from: fh.gw, to: fh.gw, half });
     }
 
-    // Triple Captain — the single best captain week available anywhere. Same
+    // Triple Captain - the single best captain week available anywhere. Same
     // guard: bestPlayerPoints is 0 for every row until the player pass has
     // run, so a max of 0 means there is nothing to recommend yet, not that
     // gameweek one is the best captain week.
@@ -330,7 +330,7 @@ export function buildChipWindows(gwStats, opts = {}) {
  * Recompute the chip windows from a model whose players have since arrived.
  *
  * buildSeasonModel runs first with `skipPlayers` so the ribbon can paint from
- * fixtures alone, and at that point every gameweek's `bestPlayerPoints` is 0 —
+ * fixtures alone, and at that point every gameweek's `bestPlayerPoints` is 0 -
  * which silently pins Triple Captain to the first gameweek of each half,
  * because its `reduce` never finds a value greater than its seed. The module
  * calls this once its background pass has filled `players`.
@@ -349,12 +349,12 @@ export function recomputeChipWindows(model) {
 
 /**
  * Plain-English note for one gameweek. The panel shows this under its rows.
- * Postponement wording says the attribution is INFERRED, because it is — see
+ * Postponement wording says the attribution is INFERRED, because it is - see
  * attributePostponements.
  */
 function gameweekNote(ppCount, isDouble, loaded) {
   if (ppCount > 1) {
-    return `${ppCount} fixtures look postponed out of this week — only one matchup `
+    return `${ppCount} fixtures look postponed out of this week - only one matchup `
          + `left to plan around. Inferred from the clubs left without a game.`;
   }
   if (ppCount === 1) {
@@ -363,7 +363,7 @@ function gameweekNote(ppCount, isDouble, loaded) {
   }
   if (isDouble) return 'Double gameweek. The strongest captaincy week of this stretch.';
   if (loaded)   return 'Several heavily one-sided fixtures land together here.';
-  return 'An ordinary week — nothing worth holding a transfer for.';
+  return 'An ordinary week - nothing worth holding a transfer for.';
 }
 
 /**
@@ -375,7 +375,7 @@ function gameweekNote(ppCount, isDouble, loaded) {
  * computations. `skipPlayers` is that path; it is also what the unit tests use.
  *
  * @param {object} ctx      from buildScoreContext
- * @param {object} season   from normaliseSeason — read for pendingFixtures
+ * @param {object} season   from normaliseSeason - read for pendingFixtures
  * @param {{skipPlayers?: boolean}} [opts]
  * @returns {object} SeasonModel
  */

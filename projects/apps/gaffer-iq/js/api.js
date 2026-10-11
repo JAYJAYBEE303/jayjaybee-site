@@ -3,7 +3,7 @@
  * Layer: data access. The ONLY file in the app that calls fetch().
  * Calls the Vercel proxy (PROXY_BASE_URL?path=…) and returns parsed JSON.
  * Side effects: network I/O. No DOM, no store mutation.
- * Throws typed ApiError on any failure — callers translate to data:error events.
+ * Throws typed ApiError on any failure - callers translate to data:error events.
  * See ARCHITECTURE.md §5 (proxy) and §6 (fetch strategy), CONVENTIONS.md §9.
  */
 
@@ -32,7 +32,7 @@ export class ApiError extends Error {
 /**
  * Calls the proxy with the given path fragment and returns parsed JSON.
  * @param {string} path     e.g. 'bootstrap-static/', 'element-summary/123/', 'league/EPL'
- * @param {string} [source] proxy upstream identifier — omit for the default FPL API,
+ * @param {string} [source] proxy upstream identifier - omit for the default FPL API,
  *                          'understat' to hit the Understat allowlist (Phase 3A).
  * @returns {Promise<object>}  the upstream JSON
  * @throws {ApiError}  on network, proxy, or upstream failure
@@ -67,7 +67,7 @@ async function callProxy(path, source) {
     const detail = body?.error ?? response.statusText;
     const upstream = body?.upstream ?? response.status;
     throw new ApiError(
-      `Proxy ${response.status} — ${detail}`,
+      `Proxy ${response.status} - ${detail}`,
       { upstreamStatus: upstream, path },
     );
   }
@@ -111,7 +111,7 @@ export async function fetchFixtures() {
 
 /**
  * Fetches a single player's per-GW history and upcoming fixtures.
- * Called lazily — never bulk-fetch all ~700 players' summaries (ARCHITECTURE.md §6).
+ * Called lazily - never bulk-fetch all ~700 players' summaries (ARCHITECTURE.md §6).
  * @param {number} playerId  FPL element id (positive integer, 1–4 digits)
  * @returns {Promise<object>}  raw element-summary JSON
  * @throws {ApiError}  with message "Failed to load player <id> data: …"
@@ -132,7 +132,7 @@ export async function fetchPlayerSummary(playerId) {
 
 /**
  * Fetches live GW points for every FPL player in the given gameweek.
- * NEVER cached — always re-fetched. The dashboard polls this every 60 s
+ * NEVER cached - always re-fetched. The dashboard polls this every 60 s
  * while the GW is in progress. See ARCHITECTURE.md §6 and ROADMAP.md §2C.
  * @param {number} gw  gameweek number (1–38)
  * @returns {Promise<object>}  raw event/live response: { elements: [{ id, stats, explain }] }
@@ -154,10 +154,10 @@ export async function fetchLivePoints(gw) {
   }
 }
 
-// ─── Phase 4-1 — FPL squad import (read-only) ────────────────────────────────
+// ─── Phase 4-1 - FPL squad import (read-only) ────────────────────────────────
 // Never write to the FPL account; never handle credentials. Team ID comes from
 // the caller (stored in localStorage by squadImport.js). Errors are translated
-// to ApiError — callers show a clear message and fall back to manual entry.
+// to ApiError - callers show a clear message and fall back to manual entry.
 
 /**
  * Fetches an FPL manager's GW squad picks (15 players + captain/vc + subs).
@@ -203,8 +203,8 @@ export async function fetchEntryInfo(teamId) {
   }
 }
 
-// ─── Phase 3A — Understat (external xG) ──────────────────────────────────────
-// Failures here are NON-FATAL — callers use Promise.allSettled and continue
+// ─── Phase 3A - Understat (external xG) ──────────────────────────────────────
+// Failures here are NON-FATAL - callers use Promise.allSettled and continue
 // with FPL-only data when these fail. See main.js loadInitialData() and
 // ROADMAP.md §3A. Do not call store.setError() for Understat failures.
 
@@ -213,7 +213,7 @@ export async function fetchEntryInfo(teamId) {
  * Understat's real getLeagueData endpoint server-side and renames its
  * {teams, players, dates} response to {teamsData, playersData, datesData}.
  *
- * @param {string} season  four-digit start-year, e.g. '2026' for 2026/27 —
+ * @param {string} season  four-digit start-year, e.g. '2026' for 2026/27 -
  *   REQUIRED, Understat has no "current season" default (confirmed live).
  *   Use config.js UNDERSTAT_SEASON / UNDERSTAT_PREV_SEASON.
  * @returns {Promise<object>}  { teamsData: {...}, datesData: [...], playersData: [...] }
@@ -257,10 +257,10 @@ export async function fetchTeamXg(teamSlug) {
 // ─── Understat match timeline (Fixtures tab) ─────────────────────────────────
 // Two calls per match, because no single Understat response carries the whole
 // picture:
-//   match/{id}      HTML page — the server-rendered timeline. The ONLY source
+//   match/{id}      HTML page - the server-rendered timeline. The ONLY source
 //                   of a MINUTE for cards, and the only place events already
 //                   appear in chronological order.
-//   matchdata/{id}  JSON — shots, whose `player_assisted` is the ONLY link
+//   matchdata/{id}  JSON - shots, whose `player_assisted` is the ONLY link
 //                   between a goal and the assist that set it up.
 // The FPL API publishes neither: its per-fixture stats are unordered totals.
 //
@@ -337,7 +337,7 @@ export async function fetchMatchData(matchId) {
  * Parse Understat's server-rendered match timeline into structured events.
  *
  * WHY HERE: this is response translation, which is api.js's job. It cannot
- * live in engine/ — DOMParser is a browser API and everything under engine/ is
+ * live in engine/ - DOMParser is a browser API and everything under engine/ is
  * required to be pure and DOM-free (ARCHITECTURE.md §3 hard rule 2).
  *
  * Scraping markup is inherently more fragile than reading JSON, so every step
@@ -351,11 +351,11 @@ export async function fetchMatchData(matchId) {
  *     .timeline-time                       "64'"
  *     .timeline-row                        one event (two rows = two events
  *                                          in the same minute)
- *       a.timeline-player-name             player(s) — two for a substitution
+ *       a.timeline-player-name             player(s) - two for a substitution
  *       .timeline-match-score              "1 - 0", goals only
  *       i.fas[title]                       "Goal" | "Yellow card" | "Red card"
  *       .timeline-group[title]             "Substituted off" / "Substituted on"
- *                                          — note the sub title is on the GROUP,
+ *                                          - note the sub title is on the GROUP,
  *                                          not on the <i>, which carries only
  *                                          .icon-sub
  *
@@ -422,7 +422,7 @@ export function parseMatchTimeline(html) {
  * minute + scorer. Both come from Understat, so the names agree exactly and no
  * fuzzy matching is needed.
  *
- * Mutates and returns `events` — a goal whose shot cannot be found simply
+ * Mutates and returns `events` - a goal whose shot cannot be found simply
  * keeps assist: null, which renders as a goal with no assister rather than as
  * an error.
  *

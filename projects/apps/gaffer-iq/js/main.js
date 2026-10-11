@@ -1,6 +1,6 @@
 /**
  * js/main.js
- * Layer: entry point. Bootstrap only — kicks off the initial data load,
+ * Layer: entry point. Bootstrap only - kicks off the initial data load,
  * subscribes to store events, reads URL hash to pick the active view,
  * wires the nav, and delegates all rendering to modules.
  * Contains no analytical logic and no per-module rendering.
@@ -62,7 +62,7 @@ let _teamXgTimeoutHandle = null;
 // PREVIOUS run's requests are still outstanding against a pending set that has
 // since been rebuilt. Without this, one of those stragglers settling would
 // remove a slug the NEW run is still waiting on, and the app would report
-// scores as final while a fresher payload was still inbound — the precise
+// scores as final while a fresher payload was still inbound - the precise
 // thing the pending set exists to prevent. A stale request still stores its
 // payload (it is real data, just from the previous run); it simply no longer
 // gets to say the wait is over.
@@ -73,7 +73,7 @@ let _teamXgRunId = 0;
  * prefetchAllTeamXg() re-requests all of them.
  *
  * MUST be called alongside store.clearCache(). clearCache() wipes
- * state.teamXg, but this Set lives in this module and used to survive it — so
+ * state.teamXg, but this Set lives in this module and used to survive it - so
  * after a refresh every slug was skipped as "already requested" while the data
  * it guarded was gone. The result was silent: no error, no warning, the whole
  * app just dropped to the role tier for the rest of the session because the
@@ -97,18 +97,18 @@ function resetTeamXgPrefetch() {
  * data:error on failure.
  *
  * If the store already holds a season (hydrated from sessionStorage) and
- * `force` is false, we just signal ready without re-hitting the API —
+ * `force` is false, we just signal ready without re-hitting the API -
  * ARCHITECTURE.md §6 treats bootstrap/fixtures as fresh for the session.
  */
 async function loadInitialData({ force = false } = {}) {
   // Two INDEPENDENT freshness gates. store.isFresh() reflects sessionStorage-
-  // backed `season` (ARCHITECTURE.md §6 — bootstrap/fixtures are the only
+  // backed `season` (ARCHITECTURE.md §6 - bootstrap/fixtures are the only
   // payloads mirrored to sessionStorage), but leagueXg/leagueXgPrev/Prev2/Prev3
   // are memory-only and reset to null on every module load (i.e. every page
   // reload), independently of whether `season` just rehydrated from cache.
   // Gating the Understat fetches on seasonFresh too (as this used to) meant a
-  // reload within the same tab session — season rehydrates, so isFresh() is
-  // true — skipped the Understat fetches forever, silently and permanently
+  // reload within the same tab session - season rehydrates, so isFresh() is
+  // true - skipped the Understat fetches forever, silently and permanently
   // stranding H2H History / Style Clash / venue split on their neutral
   // fallback for the rest of that session even though the proxy was healthy.
   // See git history for the bug report this fixes.
@@ -121,7 +121,7 @@ async function loadInitialData({ force = false } = {}) {
     // outstanding, and "outstanding" is only distinguishable from "never asked
     // for" once the prefetch has registered what it is waiting on (see
     // store.markTeamXgRequested). Announcing first means every module renders
-    // against a store that reports nothing pending — and in the case where
+    // against a store that reports nothing pending - and in the case where
     // there is genuinely nothing to fetch, no later emit ever arrives to
     // correct it, leaving skeletons on screen for the rest of the session.
     // Dispatching first costs nothing: it starts network calls and returns.
@@ -137,8 +137,8 @@ async function loadInitialData({ force = false } = {}) {
     // Phase 3A: league-wide xG is one HTTP call and enriches the whole model,
     // so it loads alongside bootstrap/fixtures rather than lazily. Wrapped in
     // Promise.allSettled so an Understat outage doesn't break the FPL pipeline
-    // — engine functions degrade to Phase 1 proxies when leagueXg is null.
-    // Phase 3B: also fetches LAST season's leagueXg — purely so
+    // - engine functions degrade to Phase 1 proxies when leagueXg is null.
+    // Phase 3B: also fetches LAST season's leagueXg - purely so
     // calcHomeAwaySplit's rolling 38-game window has real matches before this
     // season has enough of its own (see VENUE_ROLLING_GAMES, config.js).
     // Phase 4: fetches UNDERSTAT_HISTORY_SEASONS further back again, purely to
@@ -170,31 +170,31 @@ async function loadInitialData({ force = false } = {}) {
     }
 
     if (xgFresh) {
-      // Already loaded this JS lifetime — leave store.leagueXg* untouched.
+      // Already loaded this JS lifetime - leave store.leagueXg* untouched.
     } else if (leagueXgRes.status === 'fulfilled') {
       store.setLeagueXg(leagueXgRes.value);
     } else {
-      // MODEL: Understat is supplementary — log and continue with FPL-only data.
+      // MODEL: Understat is supplementary - log and continue with FPL-only data.
       // style.js + form.js fall back to Phase 1 proxies and flag estimated:true
       // on the breakdown. A failed Understat fetch must never block the main load.
-      // ROADMAP.md §3A — this path is intentionally non-fatal; no store.setError().
-      console.warn('[Gaffer IQ] Understat league xG unavailable — falling back to FPL proxies.',
+      // ROADMAP.md §3A - this path is intentionally non-fatal; no store.setError().
+      console.warn('[Gaffer IQ] Understat league xG unavailable - falling back to FPL proxies.',
         leagueXgRes.reason?.message ?? leagueXgRes.reason);
     }
 
     if (xgFresh) {
-      // Already loaded this JS lifetime — leave store.leagueXgPrev untouched.
+      // Already loaded this JS lifetime - leave store.leagueXgPrev untouched.
     } else if (leagueXgPrevRes.status === 'fulfilled') {
       store.setLeagueXgPrev(leagueXgPrevRes.value);
     } else {
-      // Same non-fatal treatment — calcHomeAwaySplit falls back to
+      // Same non-fatal treatment - calcHomeAwaySplit falls back to
       // current-season-only (ctx.playedFixtures) when this is unavailable.
-      console.warn('[Gaffer IQ] Understat previous-season xG unavailable — venue split uses this season only.',
+      console.warn('[Gaffer IQ] Understat previous-season xG unavailable - venue split uses this season only.',
         leagueXgPrevRes.reason?.message ?? leagueXgPrevRes.reason);
     }
 
     if (xgFresh) {
-      // Already loaded this JS lifetime — leave store.leagueXgHistory untouched.
+      // Already loaded this JS lifetime - leave store.leagueXgHistory untouched.
     } else {
       // Same non-fatal treatment as the two above: a season that fails is left
       // OUT of the list rather than stored as a hole, so the head-to-head record
@@ -203,18 +203,18 @@ async function loadInitialData({ force = false } = {}) {
       historyResults.forEach((res, i) => {
         if (res.status === 'fulfilled') loaded.push(res.value);
         else console.warn(
-          `[Gaffer IQ] Understat ${UNDERSTAT_HISTORY_SEASONS[i]} xG unavailable — the head-to-head record is one season shorter.`,
+          `[Gaffer IQ] Understat ${UNDERSTAT_HISTORY_SEASONS[i]} xG unavailable - the head-to-head record is one season shorter.`,
           res.reason?.message ?? res.reason);
       });
       store.setLeagueXgHistory(loaded);
     }
 
-    // Prefetch first, then announce — see the note on the early-return path
+    // Prefetch first, then announce - see the note on the early-return path
     // above. Same reason, same ordering requirement.
     prefetchAllTeamXg();
     store.markDataReady();
   } catch (err) {
-    // store.setError() clears season state before emitting — the store is left
+    // store.setError() clears season state before emitting - the store is left
     // cleanly empty, not partially populated (CONVENTIONS.md §9, store.js §setError).
     const apiErr = err instanceof ApiError ? err : new ApiError(String(err?.message ?? err));
     store.setError(apiErr);
@@ -228,7 +228,7 @@ async function loadInitialData({ force = false } = {}) {
  *
  * MODEL: replaces a per-fixture lazy fetch. That version cached a team's
  * statistics only once its fixture was opened in Matchup, then let every
- * other module pick up the same cached entry — which meant the SAME team
+ * other module pick up the same cached entry - which meant the SAME team
  * could score differently for two users, or in two tabs of the same
  * session, purely from click order rather than any real data change. 20
  * proxy calls at boot is the same order of magnitude as the existing
@@ -238,12 +238,12 @@ async function loadInitialData({ force = false } = {}) {
  *
  * Fire-and-forget: the app renders immediately on whatever tier the data
  * supports and upgrades in place as each team's payload lands. Failures are
- * swallowed to a console warning, never store.setError() — the channel tier
+ * swallowed to a console warning, never store.setError() - the channel tier
  * is an ENRICHMENT, so a dead Understat upstream must not surface as a page
  * error. Same policy as the league-xG fetch (see js/api.js, ROADMAP §3A).
  *
  * Re-render on arrival goes through store.markDataReady(): this codebase has
- * no per-tab render dispatcher — every module re-renders off the 'data:ready'
+ * no per-tab render dispatcher - every module re-renders off the 'data:ready'
  * event it already subscribes to (matchup/dashboard/planner/ranker), and
  * markDataReady() is a bare emit with no other side effects, so re-firing it
  * is the existing and only post-boot re-render path.
@@ -254,7 +254,7 @@ let _dataReadyHandle = null;
 /**
  * Batch the re-render that follows a team-xG payload landing.
  *
- * WHY: markDataReady() is a global broadcast — every module re-renders on it.
+ * WHY: markDataReady() is a global broadcast - every module re-renders on it.
  * Firing it once per payload meant 20 full application-wide rescores at boot
  * on top of the initial one. Measured on the live dataset: ~2.4s of blocking
  * main-thread work per emit, ~50s in total, which is the startup lag this
@@ -269,7 +269,7 @@ let _dataReadyHandle = null;
  * emits and the UI still upgrades promptly.
  *
  * Payloads that land after a flush simply schedule the next one, so nothing is
- * dropped — the store is already updated before this is called, and the emit
+ * dropped - the store is already updated before this is called, and the emit
  * only tells modules to re-read it.
  */
 function scheduleDataReady() {
@@ -284,7 +284,7 @@ function scheduleDataReady() {
  * Arm the TEAM_XG_SETTLE_TIMEOUT_MS backstop, once per prefetch.
  *
  * `fetch` carries no timeout, so a request the proxy never answers stays
- * pending for the life of the page — and with it every skeleton waiting on
+ * pending for the life of the page - and with it every skeleton waiting on
  * that team's score. At the deadline the store stops waiting and the affected
  * scores render on whatever tier the data supports, which is exactly the
  * behaviour that predates the skeletons. Nothing is cancelled or discarded: a
@@ -296,13 +296,13 @@ function armTeamXgDeadline() {
   _teamXgTimeoutHandle = setTimeout(() => {
     _teamXgTimeoutHandle = null;
     // resetTeamXgPrefetch clears this timer, so a stale firing should not be
-    // possible — the guard is here because "should not be possible" is exactly
+    // possible - the guard is here because "should not be possible" is exactly
     // what a force-settle must not rely on.
     if (runId !== _teamXgRunId) return;
     const stranded = store.settleAllTeamXg();
     if (stranded === 0) return;
     console.warn(`[Gaffer IQ] ${stranded} team-xG request(s) did not answer within `
-      + `${TEAM_XG_SETTLE_TIMEOUT_MS}ms — scoring on the data in hand.`);
+      + `${TEAM_XG_SETTLE_TIMEOUT_MS}ms - scoring on the data in hand.`);
     // Views that were skeletoned need a render to replace those skeletons with
     // the scores they can compute now; nothing else has changed in the store,
     // so this goes through the same coalesced path every other arrival uses.
@@ -322,7 +322,7 @@ function prefetchAllTeamXg() {
     dispatched.push(slug);
   }
 
-  // Announced BEFORE the first fetch is started, and unconditionally — even
+  // Announced BEFORE the first fetch is started, and unconditionally - even
   // when `dispatched` is empty, which is what latches the store's dispatched
   // flag and lets every score read as settled when there was never anything
   // to wait for (no Understat league payload, so no slugs to resolve). Do this
@@ -351,7 +351,7 @@ function prefetchAllTeamXg() {
         // still skeletoning a team whose payload will never arrive is stuck.
         // Hence .finally rather than a settle inside .then only.
         store.settleTeamXg(slug);
-        // Whatever tab is active upgrades in place as each payload lands —
+        // Whatever tab is active upgrades in place as each payload lands -
         // but batched, not once per payload. See scheduleDataReady. Also on
         // the failure path, so the last outstanding slug failing still
         // produces the render that clears the remaining skeletons.
@@ -366,10 +366,10 @@ const errorBanner = document.getElementById('app-error-banner');
 const errorText   = document.getElementById('app-error-text');
 
 store.subscribe('data:error', (err) => {
-  // err is a full ApiError — show its message directly. The message already
+  // err is a full ApiError - show its message directly. The message already
   // includes the endpoint name and upstream status (e.g. "Failed to load
-  // bootstrap data: Proxy 403 — FPL API rate limited"). CONVENTIONS.md §9.
-  console.error('[Gaffer IQ] data:error —', err);
+  // bootstrap data: Proxy 403 - FPL API rate limited"). CONVENTIONS.md §9.
+  console.error('[Gaffer IQ] data:error -', err);
   if (errorText)   errorText.textContent = err.message || String(err);
   if (errorBanner) errorBanner.hidden = false;
 });
@@ -388,13 +388,13 @@ document.getElementById('app-error-retry')?.addEventListener('click', () => {
   loadInitialData({ force: true });
 });
 
-// Dev visibility — confirms the pipeline works.
+// Dev visibility - confirms the pipeline works.
 store.subscribe('data:ready', () => {
   const teams    = store.getTeams();
   const players  = store.getPlayers();
   const fixtures = store.getFixtures();
   console.log(
-    `[Gaffer IQ] data:ready — ${teams.length} teams, ${players.length} players, ${fixtures.length} fixtures.`,
+    `[Gaffer IQ] data:ready - ${teams.length} teams, ${players.length} players, ${fixtures.length} fixtures.`,
     { currentGw: store.getCurrentGw(), nextGw: store.getNextGw() },
   );
 });
@@ -412,7 +412,7 @@ const navItems       = document.querySelectorAll('.module-nav__item');
 // The route a bare URL resolves to. 'landing', not 'matchup': /projects/apps/
 // gaffer-iq/ is the front page a visitor arrives on, and the modules hang off
 // it by hash (#matchup, #ranker, …) exactly as before. Changing this default is
-// the entire routing change the landing page needed — every existing deep link
+// the entire routing change the landing page needed - every existing deep link
 // still resolves to the module it always did.
 const DEFAULT_MODULE = 'landing';
 
@@ -431,7 +431,7 @@ function routeToHash() {
 
   // Publish the route so modules can skip rendering while off screen. Set it
   // AFTER the class toggles above: a module waking on 'route:changed' renders
-  // immediately, and it must measure a section that is already visible —
+  // immediately, and it must measure a section that is already visible -
   // measuring a display:none section is what produces the zero-width layout
   // artefacts this codebase has hit before.
   store.setActiveModule(target);
@@ -489,7 +489,7 @@ window.__refresh  = () => { store.clearCache(); resetTeamXgPrefetch(); loadIniti
 
 window.__engine = {
   // `overrides` lets a console session build a context with any option
-  // replaced — e.g. context({ teamXgBySlug: {} }) forces the role tier, which
+  // replaced - e.g. context({ teamXgBySlug: {} }) forces the role tier, which
   // is how the channel-vs-role before/after comparison is captured now that
   // the boot-time prefetch (prefetchAllTeamXg) puts every team on the channel
   // tier from first paint. Accepts a bare number for the long-standing
@@ -533,7 +533,7 @@ window.__engine = {
  * the browser (F12), which is the only place the engine has real data to chew on.
  *
  * Each returns a plain object and logs a readable table. Run window.__verify.all()
- * after any config.js weight change — see GAFFER_IQ_TESTING_ROADMAP.md.
+ * after any config.js weight change - see GAFFER_IQ_TESTING_ROADMAP.md.
  */
 window.__verify = {
   /** Both weight tables must sum to exactly 1.00 (FEATURE_ENGINE.md §8.1, §10). */
@@ -547,7 +547,7 @@ window.__verify = {
     ];
     console.table(rows);
     const pass = rows.every(r => r.pass);
-    console.log(pass ? '✅ weight sums OK' : '❌ WEIGHT SUM BROKEN — fix config.js');
+    console.log(pass ? '✅ weight sums OK' : '❌ WEIGHT SUM BROKEN - fix config.js');
     return { pass, rows };
   },
 
@@ -625,7 +625,7 @@ window.__verify = {
    * §8.7 zero-sum check: for every unplayed fixture, score both sides and
    * assert value(home) + value(away) === 100 (within floating-point epsilon).
    * Also reports the biggest genuine mismatches (by |edge|) so you can eyeball
-   * that lopsided splits still happen — zero-sum is a relationship, not a
+   * that lopsided splits still happen - zero-sum is a relationship, not a
    * flattening toward 50/50.
    */
   zeroSum(limit = 10) {
@@ -657,9 +657,9 @@ window.__verify = {
     const pass = worst < EPS;
     console.log(`Checked ${rows.length} fixtures. `
       + `Worst |sum-100| observed: ${worst.toExponential(2)} `
-      + `(${pass ? 'PASS — zero-sum holds' : 'FAIL — investigate'}).`);
+      + `(${pass ? 'PASS - zero-sum holds' : 'FAIL - investigate'}).`);
     rows.sort((a, b) => b.edge - a.edge);
-    console.log(`Biggest edges (genuine mismatches — should be lopsided, still sum to 100):`);
+    console.log(`Biggest edges (genuine mismatches - should be lopsided, still sum to 100):`);
     console.table(rows.slice(0, limit));
     return { pass, worstDeviation: worst, rows };
   },

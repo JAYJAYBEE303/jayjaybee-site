@@ -1,5 +1,5 @@
 /* css/planner.css
-   TRANSFER PLANNER — ported from the design export's FINAL - Planner.dc.html
+   TRANSFER PLANNER - ported from the design export's FINAL - Planner.dc.html
    (Draft C, with src/planner-core.js). Behaviour in js/modules/planner.js and
    js/modules/planner-run.js; the shell markup in index.html.
 
@@ -22,9 +22,9 @@
   --pad: clamp(16px, 3vw, 40px);
   --ease: cubic-bezier(.2, .7, .2, 1);
   --shadow-pop: 0 16px 40px rgba(1, 4, 9, .6);
-  --pl-neutral-ink: #a2abb5;   /* neutral band text — grey is too dark on its tint */
+  --pl-neutral-ink: #a2abb5;   /* neutral band text - grey is too dark on its tint */
   --pl-scrim: rgba(1, 4, 9, .55);
-  --pl-cmd-h: 52px;            /* measured by planner.js — the settings bar wraps */
+  --pl-cmd-h: 52px;            /* measured by planner.js - the settings bar wraps */
   --tap: 32px;
   --tap-sm: 24px;
   --band-tough: var(--band-orange);
@@ -302,7 +302,7 @@
   .toast button { height: 30px; padding: 0 10px; border: 1px solid var(--color-bg); border-radius: var(--radius-sm); background: transparent; color: var(--color-bg); font-weight: 700; font-size: 12px; cursor: pointer; }
   .toast > div:not(:has(button)) { padding-right: 14px; }
 
-  /* ─── Entrances — reader-caused renders only ────────────────────────────── */
+  /* ─── Entrances - reader-caused renders only ────────────────────────────── */
 
   [data-anim] {
     .side { animation: pl-in 380ms var(--ease) both; }

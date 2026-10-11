@@ -52,7 +52,7 @@ test('groupPerGwSlots marks a blank slot and keeps it in sequence', () => {
 
 test('groupPerGwSlots orders slots by gameweek regardless of input order', () => {
   // perGw is built in window order today, but the slot sequence is what the
-  // strip renders left to right — it must not depend on that staying true.
+  // strip renders left to right - it must not depend on that staying true.
   const slots = groupPerGwSlots([
     { gw: 27, isBlank: false }, { gw: 24, isBlank: false }, { gw: 24, isBlank: false },
   ]);
@@ -87,7 +87,7 @@ test('pendingFixturesForTeam returns the team postponed fixtures', () => {
 // ─── summariseGwIrregularities ───────────────────────────────────────────────
 
 test('summariseGwIrregularities returns nothing for an ordinary window', () => {
-  // Two teams, one fixture each per gameweek. The context bar must stay hidden —
+  // Two teams, one fixture each per gameweek. The context bar must stay hidden -
   // this is the common case for most of the season.
   const ctx = {
     fixtures: [

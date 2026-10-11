@@ -1,6 +1,6 @@
 /**
  * tests/engine/counter.test.js
- * Unit tests for engine/counter.js. Pure-function tests only — plain object
+ * Unit tests for engine/counter.js. Pure-function tests only - plain object
  * inputs, no DOM, no network (CONVENTIONS.md §3.3).
  */
 
@@ -196,7 +196,7 @@ test('classifyTeamRoles still classifies, but flags estimated, on thin chain cov
   const out = classifyTeamRoles(players, ctx);
   // 500 of 3000 outfield minutes chain-covered = 0.167, below 0.75.
   assert.equal(out.estimated, true);
-  // Both still get a role — the unmatched one via ICT.
+  // Both still get a role - the unmatched one via ICT.
   assert.equal(out.rolesByPlayerId[1], 'CB');
   assert.equal(out.rolesByPlayerId[2], 'WM');
 });
@@ -266,7 +266,7 @@ test('mirroring identity holds for channel-mode pairings', () => {
   };
   // Derived exactly the way calcChannelCounter derives it, NOT hardcoded. A
   // literal here is a second source of truth that can drift from the pairings
-  // it claims to summarise — which is precisely what broke this test's first
+  // it claims to summarise - which is precisely what broke this test's first
   // version (61.177534 against a true weighted mean of 67.3265). The mirror
   // arithmetic was correct; the fixture disagreed with itself.
   const totalWeight = Object.values(pairings).reduce((t, p) => t + p.weight, 0);
@@ -286,11 +286,11 @@ test('mirroring identity holds for channel-mode pairings', () => {
     );
   }
   // Per-pairing the identity is EXACT by construction (mirrored = 100 - v, so
-  // v + (100 - v) collapses algebraically) — asserted strictly above.
+  // v + (100 - v) collapses algebraically) - asserted strictly above.
   //
   // The AGGREGATE is a different arithmetic object: two independently
   // accumulated weighted means, each carrying its own IEEE-754 rounding. It is
-  // exact in real arithmetic but not in floating point — empirically ~21% of
+  // exact in real arithmetic but not in floating point - empirically ~21% of
   // random pairing triples miss by 1 ulp on the pre-existing ROLE weights
   // (1.0/0.6/0.5) and ~6% on channel weights, so this is not a channel-tier
   // regression. Gated at the same EPS the project's own zero-sum verifier uses
@@ -304,7 +304,7 @@ test('mirroring identity holds for channel-mode pairings', () => {
 
 import { calcCounterMatchup } from '../../js/engine/counter.js';
 
-test('calcCounterMatchup is channel-only — never role or element', () => {
+test('calcCounterMatchup is channel-only - never role or element', () => {
   const out = calcCounterMatchup(
     { id: 1 }, { id: 2 },
     { playersByTeamId: {}, channelProfilesByTeamId: {} },
@@ -318,7 +318,7 @@ test('calcCounterMatchupMirrored leaves a blank pairing blank', () => {
     pairings: { setPieceThreat: { value: null, weight: 0.5, estimated: true } },
   };
   const m = calcCounterMatchupMirrored(attacking);
-  // 100 - null would be 100 — a confident-looking score invented from nothing.
+  // 100 - null would be 100 - a confident-looking score invented from nothing.
   assert.equal(m.pairings.setPieceDefence.value, null);
   assert.equal(m.value, null);
 });
@@ -327,7 +327,7 @@ import { calcCombinedCounterMatchup } from '../../js/engine/counter.js';
 
 test('calcCombinedCounterMatchup carries maturity through the blend', () => {
   // Regression: it dropped `maturity`, so metricMaturity saw undefined and
-  // defaulted to 1 — a one-match profile got full composite weight, which is
+  // defaulted to 1 - a one-match profile got full composite weight, which is
   // exactly what the ramp exists to prevent.
   const attacking = { value: 60, estimated: false, maturity: 0.125, mode: 'channel', pairings: {} };
   const defending = { value: 40, estimated: false, maturity: 0.125, pairings: {} };

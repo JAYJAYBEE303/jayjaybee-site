@@ -2,7 +2,7 @@
  * js/modules/landing.js
  * Layer: module (owns the DOM). No analytical logic, no network beyond the
  * GSAP import below.
- * Renders the landing route at /projects/apps/gaffer-iq/ — the "Matchnight
+ * Renders the landing route at /projects/apps/gaffer-iq/ - the "Matchnight
  * Scoreboard" front page, ported from the design export's
  * FINAL - Landing page.html. Markup in index.html, styles in css/landing.css.
  *
@@ -11,19 +11,19 @@
  *   1. the split-flap scoreboard (cascade, ticker picker, auto-rotation, sound),
  *   2. the hanging-board physics loop (tilt spring, sway, press, light tracking),
  *   3. the intro timeline, and the exit/enter transition to and from a module,
- *   4. one live value — the gameweek named in the ticker tag.
+ *   4. one live value - the gameweek named in the ticker tag.
  *
  * GSAP is loaded with a dynamic import from the CDN, so a blocked or slow CDN
  * costs only the intro: the board still runs, and nothing else in the app
  * waits on it. See ARCHITECTURE.md §4.
  *
- * Hiding the app chrome is NOT done here — layout.css derives it from the
+ * Hiding the app chrome is NOT done here - layout.css derives it from the
  * markup alone, so it survives first paint.
  *
  * Store subscriptions:
- *   route:changed — first entry runs the intro; a later return plays the exit
+ *   route:changed - first entry runs the intro; a later return plays the exit
  *                   back in and re-measures the board.
- *   data:ready    — fills in the real gameweek number.
+ *   data:ready    - fills in the real gameweek number.
  */
 
 import { store } from '../store.js';
@@ -39,7 +39,7 @@ const FONT_WAIT_MS = 700;
 /* ---- scoreboard tuning: change feel here ---- */
 const CFG = {
   tiltY: 9, tiltX: 6,               // max tilt toward the cursor (deg). Y auto-reduces so the far edge never leaves the viewport
-  stiffness: 48, damping: 12.5,     // tilt spring (1/s², 1/s) — ζ≈0.9: weighty, one soft settle
+  stiffness: 48, damping: 12.5,     // tilt spring (1/s², 1/s) - ζ≈0.9: weighty, one soft settle
   swayDeg: .12, swayTwist: .32, swayPeriod: 6.2,   // idle pendulum: roll + twist (deg), period (s)
   kickDeg: .45, kickTwist: .9, kickDecay: 2.2,     // extra sway after a press/landing, decays with τ (s)
   driftY: 2.2, driftX: 1.1,         // touch: autonomous drift (deg), periods 11s / 17s
@@ -509,7 +509,7 @@ function intro() {
   setTimeout(cycle, 3600);
 }
 
-/** The intro run backwards and quicker — chrome drops, headline sinks, board hauls up on its cables, ticker runs off. */
+/** The intro run backwards and quicker - chrome drops, headline sinks, board hauls up on its cables, ticker runs off. */
 function exit() {
   if (introTl && introTl.progress() < 1) introTl.progress(1);
   clearInterval(timer);
@@ -520,7 +520,7 @@ function exit() {
   const x = exitTl = gsap.timeline({ defaults: { ease: 'power3.in' } });
   x.to(q('.foot'), { opacity: 0, duration: .16 }, 0)
     .to(q('.mod'), { opacity: 0, y: 8, duration: .18, stagger: .03 }, 0)
-    // The panel behind the tiles has its own fill and border — fade it too,
+    // The panel behind the tiles has its own fill and border - fade it too,
     // or it lingers as an empty box after everything else has gone.
     .to(q('.modules'), { opacity: 0, duration: .2 }, .12)
     .to(q('.intro > *'), { y: 10, opacity: 0, duration: .2, stagger: .04 }, .02)
@@ -602,7 +602,7 @@ function onRouteChanged(moduleKey) {
 
 /**
  * Wire the landing route. Called once from main.js, after routeToHash() has
- * already seeded store.activeModule — so the initial route:changed emit has
+ * already seeded store.activeModule - so the initial route:changed emit has
  * been and gone, and the current route is read directly here instead. The
  * board is built lazily on first entry: a deep link to a module never pays for it.
  */
