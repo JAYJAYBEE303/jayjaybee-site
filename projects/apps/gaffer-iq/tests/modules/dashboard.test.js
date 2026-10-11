@@ -1,6 +1,6 @@
 /**
  * tests/modules/dashboard.test.js
- * Pure-function tests only (CONVENTIONS §3.3) — buildFixtureContextLabel takes
+ * Pure-function tests only (CONVENTIONS §3.3) - buildFixtureContextLabel takes
  * a score and returns a string, with no DOM or store involvement.
  */
 
@@ -31,11 +31,11 @@ test('buildFixtureContextLabel marks a blank gameweek', () => {
   const label = buildFixtureContextLabel({ perGw: [
     { gw: 26, opponent: null, venue: null, isBlank: true },
   ] });
-  assert.equal(label, 'GW26 — Blank');
+  assert.equal(label, 'GW26 - Blank');
 });
 
 test('buildFixtureContextLabel falls back when there is no fixture data', () => {
-  // A team with no ctx entry — must not throw, and must not claim a gameweek
+  // A team with no ctx entry - must not throw, and must not claim a gameweek
   // it does not know about.
   assert.equal(typeof buildFixtureContextLabel({ perGw: [] }), 'string');
   assert.equal(typeof buildFixtureContextLabel({}), 'string');
@@ -60,7 +60,7 @@ test('buildFixtureContextLabel names the window on a blank too', () => {
     { perGw: [{ gw: 4, opponent: null, venue: null, isBlank: true }] },
     { label: 'Next 5 GWs', gws: 5 },
   );
-  assert.equal(label, 'GW4 — Blank · Next 5 GWs');
+  assert.equal(label, 'GW4 - Blank · Next 5 GWs');
 });
 
 test('buildFixtureContextLabel adds no window suffix on a one-GW horizon', () => {

@@ -1,12 +1,12 @@
 /* css/matchup.css
-   MATCHUP ANALYSER — ported from the design export's FINAL - Matchup.html
+   MATCHUP ANALYSER - ported from the design export's FINAL - Matchup.html
    ("Draft D · Composite"). Behaviour in js/modules/matchup.js; the shell
    markup in index.html.
 
    Every rule is nested under `.mx`, the redesigned block. The Full Season
    strip is deliberately OUTSIDE that block (a sibling, in its own
    .matchup-shell) so none of these resets or short class names (.chip, .bar,
-   .side, .pop …) can reach it — it keeps its components.css styling untouched.
+   .side, .pop …) can reach it - it keeps its components.css styling untouched.
 
    Colour, spacing, radius and font tokens are base.css's own (the export
    copied them verbatim); only values this page alone needs are declared on
@@ -23,7 +23,7 @@
   --dur-slow: 420ms;
   --shadow-pop: 0 16px 40px rgba(1, 4, 9, .6);
   --space-12: 48px;
-  --mx-neutral-ink: #a2abb5;   /* neutral band text — grey is too dark on its tint */
+  --mx-neutral-ink: #a2abb5;   /* neutral band text - grey is too dark on its tint */
   --mx-scrim: rgba(1, 4, 9, .55);
   --band-tough: var(--band-orange);
   --band-tough-bg: var(--band-orange-bg);
@@ -55,7 +55,7 @@
   .wrap { max-width: 1440px; margin: 0 auto; padding: 0 var(--pad); }
   kbd { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px; border: 1px solid var(--color-border); border-radius: 3px; font: 600 11px/1 var(--font-mono); color: var(--color-muted); }
 
-  /* score chip — one rule for every band: tint + hue ring. Only excellent is solid. */
+  /* score chip - one rule for every band: tint + hue ring. Only excellent is solid. */
   .chip { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 34px; height: 24px; padding: 0 6px; border: 0; border-radius: var(--radius-sm); background: var(--bb); color: var(--bt); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--b) 60%, transparent); font: 700 13px/1 var(--font-sans); font-variant-numeric: tabular-nums; white-space: nowrap; }
   .chip[data-band=excellent] { background: var(--band-excellent); color: var(--color-bg); box-shadow: 0 0 0 1px var(--band-excellent), 0 0 14px color-mix(in srgb, var(--band-excellent) 40%, transparent); }
   .chip[data-band=extreme] { background: var(--band-extreme); }
@@ -64,7 +64,7 @@
   .chip--sm { height: 20px; min-width: 28px; font-size: 12px; padding: 0 4px; }
   /* Low-confidence score (CompositeScore.provisional): same chip, dashed ring. */
   .chip.is-est { outline: 1px dashed var(--color-estimated); outline-offset: 2px; }
-  /* Still settling — the value is withheld, the footprint kept. */
+  /* Still settling - the value is withheld, the footprint kept. */
   .chip.is-pending, .is-pending.sk-t { position: relative; overflow: hidden; background: var(--color-skeleton); color: transparent; box-shadow: none; outline: 0; }
   .chip.is-pending::after, .sk::after, .sk-t::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, var(--color-skeleton-highlight), transparent); transform: translateX(-100%); animation: mx-sk 1.3s ease-in-out infinite; }
   .sk-t { position: relative; overflow: hidden; display: inline-block; background: var(--color-skeleton); color: transparent !important; border-radius: 2px; -webkit-text-stroke: 0 !important; }
@@ -81,7 +81,7 @@
   .bar.is-est { outline: 1px dashed var(--color-estimated); outline-offset: -1px; }
   .bar.is-est > i { opacity: .45; }
   .nodata { display: inline-flex; align-items: center; gap: 6px; color: var(--color-muted); font-size: 12px; }
-  .nodata::before { content: "—"; font-weight: 700; color: var(--color-muted); }
+  .nodata::before { content: "-"; font-weight: 700; color: var(--color-muted); }
 
   /* info button */
   .ib { position: relative; flex: none; display: inline-grid; place-items: center; width: 20px; height: 20px; padding: 0; border-radius: 50%; border: 1px solid var(--color-border); background: transparent; color: var(--color-muted); font: italic 600 12px/1 Georgia, 'Times New Roman', serif; cursor: pointer; transition: color var(--dur-fast), border-color var(--dur-fast), background-color var(--dur-fast); }
@@ -110,7 +110,7 @@
   .ph__t { font: 600 22px/1 var(--font-head); letter-spacing: .05em; text-transform: uppercase; }
   .ph__m { margin-left: auto; font-size: 12px; color: var(--color-muted); }
 
-  /* popover / sheet — z-index above the app nav (100) and phone tab bar (200) */
+  /* popover / sheet - z-index above the app nav (100) and phone tab bar (200) */
   .pop { position: fixed; z-index: 230; left: 0; top: 0; width: min(360px, calc(100vw - 24px)); max-height: calc(100vh - 24px); overflow-y: auto; background: var(--color-surface-raised); border: 1px solid var(--color-border); border-radius: var(--radius-sm); box-shadow: var(--shadow-pop); padding: var(--space-4); display: grid; gap: 10px; opacity: 0; transform: translateY(4px); pointer-events: none; visibility: hidden; transition: opacity 160ms var(--ease-out), transform 160ms var(--ease-out), visibility 0s 160ms; }
   .pop.is-open { opacity: 1; transform: none; pointer-events: auto; visibility: visible; transition: opacity 160ms var(--ease-out), transform 160ms var(--ease-out); }
   .pop__t { font: 600 22px/1.05 var(--font-head); letter-spacing: .05em; text-transform: uppercase; }
@@ -188,7 +188,7 @@
   .dsep { display: flex; align-items: center; gap: var(--space-2); margin: var(--space-1) var(--space-3); font: 700 10px/1 var(--font-sans); letter-spacing: .1em; text-transform: uppercase; color: var(--color-muted); }
   .dsep::before, .dsep::after { content: ""; flex: 1; height: 1px; background: var(--color-border); }
 
-  /* Team-fixtures rows: one 32px line — crest · v opponent · H/A · GW · score. Fixed
+  /* Team-fixtures rows: one 32px line - crest · v opponent · H/A · GW · score. Fixed
      columns keep H/A, GW and the chip aligned down the list; only the name flexes. */
   .dtm--fx { grid-template-columns: 24px minmax(0, 1fr) 20px 32px 34px; gap: var(--space-2); padding: var(--space-1) var(--space-3); }
   .dtm--fx:focus-visible { outline-offset: -2px; }
@@ -293,7 +293,7 @@
   .legend .bar { width: 48px; height: 8px; }
   .legend b { color: var(--color-text); }
 
-  /* counters — donut per pairing */
+  /* counters - donut per pairing */
   .ctr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-8); }
   .ctr__h { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font: 600 18px/1 var(--font-head); text-transform: uppercase; letter-spacing: .05em; padding-bottom: 10px; border-bottom: 1px solid var(--color-border); }
   .ctr__h i { font-style: normal; color: var(--color-muted); font-size: 14px; }

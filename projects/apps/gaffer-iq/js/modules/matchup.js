@@ -2,16 +2,16 @@
  * js/modules/matchup.js
  * Layer: module. Owns the DOM for the Matchup Analyser view.
  * Side effects: DOM writes only. Reads from store; calls engine functions.
- * Renders one fixture from both teams' perspectives — the full CompositeScore
+ * Renders one fixture from both teams' perspectives - the full CompositeScore
  * breakdown, counter-matchup pairings, confidence, official FPL FDR comparison
  * and each side's 10-gameweek outlook.
- * No analytical logic lives here — all scoring delegated to engine/composite.js.
+ * No analytical logic lives here - all scoring delegated to engine/composite.js.
  * See ARCHITECTURE.md §10, FEATURE_ENGINE.md §11, ROADMAP.md Phase 1C.
  *
  * Presentation ported from the design export's FINAL - Matchup.html
  * ("Draft D · Composite"); styles in css/matchup.css. The page is a command
  * bar (fixture + team drawers), a "read it as" strip, the score tape, then
- * three sections — Why (breakdown), Detail (counter donuts), Horizon (outlook).
+ * three sections - Why (breakdown), Detail (counter donuts), Horizon (outlook).
  * The Full Season strip below it belongs to js/modules/fullSeason.js and is
  * not touched from here.
  *
@@ -38,14 +38,14 @@ import { invert, clamp } from '../util.js';
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const METRIC_LABELS = {
-  // Suffixed — the ONE row where a high number means a tougher opponent, not a
+  // Suffixed - the ONE row where a high number means a tougher opponent, not a
   // better fixture (see the label's title= tooltip and buildBreakdownRows()).
   baseDifficulty: 'Base FPL Difficulty',
   counterMatchup: 'Counter-Matchup',
   teamForm:       'Team Form',
   history:        'H2H History',
   homeAway:       'Home/Away Split',
-  // styleClash:  'Style Clash',   // removed — see WEIGHTS in config.js.
+  // styleClash:  'Style Clash',   // removed - see WEIGHTS in config.js.
   //   METRIC_ORDER derives from these keys, so dropping the label drops the row.
 };
 
@@ -57,7 +57,7 @@ const METRIC_TIEBREAK = [
 ];
 
 // Heaviest metric first. DERIVED from WEIGHTS rather than written out, so a
-// reweighting in config.js reorders the card automatically — the previous
+// reweighting in config.js reorders the card automatically - the previous
 // hand-maintained list had already drifted (homeAway at 5% sat above styleClash
 // at 10%, back when that metric existed), which is exactly the failure this
 // removes.
@@ -85,7 +85,7 @@ const MATCHUP_OUTLOOK_HORIZON = HORIZONS.GW10;
 // Both are now a literal count of matches played, so both counters tick exactly
 // once per match. counterMatchup's used to be a shot count expressed as a
 // match-equivalent, which meant it could move by 0 or 2 in a week and needed a
-// caveat to read correctly — see CHANNEL_MATURITY_FULL_MATCHES in config.js.
+// caveat to read correctly - see CHANNEL_MATURITY_FULL_MATCHES in config.js.
 const MATURITY_THRESHOLDS = {
   teamForm:       FORM_WINDOW_GWS,
   counterMatchup: CHANNEL_MATURITY_FULL_MATCHES,
@@ -93,7 +93,7 @@ const MATURITY_THRESHOLDS = {
 
 // Plain-English meaning of each breakdown metric, for the "i" popup beside its
 // row. Says what the number describes about an actual match, and names the
-// input it is read off — enough for a reader meeting the row for the first
+// input it is read off - enough for a reader meeting the row for the first
 // time to know what they are looking at, without restating the arithmetic.
 //
 // Every count in the copy is interpolated from config rather than written out:
@@ -131,8 +131,8 @@ const METRIC_MEANINGS = {
 };
 
 // Attacking pairing labels. Covers both the role-mode keys (stVsCb/wmVsFb/
-// cmVsCbDm — Phase 3C, active whenever ICT data is available) and the
-// element-fallback keys (fwdVsCb/wideMidVsFb/camVsCbMid — Phase 1, active
+// cmVsCbDm - Phase 3C, active whenever ICT data is available) and the
+// element-fallback keys (fwdVsCb/wideMidVsFb/camVsCbMid - Phase 1, active
 // when it isn't). Previously only the fallback keys were mapped, so the
 // role-mode pairings (the common case) silently rendered raw camelCase keys.
 const PAIRING_LABELS = {
@@ -149,7 +149,7 @@ const PAIRING_LABELS = {
   boxThreat:      'Box Occupation',
 };
 
-// Defending mirror of PAIRING_LABELS — same units, defender-first phrasing.
+// Defending mirror of PAIRING_LABELS - same units, defender-first phrasing.
 // Keys must match MIRRORED_PAIRING_KEYS in engine/counter.js.
 /**
  * The PHASE OF PLAY each channel axis describes, as a noun phrase that reads
@@ -158,7 +158,7 @@ const PAIRING_LABELS = {
  * Keyed by both the attacking and the defending key for the same axis, mapping
  * to the SAME phrase: a set piece is a set piece whichever end you read it
  * from. Using the row's own label instead produced "of the xG this team
- * concedes comes through set-piece defence", which is circular — the phase is
+ * concedes comes through set-piece defence", which is circular - the phase is
  * set pieces, "defence" is the perspective, and the sentence already supplies
  * the perspective.
  */
@@ -200,7 +200,7 @@ const BAND_LABEL = {
 
 /**
  * Band ranges for the score popover, written from BANDS_V2 rather than out by
- * hand — the thresholds have been retuned before (CONVENTIONS.md §5.2).
+ * hand - the thresholds have been retuned before (CONVENTIONS.md §5.2).
  */
 function bandRangesText() {
   const order = ['excellent', 'great', 'good', 'neutral', 'tough', 'brutal', 'extreme'];
@@ -219,19 +219,19 @@ const INFO_COPY = {
     kicker: 'Headline',
     title: 'Gaffer IQ Score',
     body: () => 'One 0–100 score per side: higher is a better fixture for that side’s FPL '
-      + `assets. Always shown with its band — ${bandRangesText()}. A dashed outline `
+      + `assets. Always shown with its band - ${bandRangesText()}. A dashed outline `
       + 'marks a low-confidence score.',
   },
   fdr: {
     kicker: 'Benchmark',
     title: 'FPL Fixture Difficulty',
     body: () => 'The official FPL rating, 1 (easiest) to 5 (hardest). Shown as the benchmark '
-      + 'the Gaffer IQ score replaces — it feeds the score as Base FPL Difficulty.',
+      + 'the Gaffer IQ score replaces - it feeds the score as Base FPL Difficulty.',
   },
   conf: {
     kicker: 'Certainty',
     title: 'Confidence',
-    body: () => 'How much data sits behind this score. It is not a win probability — the '
+    body: () => 'How much data sits behind this score. It is not a win probability - the '
       + 'model isn’t calibrated yet, so treat it as a data-coverage read.',
   },
   outlook: {
@@ -246,7 +246,7 @@ const INFO_COPY = {
     kicker: 'How to read',
     title: 'Counter donuts',
     body: () => 'Each ring is one attack/defence pair, and every pair splits 100. The green '
-      + 'arc is the attacking side’s share — it always starts at 12 o’clock and runs '
+      + 'arc is the attacking side’s share - it always starts at 12 o’clock and runs '
       + 'anticlockwise, on the attack side of the ring. The red arc is the defending '
       + 'side’s share, on the defence side. Whichever share is larger is drawn thicker. '
       + 'Green and red mean attack and defence here, not good and bad. The centre tag '
@@ -267,7 +267,7 @@ let _descending = false; // off-season fallback: recent played fixtures, latest 
 let _drawer = null;     // null | 'fx' | 'team'
 let _lastDrawer = null;
 let _drawerTeamId = null; // team drawer: null = the team list, else that team's season
-let _pendingRender = false;     // data changed while off screen — render on activation
+let _pendingRender = false;     // data changed while off screen - render on activation
 let _hasRendered = false;       // the first real render plays the full load sequence
 let _prev = {};                 // data-key → data-sig from the last render (what re-animates)
 const _info = new Map();        // "i" id → popover content, rebuilt every render
@@ -282,7 +282,7 @@ const RM = window.matchMedia('(prefers-reduced-motion: reduce)');
  * Is every input to `team`'s score for this fixture in yet?
  *
  * A CompositeScore blends counter-matchup, which cannot be computed until BOTH
- * teams' Understat payloads have landed in the boot-time prefetch — so a score
+ * teams' Understat payloads have landed in the boot-time prefetch - so a score
  * shown before then is provisional and will rewrite itself when they do. This
  * is the test behind every skeleton on this page: both sides of the fixture,
  * not just the card's own team, because the metric reads the pairing.
@@ -300,7 +300,7 @@ function fixtureScoreSettled(fixture) {
  * Is one scoreOverHorizon perGw entry's score final?
  *
  * The entry names its opponent only by short name, so the fixture behind it is
- * re-derived through findFixtureId — the same resolution the strip already
+ * re-derived through findFixtureId - the same resolution the strip already
  * does to make its cells clickable. An entry whose fixture cannot be resolved
  * is treated as settled: there is no team pair to wait on, so a skeleton there
  * would never clear.
@@ -396,7 +396,7 @@ function crossesChipReset(a, b) {
  * Resolve the real fixture id behind one scoreOverHorizon perGw entry, so the
  * strip cell can be clicked through to the full Matchup Analyser breakdown.
  * scoreOverHorizon (engine/composite.js) doesn't carry a fixture id on perGw
- * entries — only gw/opponent shortName/venue — so it's re-derived here from
+ * entries - only gw/opponent shortName/venue - so it's re-derived here from
  * the store rather than touching the engine. Matches on gw + venue + opponent
  * shortName, which is sufficient to disambiguate DGW's two same-gw fixtures
  * (a team can't face the same opponent twice in one gw).
@@ -433,9 +433,9 @@ function counterMatchupTooltip(m) {
          + 'is not scoring and contributes nothing to the total. The rows below '
          + 'will fill in once matches have been played.';
   }
-  const blend = `Blend of Attacking Counters (${Math.round(m.attackingValue)} — this team's `
+  const blend = `Blend of Attacking Counters (${Math.round(m.attackingValue)} - this team's `
     + `attack vs the opponent's defence) and Defending Counters (${Math.round(m.defendingValue)} `
-    + `— this team's defence vs the opponent's attack). See the sections below for the `
+    + `- this team's defence vs the opponent's attack). See the sections below for the `
     + `pairing-level detail.`;
   const maturity = m.maturity ?? 1;
   if (maturity >= 1) return blend;
@@ -446,7 +446,7 @@ function counterMatchupTooltip(m) {
 
 /**
  * Progress toward a ramping metric's full weight, or null when there is none to
- * show — either the metric doesn't ramp, or it has already arrived.
+ * show - either the metric doesn't ramp, or it has already arrived.
  *
  * Derived from `maturity` rather than from a raw game count, so the counter and
  * the weight the engine actually applied can never disagree: both read the same
@@ -455,7 +455,7 @@ function counterMatchupTooltip(m) {
  * Both ramps now count matches, so `maturity * total` lands on a whole number
  * and the rounding is exact rather than approximate. It is kept as `round`
  * rather than `floor` because floating-point division leaves values like
- * 0.8 * 5 = 4.000000000000001 and 3/5 * 5 = 2.9999999999999996 — floor turns
+ * 0.8 * 5 = 4.000000000000001 and 3/5 * 5 = 2.9999999999999996 - floor turns
  * the second into 2. The clamp to `total - 1` guards the top: a metric at 96%
  * must not round up to "10/10" and claim a completeness it has not reached.
  * That display is unreachable anyway, since `maturity >= 1` hides the counter.
@@ -469,7 +469,7 @@ function maturityProgress(key, m) {
   if (!total) return null;
 
   // A metric with no maturity field is binary and already at full weight
-  // (metricMaturity, engine/composite.js) — nothing to count toward.
+  // (metricMaturity, engine/composite.js) - nothing to count toward.
   const maturity = typeof m.maturity === 'number' ? clamp(0, 1, m.maturity) : 1;
   if (maturity >= 1) return null;
 
@@ -487,7 +487,7 @@ function maturityTooltip(key, m, progress) {
     ? `${progress.done} of the ${progress.total} matches this metric reads once the season is `
       + `under way. ${tail}`
     : `${progress.done} of the ${progress.total} matches this metric needs for full confidence. `
-      + `It reads BOTH teams, so this counts whichever side has played fewer — a team several `
+      + `It reads BOTH teams, so this counts whichever side has played fewer - a team several `
       + `matches in still waits on a newly promoted opponent. ${tail}`;
 }
 
@@ -495,7 +495,7 @@ function maturityTooltip(key, m, progress) {
  * Tooltip for the Home Advantage / Away Disadvantage breakdown row. Names the
  * actual PPG split behind the number, since the displayed value is now a
  * fixture-level modifier (both teams' venue sensitivity combined) rather than
- * a standalone read of this team alone — see engine/fixtures.js
+ * a standalone read of this team alone - see engine/fixtures.js
  * calcVenueStrengthModifier.
  *
  * @param {object} m       breakdown.homeAway
@@ -512,7 +512,7 @@ function homeAwayTooltip(m, venue) {
     ? `This team: ${m.homePPG.toFixed(2)} PPG at home vs ${m.awayPPG.toFixed(2)} PPG away.`
     : `This team: ${m.awayPPG.toFixed(2)} PPG away vs ${m.homePPG.toFixed(2)} PPG at home.`;
   return `${own} Combined with the opponent's own split, whichever team shows the bigger `
-    + `home/away gap swings this row — home always gets a boost, away always a matching `
+    + `home/away gap swings this row - home always gets a boost, away always a matching `
     + `penalty, sized by how much venue has mattered for these two teams this season.`;
 }
 
@@ -542,7 +542,7 @@ const STYLE_RULE_LABELS = {
 //  */
 // function styleClashTooltip(m) {
 //   if (m.estimated) {
-//     return 'Not enough style data for both teams — Understat pressing and '
+//     return 'Not enough style data for both teams - Understat pressing and '
 //       + 'territory numbers are needed for this metric, so it sits at a neutral '
 //       + '50 and does not affect the score.';
 //   }
@@ -569,7 +569,7 @@ const STYLE_RULE_LABELS = {
  * is. Rendered at the top of the "i" panel, above the named players.
  *
  * WHY THIS EXISTS: the panel used to open straight onto the player list, so
- * the "i" answered "who is involved" but never "what am I looking at" — the
+ * the "i" answered "who is involved" but never "what am I looking at" - the
  * score and the two percentages beside it were undocumented anywhere in the
  * UI, which made them read as arbitrary.
  *
@@ -577,7 +577,7 @@ const STYLE_RULE_LABELS = {
  * MEASURES and leaves it there; it does not tell the reader which way a high
  * score should be read. That is not an oversight. `calcChannelCounter` scores
  * an axis as `attackShare - concedeShare`, which rises as the opponent
- * concedes LESS through a channel — the reverse of the "my strength meets
+ * concedes LESS through a channel - the reverse of the "my strength meets
  * their weakness" reading the model comment describes. Until that is settled,
  * an explanation asserting a direction would be documenting behaviour the
  * engine does not have. The two shares themselves are exactly what they say,
@@ -592,11 +592,11 @@ const STYLE_RULE_LABELS = {
 function buildPairingExplainer(p, key, perspective, isChannel, hasValue) {
   if (!hasValue) {
     return `<p class="counter-pairing-info__note">`
-         + `No Understat data for this axis yet — the row fills in once the`
+         + `No Understat data for this axis yet - the row fills in once the`
          + ` season's shot data covers it. It contributes nothing to the score`
          + ` until then.</p>`;
   }
-  if (!isChannel) return '';   // retired position tier — no shares to explain
+  if (!isChannel) return '';   // retired position tier - no shares to explain
 
   // Whose share is whose depends on which section the row sits in: an
   // Attacking Counters row is this team attacking, a Defending Counters row is
@@ -623,7 +623,7 @@ function buildPairingExplainer(p, key, perspective, isChannel, hasValue) {
   return `
     <div class="counter-pairing-info__explain">
       <p class="counter-pairing-info__note">
-        Both figures are <strong>shares of a team's own xG</strong> —
+        Both figures are <strong>shares of a team's own xG</strong> -
         <em>expected goals</em>, which rates every shot from 0 to 1 by how likely
         it was to be scored, whether or not it went in. Shares, not volumes:
         they describe <em>how</em> a side scores and concedes, not how much.
@@ -637,7 +637,7 @@ function buildPairingExplainer(p, key, perspective, isChannel, hasValue) {
         The <strong>score</strong> compares those two shares against the spread
         seen across the league on this axis. It is one input to Counter-Matchup,
         which carries ${Math.round(WEIGHTS.counterMatchup * 100)}% of the fixture
-        score at full maturity — see the counter beside that row for how much of
+        score at full maturity - see the counter beside that row for how much of
         that it has earned so far.
       </p>
     </div>`.trim();
@@ -652,7 +652,7 @@ function buildPairingExplainer(p, key, perspective, isChannel, hasValue) {
  * removed because a flat top-N list says nothing the reader can act on once
  * every pairing already names its own players in context.
  *
- * Renders NOTHING when there are no duels to show — see the note at the guard
+ * Renders NOTHING when there are no duels to show - see the note at the guard
  * below. Duels are empty whenever player summaries or ICT data haven't loaded
  * (pre-season, or before the user has browsed the Ranker), which is the common
  * case and a normal condition, not an error worth announcing.
@@ -665,7 +665,7 @@ function buildPairingPlayers(duels, pairingKey, perspective) {
   const matched = duelsForPairing(duels, pairingKey);
 
   // Nothing at all when there are no players to name. This used to render a
-  // "not loaded yet — open some players in the Ranker" line, which appeared in
+  // "not loaded yet - open some players in the Ranker" line, which appeared in
   // EVERY panel (duels need lazily-fetched player summaries, so the common case
   // is empty) and read as a warning about the score. It is not one: the pairing
   // score is computed from team-level shot data and does not use duels at all.
@@ -719,7 +719,7 @@ function badgeSvg(team) {
 
 /**
  * A score chip. `pending` withholds the value (still settling) but keeps the
- * footprint; `est` is CompositeScore.provisional — a final but thin read.
+ * footprint; `est` is CompositeScore.provisional - a final but thin read.
  */
 function chip(value, o = {}) {
   const tag = o.tag || 'span';
@@ -728,7 +728,7 @@ function chip(value, o = {}) {
   const band = pending || !hasValue ? 'none' : (o.band || bandFromValue(value));
   const cls = ['chip', o.size ? `chip--${o.size}` : '', o.cls || '',
     pending ? 'is-pending' : '', (!pending && o.est) ? 'is-est' : ''].filter(Boolean).join(' ');
-  const text = pending ? '00' : (o.text ?? (hasValue ? Math.round(value) : '—'));
+  const text = pending ? '00' : (o.text ?? (hasValue ? Math.round(value) : '-'));
   const label = o.aria ?? (pending ? 'Still calculating'
     : hasValue ? `${Math.round(value)} ${BAND_LABEL[band] ?? ''}` : 'No data');
   return `<${tag} class="${cls}" data-band="${band}"${tag === 'button' ? ' type="button"' : ''}`
@@ -764,7 +764,7 @@ function sec(id, kicker, title, meta, body) {
 
 /**
  * Score the selected fixture for both teams. Exactly the engine calls the
- * page has always made — this only gathers them into one object for the
+ * page has always made - this only gathers them into one object for the
  * renderers below.
  * @returns {object|null}
  */
@@ -778,14 +778,14 @@ function computeMatch(fixture, ctx) {
   const awayScore = scoreFixture(awayTeam, fixture, ctx);
 
   // Per-team individual duels. Each call scores team A's attackers against
-  // team B's likely defenders — asymmetric, mirrors calcCounterMatchup. Empty
+  // team B's likely defenders - asymmetric, mirrors calcCounterMatchup. Empty
   // when player summaries / ICT data aren't sufficient.
   const homeDuels = calcIndividualDuels(homeTeam, awayTeam, ctx);
   const awayDuels = calcIndividualDuels(awayTeam, homeTeam, ctx);
 
   // Defending counters: the SAME attack-vs-defence pairing as the other side's
   // attacking counters, re-read from the defending side (100 - value, by
-  // construction — see calcCounterMatchupMirrored). Home's defence faced
+  // construction - see calcCounterMatchupMirrored). Home's defence faced
   // away's attack, so home's mirror comes from awayScore's pairings.
   const homeDefending = calcCounterMatchupMirrored(awayScore.breakdown.counterMatchup);
   const awayDefending = calcCounterMatchupMirrored(homeScore.breakdown.counterMatchup);
@@ -793,7 +793,7 @@ function computeMatch(fixture, ctx) {
   const side = (team, venue, score, fdr, duels, defending) => {
     const outlook = scoreOverHorizon(team, horizon, ctx);
     // The aggregate reads EVERY gameweek in the window, so it is only final
-    // once every opponent across it has settled — stricter than this fixture.
+    // once every opponent across it has settled - stricter than this fixture.
     const outlookSettled = outlook.perGw.every(e => e.isBlank || perGwEntrySettled(team, e));
     return { team, venue, score, fdr, duels, defending, outlook, outlookSettled };
   };
@@ -844,27 +844,27 @@ function frameHTML(m) {
   const conf = s => Math.round(s.score.confidence * 100);
 
   const scoreCtx = settled
-    ? sides.map(s => `${esc(s.team.name)} ${Math.round(s.score.value)} — ${BAND_LABEL[bandFromValue(s.score.value)]}`
+    ? sides.map(s => `${esc(s.team.name)} ${Math.round(s.score.value)} - ${BAND_LABEL[bandFromValue(s.score.value)]}`
       + `${s.score.provisional ? ' (low confidence)' : ''}`).join(' · ')
-    : 'Still calculating — waiting on this fixture’s counter-matchup data.';
+    : 'Still calculating - waiting on this fixture’s counter-matchup data.';
   const fdrCtx = sides.map(s => `${esc(s.team.name)} ${s.fdr} / 5`).join(' · ');
   const confCtx = settled ? sides.map(s => `${esc(s.team.name)} ${conf(s)}%`).join(' · ') : 'Still calculating.';
 
   return `<section class="frame" id="mx-frame" data-rv aria-labelledby="mx-frame-t">
     <div class="frame__k"><span class="lbl">Read it as</span><h2 class="frame__t" id="mx-frame-t">Three numbers, three jobs</h2></div>
-    <div class="role"><div class="role__h"><span class="lbl">Headline</span><em>Gaffer IQ score — the answer</em>${
+    <div class="role"><div class="role__h"><span class="lbl">Headline</span><em>Gaffer IQ score - the answer</em>${
       infoButton('frame-score', { ...copy('score'), ctx: `<p>${scoreCtx}</p>` }, 'the Gaffer IQ score')}</div>${
       two(s => {
         if (!settled) return `<span class="rv__n">${chip(null, { size: 'lg', pending: true })}<span class="bandname sk-t">Settling</span></span>`;
         const b = bandFromValue(s.score.value);
         return `<span class="rv__n">${chip(s.score.value, { size: 'lg', est: s.score.provisional })}<span class="bandname" data-band="${b}">${BAND_LABEL[b]}</span></span>`;
       })}</div>
-    <div class="role"><div class="role__h"><span class="lbl">Benchmark</span><em>Official FPL FDR — what it replaces</em>${
+    <div class="role"><div class="role__h"><span class="lbl">Benchmark</span><em>Official FPL FDR - what it replaces</em>${
       infoButton('frame-fdr', { ...copy('fdr'), ctx: `<p>${fdrCtx}</p>` }, 'FPL fixture difficulty')}</div>${
       two(s => (typeof s.fdr === 'number'
         ? `<span class="rv__n">${s.fdr}<small>/ 5</small>${pips(s.fdr)}</span>`
         : '<span class="rv__n"><span class="nodata">No data</span></span>'))}</div>
-    <div class="role"><div class="role__h"><span class="lbl">Certainty</span><em>Confidence — data behind it</em>${
+    <div class="role"><div class="role__h"><span class="lbl">Certainty</span><em>Confidence - data behind it</em>${
       infoButton('frame-conf', { ...copy('conf'), ctx: `<p>${confCtx}</p>` }, 'confidence')}</div>${
       two(s => (settled
         ? `<span class="rv__n">${conf(s)}%<span class="meter${s.score.provisional ? ' is-low' : ''}" aria-hidden="true"><i style="--v:${conf(s) / 100}"></i></span></span>`
@@ -895,7 +895,7 @@ function sideHTML(s, cls, k, edge, settled) {
     : '<span class="numw"><span class="num sk-t" aria-label="Still calculating">00</span></span>';
   const slab = settled
     ? `<span class="slab" data-rv data-late><span class="bandname">${BAND_LABEL[b]}</span>${
-      infoButton(`tape-${k}`, { ...copy('score'), ctx: `<p>${esc(s.team.name)} ${v} — ${BAND_LABEL[b]}${s.score.provisional ? ' (low confidence)' : ''}</p>` }, 'the Gaffer IQ score')}</span>`
+      infoButton(`tape-${k}`, { ...copy('score'), ctx: `<p>${esc(s.team.name)} ${v} - ${BAND_LABEL[b]}${s.score.provisional ? ' (low confidence)' : ''}</p>` }, 'the Gaffer IQ score')}</span>`
     : '<span class="slab" data-rv data-late><span class="bandname sk-t">Settling</span></span>';
   return `<div class="side ${cls}" data-band="${b}"${edge ? ' data-edge' : ''} data-rv>`
     + `<span class="side__bg" aria-hidden="true" style="--bg:url('${esc(badgeSvg(s.team))}')"></span>`
@@ -916,7 +916,7 @@ function tapeHTML(m) {
       + `<span class="verdict__s">${hs} ${BAND_LABEL[bandFromValue(hs)]} against ${as} ${BAND_LABEL[bandFromValue(as)]}</span>`;
   } else verdict = '<span class="verdict__t">Level</span>';
   return PITCH + sideHTML(home, 'side--h', 'h', eH, settled)
-    + `<div class="axis"><span class="lbl">GW${esc(String(fixture.gw ?? '—'))}</span><span class="v">v</span></div>`
+    + `<div class="axis"><span class="lbl">GW${esc(String(fixture.gw ?? '-'))}</span><span class="v">v</span></div>`
     + sideHTML(away, 'side--a', 'a', eA, settled)
     + `<p class="verdict" data-rv data-late>${verdict}</p>`;
 }
@@ -933,7 +933,7 @@ function bar(v, rtl, i, key, est) {
 /**
  * One side's cell pair for a breakdown row: the value and the bar.
  * baseDifficulty is STORED as the opponent's strength (higher = harder), so it
- * is banded on invert(value) — colour then means the same on every row:
+ * is banded on invert(value) - colour then means the same on every row:
  * green = good for this team. The displayed number is untouched.
  */
 function metricCells(key, mm, pending, side, i) {
@@ -967,10 +967,10 @@ function breakdownHTML(m) {
     const fmt = mm => (pending ? 'settling' : typeof mm.value === 'number' ? Math.round(mm.value) : 'no data');
 
     // Context lines: this fixture's two readings plus the per-side notes the
-    // old card carried as hover titles — nothing dropped, just moved here.
+    // old card carried as hover titles - nothing dropped, just moved here.
     const ctx = [`<p><b>${esc(home.team.name)}</b> ${fmt(hm)} · <b>${esc(away.team.name)}</b> ${fmt(am)}</p>`];
     if (key === 'baseDifficulty') {
-      ctx.push('<p>Shows the OPPONENT’s strength — a high number means a tougher opponent for this '
+      ctx.push('<p>Shows the OPPONENT’s strength - a high number means a tougher opponent for this '
         + 'team. The bar colour reflects how good this fixture is for this team, same as every other row.</p>');
     }
     if (key === 'counterMatchup' && !pending) {
@@ -978,8 +978,8 @@ function breakdownHTML(m) {
         `<p><b>${esc(away.team.name)}:</b> ${esc(counterMatchupTooltip(am))}</p>`);
     }
     if (key === 'homeAway') {
-      ctx.push(`<p><b>${esc(home.team.name)} — Home Advantage:</b> ${esc(homeAwayTooltip(hm, 'Home'))}</p>`,
-        `<p><b>${esc(away.team.name)} — Away Disadvantage:</b> ${esc(homeAwayTooltip(am, 'Away'))}</p>`);
+      ctx.push(`<p><b>${esc(home.team.name)} - Home Advantage:</b> ${esc(homeAwayTooltip(hm, 'Home'))}</p>`,
+        `<p><b>${esc(away.team.name)} - Away Disadvantage:</b> ${esc(homeAwayTooltip(am, 'Away'))}</p>`);
     }
     for (const [s, mm] of [[home, hm], [away, am]]) {
       const pr = pending ? null : maturityProgress(key, mm);
@@ -1002,8 +1002,8 @@ function breakdownHTML(m) {
     `<span class="side-key"><b>‹ ${esc(home.team.name)}</b> · bars grow out from the halfway line · <b>${esc(away.team.name)} ›</b></span>`,
     `<div class="mir">${rows}</div>`
     + '<div class="legend">'
-    + '<span><span class="bar bar--zero is-on" data-band="brutal"><i style="--v:0"></i></span><b>0</b> computed zero — empty bar, origin marked</span>'
-    + '<span><span class="nodata">No data</span> factor couldn’t be computed — no bar drawn</span>'
+    + '<span><span class="bar bar--zero is-on" data-band="brutal"><i style="--v:0"></i></span><b>0</b> computed zero - empty bar, origin marked</span>'
+    + '<span><span class="nodata">No data</span> factor couldn’t be computed - no bar drawn</span>'
     + '<span><span class="bar is-est is-on" data-band="neutral"><i style="--v:.6"></i></span>dashed = estimated (fallback input)</span>'
     + '<span>Base FPL Difficulty runs the other way: its bar is coloured by how easy that makes the fixture.</span>'
     + '</div>');
@@ -1044,15 +1044,15 @@ function donutKey() {
     + '<span><svg class="dkey__sw" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 4a12 12 0 0 0 -12 12" class="dkey__a"/></svg><span><b>Green</b> = attack share</span></span>'
     + '<span><svg class="dkey__sw" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 4a12 12 0 0 1 12 12" class="dkey__d"/></svg><span><b>Red</b> = defence share</span></span>'
     + '<span class="dkey__no">Not good/bad</span><span>Thicker arc = larger share</span>'
-    + `<span class="dkey__ex">${mini(0, 100, 'Example: real zero — full red ring, tick at 12 o’clock')}Real 0 — full red, tick at 12</span>`
-    + `<span class="dkey__ex">${mini(null, null, 'Example: no data — dashed ring', 'missing')}No data — dashed ring</span></div>`;
+    + `<span class="dkey__ex">${mini(0, 100, 'Example: real zero - full red ring, tick at 12 o’clock')}Real 0 - full red, tick at 12</span>`
+    + `<span class="dkey__ex">${mini(null, null, 'Example: no data - dashed ring', 'missing')}No data - dashed ring</span></div>`;
 }
 
-/** "Atk 24% / Def 32%" — the two inputs as the old card's detail line showed them. */
+/** "Atk 24% / Def 32%" - the two inputs as the old card's detail line showed them. */
 function pairingIO(p, perspective) {
   const isChannel = p.attackShare !== undefined;
-  const asPct = v => (typeof v === 'number' ? `${Math.round(v * 100)}%` : '—');
-  const asScore = v => (typeof v === 'number' ? String(Math.round(v)) : '—');
+  const asPct = v => (typeof v === 'number' ? `${Math.round(v * 100)}%` : '-');
+  const asScore = v => (typeof v === 'number' ? String(Math.round(v)) : '-');
   const atk = isChannel ? asPct(p.attackShare) : asScore(p.attackForm);
   const def = isChannel ? asPct(p.concedeShare) : asScore(p.defenceForm);
   return perspective === 'defending' ? `Def ${def} / Atk ${atk}` : `Atk ${atk} / Def ${def}`;
@@ -1067,7 +1067,7 @@ function donutRow(A, D, key, p, dKey, dp, i, settled) {
   const aLabel = PAIRING_LABELS[key] ?? key;
   const dLabel = DEFENDING_PAIRING_LABELS[dKey] ?? dKey;
   const head = PAIRING_SHORT[key] ?? aLabel;
-  const shown = v => (!settled ? 'settling' : !hasValue ? '—' : p.estimated ? 'N/A' : v);
+  const shown = v => (!settled ? 'settling' : !hasValue ? '-' : p.estimated ? 'N/A' : v);
   const state = !settled ? 'pending' : usable ? 'live' : 'missing';
   const label = !settled ? `${head}: still calculating`
     : !usable ? `${head}: no data for ${A.team.name} attack against ${D.team.name} defence`
@@ -1120,11 +1120,11 @@ function countersHTML(m) {
 
 // ─── Render: outlook (Horizon) ────────────────────────────────────────────────
 
-/** Tooltip text for one outlook entry — the old strip cell's title, unchanged in substance. */
+/** Tooltip text for one outlook entry - the old strip cell's title, unchanged in substance. */
 function entryLabel(e) {
-  if (e.isBlank) return `GW${e.gw} — blank (no fixture)`;
+  if (e.isBlank) return `GW${e.gw} - blank (no fixture)`;
   return `GW${e.gw} · ${e.opponent ?? ''} (${e.venue ?? ''}) · ${Math.round(e.value)} ${BAND_LABEL[bandFromValue(e.value)]}`
-    + `${e.provisional ? ' (low confidence)' : ''}${e.provisionalKickoff ? ' — kickoff TBC' : ''}`;
+    + `${e.provisional ? ' (low confidence)' : ''}${e.provisionalKickoff ? ' - kickoff TBC' : ''}`;
 }
 
 function outlookHTML(m) {
@@ -1159,9 +1159,9 @@ function outlookHTML(m) {
         const idAttr = fixtureId !== null ? ` data-fixture-id="${fixtureId}" data-team-id="${team.id}"` : ' data-static';
         const cur = fixtureId === fixture.id ? ' aria-current="true"' : '';
         // Per cell, not per strip: the gameweeks that ARE final stay readable
-        // while the rest fill in. The cell stays clickable — only the value is withheld.
+        // while the rest fill in. The cell stays clickable - only the value is withheld.
         if (fixtureId !== null && !fixtureScoreSettled(store.getFixture(fixtureId))) {
-          const tip = `GW${e.gw} ${e.opponent ?? ''} (${e.venue ?? ''}) — still calculating`;
+          const tip = `GW${e.gw} ${e.opponent ?? ''} (${e.venue ?? ''}) - still calculating`;
           return chip(null, { tag: 'button', cls: 'oc', pending: true, tip, aria: tip,
             attrs: `${idAttr}${cur} data-rv data-key="${key}" data-sig="p" tabindex="-1"` });
         }
@@ -1172,7 +1172,7 @@ function outlookHTML(m) {
       }).join('')}</li>`;
     }).join('');
     return `<div class="ol__team">${crest(team, 24)}${esc(team.shortName)}${tbd}${summary}</div>`
-      + `<ul class="ol__chips" aria-label="${esc(team.name)}, ${esc(horizon.label.toLowerCase())} — arrow keys to move">${cells}</ul>`;
+      + `<ul class="ol__chips" aria-label="${esc(team.name)}, ${esc(horizon.label.toLowerCase())} - arrow keys to move">${cells}</ul>`;
   };
 
   return sec('horizon', 'Horizon', `${esc(horizon.label)} outlook`,
@@ -1286,7 +1286,7 @@ function renderMatchup(mode = 'switch') {
   if (m.settled) _el.tape.removeAttribute('aria-busy');
   else _el.tape.setAttribute('aria-busy', 'true');
   _el.main.innerHTML = breakdownHTML(m) + countersHTML(m) + outlookHTML(m)
-    + '<p class="foot">Confidence is data coverage, not a win probability — the model isn’t calibrated yet.</p>';
+    + '<p class="foot">Confidence is data coverage, not a win probability - the model isn’t calibrated yet.</p>';
   _el.main.querySelectorAll('.ol__chips').forEach(u => roving(u, '.oc'));
 
   const first = !_hasRendered;
@@ -1398,7 +1398,7 @@ function hideTip(t) {
 
 // ─── Drawers: fixtures (by gameweek) and teams (each team's season) ───────────
 
-/** One fixture's score chip for `team` — skeleton while either side's payload is in flight. */
+/** One fixture's score chip for `team` - skeleton while either side's payload is in flight. */
 function fixtureChip(team, fixture, ctx) {
   if (!ctx) return chip(null, { pending: true, aria: '' });
   // Per FIXTURE, not per side: counter-matchup reads both sides, so one team's
@@ -1420,7 +1420,7 @@ function fixtureDrawerHTML(ctx) {
   }).join('');
   return `<div class="drawer__h">
       <button type="button" class="step" data-gw="prev" aria-label="Previous gameweek"${first ? ' data-off disabled' : ''}>‹</button>
-      <h2 id="mx-drawer-t">GW${esc(String(group?.gw ?? '—'))} fixtures</h2>
+      <h2 id="mx-drawer-t">GW${esc(String(group?.gw ?? '-'))} fixtures</h2>
       <button type="button" class="step" data-gw="next" aria-label="Next gameweek"${last ? ' data-off disabled' : ''}>›</button>
       <button type="button" class="btn" data-close>Close</button>
     </div>
@@ -1449,7 +1449,7 @@ function teamDrawerHTML(ctx) {
         ch = fixtureChip(t, f, ctx);
       }
       return `<button type="button" class="dtm" data-team="${t.id}" aria-current="${t.id === _leadTeamId}"`
-        + ` aria-label="${esc(`${t.name} — show its fixtures`)}">${crest(t, 24)}<span>${esc(t.name)}</span>${next}${ch}</button>`;
+        + ` aria-label="${esc(`${t.name} - show its fixtures`)}">${crest(t, 24)}<span>${esc(t.name)}</span>${next}${ch}</button>`;
     }).join('');
     return `<div class="drawer__h"><h2 id="mx-drawer-t">Teams</h2><button type="button" class="btn" data-close>Close</button></div>
       <div class="drawer__b" id="mx-dlist">${rows}</div>

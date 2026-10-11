@@ -4,7 +4,7 @@
  *
  * Turns the six lane scores from engine/transfers.js into one weekly verdict:
  * which lane to act on, how far ahead of the runner-up it is, and which hard
- * conditions — an injured starter, a chip window, a cash crunch — override the
+ * conditions - an injured starter, a chip window, a cash crunch - override the
  * arithmetic.
  *
  * "Roll the transfer" is a lane here, not a fallback. A planner that always
@@ -21,7 +21,7 @@ import {
   CHIP_WINDOW_GWS, FLEX_FLOOR, PRICE_BUY_NOW_CONFIDENCE, CHIP_LABELS,
 } from '../config.js';
 
-// Tie-break priority when more than one chip's recommended GW is equally near —
+// Tie-break priority when more than one chip's recommended GW is equally near -
 // the sharper, more time-critical chips win. See detectTriggers' MODEL note.
 const CHIP_TRIGGER_PRIORITY = ['triplecaptain', 'benchboost', 'freehit', 'wildcard'];
 
@@ -52,7 +52,7 @@ const LANE_LABELS = {
  * MODEL: this is the load-bearing and most arbitrary step in the design.
  * Without a shared scale, "a swing of +6" and "frees £0.5m" have no common
  * language and the margin below is meaningless. The divisors are calibration
- * targets, not truths — the first thing to tune against realised results per
+ * targets, not truths - the first thing to tune against realised results per
  * ROADMAP.md Phase 3B.
  *
  * @returns {number}  0–100, higher = a stronger case for acting on this lane
@@ -85,7 +85,7 @@ function rankLanes(swaps) {
 
 /**
  * Hard conditions that may promote a lane past the arithmetic. Each carries its
- * own headline reason and is always reported — detecting a trigger never by
+ * own headline reason and is always reported - detecting a trigger never by
  * itself reorders anything; buildVerdict decides whether it actually promotes.
  *
  * @returns {Array<{id: string, laneId: string, message: string}>}
@@ -109,19 +109,19 @@ function detectTriggers(swaps, squadState, ctx) {
       id: 'cashCrunch',
       laneId: 'funds',
       // Flexibility is what DETECTS the crunch; it is no longer what the Funds
-      // board ranks by (that is points gained per £m freed — see
+      // board ranks by (that is points gained per £m freed - see
       // engine/transfers.js's scoreFundsLane). The message therefore names the
       // symptom and then points at what the board will actually show, rather
       // than promising a flexibility ranking the board no longer provides.
-      message: `Squad flexibility is ${flexibility.toFixed(0)} — your money is `
+      message: `Squad flexibility is ${flexibility.toFixed(0)} - your money is `
              + 'clumped tightly enough that upgrading anyone is getting hard. '
              + 'Funds & Flexibility lists the cheaper players who still improve '
              + 'your XI.',
     });
   }
 
-  // MODEL: chips.js always recommends a best gameweek for every chip — there is
-  // no "no recommendation" state — so without a cap this trigger would fire for
+  // MODEL: chips.js always recommends a best gameweek for every chip - there is
+  // no "no recommendation" state - so without a cap this trigger would fire for
   // several chips most weeks (wildcard, free hit and bench boost all landing in
   // the same nearby window is the common case, not the exception) and drown out
   // the genuinely sharp signals the other triggers carry. At most one chip
@@ -131,7 +131,7 @@ function detectTriggers(swaps, squadState, ctx) {
   // one on the scoreboard: once a round has kicked off its deadline has gone
   // and modules/planner.js advances the context to the next one. Distances
   // below are therefore measured from the first gameweek the user can still
-  // act in — the only frame in which "plan transfers around it" means anything.
+  // act in - the only frame in which "plan transfers around it" means anything.
   const currentGw = ctx?.currentGw ?? 0;
   let nearestChip = null;
   for (const [chipId, rec] of Object.entries(squadState?.chipRecs ?? {})) {
@@ -149,7 +149,7 @@ function detectTriggers(swaps, squadState, ctx) {
   if (nearestChip) {
     const { chipId, gw, distance } = nearestChip;
     // "this gameweek" would be a lie whenever the live round has already
-    // started — the nearest actionable gameweek is the one being planned, not
+    // started - the nearest actionable gameweek is the one being planned, not
     // the one being played.
     const distancePhrase = distance === 0 ? 'the gameweek you are planning'
       : `${distance} ${distance === 1 ? 'gameweek' : 'gameweeks'} away`;
@@ -157,14 +157,14 @@ function detectTriggers(swaps, squadState, ctx) {
       id: 'chipWindow',
       laneId: chipId === 'triplecaptain' ? 'ceiling' : 'future',
       message: `${CHIP_LABELS[chipId] ?? chipId} looks strongest in GW${gw}, `
-             + `${distancePhrase} — plan transfers around it.`,
+             + `${distancePhrase} - plan transfers around it.`,
     });
   }
 
   // Gated on confidence, not just direction: calcPriceChangeRisk (engine/prices.js)
   // reports direction:'rise' for any net-positive transfer flow above its activity
   // floor, including thin, noisy signals. PRICE_BUY_NOW_CONFIDENCE is the same bar
-  // the planner's own "Buy now" badge uses — reusing it keeps this trigger no more
+  // the planner's own "Buy now" badge uses - reusing it keeps this trigger no more
   // trigger-happy than that UI already is.
   const risingTarget = swaps.find(s =>
     s.lanes?.funds?.components?.priceRisk === 'rise'
@@ -174,7 +174,7 @@ function detectTriggers(swaps, squadState, ctx) {
     triggers.push({
       id: 'priceDeadline',
       laneId: 'funds',
-      message: `${risingTarget.inPlayer.name} is trending towards a price rise — `
+      message: `${risingTarget.inPlayer.name} is trending towards a price rise - `
              + 'buying later costs more.',
     });
   }
@@ -184,30 +184,30 @@ function detectTriggers(swaps, squadState, ctx) {
 
 /**
  * Build the week's verdict: which lane to act on (or whether to roll), how
- * confident that call is, and what — if anything — overrode the arithmetic.
+ * confident that call is, and what - if anything - overrode the arithmetic.
  *
  * Selection has two stages. First, the six lanes are ranked by their best
  * swap's normalised score (0–100, see normaliseLaneValue); the top-ranked lane
  * is the "arithmetic leader" and only wins outright if its score clears
- * VERDICT_ACT_THRESHOLD — otherwise the verdict rolls. Second, any lane with a
+ * VERDICT_ACT_THRESHOLD - otherwise the verdict rolls. Second, any lane with a
  * fired trigger (see detectTriggers) that ALSO clears VERDICT_ACT_THRESHOLD is a
  * promotion candidate; the highest-scoring such lane, if it differs from the
- * arithmetic leader, is promoted to be the verdict's lane instead — even when
+ * arithmetic leader, is promoted to be the verdict's lane instead - even when
  * the arithmetic leader itself didn't clear the threshold. A promotion always
  * reports confidence 'clear' (a hard condition is not a close call) before the
  * estimated-data downgrade below is applied. This is spec §8.3's "hard triggers
  * can jump the queue and say so".
  *
  * `margin` always means the arithmetic leader's normalised score minus the
- * runner-up's (never negative) — it describes how the lanes actually compare
+ * runner-up's (never negative) - it describes how the lanes actually compare
  * and keeps that meaning whether or not a promotion changed which lane won.
  *
  * Honesty rule (spec §8.4): a winning lane whose swap is itself flagged
- * `estimated` never reports the same confidence a measured winner would —
+ * `estimated` never reports the same confidence a measured winner would -
  * 'dominant' is downgraded to 'clear', and 'clear' (including a fresh
  * promotion) is downgraded to 'close'.
  *
- * @param {Array<object>} swaps        Swap[] from enumerateSwaps() — each with
+ * @param {Array<object>} swaps        Swap[] from enumerateSwaps() - each with
  *   `lanes.{now,future,funds,ceiling,structure}` as
  *   `{ value: number, components: object, estimated: boolean, reasoning: string }`,
  *   plus `flags.{outInXi, inEntersXi, outUnavailable}`, `outPlayer`, `inPlayer`.
@@ -215,7 +215,7 @@ function detectTriggers(swaps, squadState, ctx) {
  *           freeTransfers: number,
  *           chipRecs: Object<string, { gw: number, reasoning: string }> }} squadState
  * @param {{ currentGw: number }} ctx   from buildScoreContext(). `currentGw` is
- *   the gameweek being PLANNED — see modules/planner.js getPlanningTiming(),
+ *   the gameweek being PLANNED - see modules/planner.js getPlanningTiming(),
  *   which advances it past a round that has already kicked off.
  * @returns {{
  *   lane: 'now'|'future'|'funds'|'ceiling'|'structure'|'roll',
@@ -253,16 +253,16 @@ export function buildVerdict(swaps, squadState, ctx) {
   if (!promoted && (!winner || winner.score < VERDICT_ACT_THRESHOLD)) {
     // No triggerNote here: the structured `triggers` list this verdict already
     // carries is rendered as its own bulleted list by the module (with the `!`
-    // marker) — repeating the same sentences in prose read as broken, not
+    // marker) - repeating the same sentences in prose read as broken, not
     // thorough. See spec revision in the multi-lens transfers task-8 review.
     const estimatedNote = winner?.estimated
       ? ' Some of the inputs behind this are estimated, so treat it as a lean rather '
         + 'than a certainty.'
       : '';
     const headline = winner
-      ? `${LANE_LABELS.roll} — the best move, ${LANE_LABELS[winner.laneId]}, scores `
+      ? `${LANE_LABELS.roll} - the best move, ${LANE_LABELS[winner.laneId]}, scores `
         + `${winner.score.toFixed(0)} against a threshold of ${VERDICT_ACT_THRESHOLD}.`
-      : `${LANE_LABELS.roll} — no legal transfers are available within your budget.`;
+      : `${LANE_LABELS.roll} - no legal transfers are available within your budget.`;
     return {
       lane: 'roll',
       laneScore: winner?.score ?? 0,
@@ -303,7 +303,7 @@ export function buildVerdict(swaps, squadState, ctx) {
   // as its own bulleted list by the module, so repeating trigger messages in
   // prose here would duplicate it. The one exception is the promotion
   // headline just below, which must keep stating the promoting trigger's
-  // message — that sentence is what explains why a lower-scoring lane won.
+  // message - that sentence is what explains why a lower-scoring lane won.
   if (promoted) {
     const leadTrigger = triggers.find(t => t.id === promotedBy);
     const leaderLabel = LANE_LABELS[leader.laneId];
@@ -315,7 +315,7 @@ export function buildVerdict(swaps, squadState, ctx) {
     // estimated-data downgrade above can drop 'clear'/'dominant' to 'close'
     // on a margin that was already ≥ VERDICT_MARGIN_CLEAR, but `alternatives`
     // is filtered on that same margin and was computed before the downgrade
-    // — it has nothing within range to name. That disagreement is intentional
+    // - it has nothing within range to name. That disagreement is intentional
     // (the downgrade is about honesty re: estimated data, not about how far
     // apart the lanes actually are), so only the SENTENCE falls back here;
     // `confidence` itself is left as 'close' for the banner's badge/CSS.
@@ -324,7 +324,7 @@ export function buildVerdict(swaps, squadState, ctx) {
     headline =
         confidence === 'dominant' ? `${winnerLabel} is in a different league this week.`
       : canNameAlternatives
-        ? `Close call — ${winnerLabel}, but ${altNames} `
+        ? `Close call - ${winnerLabel}, but ${altNames} `
           + `${alternatives.length === 1 ? 'is' : 'are'} within ${VERDICT_MARGIN_CLEAR} points.`
         : `${winnerLabel}, clearly.`;
   }

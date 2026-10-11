@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-derive_constants.py — regenerate every model constant in the Understat channel
+derive_constants.py - regenerate every model constant in the Understat channel
 counters spec from live Understat data.
 
 Source of truth for:
@@ -11,7 +11,7 @@ Source of truth for:
       2026-08-20-understat-channel-counters-design.md
 
 Run this to re-validate the constants against a newer season. It fetches
-Understat's real internal JSON endpoints — the same ones api/fpl.js proxies —
+Understat's real internal JSON endpoints - the same ones api/fpl.js proxies -
 and needs only the standard library plus network access.
 
     python derive_constants.py --season 2025 --out ./understat-cache
@@ -96,7 +96,7 @@ def pct(v, k):
 # ── part 1: role signatures ─────────────────────────────────────────────────
 
 def role_signatures(league):
-    """buildupShare / createBias per player — mirrors buildRoleSignature()."""
+    """buildupShare / createBias per player - mirrors buildRoleSignature()."""
     out = []
     for p in league['players']:
         minutes, chain = float(p['time']), float(p['xGChain'])
@@ -123,7 +123,7 @@ def bucket(pos):
 
     Understat reports the SET of position groups a player has appeared in
     ('D M S' = defender, midfielder, substitute), not a single role. This is a
-    proxy only — the engine uses real FPL element_type. Expect a handful of
+    proxy only - the engine uses real FPL element_type. Expect a handful of
     hybrids (Rice, Curtis Jones) to land in the wrong bucket here.
     """
     if pos.strip() in ('S', 'F S', 'F'):
@@ -138,7 +138,7 @@ def bucket(pos):
 
 def report_roles(players):
     print('=' * 72)
-    print('PART 1 — ROLE SIGNATURE (feeds ROLE_SIGNATURE_THRESHOLDS)')
+    print('PART 1 - ROLE SIGNATURE (feeds ROLE_SIGNATURE_THRESHOLDS)')
     print('=' * 72)
     for p in players:
         p['bucket'] = bucket(p['position'])
@@ -153,7 +153,7 @@ def report_roles(players):
             cells.append(f'{pct(v,.25):.2f}/{pct(v,.5):.2f}/{pct(v,.75):.2f}'.rjust(18))
         print(f'{b:8s} {len(g):>4d}  ' + '  '.join(cells) + '   (p25/p50/p75)')
 
-    # The two headline correlations are computed over PURE defenders — those
+    # The two headline correlations are computed over PURE defenders - those
     # Understat never lists in midfield. Hybrids ('D M S': Rice, Zubimendi,
     # Curtis Jones) genuinely sit between the FB and CB clusters, so including
     # them measures a different question and blunts both figures
@@ -183,7 +183,7 @@ def report_roles(players):
             return 'SS' if p['buildupShare'] >= T['fwdSsBuildupShareMin'] else 'ST'
         return 'GKP'
 
-    print('\nGroups produced by the published thresholds — sanity-check the names:')
+    print('\nGroups produced by the published thresholds - sanity-check the names:')
     for role in ('FB', 'CB', 'WM', 'CM', 'DM', 'SS', 'ST'):
         g = sorted(p['name'] for p in players if classify(p) == role)
         print(f'  {role:3s} n={len(g):3d}  {", ".join(g[:7])}')
@@ -192,7 +192,7 @@ def report_roles(players):
 # ── part 2: channel axes ────────────────────────────────────────────────────
 
 def axis_shares(stats):
-    """Three axis shares per side — mirrors buildChannelProfile()."""
+    """Three axis shares per side - mirrors buildChannelProfile()."""
     sit, sz, asp = stats['situation'], stats['shotZone'], stats['attackSpeed']
     out = {}
     for side in ('for', 'against'):
@@ -219,7 +219,7 @@ def axis_shares(stats):
 
 def report_axes(rows):
     print('\n' + '=' * 72)
-    print('PART 2 — CHANNEL AXES (feeds CHANNEL_AXIS_POOLED_SD, CHANNEL_WEIGHTS)')
+    print('PART 2 - CHANNEL AXES (feeds CHANNEL_AXIS_POOLED_SD, CHANNEL_WEIGHTS)')
     print('=' * 72)
     AX = ('setPiece', 'box', 'fast')
     slugs = list(rows)
@@ -244,14 +244,14 @@ def report_axes(rows):
     for key, a in (('setPieceThreat', 'setPiece'), ('wideTransition', 'fast'), ('boxThreat', 'box')):
         print(f'  {key:15s} {pooled[a]:.4f}')
 
-    print('\nAxis independence — no axis should need collapsing into another:')
+    print('\nAxis independence - no axis should need collapsing into another:')
     for label, side in (('attacking', 'for'), ('defensive', 'against')):
         for i, a in enumerate(AX):
             for b in AX[i + 1:]:
                 v = corr([rows[s][side][a] for s in slugs], [rows[s][side][b] for s in slugs])
                 print(f'  {label:10s} corr({a}, {b}) = {v:+.3f}')
 
-    print('\nResidual quality confound — shares are NOT perfectly quality-neutral:')
+    print('\nResidual quality confound - shares are NOT perfectly quality-neutral:')
     vol_f = [rows[s]['for']['npxg'] for s in slugs]
     vol_a = [rows[s]['against']['npxg'] for s in slugs]
     for a in AX:

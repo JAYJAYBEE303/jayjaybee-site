@@ -3,7 +3,7 @@
  * Layer: module (copy). The Transfer Planner's six lens boards and the words
  * around the verdict: what each lens measures, what a lane commits you to,
  * which gameweek the plan is for, and what an empty lens says. No listeners,
- * no state, no engine calls — planner.js owns all three.
+ * no state, no engine calls - planner.js owns all three.
  *
  * Split out of planner.js, which was 1,324 lines before this feature and is
  * the file both halves of this page are edited in.
@@ -20,14 +20,14 @@ import { STRUCTURE_PLAYTIME_FLOOR } from '../config.js';
  * this board answers, in plain language. Without it the six titles read as
  * six arbitrary rankings of the same transfer list.
  *
- * `unit` labels the MIDDLE COLUMN — the one number on every row — so a reader
+ * `unit` labels the MIDDLE COLUMN - the one number on every row - so a reader
  * never has to guess whether "+8.0" is points, pounds, a rate or a ratio. It
  * describes that column and nothing else; the strategy explanation lives in
  * `blurb`, not here.
  *
  * The unit labels are load-bearing, not decoration. Now, Long term, Future Prep
- * and Structure Fix all report projected XI points, but over DIFFERENT SPANS —
- * one gameweek, five, three, five — so their numbers are not comparable to one
+ * and Structure Fix all report projected XI points, but over DIFFERENT SPANS -
+ * one gameweek, five, three, five - so their numbers are not comparable to one
  * another and the span in each label is the only thing that says so. Never
  * shorten a unit to just "projected XI points". See engine/transfers.js's
  * header and spec §6.
@@ -83,7 +83,7 @@ export function swapKey(swap) {
 }
 
 /**
- * Confidence badge copy. The raw enum values are engine vocabulary — 'close'
+ * Confidence badge copy. The raw enum values are engine vocabulary - 'close'
  * on its own reads as an adjective with no noun and told the user nothing.
  */
 export const CONFIDENCE_LABELS = {
@@ -99,7 +99,7 @@ export const CONFIDENCE_LABELS = {
  */
 export const LANE_DIRECTIONS = {
   now: 'Strategy: spend this week\'s transfer on the biggest gain for the next '
-     + 'gameweek. This is a bet on Saturday alone — it takes no view on '
+     + 'gameweek. This is a bet on Saturday alone - it takes no view on '
      + 'anything beyond it, so check it against Long term before committing.',
   longterm: 'Strategy: spend the transfer on the biggest gain across the whole '
           + 'planning window. A move that is flat this week but strong over five '
@@ -115,7 +115,7 @@ export const LANE_DIRECTIONS = {
          + 'captain alongside this, and check it against any Triple Captain you '
          + 'still hold.',
   structure: 'Strategy: repair before you upgrade. A starting slot is broken and '
-           + 'is leaking points every week it stays — fixing it comes ahead of '
+           + 'is leaking points every week it stays - fixing it comes ahead of '
            + 'any speculative buy.',
   roll: 'Strategy: bank the transfer. Nothing on the boards clears the bar to '
       + 'act, and carrying a free transfer into next week is worth more than a '
@@ -124,7 +124,7 @@ export const LANE_DIRECTIONS = {
 
 /**
  * Small counts spelled out, so prose never collides with the gameweek numbers
- * sitting next to it — "1 GW2 match" reads as one number run into another.
+ * sitting next to it - "1 GW2 match" reads as one number run into another.
  * A gameweek holds at most ten fixtures, so the table covers every real case
  * and anything past it falls back to a digit rather than inventing words.
  */
@@ -138,7 +138,7 @@ function numberWord(n) {
 /**
  * The gameweek this plan is FOR, and why it may not be the gameweek showing on
  * the scoreboard. A round that has kicked off cannot be changed, so once
- * GW n is under way the planner is planning GW n+1 and must say so — otherwise
+ * GW n is under way the planner is planning GW n+1 and must say so - otherwise
  * every recommendation reads as advice about a deadline that has already gone.
  *
  * @param {PlannerTiming|null} timing
@@ -150,7 +150,7 @@ export function timingNote(timing) {
 
   // The same short sentence in every phase. WHY the planning gameweek is not
   // the live one is a detail the user does not need spelled out on every
-  // render — which round is being planned is the only part that changes what
+  // render - which round is being planned is the only part that changes what
   // they actually do.
   const lead = `This plan is for GW${planningGw}.`;
 
@@ -161,9 +161,9 @@ export function timingNote(timing) {
   // committing on information that is not in yet.
   const caution = unplayed === 1
     ? ` One GW${currentGw} match is still to play, and its result will move `
-      + 'these numbers — deciding now means deciding on incomplete information.'
+      + 'these numbers - deciding now means deciding on incomplete information.'
     : ` ${numberWord(unplayed)} GW${currentGw} matches are still to play, and `
-      + 'those results will move these numbers — deciding now means deciding on '
+      + 'those results will move these numbers - deciding now means deciding on '
       + 'incomplete information.';
 
   return lead + caution;
@@ -179,10 +179,10 @@ export function timingNote(timing) {
  * Whether SOME candidate out-player is structurally broken, independent of
  * whether any candidate swap for them turned out profitable (the Structure
  * lane always scores `max(0, longXiDelta * gws)`, so a broken starter with no
- * affordable improvement scores exactly 0 — same as "nothing is broken").
+ * affordable improvement scores exactly 0 - same as "nothing is broken").
  * Mirrors the three OUT-side conditions `scoreStructureLane` checks
  * (engine/transfers.js), read back off data the swaps already carry rather
- * than recomputed here — this stays a DOM module, no engine logic.
+ * than recomputed here - this stays a DOM module, no engine logic.
  * @param {Array<Swap>} swaps  the full unfiltered enumeration
  * @returns {boolean}
  */
@@ -197,19 +197,19 @@ function hasBrokenStarter(swaps) {
 /** What a board says when it has nothing to recommend.
  *  @param {string} boardId
  *  @param {Array<Swap>} [swaps]  only read by 'structure', to tell "nothing
- *    broken" apart from "broken, but nothing affordable fixes it" — the two
+ *    broken" apart from "broken, but nothing affordable fixes it" - the two
  *    are very different claims and the verdict banner above may already be
  *    naming the broken player, so silently reusing one empty string for both
  *    would contradict it. */
 export function emptyMessage(boardId, swaps) {
   switch (boardId) {
     case 'structure': return hasBrokenStarter(swaps)
-      ? 'A starter is flagged, low on minutes, or rating poorly — but no '
+      ? 'A starter is flagged, low on minutes, or rating poorly - but no '
         + 'affordable replacement actually gains points in your XI.'
-      : 'Nothing broken — no starter is flagged or short of minutes.';
+      : 'Nothing broken - no starter is flagged or short of minutes.';
     case 'future':    return 'No strong enough run over the 3rd to 5th upcoming '
                            + 'gameweeks within your budget.';
-    case 'funds':     return 'No cheaper player would also improve your XI — every '
+    case 'funds':     return 'No cheaper player would also improve your XI - every '
                            + 'downgrade in price is a downgrade in points too.';
     case 'ceiling':   return 'No higher-ceiling option within budget.';
     case 'longterm':  return 'No move gains points across the next five gameweeks '

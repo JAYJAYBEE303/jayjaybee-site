@@ -3,9 +3,9 @@
  * Layer: module. Owns the DOM for the GW Decision Dashboard view.
  * Side effects: DOM writes, sessionStorage reads/writes, network (live poll).
  * Reads from store; delegates all scoring to engine/composite.js exclusively.
- * No analytical logic lives here — scorePlayer(player, getHorizon(), ctx)
+ * No analytical logic lives here - scorePlayer(player, getHorizon(), ctx)
  * is the sole engine call, over the SAME global horizon the Planner reads.
- * Layout: design export FINAL - Dashboard.dc.html (styles css/dashboard.css) —
+ * Layout: design export FINAL - Dashboard.dc.html (styles css/dashboard.css) -
  * a command bar (gameweek, squad tally, search, import), the squad board /
  * team sheet, and Captain, Breakdown and Risks panels.
  * See ROADMAP.md Phase 2C.
@@ -41,7 +41,7 @@ import { fetchAndMapSquad, loadSavedTeamId, saveTeamId, resolveImportGw } from '
  *
  * The global horizon, NOT the GW1 lock this module used to carry. A player's
  * chip appears on both this page and the Planner, and under two different
- * windows the same player read 81 here and 84 there — a difference with a real
+ * windows the same player read 81 here and 84 there - a difference with a real
  * reason behind it (this page answered "this week", the Planner "the next
  * five") that no one reading two chips could see, and which therefore read as
  * one of the two numbers being wrong.
@@ -65,7 +65,7 @@ function getHorizon() {
  */
 const MIN_SEC_RISK = 0.65;
 
-/** Live poll interval — 60 s per ROADMAP.md §2C / ARCHITECTURE.md §6. */
+/** Live poll interval - 60 s per ROADMAP.md §2C / ARCHITECTURE.md §6. */
 const LIVE_POLL_INTERVAL_MS = 60_000;
 
 // ─── Display constants ───────────────────────────────────────────────────────
@@ -76,7 +76,7 @@ const BAND_LABEL = {
   excellent: 'Excellent', great: 'Great', good: 'Good', neutral: 'Neutral',
   tough: 'Tough', brutal: 'Brutal', extreme: 'Extreme',
 };
-/** Rank tier as a short label — same wording and config counts as the Ranker's. */
+/** Rank tier as a short label - same wording and config counts as the Ranker's. */
 const TIER_SHORT = {
   positionBest:     pos => `Best ${pos}`,
   positionElite:    pos => `Top ${RANK_ELITE_COUNT_BY_POS[pos]} ${pos}`,
@@ -92,7 +92,7 @@ const reducedMotion = () => globalThis.matchMedia?.('(prefers-reduced-motion: re
 
 // ─── Module-level state ───────────────────────────────────────────────────────
 //
-// NOTE: the squad itself is NOT module-level state — it lives in store.js
+// NOTE: the squad itself is NOT module-level state - it lives in store.js
 // (store.getSquad()/setSquad()) so Dashboard and Planner share one source of
 // truth. See afterSquadChange() and initDashboard()'s 'squad:updated' subscription.
 
@@ -104,14 +104,14 @@ let _importedTeamId = null;
 /** Raw FPL entry object from last import (name, rank, etc.), or null. */
 let _importedEntryInfo = null;
 
-/** True while an import fetch is in flight — prevents concurrent imports. */
+/** True while an import fetch is in flight - prevents concurrent imports. */
 let _importInFlight = false;
 
-/** Map<playerId, scorePlayer result> — rebuilt on data:ready + squad changes. */
+/** Map<playerId, scorePlayer result> - rebuilt on data:ready + squad changes. */
 let _scores = new Map();
 
 /**
- * Map<playerId, rankTier|null> — EVERY player's standing against the full
+ * Map<playerId, rankTier|null> - EVERY player's standing against the full
  * pool (FEATURE_ENGINE.md §13), not just the squad. null until computed.
  * Deliberately NOT rebuilt on every squad edit: the ranking depends only on
  * ctx/horizon, not on squad membership, so recomputing it on every add/remove
@@ -147,7 +147,7 @@ let _livePoints = null;
  */
 let _liveStale  = false;
 
-/** When the live points last refreshed successfully — shown in the GW meta. */
+/** When the live points last refreshed successfully - shown in the GW meta. */
 let _liveUpdatedAt = null;
 
 /** setInterval handle while live polling is active; null otherwise. */
@@ -212,9 +212,9 @@ function isScoreEstimated(score) {
 
 /**
  * scorePlayer's breakdown is { form, fixture, counter } (FEATURE_ENGINE.md §10)
- * — a different shape from scoreFixture's { baseDifficulty, counterMatchup,
+ * - a different shape from scoreFixture's { baseDifficulty, counterMatchup,
  * teamForm, homeAway, history } breakdown. ARCHITECTURE.md §8: every displayed
- * score must be explainable via its breakdown — the Breakdown panel and the
+ * score must be explainable via its breakdown - the Breakdown panel and the
  * board's Form · Fix · Ctr bars render these three.
  */
 const BREAKDOWN_ORDER  = ['form', 'fixture', 'counter'];
@@ -223,7 +223,7 @@ const BREAKDOWN_LABELS = { form: 'Form', fixture: 'Fixture', counter: 'Counter' 
 /**
  * Build the "which fixture is this" context line for a breakdown panel.
  *
- * Names the NEAREST gameweek in the score's window — which may hold TWO
+ * Names the NEAREST gameweek in the score's window - which may hold TWO
  * fixtures. This previously read perGw[0] and discarded the second, which is
  * precisely the information a user opens this line to check on a double: it is
  * the sanity check on the captaincy pick, and it was telling half the truth.
@@ -241,7 +241,7 @@ export function buildFixtureContextLabel(score, horizon = null) {
   const slot   = groupPerGwSlots(score?.perGw ?? [])[0];
   const window = (horizon && horizon.gws > 1) ? ` · ${horizon.label}` : '';
   if (!slot) return (horizon ?? getHorizon()).label;
-  if (slot.isBlank) return `GW${slot.gw} — Blank${window}`;
+  if (slot.isBlank) return `GW${slot.gw} - Blank${window}`;
 
   const fixtures = slot.fixtures
     .map(f => `${f.opponent ?? '?'} (${f.venue ?? '?'})`)
@@ -270,11 +270,11 @@ function buildCtx() {
  * Requires data:ready to have fired; returns 'off-season' if no data.
  *
  * States:
- *   'live'         — GW in progress: isCurrent, not finished, data_checked (FPL
+ *   'live'         - GW in progress: isCurrent, not finished, data_checked (FPL
  *                    has processed at least one fixture's data).
- *   'pre-deadline' — GW upcoming: isCurrent, not finished, not yet data_checked.
- *   'finished'     — every match in the current GW has been played.
- *   'off-season'   — no current GW (between seasons or unrecognised state).
+ *   'pre-deadline' - GW upcoming: isCurrent, not finished, not yet data_checked.
+ *   'finished'     - every match in the current GW has been played.
+ *   'off-season'   - no current GW (between seasons or unrecognised state).
  *
  * See normalise.js → events[].dataChecked for how data_checked is exposed, and
  * events[].complete for why the finished test does not read `finished`.
@@ -287,7 +287,7 @@ function getGwState() {
   if (!ev) return 'off-season';
   // `complete`, not `finished`: FPL holds `finished` back until bonus is
   // confirmed, and until then a round whose last match ended yesterday reads
-  // as neither finished nor data_checked — i.e. 'pre-deadline'.
+  // as neither finished nor data_checked - i.e. 'pre-deadline'.
   if (ev.complete) return 'finished';
   if (ev.dataChecked) return 'live';
   return 'pre-deadline';
@@ -325,7 +325,7 @@ async function fetchAndCacheLivePoints() {
   } catch (err) {
     // Non-fatal: preserve last known data and flag stale. CONVENTIONS.md §9.
     _liveStale = true;
-    console.warn('[dashboard] Live points fetch failed — showing stale data:', err.message ?? err);
+    console.warn('[dashboard] Live points fetch failed - showing stale data:', err.message ?? err);
   }
 
   render();
@@ -366,7 +366,7 @@ function reconcileLivePoll() {
 }
 
 // ─── Squad management ─────────────────────────────────────────────────────────
-// Reads store.getSquad() directly rather than caching a local copy — the
+// Reads store.getSquad() directly rather than caching a local copy - the
 // store is the only source of truth (CONVENTIONS.md §8), and afterSquadChange()
 // (subscribed to 'squad:updated') is what re-renders after any mutation, from
 // either this module or Planner.
@@ -395,7 +395,7 @@ function addPlayer(playerId) {
   const player = store.getPlayer(playerId);
   if (!player || !canAdd(player)) return;
   // afterSquadChange() runs via the 'squad:updated' subscription, not a direct
-  // call here — the same path Planner's edits take, so both modules react
+  // call here - the same path Planner's edits take, so both modules react
   // identically regardless of which one made the change.
   store.setSquad([...store.getSquad(), playerId]);
 }
@@ -434,9 +434,9 @@ function scoreSquad() {
 
 /**
  * Rank tier (FEATURE_ENGINE.md §13) needs a player's standing against the
- * FULL player pool, not just the 15-man squad — "top 30 in the game" has to
+ * FULL player pool, not just the 15-man squad - "top 30 in the game" has to
  * mean the same thing here as on the Ranker/Planner. Computed once per data
- * load and cached (see _rankTierByPlayerId) — the ranking doesn't depend on
+ * load and cached (see _rankTierByPlayerId) - the ranking doesn't depend on
  * squad membership, so there's no reason to re-score ~700 players on every
  * add/remove click. Same per-load cost the Ranker already accepts as normal;
  * this module just doesn't pay it repeatedly.
@@ -484,13 +484,13 @@ const FLAG_LABELS = {
 
 /**
  * Everything the page shows, worked out once per render from the store and
- * the engine results already in _scores. Selection only — every number here
+ * the engine results already in _scores. Selection only - every number here
  * is an engine output read as-is.
  *
  * phase:
- *   'loading'  — no data yet
- *   'partial'  — fewer than 15 players: no XI, no captain
- *   'settling' — the Understat prefetch hasn't settled. The captain, the XI and
+ *   'loading'  - no data yet
+ *   'partial'  - fewer than 15 players: no XI, no captain
+ *   'settling' - the Understat prefetch hasn't settled. The captain, the XI and
  *                the bench are all a RANKING of the squad by a score that is
  *                still settling; rendering now would name a captain and then
  *                silently name a different one when the last payload landed,
@@ -515,7 +515,7 @@ function buildModel() {
   const { xi, bench } = pickStartingXI(entries);
 
   // Captaincy picks the highest real points-scale projection (expectedPoints),
-  // NOT the 0-100 composite `score.value` — that composite is a normalised
+  // NOT the 0-100 composite `score.value` - that composite is a normalised
   // quality score meant for within-position comparisons and does not scale
   // with a position's actual scoring ceiling, so it can rank a merely-solid
   // defender above a genuinely higher-scoring midfielder/forward. See
@@ -546,7 +546,7 @@ function chipHTML(band, text, { size = '', est = false, title = '' } = {}) {
 
 function pendingChipHTML(size = '') {
   return `<span class="chip${size ? ` chip--${size}` : ''} is-pending" aria-hidden="true"`
-    + ` title="Still calculating — waiting on league-wide counter-matchup data">00</span>`;
+    + ` title="Still calculating - waiting on league-wide counter-matchup data">00</span>`;
 }
 
 function crestHTML(team, size = '') {
@@ -575,13 +575,13 @@ function scoreChipHTML(player, score, settled, size = '') {
   const est = isScoreEstimated(score);
   const tier = tierShort(_rankTierByPlayerId?.get(player.id), player.position);
   return chipHTML(score.band, String(v), { size, est,
-    title: `${v} ${BAND_LABEL[score.band] ?? ''}${tier ? ` · ${tier} in the game` : ''}${est ? ' · estimated — limited data' : ''}` });
+    title: `${v} ${BAND_LABEL[score.band] ?? ''}${tier ? ` · ${tier} in the game` : ''}${est ? ' · estimated - limited data' : ''}` });
 }
 
 /** The nearest gameweek's opponents, short: "MCI A + LIV H" / "Blank". */
 function nextShort(score, full = false) {
   const slot = groupPerGwSlots(score?.perGw ?? [])[0];
-  if (!slot) return '—';
+  if (!slot) return '-';
   if (slot.isBlank) return 'Blank';
   const teamByShort = full ? new Map(store.getTeams().map(t => [t.shortName, t.name])) : null;
   return slot.fixtures
@@ -716,7 +716,7 @@ function renderSearchResults() {
 
   const allPlayers = store.getPlayers();
   if (allPlayers.length === 0) {
-    _searchResults.innerHTML = '<li class="empty">Player data not yet loaded — please wait a moment.</li>';
+    _searchResults.innerHTML = '<li class="empty">Player data not yet loaded - please wait a moment.</li>';
     showResults();
     return;
   }
@@ -732,7 +732,7 @@ function renderSearchResults() {
       })
       .slice(0, 12);
   } catch (err) {
-    console.error('[dashboard] renderSearchResults: filter threw —', err);
+    console.error('[dashboard] renderSearchResults: filter threw -', err);
     hideResults();
     return;
   }
@@ -758,7 +758,7 @@ function renderSearchResults() {
     return `<li id="db-opt-${p.id}" role="option" data-player-id="${p.id}" aria-selected="${i === _sIdx}" aria-disabled="${disabled}"`
       + ` title="${disabled ? esc(reason) : esc(p.fullName || p.name || '')}">`
       + `<span class="pos--${esc(p.position)}">${esc(p.position)}</span>`
-      + `<span><b>${esc(p.name ?? '?')}</b><small>${team ? esc(team.shortName) : '—'} · ${esc(p.position ?? '?')} · ${price(p)}</small></span>`
+      + `<span><b>${esc(p.name ?? '?')}</b><small>${team ? esc(team.shortName) : '-'} · ${esc(p.position ?? '?')} · ${price(p)}</small></span>`
       + `<span>${esc(reason)}</span></li>`;
   }).join('');
   _searchInput.setAttribute('aria-activedescendant', `db-opt-${results[_sIdx].id}`);
@@ -788,9 +788,9 @@ function rowHTML(e, m, i, showLive) {
     + `<span class="role" data-role="${role.startsWith('B') ? 'B' : role}" title="${roleTitle}">${role || '·'}</span>`
     + `<button type="button" class="who" data-rowbtn aria-pressed="${_openId === player.id}" aria-label="${esc(aria)}. Show detail.">`
     + `<span><span class="ell">${esc(name)}</span>${statusHTML(player)}</span>`
-    + `<span>${crestHTML(team)}${team ? esc(team.shortName) : '—'} · ${price(player)}</span></button>`
+    + `<span>${crestHTML(team)}${team ? esc(team.shortName) : '-'} · ${price(player)}</span></button>`
     + `<span class="nx wd">${nf != null ? chipHTML(nfBand, String(nf), { size: 'sm', est: score.nextFixtureScore.estimated,
-        title: `Next fixture ${nf} ${BAND_LABEL[nfBand] ?? ''} — fixture + counter-matchup, excluding form` }) : pendingChipHTML('sm')}`
+        title: `Next fixture ${nf} ${BAND_LABEL[nfBand] ?? ''} - fixture + counter-matchup, excluding form` }) : pendingChipHTML('sm')}`
     + `<span class="ell">${esc(nextShort(score))}</span></span>`
     + scoreChipHTML(player, score, m.settled)
     + ffcHTML(score, m.settled)
@@ -836,7 +836,7 @@ function boardHTML(m, showLive) {
       + '</div>';
   }).join('');
   if (m.phase === 'settling') {
-    html += '<p class="wait" role="status">Still calculating — waiting on league-wide counter-matchup data.</p>';
+    html += '<p class="wait" role="status">Still calculating - waiting on league-wide counter-matchup data.</p>';
   }
   return html;
 }
@@ -857,7 +857,7 @@ function tokenHTML(e, m, showLive, delay) {
     + (flags.length ? `<span class="tok__w" aria-hidden="true" title="${esc(flags.map(f => FLAG_LABELS[f]).join(' · '))}">⚠</span>` : '')
     + `<span class="tok__pos pos--${player.position}">${player.position}</span>`
     + `<span class="tok__name">${esc(player.name)}</span>`
-    + `<span class="tok__sub">${team ? esc(team.shortName) : '—'} · v ${esc(nextShort(score))}</span>`
+    + `<span class="tok__sub">${team ? esc(team.shortName) : '-'} · v ${esc(nextShort(score))}</span>`
     + `<span class="tok__nums">${scoreChipHTML(player, score, true)}<span title="Predicted points">${score.expectedPoints.value.toFixed(1)}</span>`
     + `${live ? `<small class="${_liveStale ? 'live is-stale' : ''}" title="${esc(live.full)}">· ${live.pts} pts</small>` : ''}</span></button>`;
 }
@@ -884,7 +884,7 @@ function sheetHTML(m, showLive) {
     return `<li><button type="button" class="bn${_openId === player.id ? ' is-open' : ''}" data-row-id="${player.id}" aria-pressed="${_openId === player.id}"`
       + ` aria-label="Bench ${i + 1}: ${esc(player.fullName || player.name)}. Show detail." style="--d:${640 + i * 50}ms">`
       + `<span>${i + 1}</span><span><b>${esc(player.fullName || player.name)}${flagged ? ' <span class="warn">⚠</span>' : ''}</b>`
-      + `<small><b class="pos--${player.position}">${player.position}</b>${crestHTML(team)}${team ? esc(team.shortName) : '—'} · v ${esc(nextShort(score))}</small></span>`
+      + `<small><b class="pos--${player.position}">${player.position}</b>${crestHTML(team)}${team ? esc(team.shortName) : '-'} · v ${esc(nextShort(score))}</small></span>`
       + `${scoreChipHTML(player, score, true)}</button></li>`;
   }).join('');
   const line = d => `pathLength="1" style="--d:${d}ms"`;
@@ -940,9 +940,9 @@ function whyHTML(m) {
   const player = store.getPlayer(id);
   const score = _scores.get(id);
   const team = store.getTeam(player.teamId);
-  if (!score || !m.settled) return `<p>${esc(player.fullName || player.name)} — still calculating, waiting on league-wide counter-matchup data.</p>`;
+  if (!score || !m.settled) return `<p>${esc(player.fullName || player.name)} - still calculating, waiting on league-wide counter-matchup data.</p>`;
   const role = m.phase === 'ready' ? m.role.get(id) : '';
-  const roleTitle = !role ? '—' : role === 'C' ? 'Captain' : role === 'XI' ? 'Starting' : `Bench ${role.slice(1)}`;
+  const roleTitle = !role ? '-' : role === 'C' ? 'Captain' : role === 'XI' ? 'Starting' : `Bench ${role.slice(1)}`;
   const flags = getRiskFlags(player, score);
   const ms = score.breakdown?.form?.minutesSecurity ?? 0;
   const tier = tierShort(_rankTierByPlayerId?.get(id), player.position);
@@ -956,14 +956,14 @@ function whyHTML(m) {
       const v = Math.round(c.value), band = bandFromValue(v), w = Math.round(c.weight * 100);
       return `<div class="bd" role="group" data-band="${band}" aria-label="${BREAKDOWN_LABELS[k]} ${v} ${BAND_LABEL[band] ?? ''}, weight ${w}%${c.estimated ? ', estimated' : ''}">`
         + `<span>${BREAKDOWN_LABELS[k]}</span><span class="mbar" aria-hidden="true"><span class="${c.estimated ? 'is-est' : ''}" style="width:${v}%"></span></span>`
-        + `<b title="${c.estimated ? 'Estimated — limited data' : ''}">${c.estimated ? '~' : ''}${v}</b><span>${w}%</span></div>`;
+        + `<b title="${c.estimated ? 'Estimated - limited data' : ''}">${c.estimated ? '~' : ''}${v}</b><span>${w}%</span></div>`;
     }).join('')
     + '<div class="why__facts">'
     + `<span><span class="lbl lbl--sm">Pred</span><b>${score.expectedPoints.value.toFixed(1)} pts</b></span>`
     + `<span><span class="lbl lbl--sm">Mins</span><b>${Math.round(ms * 100)}%${ms < MIN_SEC_RISK ? ' · low' : ''}</b></span>`
     + `<span><span class="lbl lbl--sm">Role</span><b>${roleTitle}</b></span></div>`
     + (flags.length ? `<span class="why__flags"><span class="warn" aria-hidden="true">⚠ </span>${esc(flags.map(f => FLAG_LABELS[f]).join(' · '))}`
-      + `${player.status !== 'available' && player.statusNote ? ` — ${esc(player.statusNote)}` : ''}</span>` : '')
+      + `${player.status !== 'available' && player.statusNote ? ` - ${esc(player.statusNote)}` : ''}</span>` : '')
     + '</div>';
 }
 
@@ -985,7 +985,7 @@ function risksHTML(m) {
         : f === 'rotation' ? `${Math.round((s.breakdown?.form?.minutesSecurity ?? 0) * 100)}% mins share`
         : f === 'confidence' ? 'Limited data'
         : `${Math.round(s.value)} ${BAND_LABEL[s.band] ?? ''}`;
-      return `<button type="button" data-row-id="${id}"><span>${m.role.get(id) ?? '—'}</span>`
+      return `<button type="button" data-row-id="${id}"><span>${m.role.get(id) ?? '-'}</span>`
         + `<span>${crestHTML(store.getTeam(p.teamId))}<span class="ell">${esc(p.fullName || p.name)}</span></span><span>${esc(note)}</span></button>`;
     }).join('') + '</div>').join('');
 }
@@ -1016,7 +1016,7 @@ function render(animate = false) {
     + `dashed = estimated, ~ = limited data, hatched = blank GW. Pred = projected points for GW${store.getUpcomingGw() ?? store.getCurrentGw() ?? ''}.`;
 
   // Entrances play on reader-caused renders, and once when the first settled
-  // board appears — never on a live-poll repaint.
+  // board appears - never on a live-poll repaint.
   const anim = (animate || (_animNext && m.phase === 'ready')) && !reducedMotion();
   if (m.phase === 'ready') _animNext = false;
   _board.removeAttribute('data-anim');
@@ -1256,7 +1256,7 @@ function showImportStatus(msg, type) {
  */
 function openImportPanel() {
   if (!_importPanel) return;
-  // The help row occupies the same slot — collapse it first.
+  // The help row occupies the same slot - collapse it first.
   closeHelp();
   _importPanel.hidden = false;
   _importBtn?.setAttribute('aria-expanded', 'true');
@@ -1278,7 +1278,7 @@ function closeImportPanel() {
 
 function toggleHelp() {
   if (!_importHelp.hidden) { closeHelp(); return; }
-  // Reciprocal of the guard in openImportPanel — opening help hides the form.
+  // Reciprocal of the guard in openImportPanel - opening help hides the form.
   closeImportPanel();
   _importHelp.hidden = false;
   _helpBtn.setAttribute('aria-expanded', 'true');
@@ -1315,7 +1315,7 @@ async function handleImport() {
     const { playerIds, entryInfo, missingCount } = await fetchAndMapSquad(teamId, gw);
 
     if (playerIds.length === 0) {
-      showImportStatus('No recognised players found — check the Team ID and try again.', 'error');
+      showImportStatus('No recognised players found - check the Team ID and try again.', 'error');
       return;
     }
 
@@ -1330,7 +1330,7 @@ async function handleImport() {
     showImportStatus(`Imported ${playerIds.length} players from GW${gw}.${warn}`, 'success');
   } catch (err) {
     const detail = err?.upstreamStatus === 404
-      ? 'Team not found — check the ID. Private leagues may block access.'
+      ? 'Team not found - check the ID. Private leagues may block access.'
       : (err?.message ?? String(err));
     showImportStatus(`Import failed: ${detail}`, 'error');
     console.warn('[dashboard] Squad import failed:', err);
@@ -1386,14 +1386,14 @@ function wireDom() {
     if (e.key === 'Escape') { e.stopPropagation(); closeImportPanel(); _importBtn.focus(); }
   });
 
-  // The aside sticks under the command bar, which wraps at some widths —
+  // The aside sticks under the command bar, which wraps at some widths -
   // track its real height rather than assuming one.
   new ResizeObserver(() => _root.style.setProperty('--db-cmd-h', `${_cmd.offsetHeight}px`)).observe(_cmd);
 
-  // ── Live poll lifecycle — start/stop on navigation ───────────────────────
+  // ── Live poll lifecycle - start/stop on navigation ───────────────────────
   window.addEventListener('hashchange', onHashChange);
 
-  // ── Render the initial shell — squad is already hydrated by store.js ─────
+  // ── Render the initial shell - squad is already hydrated by store.js ─────
   render();
 
   _domWired = true;
@@ -1421,7 +1421,7 @@ function onDataReady() {
 
   // Everything above is bookkeeping: cheap, and it must stay eager so the
   // module's state stays truthful whether or not anyone is looking. Everything
-  // below is the expensive half — scoreSquad() drives ensureRankTiers, a
+  // below is the expensive half - scoreSquad() drives ensureRankTiers, a
   // full-pool ranking measured at ~920ms. Because data:ready fires once per
   // team-xG payload at boot, running that off screen cost ~18s of blocking work
   // on a tab that was not visible. Invalidate always, recompute lazily.
@@ -1472,7 +1472,7 @@ function onRouteChanged(module) {
  * the board shows its loading state before the first data:ready.
  *
  * Also subscribes to 'squad:updated' so a squad built or imported on the
- * Planner — or anywhere else — re-scores and re-renders here too, with no
+ * Planner - or anywhere else - re-scores and re-renders here too, with no
  * rebuild step. afterSquadChange() itself no-ops safely via render()'s null
  * DOM-ref guard if this module hasn't wired yet.
  */
@@ -1485,7 +1485,7 @@ export function initDashboard() {
   wireDom();
 
   // If the store is already hydrated from sessionStorage, data:ready won't
-  // fire again — wire the DOM and render immediately.
+  // fire again - wire the DOM and render immediately.
   if (store.isFresh()) {
     onDataReady();
   }

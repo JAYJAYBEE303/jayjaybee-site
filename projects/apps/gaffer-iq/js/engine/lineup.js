@@ -5,7 +5,7 @@
  * the XI's expected points.
  *
  * Shared by modules/dashboard.js and engine/transfers.js so that both agree on
- * what "your starting XI" means — the transfer lanes are measured as the change
+ * what "your starting XI" means - the transfer lanes are measured as the change
  * in this total, so a disagreement here would silently corrupt every lane.
  *
  * See docs/superpowers/specs/2026-08-30-planner-multi-lens-transfers-design.md §6.
@@ -17,7 +17,7 @@ import { XI_FORMATION_MIN, XI_SIZE, BENCH_CONTRIBUTION_WEIGHT } from '../config.
  * A player's projected points for the window their score was built over.
  *
  * MODEL: expectedPoints, NOT score.value. The composite is a within-position
- * quality index — a 5.0m defender and a 13.0m midfielder can share a composite
+ * quality index - a 5.0m defender and a 13.0m midfielder can share a composite
  * of 70 while being worlds apart in points. Ordering an XI by the composite
  * therefore benches the wrong players, and measuring a transfer by it ranks a
  * fringe-bench swap above a real upgrade. See FEATURE_ENGINE.md §10.2.
@@ -35,7 +35,7 @@ function expectedPointsOf(entry) {
  * Formation rules (FPL): exactly 1 GKP, at least 3 DEF, at least 2 MID, at
  * least 1 FWD, 11 players total. Fill the minimums by expected points
  * descending, then fill remaining outfield slots from the leftover pool.
- * Bench is ordered outfield-by-expected-points descending, reserve GKP last —
+ * Bench is ordered outfield-by-expected-points descending, reserve GKP last -
  * a keeper can only replace a keeper, so he is never the first substitute.
  *
  * @param {Array<{player: Player, score: object}>} scoredSquad

@@ -26,7 +26,7 @@ import {
   calcTeamForm, calcPlayerForm, calcPlayingLikelihood, calcPlaytimeSecurity,
   buildUnderstatPlayerLookup,
 } from './form.js';
-// calcStyleClash is no longer imported — styleClash was removed from WEIGHTS
+// calcStyleClash is no longer imported - styleClash was removed from WEIGHTS
 // (config.js explains why). buildXgProfilesByTeamId stays: the xG profiles it
 // builds are still consumed by engine/counter.js and displayed by the UI.
 import { buildXgProfilesByTeamId } from './style.js';
@@ -36,7 +36,7 @@ import {
 } from './counter.js';
 
 /**
- * Build the assembly context every engine function consumes. Pure — derives
+ * Build the assembly context every engine function consumes. Pure - derives
  * indices and aggregates from a Season plus an optional summary map, never
  * mutates either input.
  *
@@ -44,10 +44,10 @@ import {
  * @param {object} [opts]
  * @param {object} [opts.playerSummariesById]  playerId → PlayerSummary (may be partial)
  * @param {object} [opts.leagueXg]             Understat league/EPL payload, current season (Phase 3A); null when unavailable
- * @param {object} [opts.leagueXgPrev]         Understat league/EPL payload, LAST season (Phase 3B) — feeds only
+ * @param {object} [opts.leagueXgPrev]         Understat league/EPL payload, LAST season (Phase 3B) - feeds only
  *   calcHomeAwaySplit's rolling window (engine/fixtures.js); null when unavailable
  * @param {object[]} [opts.leagueXgHistory]    Understat league/EPL payloads for the seasons before those two
- *   (UNDERSTAT_HISTORY_SEASONS, config.js), newest first — feeds only the cross-season head-to-head
+ *   (UNDERSTAT_HISTORY_SEASONS, config.js), newest first - feeds only the cross-season head-to-head
  *   window (engine/h2h.js); [] or absent when none loaded
  * @param {number} [opts.currentGw]            override; defaults to season.upcomingGw (the round still
  *                                              to be played), then currentGw, then 1
@@ -59,10 +59,10 @@ import {
  *     fixtures:                  Fixture[]                       (passthrough, sorted)
  *     playedFixtures:            Fixture[]                       (derived: f.played && f.result)
  *     playerSummariesById:       Object<playerId, PlayerSummary> (passthrough, possibly {})
- *     leagueXg:                  object | null                   (passthrough — Phase 3A)
- *     leagueXgPrev:              object | null                   (passthrough — Phase 3B)
- *     rollingVenueStatsByTeamId: object                           (derived — Phase 3B, calcHomeAwaySplit input)
- *     leagueXgHistory:           object[]                        (passthrough — Phase 4, cross-season H2H input)
+ *     leagueXg:                  object | null                   (passthrough - Phase 3A)
+ *     leagueXgPrev:              object | null                   (passthrough - Phase 3B)
+ *     rollingVenueStatsByTeamId: object                           (derived - Phase 3B, calcHomeAwaySplit input)
+ *     leagueXgHistory:           object[]                        (passthrough - Phase 4, cross-season H2H input)
  *     currentGw:                 number
  *     leagueAvgStrength:         number  (mean of team.strength.overall across the league)
  */
@@ -72,7 +72,7 @@ import {
  * are, each player's price-derived role prior, and how crowded his club's
  * group at his position is.
  *
- * Done once per context because both are O(pool) aggregates — recomputing them
+ * Done once per context because both are O(pool) aggregates - recomputing them
  * inside a per-player call would make the Ranker's full-pool render quadratic.
  *
  * @param {Player[]} players  the whole pool
@@ -84,7 +84,7 @@ function buildPlaytimeContext(players) {
   // MODEL: elapsed gameweeks are derived from the DATA, not from a gameweek
   // counter. The most-played footballer in the league defines how many rounds
   // have actually been played, which stays honest through postponements,
-  // blanks and doubles in a way currentGw does not — and needs no agreement
+  // blanks and doubles in a way currentGw does not - and needs no agreement
   // about whether currentGw means "in progress" or "last completed".
   let maxMinutes = 0;
   for (const p of pool) {
@@ -123,7 +123,7 @@ function buildPlaytimeContext(players) {
     const slots  = groupMinutes / slotMinutes;
     const bodies = members.filter(
       p => (p?.totals?.minutes ?? 0) >= PLAYTIME_BODY_SHARE * slotMinutes).length;
-    // Below one slot there is nothing to be crowded out of — a group with no
+    // Below one slot there is nothing to be crowded out of - a group with no
     // minutes yet (preseason) must not read as infinitely contested.
     crowdingByGroup[key] = slots >= 1 ? (bodies / slots) : 1;
   }
@@ -153,7 +153,7 @@ export function buildScoreContext(season, opts = {}) {
   const playedFixtures = (season.fixtures || []).filter(f => f.played && f.result);
 
   // Pool-wide aggregates for the playtime model (FEATURE_ENGINE.md §7.3b).
-  // elapsedGws is also what fixes calcPlayerForm's minutesSecurity — see the
+  // elapsedGws is also what fixes calcPlayerForm's minutesSecurity - see the
   // MODEL note in engine/form.js's fallbackPlayerForm.
   const { elapsedGws, playtimeByPlayerId } = buildPlaytimeContext(season.players);
 
@@ -171,7 +171,7 @@ export function buildScoreContext(season, opts = {}) {
 
   // Phase 3A: precompute the league-wide xG-based style profile lookup once
   // so calcStyleProfile doesn't repeat min-max normalisation per fixture. Pure
-  // — returns null when Understat data is unavailable, in which case style.js
+  // - returns null when Understat data is unavailable, in which case style.js
   // falls back to its Phase 1 proxies.
   const leagueXg = opts.leagueXg ?? null;
   const xgProfilesByTeamId = leagueXg
@@ -186,7 +186,7 @@ export function buildScoreContext(season, opts = {}) {
   // Channel tier: the per-team Understat `statistics` block, fetched eagerly
   // for every team at startup (js/main.js prefetchAllTeamXg). {} only until
   // that boot-time fetch resolves, in which case calcCounterMatchup degrades
-  // to the role tier — see the design spec §8 for why the tier is chosen by
+  // to the role tier - see the design spec §8 for why the tier is chosen by
   // data availability rather than by which module is asking.
   const teamXgBySlug = opts.teamXgBySlug ?? null;
   const channelProfilesByTeamId = buildChannelProfilesByTeamId(
@@ -195,9 +195,9 @@ export function buildScoreContext(season, opts = {}) {
   );
 
   // Phase 3B: precompute calcHomeAwaySplit's rolling cross-season window once
-  // per ctx, same idiom as xgProfilesByTeamId above — never recomputed per
+  // per ctx, same idiom as xgProfilesByTeamId above - never recomputed per
   // fixture. leagueXgPrev (last season) exists ONLY to feed this; nothing
-  // else in the engine reads it. Always call — buildRollingVenueStatsByTeamId
+  // else in the engine reads it. Always call - buildRollingVenueStatsByTeamId
   // itself degrades to {} when both payloads are null/absent, and
   // calcHomeAwaySplit already falls back to FPL fixtures for anything missing
   // here, so there is no "skip when unavailable" branch needed.
@@ -205,7 +205,7 @@ export function buildScoreContext(season, opts = {}) {
   const rollingVenueStatsByTeamId =
     buildRollingVenueStatsByTeamId(leagueXg, leagueXgPrev, season.teamsById);
 
-  // Phase 4: the older Understat payloads — passthrough only, read exclusively
+  // Phase 4: the older Understat payloads - passthrough only, read exclusively
   // by the cross-season head-to-head collector (engine/h2h.js) alongside
   // leagueXg/leagueXgPrev above. Nothing else touches these.
   const leagueXgHistory = opts.leagueXgHistory ?? [];
@@ -216,36 +216,36 @@ export function buildScoreContext(season, opts = {}) {
     fixtures:            season.fixtures || [],
     playedFixtures,
     playerSummariesById: opts.playerSummariesById || {},
-    // Phase 3A — Understat league payload (null when fetch failed or not yet
+    // Phase 3A - Understat league payload (null when fetch failed or not yet
     // loaded). style.js and form.js consult it for real xG inputs and fall
     // back to FPL-derived proxies when absent.
     leagueXg,
     xgProfilesByTeamId,
     understatPlayersByName,
     channelProfilesByTeamId,
-    // Phase 3B — last season's Understat payload, and the rolling venue stats
+    // Phase 3B - last season's Understat payload, and the rolling venue stats
     // derived from it plus leagueXg. See buildRollingVenueStatsByTeamId
     // (engine/fixtures.js) and FEATURE_ENGINE.md §3.1.
     leagueXgPrev,
     rollingVenueStatsByTeamId,
-    // Phase 4 — the older Understat payloads, see above and §4.
+    // Phase 4 - the older Understat payloads, see above and §4.
     leagueXgHistory,
     currentGw:           opts.currentGw ?? season.upcomingGw ?? season.currentGw ?? 1,
     leagueAvgStrength,
     // Gameweeks actually played, derived from the pool's minutes rather than a
-    // counter — see buildPlaytimeContext.
+    // counter - see buildPlaytimeContext.
     elapsedGws:          opts.elapsedGws ?? elapsedGws,
     playtimeByPlayerId,
   };
 }
 
 /**
- * Map a 0–100 value onto its band string — the seven-tier scale (config.js
- * BANDS_V2). Thresholds come from config; never inline a literal here — CSS
+ * Map a 0–100 value onto its band string - the seven-tier scale (config.js
+ * BANDS_V2). Thresholds come from config; never inline a literal here - CSS
  * modifier classes (.score-pill--great etc.) key off this string, so the
  * colour mapping stays single-sourced.
  *
- * Rounds BEFORE comparing against the thresholds — every UI surface displays
+ * Rounds BEFORE comparing against the thresholds - every UI surface displays
  * Math.round(value), so banding the raw unrounded value could label a
  * displayed "44" as 'tough' whenever the true value was e.g. 43.6 (< the
  * neutral threshold pre-rounding, but rounds up to display as 44). Rounding
@@ -269,7 +269,7 @@ export function bandFromValue(value) {
 // deliberately absent: it is the reading the resilience is measured RELATIVE TO,
 // not one of the things that can pile up against it. Kept here rather than in
 // config.js because it is structural (which metrics are secondary), not a
-// tunable — same call as ROLE_ATTACK_GROUPS in counter.js.
+// tunable - same call as ROLE_ATTACK_GROUPS in counter.js.
 const STACK_METRICS = ['counterMatchup', 'teamForm', 'history', 'homeAway'];
 
 /**
@@ -278,14 +278,14 @@ const STACK_METRICS = ['counterMatchup', 'teamForm', 'history', 'homeAway'];
  * MODEL: `estimated` and `maturity` answer different questions and both are
  * needed. `estimated` means "this reading is a fallback, don't use it" and
  * always wins. `maturity` means "this reading is real, but built on N% of the
- * evidence it eventually will be" — a distinction that did not exist before
+ * evidence it eventually will be" - a distinction that did not exist before
  * 2026-08-21, when every metric was all-or-nothing. Conflating them would
  * force a choice between throwing away an early-season signal entirely and
  * letting three matches of data swing a fixture as hard as thirty.
  *
  * A metric that reports no `maturity` is binary exactly as before: 1 when
  * usable, 0 when estimated. counterMatchup (engine/channel.js) and teamForm
- * (engine/form.js) both report partial values; the mechanism is general — any
+ * (engine/form.js) both report partial values; the mechanism is general - any
  * metric can opt in by returning a `maturity` field, with no change needed here.
  *
  * @param {{estimated?: boolean, maturity?: number}|null} metric
@@ -303,18 +303,18 @@ export function metricMaturity(metric) {
  * How much to deduct from a fixture's weighted composite because MULTIPLE
  * secondary metrics are simultaneously unfavourable.
  *
- * MODEL: the plain weighted sum degrades linearly — the first poor secondary
+ * MODEL: the plain weighted sum degrades linearly - the first poor secondary
  * metric costs a favourite as much as the third does. Real fixtures don't work
  * that way: a side facing a weak opponent still has a good chance if only one
  * thing is against them, but genuinely loses it when a poor venue record, poor
  * form AND a losing counter-matchup arrive together. Each metric's shortfall
  * below STACK_PIVOT is weight-averaged into a 0–1 stackIndex, then raised to
  * STACK_CURVE, so one dip barely registers while three compound sharply.
- * Same shape as calcTenurePenalty (§2.1), deliberately — the engine keeps one
+ * Same shape as calcTenurePenalty (§2.1), deliberately - the engine keeps one
  * idiom for "punish genuine stacking, not incidental single dips".
  *
  * MODEL: estimated sub-metrics are excluded entirely and the remaining weights
- * re-normalised. FEATURE_ENGINE.md §1 rule 3 — absence of information is not
+ * re-normalised. FEATURE_ENGINE.md §1 rule 3 - absence of information is not
  * evidence of a bad fixture, so a data gap must never manufacture a penalty.
  * With STACK_PIVOT below 50, a metric sitting on its neutral-50 fallback also
  * contributes nothing even if it is somehow flagged non-estimated.
@@ -322,7 +322,7 @@ export function metricMaturity(metric) {
  * MODEL: an immature metric is weighed by what it has actually EARNED
  * (weight × maturity), the same quantity the composite sum uses. Counting a
  * one-game form reading at its full 15% here while the sum counted 3% would let
- * evidence the score barely trusts drive a penalty at full force — the exact
+ * evidence the score barely trusts drive a penalty at full force - the exact
  * asymmetry the maturity ramp exists to remove. A metric reporting no maturity
  * is unchanged (metricMaturity treats it as 1).
  *
@@ -339,7 +339,7 @@ function calcStackingPenalty(breakdown) {
 
   for (const key of STACK_METRICS) {
     const m = breakdown[key];
-    // A data gap is not evidence of badness — skip without counting its weight.
+    // A data gap is not evidence of badness - skip without counting its weight.
     if (!m || m.estimated) continue;
     const earned = m.weight * metricMaturity(m);
     if (earned === 0) continue;
@@ -364,17 +364,17 @@ function calcStackingPenalty(breakdown) {
 }
 
 /**
- * Compute team's INDEPENDENT (pre-relative) fixture composite — every existing
+ * Compute team's INDEPENDENT (pre-relative) fixture composite - every existing
  * sub-metric, weighted-summed with `WEIGHTS`, less the §8.6 stacking penalty.
  * This is exactly what `scoreFixture`'s `value` meant before §8.7: an absolute
  * 0–100 read of `team`'s own metrics against `opponent`, with NO comparison to
  * `opponent`'s own independent read. scoreFixture calls this once per side of
- * the same fixture and derives the final, relative value from the pair — see
+ * the same fixture and derives the final, relative value from the pair - see
  * scoreFixture's own doc block for why.
  *
  * Not exported: an absolute fixture read is not itself a useful public value
  * post-§8.7 (see the trace in FEATURE_ENGINE.md §8.7 for why two independent
- * absolute reads don't sum to 100) — only the derived relative value is.
+ * absolute reads don't sum to 100) - only the derived relative value is.
  *
  * @param {Team} team       team whose perspective this reads from
  * @param {Team} opponent
@@ -388,13 +388,13 @@ function calcStackingPenalty(breakdown) {
 function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
   const opponentId = opponent.id;
 
-  // team's own FDR for this fixture — the fallback calcBaseDifficulty uses
+  // team's own FDR for this fixture - the fallback calcBaseDifficulty uses
   // when FPL's granular strength fields aren't published yet (see fixtures.js).
   const fdrForTeam = isHome ? fixture.fplDifficulty?.home : fixture.fplDifficulty?.away;
   const base    = calcBaseDifficulty(team, opponent, isHome, fdrForTeam);
-  // §3 (Phase 4): venue effect is fixture-level, not single-team — both sides'
+  // §3 (Phase 4): venue effect is fixture-level, not single-team - both sides'
   // own venue-dependence feed a shared, symmetric modifier around the neutral
-  // 50 baseline (calcVenueStrengthModifier, engine/fixtures.js — replaces the
+  // 50 baseline (calcVenueStrengthModifier, engine/fixtures.js - replaces the
   // earlier league-normalised, weighted calcVenueEffect). `venue` here is
   // `team`'s own 0-100 read of that shared modifier, reshaped to the same
   // {value, estimated, gamesAtVenue} contract every other sub-metric and
@@ -406,7 +406,7 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
     value:        isHome ? venueStrength.homeStrength : venueStrength.awayStrength,
     estimated:    venueStrength.estimated,
     gamesAtVenue: isHome ? venueStrength.homeBase.homeGames : venueStrength.awayBase.awayGames,
-    // Transparency fields (ARCHITECTURE.md §12 rule 6) — this team's own
+    // Transparency fields (ARCHITECTURE.md §12 rule 6) - this team's own
     // standalone venue-sensitivity read, not the combined fixture modifier.
     ownSplit: isHome ? venueStrength.homeBase : venueStrength.awayBase,
     modifier: venueStrength.modifier,
@@ -427,7 +427,7 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
   //
   // Revised 2026-08-21 from an all-or-nothing sum to a continuous one. A metric
   // whose evidence is thin but real now contributes proportionally rather than
-  // being discarded — see metricMaturity below for why that is not the same
+  // being discarded - see metricMaturity below for why that is not the same
   // thing as `estimated`.
   const mBase    = metricMaturity(base);
   const mCounter = metricMaturity(counter);
@@ -443,7 +443,7 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
     + WEIGHTS.history        * mHistory
     + WEIGHTS.homeAway       * mVenue;
 
-  // Weighted blend — every sub-metric is already 0–100, higher = better for `team`.
+  // Weighted blend - every sub-metric is already 0–100, higher = better for `team`.
   // WEIGHTS sums to 1.00 (config.js / FEATURE_ENGINE.md §8.1).
   //
   // baseDifficulty is the ONE exception to the higher-is-better rule: it is
@@ -453,7 +453,7 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
   //
   // MODEL: estimated sub-metrics are EXCLUDED from the sum, and the remaining
   // (non-estimated) weights are re-normalised so they cover the full 0–1 range
-  // — an unreliable reading no longer dilutes the score at full weight, it
+  // - an unreliable reading no longer dilutes the score at full weight, it
   // simply doesn't count. `confidence` above IS that re-normalisation
   // denominator: baseDifficulty is never estimated (§8.1), so confidence is
   // always > 0 and this never divides by zero. See §8.3.
@@ -472,7 +472,7 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
   const linearValue = confidence > 0 ? rawWeightedSum / confidence : 50;
 
   // §8.6 conditional term. Built from the same sub-metric shapes the breakdown
-  // below reports, so it needs their { value, weight, estimated } triples — hence
+  // below reports, so it needs their { value, weight, estimated } triples - hence
   // the small intermediate object rather than reading the breakdown after the fact.
   const stack = calcStackingPenalty({
     counterMatchup: { value: counter.value, weight: WEIGHTS.counterMatchup, estimated: counter.estimated, maturity: mCounter },
@@ -488,7 +488,7 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
     band:         bandFromValue(value),
     confidence,
     provisional:  confidence < CONFIDENCE_FLOOR,
-    // §8.6 — the conditional adjustment, exposed so the UI can explain any gap
+    // §8.6 - the conditional adjustment, exposed so the UI can explain any gap
     // between the weighted sum and this raw value. Sits alongside `breakdown`
     // rather than inside it because it is an adjustment ACROSS sub-metrics, not
     // a sub-metric of its own (it has no weight in WEIGHTS).
@@ -502,7 +502,7 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
     },
     breakdown: {
       baseDifficulty: {
-        // Reported as stored — higher = harder. The composite above consumes
+        // Reported as stored - higher = harder. The composite above consumes
         // invert(base.value); the UI wants this one.
         value:     base.value,
         weight:    WEIGHTS.baseDifficulty,
@@ -516,7 +516,7 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
         estimated: counter.estimated,
         pairings:  counter.pairings,
         // Unblended inputs so the UI can explain the blend (ARCHITECTURE.md §12
-        // rule 6) — attackingValue: this team's attack vs the opponent's
+        // rule 6) - attackingValue: this team's attack vs the opponent's
         // defence; defendingValue: this team's defence vs the opponent's attack.
         attackingValue: counter.attackingValue,
         defendingValue: counter.defendingValue,
@@ -549,7 +549,7 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
         weight:       WEIGHTS.homeAway,
         estimated:    venue.estimated,
         gamesAtVenue: venue.gamesAtVenue,
-        // §3 (Phase 4) — this team's own home/away PPG split, and the shared
+        // §3 (Phase 4) - this team's own home/away PPG split, and the shared
         // fixture-level modifier it was blended with, so the UI can explain
         // WHY this venue reading is what it is (ARCHITECTURE.md §12 rule 6).
         homePPG:   venue.ownSplit.homePPG,
@@ -560,13 +560,13 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
       },
       // styleClash: removed from the breakdown along with its weight. Restoring
       // it means uncommenting the four sites above, this block, its WEIGHTS
-      // entry and its STACK_METRICS entry — engine/style.js itself is untouched.
+      // entry and its STACK_METRICS entry - engine/style.js itself is untouched.
     },
   };
 }
 
 /**
- * Score a single fixture from ONE team's perspective — RELATIVE to the same
+ * Score a single fixture from ONE team's perspective - RELATIVE to the same
  * fixture's other team, so the two teams' totals are guaranteed to sum to
  * exactly 100 (§8.7).
  *
@@ -576,7 +576,7 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
  * "facing a tough opponent" and both get punished for it; two weak teams both
  * read as "facing a soft opponent" and both get rewarded). This function fixes
  * that by computing BOTH sides' raw reads and deriving the final value from
- * their signed difference — "derive, don't independently compute", the same
+ * their signed difference - "derive, don't independently compute", the same
  * principle §7.2's mirrored counter pairings already use:
  *
  *   edge  = rawOwn − rawOpponent
@@ -584,22 +584,22 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
  *
  * scoreFixture(opponent, fixture, ctx) computes the identical (rawOwn,
  * rawOpponent) pair in swapped order, so its value is ALWAYS
- * clamp(0, 100, 50 − edge * RELATIVE_EDGE_SENSITIVITY) — literally 100 minus
+ * clamp(0, 100, 50 − edge * RELATIVE_EDGE_SENSITIVITY) - literally 100 minus
  * this value before clamping. `clamp(0,100,v) + clamp(0,100,100−v) ≡ 100` for
  * every real `v` (trivial by cases on the three clamp regions), so the two
- * teams' totals sum to exactly 100 BY CONSTRUCTION, not by coincidence —
+ * teams' totals sum to exactly 100 BY CONSTRUCTION, not by coincidence -
  * verified for the full input range in FEATURE_ENGINE.md §8.7.
  *
  * This does NOT flatten every fixture toward 50/50: a genuine strength gap
  * (e.g. a promoted side's low, tenure-uninflated baseDifficulty reading against
  * an established side's high one) still produces a large edge and therefore a
- * lopsided split — it just now sums to 100 rather than landing wherever two
+ * lopsided split - it just now sums to 100 rather than landing wherever two
  * unrelated absolute reads happen to fall. See the worked examples in
  * FEATURE_ENGINE.md §8.7.
  *
  * Asymmetric perspective, symmetric total: scoreFixture(home, fixture, ctx) and
  * scoreFixture(away, fixture, ctx) still read differently per side (venue, form,
- * counter-matchup are each team's own) — only their TOTALS are now complementary.
+ * counter-matchup are each team's own) - only their TOTALS are now complementary.
  *
  * @param {Team} team       team whose perspective we score from
  * @param {Fixture} fixture
@@ -608,14 +608,14 @@ function computeRawFixtureScore(team, opponent, fixture, isHome, ctx) {
  *   value: 0–100, higher = easier/better fixture for `team`. Direction: higher = better.
  *   band: 'excellent' | 'great' | 'good' | 'neutral' | 'tough' | 'brutal' | 'extreme'
  *         (see BANDS_V2 in config).
- *   confidence: 0–1; the WEAKER (min) of the two sides' own confidence — the
+ *   confidence: 0–1; the WEAKER (min) of the two sides' own confidence - the
  *     final value depends on both raw reads, so it can only be as trustworthy
  *     as the less-certain of the two.
- *   provisional: true when confidence < CONFIDENCE_FLOOR — UI hatches/greys the score.
+ *   provisional: true when confidence < CONFIDENCE_FLOOR - UI hatches/greys the score.
  *   breakdown: `team`'s own per sub-metric { value, weight, estimated, ...extras }
- *     — unchanged in meaning; still explains `team`'s own raw read.
- *   relative: the new §8.7 adjustment — { ownRawValue, opponentRawValue, edge,
- *     sensitivity } — explains how the final value was derived from the pair.
+ *     - unchanged in meaning; still explains `team`'s own raw read.
+ *   relative: the new §8.7 adjustment - { ownRawValue, opponentRawValue, edge,
+ *     sensitivity } - explains how the final value was derived from the pair.
  *   See ARCHITECTURE.md §8 and FEATURE_ENGINE.md §8, §8.7 for the contract.
  */
 export function scoreFixture(team, fixture, ctx) {
@@ -645,7 +645,7 @@ export function scoreFixture(team, fixture, ctx) {
   const edge  = own.value - opp.value;
   const value = clamp(0, 100, 50 + (edge * RELATIVE_EDGE_SENSITIVITY));
 
-  // MODEL: min(), not own.confidence alone — the final value is a function of
+  // MODEL: min(), not own.confidence alone - the final value is a function of
   // BOTH raw reads, so if either side rests on heavily estimated data the
   // relative result is only as trustworthy as the weaker of the two.
   const confidence = Math.min(own.confidence, opp.confidence);
@@ -657,7 +657,7 @@ export function scoreFixture(team, fixture, ctx) {
     provisional:  confidence < CONFIDENCE_FLOOR,
     stacking:     own.stacking,
     breakdown:    own.breakdown,
-    // §8.7 — explains the relative step itself, alongside (not inside)
+    // §8.7 - explains the relative step itself, alongside (not inside)
     // `breakdown`, since it's an adjustment ACROSS the two teams' totals,
     // not a sub-metric of `team`'s own.
     relative: {
@@ -740,7 +740,7 @@ function calcPlayerCounterEdge(player, gwWindow, teamFixturesByGw, ctx) {
         estimated = (cm.pairings.wideMidVsFb?.estimated ?? true)
                  || (cm.pairings.camVsCbMid?.estimated  ?? true);
       } else {
-        // DEF/GKP: invert opponent's attack score — higher = their attack is weak vs this defence.
+        // DEF/GKP: invert opponent's attack score - higher = their attack is weak vs this defence.
         // MODEL: a defender's counter edge is determined by how poorly the opponent attacks.
         const oppCm = calcCounterMatchup(opponent, team, ctx);
         edgeValue   = 100 - oppCm.value;
@@ -765,7 +765,7 @@ function calcPlayerCounterEdge(player, gwWindow, teamFixturesByGw, ctx) {
  * double GWs (both fixtures scored and included, naturally boosting the score).
  * Applies HORIZON_DECAY weighting and AGG_METHOD blending from config.
  *
- * Pure: no DOM, no fetch, no store mutation — all inputs are parameters.
+ * Pure: no DOM, no fetch, no store mutation - all inputs are parameters.
  *
  * @param {Team}   team
  * @param {{label: string, gws: number}} horizon  e.g. HORIZONS.GW3
@@ -775,7 +775,7 @@ function calcPlayerCounterEdge(player, gwWindow, teamFixturesByGw, ctx) {
  *   perGw: [{gw, value, band, opponent, venue, isBlank, provisional,
  *     provisionalKickoff}] one entry per FIXTURE; DGWs produce two entries for
  *     the same gw, blanks one with isBlank: true. Fold it into one slot per
- *     gameweek with groupPerGwSlots (engine/fixtures.js) — do not assume the
+ *     gameweek with groupPerGwSlots (engine/fixtures.js) - do not assume the
  *     array length equals the horizon length.
  *
  *   AGGREGATION collapses each gameweek's fixtures to a mean and then applies
@@ -787,7 +787,7 @@ function calcPlayerCounterEdge(player, gwWindow, teamFixturesByGw, ctx) {
  * Lift a gameweek's value for each fixture beyond the first.
  *
  * MODEL: FEATURE_ENGINE.md §9. Applied to a per-GW value AFTER that gameweek's
- * fixtures have been collapsed to a mean — never to an individual fixture
+ * fixtures have been collapsed to a mean - never to an individual fixture
  * score, and never more than once per gameweek. Asymptotic toward 100 so the
  * band scale cannot overflow.
  *
@@ -799,7 +799,7 @@ export function applyDgwUplift(gwValue, fixtureCount) {
   // 0 fixtures means the caller has already substituted BLANK_GW_VALUE, and 1
   // is the ordinary case. Guarding both here rather than at the call site keeps
   // the function total: a negative (n − 1) would otherwise DEDUCT from a blank,
-  // which is not the model — a blank is already priced by BLANK_GW_VALUE.
+  // which is not the model - a blank is already priced by BLANK_GW_VALUE.
   if (fixtureCount <= 1) return gwValue;
   return gwValue + (100 - gwValue) * DGW_UPLIFT * (fixtureCount - 1);
 }
@@ -819,10 +819,10 @@ export function scoreOverHorizon(team, horizon, ctx) {
   // ONE ENTRY PER GAMEWEEK, not per fixture. This is the load-bearing change:
   // the previous version pushed one entry per fixture, so a double gameweek's
   // two entries doubled that GW's WEIGHT in the mean below without adding any
-  // return — and a double against two hard opponents therefore scored LOWER
+  // return - and a double against two hard opponents therefore scored LOWER
   // than a single hard fixture. See FEATURE_ENGINE.md §9.
   const entries = [];  // { gwOffset, value, fixtureScores: [] }
-  const perGw   = [];  // public per-GW strip array — still one entry per FIXTURE
+  const perGw   = [];  // public per-GW strip array - still one entry per FIXTURE
 
   for (let i = 0; i < gwWindow.length; i++) {
     const gw       = gwWindow[i];
@@ -830,7 +830,7 @@ export function scoreOverHorizon(team, horizon, ctx) {
     const fixtures = teamFixturesByGw.get(gw) ?? [];
 
     if (fixtures.length === 0) {
-      // MODEL: blank GW — BLANK_GW_VALUE (40) reflects zero return for assets;
+      // MODEL: blank GW - BLANK_GW_VALUE (40) reflects zero return for assets;
       // mildly bad rather than neutral, never silently skipped. FEATURE_ENGINE.md §9.
       entries.push({ gwOffset, value: BLANK_GW_VALUE, fixtureScores: [] });
       perGw.push({
@@ -848,7 +848,7 @@ export function scoreOverHorizon(team, horizon, ctx) {
 
     entries.push({ gwOffset, value: gwValue, fixtureScores: scores });
 
-    // perGw stays ONE ENTRY PER FIXTURE — its shape is unchanged and every
+    // perGw stays ONE ENTRY PER FIXTURE - its shape is unchanged and every
     // renderer depends on it. groupPerGwSlots (engine/fixtures.js) is what
     // folds it into gameweeks for display, so the engine contract holds still
     // while the strips migrate.
@@ -865,7 +865,7 @@ export function scoreOverHorizon(team, horizon, ctx) {
         venue:       isHome ? 'H' : 'A',
         isBlank:     false,
         provisional: score.provisional,
-        // Additive field — schedule confidence, distinct from `provisional`
+        // Additive field - schedule confidence, distinct from `provisional`
         // above, which is MODEL confidence. See engine/normalise.js.
         provisionalKickoff: Boolean(f.provisionalKickoff),
       });
@@ -885,7 +885,7 @@ export function scoreOverHorizon(team, horizon, ctx) {
   // Weighted mean with GW-distance decay; nearer GWs have more weight.
   //
   // `entries` is now ONE PER GAMEWEEK, so each gameweek contributes exactly one
-  // weight regardless of how many fixtures it holds — a double's extra return
+  // weight regardless of how many fixtures it holds - a double's extra return
   // is already priced into e.value by applyDgwUplift above. minVal therefore
   // tracks the worst ADJUSTED GAMEWEEK, not the worst individual fixture, which
   // is the point: leaving it on raw fixtures would let W_MIN keep punishing a
@@ -918,7 +918,7 @@ export function scoreOverHorizon(team, horizon, ctx) {
 
   const value = clamp(0, 100, rawValue);
 
-  // Confidence averages over every FIXTURE, not every gameweek — a double's two
+  // Confidence averages over every FIXTURE, not every gameweek - a double's two
   // fixtures each carry their own confidence and both inform how much to trust
   // the run. numBlanks still counts GAMEWEEKS, which is what it has always meant.
   const allScores = entries.flatMap(e => e.fixtureScores);
@@ -947,26 +947,26 @@ export function scoreOverHorizon(team, horizon, ctx) {
 
 /**
  * Average FPL points per gameweek THIS season. Prefers real per-GW history
- * (already lazily loaded via a player-summary fetch — never bulk-fetched, see
+ * (already lazily loaded via a player-summary fetch - never bulk-fetched, see
  * ARCHITECTURE.md §3 rule 7): FPL's history payload has one entry per elapsed
  * gameweek regardless of whether the player featured (0 minutes/0 points for
  * a blank week), so totalPoints / history.length is already a true weekly
  * average. Falls back to season totals ÷ elapsed gameweeks when no summary
  * is loaded, flagged estimated. Pre-season (`elapsedGws <= 0`), this is
- * genuinely 0 for every player — real, not a bug. See `calcLastSeasonAvgPointsPerGw`
+ * genuinely 0 for every player - real, not a bug. See `calcLastSeasonAvgPointsPerGw`
  * for the explicit, user-toggled "show last season instead" view (Ranker
  * only) rather than any automatic substitution here.
  *
  * MODEL: the fallback divides by gameweeks ELAPSED THIS SEASON
  * (ctx.playedFixtures, deduplicated by gw), not by games the player actually
  * appeared in. A player who scored 10 points in GW1 and then missed GW2-4
- * averages 10/4 = 2.5, not 10/1 = 10 — a non-playing week counts as a
+ * averages 10/4 = 2.5, not 10/1 = 10 - a non-playing week counts as a
  * (correctly zero-contributing) week, exactly like the real per-GW-history
  * branch above already does. Dividing by games played instead would make
  * fringe/rotation players who had one big week look like elite performers.
  *
  * Pure: depends only on `player` and ctx (playerSummariesById, playedFixtures
- * — both already part of every ctx built by buildScoreContext) — no new
+ * - both already part of every ctx built by buildScoreContext) - no new
  * network access.
  *
  * @param {Player} player
@@ -992,24 +992,24 @@ export function calcAvgPointsPerGw(player, ctx) {
 /**
  * Average points per GW from the player's most recent PAST season (not this
  * season). Powers the Ranker's explicit "Last Season" Avg Pts/GW toggle
- * (FEATURE_ENGINE.md §10.1) — a deliberate, user-triggered alternative VIEW,
+ * (FEATURE_ENGINE.md §10.1) - a deliberate, user-triggered alternative VIEW,
  * not an automatic fallback baked into `calcAvgPointsPerGw` above. Kept as a
  * fully separate function so the ordinary current-season metric never
  * silently substitutes anything: callers choose explicitly which one to show.
  *
  * MODEL: divides by the fixed SEASON_GWS (config.js, 38), not by games that
- * player actually appeared in that past season — same reasoning as the
+ * player actually appeared in that past season - same reasoning as the
  * current-season fallback above (a fringe player's one good stretch
  * shouldn't read as elite sustained output).
  *
- * Sourced from `historyPast` (`normalisePlayerSummary` — the SAME lazily-
+ * Sourced from `historyPast` (`normalisePlayerSummary` - the SAME lazily-
  * loaded `element-summary` fetch that already provides current-season
  * `history[]`; no new endpoint, no new fetch shape). Returns `null` when this
  * player's summary hasn't been loaded yet (caller should render a loading
  * state, not a definitive dash) or when it's loaded but genuinely carries no
  * past seasons (caller should then render a definitive "no data" dash).
  *
- * Pure: depends only on `player.id` and `ctx.playerSummariesById` — no
+ * Pure: depends only on `player.id` and `ctx.playerSummariesById` - no
  * network access itself; the Ranker is responsible for triggering the lazy
  * load beforehand (see `ensurePlayerSummary` / the chunked bulk loader).
  *
@@ -1042,13 +1042,13 @@ export function calcLastSeasonAvgPointsPerGw(player, ctx) {
  * how many FPL points is this player actually expected to score next,
  * scaled by how good his next fixture is and how likely he is to start?
  *
- * This is deliberately NOT `scorePlayer`'s 0–100 `value` — that composite is a
+ * This is deliberately NOT `scorePlayer`'s 0–100 `value` - that composite is a
  * normalised quality score (FEATURE_ENGINE.md §10) meant for comparing players
  * WITHIN a position, so a defender in great form with an easy fixture can
  * outscore a middling forward even though the forward's actual point ceiling
  * is far higher. `expectedPoints` stays on the real points scale (from
  * `avgPointsPerGw`, which already reflects each position's true scoring
- * ceiling — forwards/mids naturally average more than defenders) so captaincy
+ * ceiling - forwards/mids naturally average more than defenders) so captaincy
  * picks the player predicted to score the most points, full stop, regardless
  * of position or price. See FEATURE_ENGINE.md §10.2.
  *
@@ -1061,7 +1061,7 @@ export function calcLastSeasonAvgPointsPerGw(player, ctx) {
 export function calcExpectedPoints(avgPointsPerGw, nextFixtureScore, playing, fixtureCount = 1) {
   const fixtureMultiplier = 1 + EXPECTED_PTS_FIXTURE_SWING * ((nextFixtureScore.value - 50) / 50);
   const minutesMultiplier = playing.value / 100;
-  // How many games he actually plays that week. A blank yields 0 — the team does
+  // How many games he actually plays that week. A blank yields 0 - the team does
   // not play, so no projection is possible; a double yields ~1.9x. Clamped at 0
   // so a nonsense negative count can never invert the projection into negative
   // points. Defaults to 1 for callers with no fixture context.
@@ -1084,17 +1084,17 @@ export function calcExpectedPoints(avgPointsPerGw, nextFixtureScore, playing, fi
  *             costPerPoint: number|null, nextFixtureScore: {value:number, estimated:boolean},
  *             expectedPoints: {value:number, estimated:boolean} }}
  *   value: 0–100, higher = better projected value. Direction: higher = better.
- *   valueScore: value / price — points-per-million proxy for budget-aware ranking.
- *   costPerPoint: price / avgPointsPerGw — money spent per point, the INVERSE
+ *   valueScore: value / price - points-per-million proxy for budget-aware ranking.
+ *   costPerPoint: price / avgPointsPerGw - money spent per point, the INVERSE
  *   ratio direction from valueScore. Never merge these: valueScore answers
  *   "how much projected score do I get per pound", costPerPoint answers "how
  *   much does each point actually cost". null when avgPointsPerGw is 0 (never
- *   NaN/Infinity — a player with no scoring record has no meaningful cost).
+ *   NaN/Infinity - a player with no scoring record has no meaningful cost).
  *   nextFixtureScore: 0–100 blend of just fixture + counter (excludes form),
  *   answering "how favourable is this player's next fixture", derived from the
- *   SAME horizonResult/counterEdge already computed below — not a new metric.
+ *   SAME horizonResult/counterEdge already computed below - not a new metric.
  *   expectedPoints: real points-scale captaincy/TC projection (avgPointsPerGw
- *   scaled by nextFixtureScore and playing likelihood) — NOT the same axis as
+ *   scaled by nextFixtureScore and playing likelihood) - NOT the same axis as
  *   `value`; see calcExpectedPoints above and FEATURE_ENGINE.md §10.2.
  *   See FEATURE_ENGINE.md §10.
  */
@@ -1135,9 +1135,9 @@ export function scorePlayer(player, horizon, ctx) {
 
   const counterEdge    = calcPlayerCounterEdge(player, gwWindow, teamFixturesByGw, ctx);
   const avgPointsPerGw = calcAvgPointsPerGw(player, ctx);
-  // §7.3 — reuses formResult so minutesSecurity isn't recomputed.
+  // §7.3 - reuses formResult so minutesSecurity isn't recomputed.
   const playing        = calcPlayingLikelihood(player, formResult);
-  // §7.3b — the richer squad-context model behind the Ranker's Playtime column.
+  // §7.3b - the richer squad-context model behind the Ranker's Playtime column.
   // Deliberately NOT folded into `value` below: PROJ_MINUTES already carries a
   // minutes term through calcPlayingLikelihood, and adding a second would
   // double-count playing time in the composite. This is a display metric that
@@ -1151,7 +1151,7 @@ export function scorePlayer(player, horizon, ctx) {
   + (PROJ_MINUTES * playing.value),
   );
 
-  // Fixture + counter only (excludes form) — "is his NEXT FIXTURE good", not
+  // Fixture + counter only (excludes form) - "is his NEXT FIXTURE good", not
   // "is he in form". Re-normalised over just these two weights since PROJ_FORM
   // is dropped from the blend. Reused below by expectedPoints so both metrics
   // agree on what "a good fixture" means.
@@ -1172,7 +1172,7 @@ export function scorePlayer(player, horizon, ctx) {
         weight:          PROJ_FORM,
         estimated:       formResult.estimated,
         // minutesSecurity exposed here so callers (e.g. ranker) do not need to
-        // re-call calcPlayerForm — avoids doubling the work per player row.
+        // re-call calcPlayerForm - avoids doubling the work per player row.
         minutesSecurity: formResult.minutesSecurity ?? null,
       },
       // Squad-context playtime read (§7.3b). Carries its own band/label so the
@@ -1198,7 +1198,7 @@ export function scorePlayer(player, horizon, ctx) {
       ? player.price / avgPointsPerGw.value : null,
     nextFixtureScore,
     // The fourth argument is how many fixtures the team plays in the NEAREST
-    // gameweek of the window — 2 on a double, 0 on a blank. Taken from
+    // gameweek of the window - 2 on a double, 0 on a blank. Taken from
     // gwWindow[0] rather than ctx.currentGw so it can never disagree with the
     // window the rest of this function scored.
     expectedPoints: calcExpectedPoints(
@@ -1212,7 +1212,7 @@ export function scorePlayer(player, horizon, ctx) {
 
 /**
  * Score every player over a horizon and return them sorted by projected value
- * descending. Pure — no DOM, no network, no store access.
+ * descending. Pure - no DOM, no network, no store access.
  * Consumed by modules/ranker.js as the primary entry point for bulk scoring.
  *
  * @param {Player[]} players
@@ -1236,30 +1236,30 @@ export function rankPlayers(players, horizon, ctx) {
  * `score.band` (§8.4): band classifies a score against the fixed 0–100
  * scale; tier classifies a player against the CURRENT POOL, so a strong pick
  * still stands out even in a season where absolute scores run low (or vice
- * versa). Every player gets a tier now (see below) — this fully supersedes
+ * versa). Every player gets a tier now (see below) - this fully supersedes
  * `score.band`'s colour for wherever a rank tier is rendered; `null` is only
  * a defensive fallback for a malformed/empty pool, not a normal outcome.
  * See FEATURE_ENGINE.md §13.
  *
  * Precedence (most to least specific), each tier evaluated in order and the
  * first match wins:
- *   1. 'positionBest'     — positionIndex === 0
- *   2. 'positionElite'    — positionIndex < RANK_ELITE_COUNT_BY_POS[position]
- *   3. 'positionStrong'   — positionIndex < RANK_STRONG_COUNT_BY_POS[position]
- *   4. 'topPercentile'    — index < poolSize * RANK_TOP_PERCENTILE
- *   5. 'bottomPercentile' — index >= poolSize * (1 - RANK_BOTTOM_PERCENTILE)
- *   6. 'midPercentile'    — everyone else
+ *   1. 'positionBest'     - positionIndex === 0
+ *   2. 'positionElite'    - positionIndex < RANK_ELITE_COUNT_BY_POS[position]
+ *   3. 'positionStrong'   - positionIndex < RANK_STRONG_COUNT_BY_POS[position]
+ *   4. 'topPercentile'    - index < poolSize * RANK_TOP_PERCENTILE
+ *   5. 'bottomPercentile' - index >= poolSize * (1 - RANK_BOTTOM_PERCENTILE)
+ *   6. 'midPercentile'    - everyone else
  * A position-elite player is always also position-strong (the elite count is
- * always ≤ the strong count for every position) — elite is checked first
+ * always ≤ the strong count for every position) - elite is checked first
  * specifically because it is the more exclusive, "definitely worth squad
  * consideration" signal, and would otherwise be silently absorbed into the
  * wider tier.
  *
- * MODEL: the two green "worth considering" tiers are PER-POSITION —
+ * MODEL: the two green "worth considering" tiers are PER-POSITION -
  * `positionIndex` is this player's 0-based rank among players of their OWN
  * position only, not the whole pool. A pool-wide ranking systematically
  * buried Forwards (fewer of them, and not reliably higher-scoring) under
- * cheap Defenders that post a similar composite score — ranking each
+ * cheap Defenders that post a similar composite score - ranking each
  * position against its own peers is what actually surfaces good picks per
  * position, which is the point of the feature. `topPercentile` and
  * `bottomPercentile` stay pool-wide by contrast: there's no equivalent
@@ -1268,13 +1268,13 @@ export function rankPlayers(players, horizon, ctx) {
  *
  * MODEL: `topPercentile` and `bottomPercentile` can overlap the green tiers'
  * rank range for a thin position (e.g. GKP's top 8 already covers more than
- * 25% of all goalkeepers) — harmless, since green is checked first and always
+ * 25% of all goalkeepers) - harmless, since green is checked first and always
  * wins; `topPercentile` only actually shows (grey) for positions/pool shapes
  * where the pool-wide top-25% cutoff reaches deeper than that position's own
  * green cutoff.
  *
  * MODEL: tier names describe their ROLE (mirroring the RANK_* config constant
- * names), not the current threshold numbers — those are tunable
+ * names), not the current threshold numbers - those are tunable
  * (FEATURE_ENGINE.md §13), and a name baked to a specific figure would
  * silently go stale the next time any of them are retuned.
  *
@@ -1283,7 +1283,7 @@ export function rankPlayers(players, horizon, ctx) {
  * @param {number} positionIndex  0-based rank among players of the SAME position only
  * @param {string} position       the player's position (GKP/DEF/MID/FWD)
  * MODEL: 'positionBest' has no config constant because it has no threshold to
- * tune — it is literally rank 1, so there are always exactly four of them on
+ * tune - it is literally rank 1, so there are always exactly four of them on
  * the board (one per position) however the pool moves. That fixed scarcity is
  * the whole signal, and is why it earns the gold treatment the 0-100 scale
  * reserves for its top tier: a count that cannot inflate.
@@ -1305,14 +1305,14 @@ export function calcRankTier(index, poolSize, positionIndex, position) {
 /**
  * Rank an UNSORTED row array by an arbitrary metric and return the tiers as a
  * lookup, for a column that is not the headline score. Same tiers, same
- * per-position logic and the same full-pool rule as `attachRankTiers` — the
+ * per-position logic and the same full-pool rule as `attachRankTiers` - the
  * only things that vary are which number is being ranked and which end of it
  * is good.
  *
  * `ascending` exists for metrics where LOWER wins: Cost/Pt is £ per point, so
  * the cheapest points in the game belong at the top of that column, not the
- * bottom. Getting it backwards would not throw — it would quietly gild the
- * worst player in every position — so the direction is always the caller's
+ * bottom. Getting it backwards would not throw - it would quietly gild the
+ * worst player in every position - so the direction is always the caller's
  * explicit choice, never inferred from the numbers.
  *
  * The pool is the rows that HAVE the metric, not every row passed in, so the
@@ -1331,7 +1331,7 @@ export function rankTierMapBy(rows, valueOf, { ascending = false } = {}) {
     const v = valueOf(row);
     // A row with no value on this metric is not last, it is ABSENT: a player
     // with no points has no Cost/Pt at all, and ranking them worst would paint
-    // a colour onto a cell that reads "—". They leave the pool entirely.
+    // a colour onto a cell that reads "-". They leave the pool entirely.
     if (typeof v !== 'number' || !Number.isFinite(v)) continue;
     ranked.push({ row, v });
   }
@@ -1346,15 +1346,15 @@ export function rankTierMapBy(rows, valueOf, { ascending = false } = {}) {
 
 /**
  * Attach a `rankTier` to every entry of an already-sorted (descending by
- * value) scored-player array — the shape `rankPlayers` returns, or any
+ * value) scored-player array - the shape `rankPlayers` returns, or any
  * caller's own equivalent (e.g. modules/ranker.js's chunked `_rows`, which
  * carries the same { player, score, ... } shape plus extra fields that pass
  * through unchanged). Pure: returns a new array, never mutates the input.
  *
  * Derives each player's per-position rank in a single pass: since `sortedRows`
  * is already sorted descending pool-wide, counting occurrences of each
- * position as we go — advancing that position's counter only when we meet
- * another player of it — reproduces the same descending order restricted to
+ * position as we go - advancing that position's counter only when we meet
+ * another player of it - reproduces the same descending order restricted to
  * one position, without a second sort.
  *
  * @param {{player: Player, score: object}[]} sortedRows

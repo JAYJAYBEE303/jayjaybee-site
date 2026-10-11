@@ -3,7 +3,7 @@
  * Layer: engine (pure). No DOM, no network, no store mutation.
  * Predicts imminent FPL price rises and falls from in-GW transfer flow.
  * Inputs come from the normalised Player model (transfersInEvent,
- * transfersOutEvent, ownership) — all already present in bootstrap-static.
+ * transfersOutEvent, ownership) - all already present in bootstrap-static.
  * No new API calls are required.
  * See ROADMAP.md Phase 4-4, ARCHITECTURE.md §8.
  */
@@ -25,7 +25,7 @@ import {
  * MODEL: FPL raises a price when net transfers in exceed roughly 2% of current
  * owners. We do not know total FPL team count, so we use the ratio of net
  * to total in-GW activity as the primary signal and scale confidence by
- * absolute activity volume. Predictions are probabilistic — always show
+ * absolute activity volume. Predictions are probabilistic - always show
  * confidence, never present as certain.
  *
  * @param {Player} player  normalised Player (must have transfersInEvent,
@@ -50,7 +50,7 @@ export function calcPriceChangeRisk(player) {
   // How one-sided the activity is: 0 = perfectly split, 1 = entirely one direction.
   const netRatio = Math.abs(net) / activity;
 
-  // Scale confidence by absolute volume — a strong net ratio from thin volume
+  // Scale confidence by absolute volume - a strong net ratio from thin volume
   // (e.g. 600 in vs 400 out early in the GW) is much less reliable than the
   // same ratio at 60k vs 40k. Cap at 1.
   const activityFactor = Math.min(1, activity / PRICE_ACTIVITY_SCALE);
@@ -75,7 +75,7 @@ export function calcPriceChangeRisk(player) {
   return {
     direction:  'stable',
     confidence: 0,
-    reasoning:  'Equal transfers in and out — no price move predicted.',
+    reasoning:  'Equal transfers in and out - no price move predicted.',
   };
 }
 
@@ -104,7 +104,7 @@ export function rankByPriceFall(players) {
 }
 
 /**
- * Actual price movement since the season opened — a FACT, not a prediction.
+ * Actual price movement since the season opened - a FACT, not a prediction.
  * The sibling of calcPriceChangeRisk above, and deliberately separate from it:
  * that one forecasts the next move from transfer flow, this one reports the
  * moves already banked. Never merge them.
@@ -115,7 +115,7 @@ export function rankByPriceFall(players) {
  * @param {Player} player  normalised Player (must have costChangeStart)
  * @returns {{ value: number, direction: 'rise'|'fall'|'flat', label: string }}
  *          value is in millions; label is signed and always one decimal place
- *          ("+£0.3m", "-£0.1m", "£0.0m" — no sign at all when flat).
+ *          ("+£0.3m", "-£0.1m", "£0.0m" - no sign at all when flat).
  */
 export function calcSeasonPriceChange(player) {
   const tenths = player.costChangeStart ?? 0;
@@ -124,7 +124,7 @@ export function calcSeasonPriceChange(player) {
   const sign      = tenths > 0 ? '+' : tenths < 0 ? '-' : '';
 
   // Format from the ABSOLUTE value and prepend the sign, so a fall renders
-  // "-£0.1m" rather than "£-0.1m". Zero gets no sign — "+£0.0m" would read as
+  // "-£0.1m" rather than "£-0.1m". Zero gets no sign - "+£0.0m" would read as
   // a rise that never happened.
   const label = `${sign}£${(Math.abs(tenths) / 10).toFixed(1)}m`;
 

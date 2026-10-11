@@ -8,15 +8,15 @@
  * single pass over a shared spine is what makes that honest.
  *
  * The spine is engine/lineup.js. A swap's worth is the change in the squad's
- * projected XI expected points — which is why bench-for-bench churn scores
+ * projected XI expected points - which is why bench-for-bench churn scores
  * near zero here however large the composite gap between the two players is.
  *
  * THREE WINDOWS, not one. `calcXiExpectedPoints` returns a PER-GAMEWEEK figure
  * (composite.js's expectedPoints is per-gameweek; a horizon only ever fed its
  * fixture multiplier), so each lane multiplies its own window's delta by that
  * window's length to report a WINDOW TOTAL. Lane values are therefore NOT
- * comparable across boards as raw numbers — a Long term value is ~5x a Now
- * value for the same move — and each board's `unit` label names its span.
+ * comparable across boards as raw numbers - a Long term value is ~5x a Now
+ * value for the same move - and each board's `unit` label names its span.
  * engine/strategy.js compares them only after normalising by LANE_SCALE_*,
  * whose divisors carry the same window factor.
  *
@@ -55,10 +55,10 @@ function memoScore(cache, player, horizon, ctx, scoreFn) {
   } catch (err) {
     // Not re-thrown: one unscoreable player must not fail the whole
     // enumeration (CONVENTIONS.md §9 requires this catch do SOMETHING,
-    // not swallow silently — logging is that something). The caller-side
+    // not swallow silently - logging is that something). The caller-side
     // consequence is real, though: if this is a SQUAD member, longEntries
     // falls below SQUAD_TOTAL and enumerateSwaps returns [], which
-    // upstream must not present as "no legal transfers" — see
+    // upstream must not present as "no legal transfers" - see
     // modules/planner.js's renderBoards, which distinguishes that case
     // from a genuine empty enumeration using this warning as its signal.
     console.warn('[engine/transfers] scoreFn failed for player', player?.id, err?.message ?? err);
@@ -71,7 +71,7 @@ function memoScore(cache, player, horizon, ctx, scoreFn) {
 /**
  * Cheap, no-scoring proxy used only to SELECT which players are worth a full
  * composite score, never to rank them against each other for real. A rough
- * season-points-per-gameweek approximation — NOT the same computation as
+ * season-points-per-gameweek approximation - NOT the same computation as
  * `calcAvgPointsPerGw`, which prefers real per-GW summary history when it is
  * loaded and otherwise divides by `ctx.playedFixtures`, not `ctx.elapsedGws`.
  * This proxy is deliberately cruder: it exists purely to avoid a `scorePlayer`
@@ -105,17 +105,17 @@ function candidateProxyScore(player, ctx) {
  * already in the squad.
  *
  * Selection is two-staged to stay affordable: first a cheap proxy
- * (`candidateProxyScore`, season points per elapsed gameweek — no
+ * (`candidateProxyScore`, season points per elapsed gameweek - no
  * `scorePlayer` call) narrows ~626 players down to CANDIDATE_POOL_PER_POS per
  * position, THEN only that narrowed set is scored through the caller's
  * memoised `scoreLong` closure. Scoring the full pool first (as an earlier
  * version of this function did, via rankPlayers) was exactly the cost
- * CANDIDATE_POOL_PER_POS exists to avoid — see spec rationale below.
+ * CANDIDATE_POOL_PER_POS exists to avoid - see spec rationale below.
  *
  * MODEL: bounding the pool by rank rather than scoring all ~700 players is what
  * keeps the enumeration affordable. A transfer target outside the top 40 of its
  * position is not a recommendation this tool would ever make, so nothing of
- * value is lost — but the bound is config, not a hard-coded assumption.
+ * value is lost - but the bound is config, not a hard-coded assumption.
  *
  * @param {Player[]} allPlayers   the full player pool
  * @param {number[]} squadIds     the user's 15 player ids, excluded from pools
@@ -172,7 +172,7 @@ function withSwap(entries, outId, inEntry) {
  * @param {object}   opts            { horizon, budget, freeTransfers,
  *                                     scorePlayerFn?, caches?,
  *                                     rankTierByPlayerId? }
- * @param {{label: string, gws: number}} opts.horizon  the LONG window — the
+ * @param {{label: string, gws: number}} opts.horizon  the LONG window - the
  *   spine of the enumeration and the window the Long term, Funds, Ceiling and
  *   Structure lanes are measured over. Its `gws` is also the multiplier those
  *   lanes use, so a horizon change stays consistent end to end.
@@ -187,7 +187,7 @@ function withSwap(entries, outId, inEntry) {
  *   'midPercentile'|'bottomPercentile'|null), from
  *   attachRankTiers(rankPlayers(...)) over the FULL player pool. Computed by
  *   the caller (modules/planner.js caches it) because ranking the whole pool
- *   is expensive and this function must not recompute it. Optional — when
+ *   is expensive and this function must not recompute it. Optional - when
  *   absent, the Structure lane's bottomPercentile condition simply never
  *   fires; nothing throws.
  * @returns {Array<Swap>}  unsorted; callers sort by whichever lane they render
@@ -217,8 +217,8 @@ export function enumerateSwaps(squadIds, allPlayers, ctx, opts = {}) {
   const farHorizon  = { label: 'Future', gws: FUTURE_WINDOW_GWS };
   const now1Horizon = { label: 'Now',    gws: NOW_WINDOW_GWS };
 
-  // Window lengths in gameweeks. Lane values are WINDOW TOTALS — a per-GW
-  // expected-points delta multiplied by the weeks it applies to — because
+  // Window lengths in gameweeks. Lane values are WINDOW TOTALS - a per-GW
+  // expected-points delta multiplied by the weeks it applies to - because
   // `expectedPoints` is a per-gameweek figure and the horizon only ever fed its
   // fixture multiplier. Read off the horizon rather than hard-coded so the
   // design survives the horizon switcher returning (ARCHITECTURE.md §9).
@@ -258,7 +258,7 @@ export function enumerateSwaps(squadIds, allPlayers, ctx, opts = {}) {
   // bad fixture hide a player the other two windows would have wanted.
   const pools = buildCandidatePools(allPlayers, squadIds, ctx, scoreLong);
   // A single transfer is free whenever at least one FT is available. The hit
-  // only ever applies to a SECOND move, which computeBestTwoSwap models — so a
+  // only ever applies to a SECOND move, which computeBestTwoSwap models - so a
   // single swap carries a cost of 0 in every normal state of this page.
   const hitCost = freeTransfers >= 1 ? 0 : HIT_PENALTY;
   const swaps = [];
@@ -282,7 +282,7 @@ export function enumerateSwaps(squadIds, allPlayers, ctx, opts = {}) {
       const now1After = withSwap(now1Entries, outPlayer.id, { player: inPlayer, score: inNow1 });
       const farAfter  = withSwap(farEntries,  outPlayer.id, { player: inPlayer, score: inFar });
 
-      // Keep the full { value, estimated } shape rather than just .value — the
+      // Keep the full { value, estimated } shape rather than just .value - the
       // aggregate already accounts for every XI/bench member's own estimated
       // flag, and throwing it away under-reports how much of the swap's score
       // rests on estimated data (see lanes.now.estimated below).
@@ -290,7 +290,7 @@ export function enumerateSwaps(squadIds, allPlayers, ctx, opts = {}) {
       const now1AfterXi = calcXiExpectedPoints(now1After);
       const farAfterXi  = calcXiExpectedPoints(farAfter);
       // Per-gameweek deltas. Every lane below turns its own into a window total
-      // by multiplying by that window's length — see the longGws/now1Gws/farGws
+      // by multiplying by that window's length - see the longGws/now1Gws/farGws
       // note above.
       const longXiDelta = longAfterXi.value - baseLong.value;
       const now1XiDelta = now1AfterXi.value - baseNow1.value;
@@ -306,7 +306,7 @@ export function enumerateSwaps(squadIds, allPlayers, ctx, opts = {}) {
       const priceRisk = calcPriceChangeRisk(inPlayer);
 
       // Window totals. hitCost is a ONE-OFF penalty and is subtracted after the
-      // multiply — scaling it by the window would charge the same −4 five times.
+      // multiply - scaling it by the window would charge the same −4 five times.
       const nowTotal  = (now1XiDelta * now1Gws) - hitCost;
       const longTotal = (longXiDelta * longGws) - hitCost;
 
@@ -339,7 +339,7 @@ export function enumerateSwaps(squadIds, allPlayers, ctx, opts = {}) {
             components: { now1XiDelta, gws: now1Gws, hitCost },
             // True if EITHER the aggregated after-XI estimate is estimated
             // (any XI/bench member, not just the incoming player) OR the
-            // incoming player's own expected points are — under-reporting
+            // incoming player's own expected points are - under-reporting
             // this bit would let the weekly verdict overstate its confidence
             // when the win rests on estimated data.
             estimated: Boolean(now1AfterXi.estimated || inNow1.expectedPoints?.estimated),
@@ -376,7 +376,7 @@ export function enumerateSwaps(squadIds, allPlayers, ctx, opts = {}) {
 
 /**
  * Plain-language explanation of a Now-lane score. Built in the engine so the
- * module only renders it — the same contract engine/chips.js already follows.
+ * module only renders it - the same contract engine/chips.js already follows.
  *
  * @returns {string}
  */
@@ -384,7 +384,7 @@ function buildNowReasoning(outPlayer, inPlayer, nowTotal, hitCost) {
   const gain = nowTotal.toFixed(1);
   const hit  = hitCost > 0 ? ` after a −${hitCost}pt hit` : '';
   if (Math.abs(nowTotal) < 0.2) {
-    return `${inPlayer.name} for ${outPlayer.name} barely changes your XI — `
+    return `${inPlayer.name} for ${outPlayer.name} barely changes your XI - `
          + 'both would be substitutes, so the projected points are almost identical.';
   }
   return `${inPlayer.name} for ${outPlayer.name} is worth ${gain} points to your `
@@ -416,14 +416,14 @@ function buildLongTermReasoning(outPlayer, inPlayer, longTotal, gws, hitCost) {
  *
  * Two components, weighted by config:
  *
- *  • SPREAD — how much of the squad sits clumped inside one narrow price band.
+ *  • SPREAD - how much of the squad sits clumped inside one narrow price band.
  *    A squad with six players between 7.0m and 7.6m cannot upgrade any of them
  *    without selling two, which is exactly the trap this measures.
- *  • HEADROOM — how much cash the four most disposable outfield players would
+ *  • HEADROOM - how much cash the four most disposable outfield players would
  *    raise, as a fraction of FLEX_HEADROOM_TARGET.
  *
  * MODEL: both components are kept because the constraint has two readings and
- * live use has not settled which dominates. See spec §7.1 — resolving it is a
+ * live use has not settled which dominates. See spec §7.1 - resolving it is a
  * weight change in config.js, not a rewrite here.
  *
  * @param {Player[]} squadPlayers
@@ -467,7 +467,7 @@ export function calcSquadFlexibility(squadPlayers, scoresById) {
 }
 
 /**
- * Future Prep — the strongest run over the DEFERRED window: the 3rd, 4th and
+ * Future Prep - the strongest run over the DEFERRED window: the 3rd, 4th and
  * 5th upcoming gameweeks (FUTURE_WINDOW_START/FUTURE_WINDOW_GWS). Ranked by
  * raw projected XI points in that window, as a window total.
  *
@@ -478,7 +478,7 @@ export function calcSquadFlexibility(squadPlayers, scoresById) {
  * TAIL of the long window, Future Prep will often repeat Long term's top rows.
  * The trade was made because "which players have the strongest run over
  * gameweeks 3–5" is the question the board is actually asked, and a swing
- * figure does not answer it — it answers "who improves most relative to now",
+ * figure does not answer it - it answers "who improves most relative to now",
  * which is a different question that happened to be cheaper to keep distinct.
  * Restoring swing is a deliberate reversal, not a bug fix. See spec §7.3.
  *
@@ -497,12 +497,12 @@ function scoreFutureLane(swap) {
     components: { farTotal, farXiDelta: swap.farXiDelta, gws },
     // True if EITHER the aggregated after-XI far estimate is estimated (see
     // swap.farEstimated, exposed by enumerateSwaps for exactly this) OR the
-    // incoming player's own far-window expected points are — mirrors the Now
+    // incoming player's own far-window expected points are - mirrors the Now
     // lane's pattern above so this lane cannot understate estimated inputs.
     estimated: Boolean(swap.farEstimated || swap.inFarScore?.expectedPoints?.estimated),
     reasoning: qualifies
       ? `${swap.inPlayer.name} projects ${farTotal.toFixed(1)} points to your XI `
-        + `across the deferred window — the ${gws} gameweeks starting `
+        + `across the deferred window - the ${gws} gameweeks starting `
         + `${FUTURE_WINDOW_START} after this one.`
       : `${swap.inPlayer.name} does not project a strong enough deferred run to `
         + 'be a future-prep buy.',
@@ -510,13 +510,13 @@ function scoreFutureLane(swap) {
 }
 
 /**
- * Funds & Flexibility — XI points gained per £m freed, over the long window.
+ * Funds & Flexibility - XI points gained per £m freed, over the long window.
  *
  * The board answers one question: which downgrades in PRICE are upgrades in
  * OUTPUT, and which of those buys the most output per pound released.
  *
  * MODEL: this lane used to rank by flexibility gained per point given up, where
- * "flexibility" is calcSquadFlexibility's 0–100 price-clumping measure — not
+ * "flexibility" is calcSquadFlexibility's 0–100 price-clumping measure - not
  * cash. Two faults followed and both are fixed here. It never filtered on
  * price, so a same-price sideways move that happened to spread the squad's
  * price bands outranked a real saving; and `pointsGiven` floored at zero, so a
@@ -526,11 +526,11 @@ function scoreFutureLane(swap) {
  * Three properties fall out of the arithmetic rather than needing their own
  * filters:
  *
- *  • CHEAPER ONLY — a same-price or dearer swap frees ≤ 0, which fails the
+ *  • CHEAPER ONLY - a same-price or dearer swap frees ≤ 0, which fails the
  *    FUNDS_MIN_CASH_FREED comparison and scores 0.
- *  • BETTER ONLY — a cheaper-but-worse swap has a negative delta and so a
+ *  • BETTER ONLY - a cheaper-but-worse swap has a negative delta and so a
  *    negative value, which the board's own `value > 0` row filter drops.
- *  • NO NOISE MOVES — FUNDS_MIN_CASH_FREED also stops a £0.1m saving inflating
+ *  • NO NOISE MOVES - FUNDS_MIN_CASH_FREED also stops a £0.1m saving inflating
  *    the ratio tenfold against a £1.0m one.
  *
  * The LONG window, not the immediate one: the point of freed cash is the
@@ -538,7 +538,7 @@ function scoreFutureLane(swap) {
  * misprice it.
  *
  * calcSquadFlexibility no longer ranks this lane but is deliberately still
- * computed and reported — engine/strategy.js's cashCrunch trigger and the
+ * computed and reported - engine/strategy.js's cashCrunch trigger and the
  * why-panel both read it, and `flexGain` stays in components for them.
  *
  * @param {object} swap
@@ -572,7 +572,7 @@ function scoreFundsLane(swap, flexBefore, flexAfter, priceRisk) {
       reasoning: cashFreed <= 0
         ? `${swap.inPlayer.name} costs the same or more than ${swap.outPlayer.name}, `
           + 'so this move frees no money.'
-        : `Frees only £${cashFreed.toFixed(1)}m — below the £`
+        : `Frees only £${cashFreed.toFixed(1)}m - below the £`
           + `${FUNDS_MIN_CASH_FREED.toFixed(1)}m worth planning around.`,
     };
   }
@@ -585,14 +585,14 @@ function scoreFundsLane(swap, flexBefore, flexAfter, priceRisk) {
             || flexBefore.estimated || flexAfter.estimated,
     reasoning: pointsGained >= 0
       ? `Frees £${cashFreed.toFixed(1)}m AND gains ${pointsGained.toFixed(1)} points `
-        + `over the next ${gws} gameweeks — ${value.toFixed(1)} points per £m released.`
+        + `over the next ${gws} gameweeks - ${value.toFixed(1)} points per £m released.`
       : `Frees £${cashFreed.toFixed(1)}m but costs ${Math.abs(pointsGained).toFixed(1)} `
         + `points over the next ${gws} gameweeks.`,
   };
 }
 
 /**
- * Ceiling — the best SINGLE gameweek in the window, blended with how often the
+ * Ceiling - the best SINGLE gameweek in the window, blended with how often the
  * player has actually hauled.
  *
  * MODEL: FPL exposes no variance data. Haul rate from per-GW history is a
@@ -612,7 +612,7 @@ function scoreCeilingLane(swap, ctx) {
   const summary = ctx?.playerSummariesById?.[swap.inId] ?? null;
 
   // A blank slot is scored BLANK_GW_VALUE by groupPerGwSlots/fixtures.js, which
-  // is high enough to beat a genuinely hard fixture in a naive max() — the
+  // is high enough to beat a genuinely hard fixture in a naive max() - the
   // team does not play that week, so it can never be the "peak" week. Blanks
   // are excluded before taking the max; if every slot in the window is blank
   // there is no week to peak in at all, and the lane reports 0 while flagging
@@ -652,14 +652,14 @@ function scoreCeilingLane(swap, ctx) {
         + 'be projected.'
       : played.length === 0
         ? `${swap.inPlayer.name}'s peak week projects at ${peak.value.toFixed(1)} points, `
-          + 'but no gameweek history has loaded yet — treat this as a rough estimate.'
+          + 'but no gameweek history has loaded yet - treat this as a rough estimate.'
         : `${swap.inPlayer.name} has hauled in ${hauls.length} of ${played.length} `
           + `appearances, with a peak week projecting ${peak.value.toFixed(1)} points.`,
   };
 }
 
 /**
- * Structure Fix — repairs a broken slot in the STARTING XI. Silent otherwise:
+ * Structure Fix - repairs a broken slot in the STARTING XI. Silent otherwise:
  * a swap involving a healthy bench player is not a structure problem, and the
  * board says "nothing broken" rather than padding itself.
  *
@@ -669,13 +669,13 @@ function scoreCeilingLane(swap, ctx) {
  *   (b) breakdown.playtime.value below STRUCTURE_PLAYTIME_FLOOR
  *   (c) rank tier 'bottomPercentile'
  *
- * MODEL: (c) exists because a player can be fit and nailed — (a) and (b) both
- * stay silent — while his underlying output has collapsed relative to the
+ * MODEL: (c) exists because a player can be fit and nailed - (a) and (b) both
+ * stay silent - while his underlying output has collapsed relative to the
  * WHOLE player pool: a nailed starter quietly posting bottom-decile numbers
  * is still costing the user every week, and this is the only one of the
  * three conditions that would ever catch him. Rank tier is intentionally not
- * computed in here — it depends on a full-pool ranking the caller has
- * already paid for (see rankTierByPlayerId in enumerateSwaps' JSDoc) — so
+ * computed in here - it depends on a full-pool ranking the caller has
+ * already paid for (see rankTierByPlayerId in enumerateSwaps' JSDoc) - so
  * this condition degrades to "never fires" rather than recomputing it.
  *
  * @param {object} swap
@@ -685,7 +685,7 @@ function scoreCeilingLane(swap, ctx) {
  * @returns {{ value: number, components: object, estimated: boolean,
  *             reasoning: string }}  value in projected XI points restored over
  *   the long window (a WINDOW TOTAL, matching the Long term board it sits
- *   beside — the repair goes on paying every week it stands, and reporting a
+ *   beside - the repair goes on paying every week it stands, and reporting a
  *   per-gameweek figure alongside five-gameweek totals would make the same
  *   swap read as two different sizes on one grid), 0 when there is nothing to
  *   repair, higher = more urgent fix
@@ -702,7 +702,7 @@ function scoreStructureLane(swap, rankTierByPlayerId = null) {
   const unavailable = swap.outPlayer.status !== 'available';
   // composite.js's no-team fallback branch omits `breakdown.playtime` entirely
   // (see scorePlayer). The `?? 1` below keeps this function total rather than
-  // throwing, but that fallback must not be silent — playtimeMissing feeds
+  // throwing, but that fallback must not be silent - playtimeMissing feeds
   // into `estimated` below in both return branches.
   const playtimeMissing = !swap.outScore?.breakdown?.playtime;
   const playtime    = swap.outScore?.breakdown?.playtime?.value ?? 1;
@@ -713,7 +713,7 @@ function scoreStructureLane(swap, rankTierByPlayerId = null) {
   if (!unavailable && !lowPlaytime && !bottomTier) {
     return {
       value: 0, components: { playtime, rankTier }, estimated: playtimeMissing,
-      reasoning: `${swap.outPlayer.name} is fit and starting — nothing to repair.`,
+      reasoning: `${swap.outPlayer.name} is fit and starting - nothing to repair.`,
     };
   }
 

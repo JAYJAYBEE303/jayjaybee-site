@@ -11,7 +11,7 @@ Two faults in the Transfer Planner's lens boards, reported from live use.
 
 **Funds & Flexibility recommends moves that free no money.** The lane ranks by
 `flexGain / (pointsGiven + 1)`, where `flexGain` is the change in
-`calcSquadFlexibility` — a 0–100 measure of *price clumping and headroom*, not
+`calcSquadFlexibility` - a 0–100 measure of *price clumping and headroom*, not
 of cash. A same-price sideways move that happens to spread the squad's price
 bands therefore scores 4.0 and outranks a genuine downgrade-in-price,
 upgrade-in-output move. Observed on live data: the board's top three rows were
@@ -30,14 +30,14 @@ Two independent causes:
 fixed at `GW5` since the horizon switcher was removed (ARCHITECTURE.md §9). The
 Now lane therefore scores a five-gameweek window while presenting itself as the
 immediate move, and there is no board answering "what is the best transfer for
-the next five gameweeks" as distinct from "for this Saturday" — the two are the
+the next five gameweeks" as distinct from "for this Saturday" - the two are the
 same computation today.
 
 A related mislabelling falls out of the same reading. `expectedPoints` is a
 **per-gameweek** figure: `avgPointsPerGw × fixtureMultiplier × minutesMultiplier`.
 The horizon feeds only the fixture multiplier. So the Now board's
 `unit: 'projected XI points over the horizon'` describes a quantity the number
-is not — it is a per-GW rate whose fixture term is averaged over five weeks.
+is not - it is a per-GW rate whose fixture term is averaged over five weeks.
 
 ## 2. Goals
 
@@ -52,7 +52,7 @@ is not — it is a per-GW rate whose fixture term is averaged over five weeks.
   haul-rate blend, and stays on a single-gameweek points scale because "peak
   week" is inherently one week and its board label says so.
 - Structure Fix keeps its detection rules (flagged / low playtime / bottom
-  percentile) and its window unchanged. Its *scale* had to move — see §11.
+  percentile) and its window unchanged. Its *scale* had to move - see §11.
 - `calcSquadFlexibility` is not deleted or reweighted.
 - The horizon switcher is not reinstated.
 - The six pre-existing test failures in `channel.test.js` and
@@ -69,12 +69,12 @@ Six boards, in render order:
 | Future Prep | XI points gained | 3rd–5th upcoming GWs |
 | Funds & Flexibility | XI points gained per £m freed | next 5 GWs |
 | Ceiling | peak-week blend | next 5 GWs, reported as a 1-GW peak (unchanged) |
-| Structure Fix | XI points restored | next 5 GWs (detection unchanged, now a window total — §11.1) |
+| Structure Fix | XI points restored | next 5 GWs (detection unchanged, now a window total - §11.1) |
 
 ## 5. Scoring windows
 
 `enumerateSwaps` runs a third memoised pass, on the pattern the existing
-`farCtx` already establishes — a window is expressed by shifting
+`farCtx` already establishes - a window is expressed by shifting
 `ctx.currentGw` and setting `horizon.gws`.
 
 | Cache | Start offset | `gws` | Consumed by |
@@ -104,7 +104,7 @@ to three and is still cleared together on `rescore`.
 **Why `FUTURE_WINDOW_START = 2` means the 3rd upcoming gameweek.**
 `scorePlayer` builds its window as `startGw + i` for `i` in `0..gws-1` with
 `startGw = ctx.currentGw`, so offset +0 is the first upcoming gameweek. The
-3rd–5th upcoming are offsets +2, +3, +4 — start 2, length 3.
+3rd–5th upcoming are offsets +2, +3, +4 - start 2, length 3.
 
 ## 6. Points scale
 
@@ -130,7 +130,7 @@ of scope here; recorded so a later reader knows it was seen and deferred.
 
 **Consequence: the three horizon boards are no longer comparable by raw
 number.** A Long term row will read roughly five times a Now row for the same
-move. This is correct — they measure different spans — and each board's `unit`
+move. This is correct - they measure different spans - and each board's `unit`
 label states its span. The verdict banner compares them only after
 normalisation (§8).
 
@@ -197,8 +197,8 @@ Four properties, each answering one half of the reported fault:
   filter drops it. The board self-restricts to cheaper *and* better without a
   new filter.
 - **Judged over five gameweeks**, not one. Freeing cash is a medium-term
-  decision — the point of the freed money is the upgrade it funds in a week or
-  two — so the one-gameweek window would misjudge it.
+  decision - the point of the freed money is the upgrade it funds in a week or
+  two - so the one-gameweek window would misjudge it.
 - **`FUNDS_MIN_CASH_FREED = 0.2`.** Without a floor, a −£0.1m move dividing
   into the ratio inflates tenfold, and £0.1m is price-change noise rather than
   a saving worth planning around.
@@ -210,7 +210,7 @@ why-panel can still report it. Deleting it would silently remove the cash
 crunch trigger.
 
 **Trigger wording.** `cashCrunch` still promotes the `funds` lane, which
-remains roughly right advice — a clumped squad does want the cheaper-and-better
+remains roughly right advice - a clumped squad does want the cheaper-and-better
 move. But its message names squad flexibility, which the board no longer
 measures, so the message is reworded to point at what the board now shows.
 
@@ -225,14 +225,14 @@ verdict's margin language. Every horizon lane's magnitude changes under §6, so
 every divisor must move.
 
 Measured on live data at GW3 (15-man squad, GW5 horizon, £2.0m budget, 575
-enumerated swaps) — the same procedure as the original GW2 calibration. Each
+enumerated swaps) - the same procedure as the original GW2 calibration. Each
 divisor is the lane's observed maximum ÷ ~0.95, so the best real move lands at
 90–100.
 
 | Constant | Was | Now | Observed max | Normalises to |
 |---|---|---|---|---|
 | `LANE_SCALE_NOW` | 10 | 10 | 8.8 | 88 |
-| `LANE_SCALE_LONGTERM` | — | 42 | 39.7 | 94 |
+| `LANE_SCALE_LONGTERM` | - | 42 | 39.7 | 94 |
 | `LANE_SCALE_FUTURE` | 0.7 | 25 | 24.0 | 96 |
 | `LANE_SCALE_FUNDS` | 5 | 90 | 88.5 | 98 |
 | `LANE_SCALE_CEILING` | 8 | 8 | 6.2 | 78 |
@@ -241,11 +241,11 @@ divisor is the lane's observed maximum ÷ ~0.95, so the best real move lands at
 Two of these would have been serious bugs left at their pre-measurement
 guesses. `LANE_SCALE_FUTURE` was `0.7` because it divided a *swing*; against a
 3-GW raw total it pins the lane at 100 and Future Prep hijacks the verdict every
-week. `LANE_SCALE_FUNDS` was guessed at 10 against an observed max of 88.5 —
+week. `LANE_SCALE_FUNDS` was guessed at 10 against an observed max of 88.5 -
 a points-per-£m ratio is scale-free and runs an order of magnitude above every
 points lane, because the divisor is routinely a fraction of a pound.
 
-These remain calibration targets, not truths — the first thing to tune against
+These remain calibration targets, not truths - the first thing to tune against
 realised results per ROADMAP.md Phase 3B.
 
 ## 9. Files
@@ -263,8 +263,8 @@ realised results per ROADMAP.md Phase 3B.
 `repeat(auto-fit, minmax(20rem, 1fr))` and reflows to six cards unaided.
 
 **`computeBestTwoSwap`.** It currently ranks two-transfer combinations by
-`lanes.now.value`. With Now narrowed to one gameweek, a two-transfer plan —
-which costs a −4 hit and is inherently a medium-term commitment — would be
+`lanes.now.value`. With Now narrowed to one gameweek, a two-transfer plan -
+which costs a −4 hit and is inherently a medium-term commitment - would be
 optimised for a single Saturday. It moves to `lanes.longterm.value`.
 
 ## 10. Verification
@@ -276,7 +276,7 @@ optimised for a single Saturday. It moves to `lanes.longterm.value`.
 3. Funds scores 0 for a saving below `FUNDS_MIN_CASH_FREED`.
 4. Funds ranks a small-saving-big-gain above a big-saving-small-gain
    (the ratio is doing the work, not the raw saving).
-5. Funds value is negative — and so filtered off the board — for a
+5. Funds value is negative - and so filtered off the board - for a
    cheaper-but-worse move.
 6. Now and Long term diverge for a player with one strong week and four weak
    ones.
@@ -315,7 +315,7 @@ rules are untouched.
 The points-per-£m ranking was chosen deliberately over "points gained, cheaper
 only", with the risk stated at the time: a small saving with a big gain
 outranks a large saving with a decent one. Live data at GW3 shows the effect is
-not marginal — it decides the whole board.
+not marginal - it decides the whole board.
 
 Every qualifying row at the top freed £0.2–0.4m:
 
@@ -332,7 +332,7 @@ larger saving also carries ~14x the gain, which essentially never happens. So
 the £2.8m-freeing move that also gains points ranks 29th and never reaches the
 three-row board.
 
-This matters because the motivating example was a **£0.9m** saving — squarely
+This matters because the motivating example was a **£0.9m** saving - squarely
 in the range the ratio buries. The board is correct on its own terms (every row
 IS cheaper and better, which is what was broken before) but it answers
 "cheapest possible sidestep" more than "best value downgrade".
@@ -345,10 +345,10 @@ Three ways out, if the behaviour is unwanted:
 1. **Rank by points gained, cheaper only** (the option not taken). Cherki →
    Janelt's 5.5 would rank on merit; the saving becomes a qualifier, not a
    ranker. Simplest, and matches "in order of value" most literally.
-2. **Damp the divisor** — `pointsGained / sqrt(cashFreed)`, or
+2. **Damp the divisor** - `pointsGained / sqrt(cashFreed)`, or
    `/ (cashFreed + k)`. Keeps some efficiency pressure without letting £0.2m
    dominate. Costs the clean "per £m" unit label.
-3. **Raise the floor a lot** — `FUNDS_MIN_CASH_FREED` around £1.0m, making the
+3. **Raise the floor a lot** - `FUNDS_MIN_CASH_FREED` around £1.0m, making the
    board explicitly about meaningful war-chest moves. Narrows it sharply: only
    a handful of swaps qualified at that level in the GW3 sample.
 

@@ -1,6 +1,6 @@
-/* Gaffer IQ — layout.css
+/* Gaffer IQ - layout.css
    App shell: sticky nav, module sections, horizon switcher.
-   No component-specific styles here — those belong in components.css.
+   No component-specific styles here - those belong in components.css.
    All values reference var(--…) from base.css. */
 
 /* ─── App shell ──────────────────────────────────────────────────────────── */
@@ -113,7 +113,7 @@
    viewport-height composition rather than a padded document inside .app-main.
 
    KEYED OFF :has(), NOT A JS-APPLIED BODY CLASS. js/main.js is a module with a
-   large import graph, so the browser paints long before the router runs — a
+   large import graph, so the browser paints long before the router runs - a
    class added in JS meant the fully-styled nav rendered and then vanished, a
    visible flash on every load. index.html already ships with .is-active on the
    landing section, so this resolves during the first style pass with no script
@@ -122,7 +122,7 @@
 
    :has() is baseline across the evergreen browsers this project targets
    (CONVENTIONS.md §1). Where it is unsupported the app chrome simply stays
-   visible on the landing route — degraded, not broken. */
+   visible on the landing route - degraded, not broken. */
 
 /* NOT `display: none` on .app-nav. assets/js/back-to-jayjaybee.js injects the
    shared "‹ jayjaybee.com" link as the first child of this header, so hiding
@@ -177,7 +177,7 @@ body:has(.landing.is-active) .app-main {
 }
 
 /* The FPL error banner and the schedule bar are app chrome too. Data still
-   loads behind the landing and both still populate — they are only visually
+   loads behind the landing and both still populate - they are only visually
    suppressed here, and reappear intact the moment the visitor enters a module.
    The landing is a fixed-height, non-scrolling page, so anything stacked above
    it would push its footer off screen. */
@@ -311,7 +311,7 @@ body:has([data-module="planner"].is-active) .app-main {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   MOBILE LAYOUT  ≤ 768px — Phase 4-5
+   MOBILE LAYOUT  ≤ 768px - Phase 4-5
    All desktop rules above are completely untouched; this block is purely
    additive. Overrides the 900px breakpoint where needed.
    Test breakpoints: 375px (iPhone SE), 390px (iPhone 14), 768px (tablet).
@@ -329,7 +329,7 @@ body:has([data-module="planner"].is-active) .app-main {
     padding-bottom: calc(56px + var(--space-4) + env(safe-area-inset-bottom, 0px));
   }
 
-  /* ─── Top nav — slimmed to brand + horizon switcher only ──────────────── */
+  /* ─── Top nav - slimmed to brand + horizon switcher only ──────────────── */
 
   /* The module nav is fixed to the bottom (see below), so it no longer takes
      up space here. The app-nav becomes a single-row brand + switcher bar. */
@@ -345,7 +345,7 @@ body:has([data-module="planner"].is-active) .app-main {
     font-size: var(--font-size-sm);
   }
 
-  /* ─── Bottom tab bar — replaces the inline module nav ─────────────────── */
+  /* ─── Bottom tab bar - replaces the inline module nav ─────────────────── */
 
   /* position:fixed removes the element from the app-nav flex flow, making the
      app-nav naturally show only brand + horizon switcher. The tab bar sits
@@ -391,7 +391,7 @@ body:has([data-module="planner"].is-active) .app-main {
     border-top-color: var(--color-accent);
   }
 
-  /* ─── Horizon switcher — full width below brand ────────────────────────── */
+  /* ─── Horizon switcher - full width below brand ────────────────────────── */
 
 
 }

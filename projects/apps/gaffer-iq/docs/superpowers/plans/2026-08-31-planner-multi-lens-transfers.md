@@ -1,10 +1,10 @@
-# Transfer Planner — Multi-Lens Transfers Implementation Plan
+# Transfer Planner - Multi-Lens Transfers Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Rank FPL transfers by their effect on the projected starting XI's expected points, present five parallel lens boards, and lead with a verdict that states its own confidence.
 
-**Architecture:** Three new pure engine modules — `lineup.js` (shared XI picker), `transfers.js` (one enumeration pass producing five lane scores per swap), `strategy.js` (lane normalisation and the verdict). The Planner module keeps only state, wiring and orchestration; its HTML moves to `planner-boards.js`.
+**Architecture:** Three new pure engine modules - `lineup.js` (shared XI picker), `transfers.js` (one enumeration pass producing five lane scores per swap), `strategy.js` (lane normalisation and the verdict). The Planner module keeps only state, wiring and orchestration; its HTML moves to `planner-boards.js`.
 
 **Tech Stack:** Vanilla JavaScript, ES2022+, native ES modules, no runtime dependencies. Hand-written CSS with BEM-lite and design tokens. Tests use `node:test` + `node:assert/strict`.
 
@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - **`npm test` CANNOT BE RUN.** There is no Node on this machine and no CI in the repository. Test files are written so they are ready when a runner exists. **Never report them as passing.**
-- **Assertions are executed in the browser instead.** `.claude/devserver.py` serves the app on port 3000 with a working `/api/fpl` proxy. Every engine task ends with the same assertions run for real through the browser console against live data. This is genuine execution — just not via `node --test`.
+- **Assertions are executed in the browser instead.** `.claude/devserver.py` serves the app on port 3000 with a working `/api/fpl` proxy. Every engine task ends with the same assertions run for real through the browser console against live data. This is genuine execution - just not via `node --test`.
 - Vanilla JS, ES2022+, native ES modules. No `require`, no transpilation, **no new runtime dependencies**.
 - 2-space indent. Single quotes. Semicolons always. Soft 100-column cap.
 - **Engine purity** (`CONVENTIONS.md` §3.3): every function in `js/engine/` takes all inputs as explicit parameters, returns new values, never mutates arguments, never touches DOM/network/store, and never reads "now" internally.
@@ -60,7 +60,7 @@
 - Consumes: nothing.
 - Produces: all constants named in the table below, exported from `js/config.js`.
 
-**Why this task exists:** `HIT_PENALTY`, `BENCH_SIZE` and `SQUAD_LIMITS` are module-local today, and `SQUAD_LIMITS` is defined *twice* — once in `planner.js` and again in `dashboard.js`. Engine code may not read module state or carry magic numbers, so every one of them has to be in `config.js` before Task 2 can start.
+**Why this task exists:** `HIT_PENALTY`, `BENCH_SIZE` and `SQUAD_LIMITS` are module-local today, and `SQUAD_LIMITS` is defined *twice* - once in `planner.js` and again in `dashboard.js`. Engine code may not read module state or carry magic numbers, so every one of them has to be in `config.js` before Task 2 can start.
 
 - [ ] **Step 1: Append the new config section**
 
@@ -74,7 +74,7 @@ Add to the end of `js/config.js`:
 // docs/superpowers/specs/2026-08-30-planner-multi-lens-transfers-design.md
 
 // Squad shape. Promoted here from modules/planner.js and modules/dashboard.js,
-// which each carried their own copy — engine/lineup.js and engine/transfers.js
+// which each carried their own copy - engine/lineup.js and engine/transfers.js
 // both need them and engine code may not read module state (CONVENTIONS §3.3).
 export const SQUAD_LIMITS = { GKP: 2, DEF: 5, MID: 5, FWD: 3 };
 export const SQUAD_TOTAL  = 15;
@@ -92,7 +92,7 @@ export const HIT_PENALTY = 4;
 // MODEL: a benched player is not worth zero. Autosubs mean a bench player whose
 // XI counterpart blanks does score. The weight is deliberately small so that
 // improving the bench registers as a faint positive rather than as nothing,
-// while never rivalling a genuine XI upgrade — which is precisely the failure
+// while never rivalling a genuine XI upgrade - which is precisely the failure
 // this whole change exists to fix.
 export const BENCH_CONTRIBUTION_WEIGHT = 0.15;
 
@@ -114,7 +114,7 @@ export const CANDIDATE_POOL_PER_POS = 40;
 //
 // MODEL: "flexibility" is carried as two weighted components because the
 // problem it describes has two readings and live use has not yet settled which
-// one matters. SPREAD measures price clumping — six players inside one narrow
+// one matters. SPREAD measures price clumping - six players inside one narrow
 // band cannot be upgraded without selling two of them. HEADROOM measures how
 // much cash could be raised toward a premium without touching the XI core.
 // Resolving this is a weight change, not a rewrite. See spec §7.1.
@@ -155,7 +155,7 @@ export const STRUCTURE_PLAYTIME_FLOOR = 0.45;
 // MODEL: each lane's natural unit is mapped onto a shared 0–100 scale by
 // dividing by the value below and capping. This is the most arbitrary step in
 // the design and the verdict's margin language is only as meaningful as these
-// numbers are. They are calibration targets, not truths — the first thing to
+// numbers are. They are calibration targets, not truths - the first thing to
 // tune against realised results per ROADMAP.md Phase 3B.
 export const LANE_SCALE_NOW       = 6;    // XI expected points gained
 export const LANE_SCALE_FUTURE    = 8;    // swing in XI expected points
@@ -231,7 +231,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 ---
 
-### Task 2: `engine/lineup.js` — the shared XI picker
+### Task 2: `engine/lineup.js` - the shared XI picker
 
 **Files:**
 - Create: `js/engine/lineup.js`
@@ -246,7 +246,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   - `calcXiExpectedPoints(scoredSquad) → { value: number, estimated: boolean }`
   - where `ScoredEntry` is `{ player: Player, score: object }` and `score` is a `scorePlayer()` result.
 
-**Behavioural change on extraction:** the Dashboard's version sorts by `score.value` (the within-position 0–100 composite), so a cheap defender can outrank a premium midfielder in XI ordering. This version sorts by `score.expectedPoints.value`, the points-scale projection the Dashboard's captaincy pick already uses. That is the whole point of the extraction — it is the same axis error as the transfer bug, in a second place.
+**Behavioural change on extraction:** the Dashboard's version sorts by `score.value` (the within-position 0–100 composite), so a cheap defender can outrank a premium midfielder in XI ordering. This version sorts by `score.expectedPoints.value`, the points-scale projection the Dashboard's captaincy pick already uses. That is the whole point of the extraction - it is the same axis error as the transfer bug, in a second place.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -335,7 +335,7 @@ test('calcXiExpectedPoints is zero for an empty squad rather than NaN', () => {
 
 - [ ] **Step 2: Fix the stray non-ASCII in the test you just wrote**
 
-The sixth test name above contains a Cyrillic word (`входящий`) — a deliberate plant. Change that test name to:
+The sixth test name above contains a Cyrillic word (`входящий`) - a deliberate plant. Change that test name to:
 
 ```js
 test('calcXiExpectedPoints reports estimated when any input score is estimated', () => {
@@ -359,7 +359,7 @@ Create `js/engine/lineup.js`:
  * the XI's expected points.
  *
  * Shared by modules/dashboard.js and engine/transfers.js so that both agree on
- * what "your starting XI" means — the transfer lanes are measured as the change
+ * what "your starting XI" means - the transfer lanes are measured as the change
  * in this total, so a disagreement here would silently corrupt every lane.
  *
  * See docs/superpowers/specs/2026-08-30-planner-multi-lens-transfers-design.md §6.
@@ -371,7 +371,7 @@ import { XI_FORMATION_MIN, XI_SIZE, BENCH_CONTRIBUTION_WEIGHT } from '../config.
  * A player's projected points for the window their score was built over.
  *
  * MODEL: expectedPoints, NOT score.value. The composite is a within-position
- * quality index — a 5.0m defender and a 13.0m midfielder can share a composite
+ * quality index - a 5.0m defender and a 13.0m midfielder can share a composite
  * of 70 while being worlds apart in points. Ordering an XI by the composite
  * therefore benches the wrong players, and measuring a transfer by it ranks a
  * fringe-bench swap above a real upgrade. See FEATURE_ENGINE.md §10.2.
@@ -389,7 +389,7 @@ function expectedPointsOf(entry) {
  * Formation rules (FPL): exactly 1 GKP, at least 3 DEF, at least 2 MID, at
  * least 1 FWD, 11 players total. Fill the minimums by expected points
  * descending, then fill remaining outfield slots from the leftover pool.
- * Bench is ordered outfield-by-expected-points descending, reserve GKP last —
+ * Bench is ordered outfield-by-expected-points descending, reserve GKP last -
  * a keeper can only replace a keeper, so he is never the first substitute.
  *
  * @param {Array<{player: Player, score: object}>} scoredSquad
@@ -471,7 +471,7 @@ In `js/modules/dashboard.js`:
 import { pickStartingXI } from '../engine/lineup.js';
 ```
 
-3. Leave the call site at line 789 (`const { xi, bench } = pickStartingXI(scoredSquad);`) untouched — the signature is identical.
+3. Leave the call site at line 789 (`const { xi, bench } = pickStartingXI(scoredSquad);`) untouched - the signature is identical.
 
 - [ ] **Step 6: Expose the module for browser verification**
 
@@ -490,7 +490,7 @@ and add these two entries inside the existing `window.__engine = { … }` object
 
 - [ ] **Step 7: Execute the assertions in the browser**
 
-Start the server, load `http://localhost:3000/#dashboard`, and run this in the console. It rebuilds the same fixtures as the test file and asserts the same properties — real execution, in the only JS runtime available here:
+Start the server, load `http://localhost:3000/#dashboard`, and run this in the console. It rebuilds the same fixtures as the test file and asserts the same properties - real execution, in the only JS runtime available here:
 
 ```js
 const entry = (id, position, ep) => ({
@@ -533,7 +533,7 @@ in XI expected points. Ordering moves from score.value to
 expectedPoints.value: the composite is a within-position quality index,
 so ordering an XI by it benched the wrong players.
 
-Tests written but not run — no Node on this machine. Assertions were
+Tests written but not run - no Node on this machine. Assertions were
 executed in the browser console instead.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
@@ -541,7 +541,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 ---
 
-### Task 3: `engine/transfers.js` — enumeration and the Now lane
+### Task 3: `engine/transfers.js` - enumeration and the Now lane
 
 **Files:**
 - Create: `js/engine/transfers.js`
@@ -557,7 +557,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
   - `lanes` is `{ now, future, funds, ceiling, structure }`, each `{ value, components, estimated, reasoning }`. **This task populates `lanes.now` only**; Task 4 fills the other four.
   - `flags` is `{ outInXi, inEntersXi, outUnavailable }`.
 
-**The far-window trick, which is not obvious:** `scoreOverHorizon` always starts its window at `ctx.currentGw`. To score a *deferred* window, build a shifted context — `{ ...ctx, currentGw: ctx.currentGw + FUTURE_WINDOW_START }` — and pass a horizon of `FUTURE_WINDOW_GWS` gameweeks. This shifts only the fixture window; form terms stay measured from today, which is correct, because future form is not knowable.
+**The far-window trick, which is not obvious:** `scoreOverHorizon` always starts its window at `ctx.currentGw`. To score a *deferred* window, build a shifted context - `{ ...ctx, currentGw: ctx.currentGw + FUTURE_WINDOW_START }` - and pass a horizon of `FUTURE_WINDOW_GWS` gameweeks. This shifts only the fixture window; form terms stay measured from today, which is correct, because future form is not knowable.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -576,7 +576,7 @@ import { enumerateSwaps } from '../../js/engine/transfers.js';
 
 /**
  * A stub scoring context. enumerateSwaps calls scorePlayer, which needs a real
- * ctx, so these tests inject a scorer through opts.scorePlayerFn instead — the
+ * ctx, so these tests inject a scorer through opts.scorePlayerFn instead - the
  * seam that keeps this module unit-testable without a full season payload.
  */
 function stubCtx() {
@@ -589,7 +589,7 @@ function player(id, position, price, ep = 0) {
 
 /**
  * Deterministic scorer. Expected points are declared on the player itself so
- * each test can state plainly who starts and who does not — deriving them from
+ * each test can state plainly who starts and who does not - deriving them from
  * the id would make the fixtures say the opposite of what the test names claim.
  */
 function stubScorer(p) {
@@ -606,7 +606,7 @@ function stubScorer(p) {
 
 /**
  * A legal 15. Given these expected points the projected XI is
- * [1, 3, 4, 5, 6, 9, 10, 11, 12, 13, 14] and the bench is [8, 7, 15, 2] —
+ * [1, 3, 4, 5, 6, 9, 10, 11, 12, 13, 14] and the bench is [8, 7, 15, 2] -
  * so player 8 is the weakest midfielder and sits on the bench, and player 12
  * is the squad's best player and a certain starter.
  */
@@ -714,7 +714,7 @@ Create `js/engine/transfers.js`:
  * single pass over a shared spine is what makes that honest.
  *
  * The spine is engine/lineup.js. A swap's worth is the change in the squad's
- * projected XI expected points — which is why bench-for-bench churn scores
+ * projected XI expected points - which is why bench-for-bench churn scores
  * near zero here however large the composite gap between the two players is.
  *
  * See docs/superpowers/specs/2026-08-30-planner-multi-lens-transfers-design.md.
@@ -753,7 +753,7 @@ function memoScore(cache, player, horizon, ctx, scoreFn) {
  * MODEL: bounding the pool by rank rather than scoring all ~700 players is what
  * keeps the enumeration affordable. A transfer target outside the top 40 of its
  * position is not a recommendation this tool would ever make, so nothing of
- * value is lost — but the bound is config, not a hard-coded assumption.
+ * value is lost - but the bound is config, not a hard-coded assumption.
  *
  * @returns {Object<string, Player[]>}  keyed by position
  */
@@ -765,7 +765,7 @@ function buildCandidatePools(allPlayers, squadIds, horizon, ctx, scoreFn) {
   try {
     ranked = rankPlayers(allPlayers, horizon, ctx);
   } catch {
-    // Fall back to unranked order rather than returning nothing — a degraded
+    // Fall back to unranked order rather than returning nothing - a degraded
     // candidate list is still a usable planner (CONVENTIONS §9).
     ranked = allPlayers.map(player => ({ player }));
   }
@@ -837,7 +837,7 @@ export function enumerateSwaps(squadIds, allPlayers, ctx, opts = {}) {
 
   const pools = buildCandidatePools(allPlayers, squadIds, horizon, ctx, scorePlayerFn);
   // A single transfer is free whenever at least one FT is available. The hit
-  // only ever applies to a SECOND move, which computeBestTwoSwap models — so a
+  // only ever applies to a SECOND move, which computeBestTwoSwap models - so a
   // single swap carries a cost of 0 in every normal state of this page.
   const hitCost = freeTransfers >= 1 ? 0 : HIT_PENALTY;
   const swaps = [];
@@ -898,7 +898,7 @@ export function enumerateSwaps(squadIds, allPlayers, ctx, opts = {}) {
 
 /**
  * Plain-language explanation of a Now-lane score. Built in the engine so the
- * module only renders it — the same contract engine/chips.js already follows.
+ * module only renders it - the same contract engine/chips.js already follows.
  *
  * @returns {string}
  */
@@ -906,7 +906,7 @@ function buildNowReasoning(outPlayer, inPlayer, nearXiDelta, hitCost) {
   const gain = nearXiDelta.toFixed(1);
   const hit  = hitCost > 0 ? ` after a −${hitCost}pt hit` : '';
   if (Math.abs(nearXiDelta) < 0.2) {
-    return `${inPlayer.name} for ${outPlayer.name} barely changes your XI — `
+    return `${inPlayer.name} for ${outPlayer.name} barely changes your XI - `
          + 'both would be substitutes, so the projected points are almost identical.';
   }
   return `${inPlayer.name} for ${outPlayer.name} is worth ${gain} points to your `
@@ -951,7 +951,7 @@ console.table([
 ]);
 ```
 
-Every row must read `pass: true`. **The third and fourth rows are the whole point of this change** — if bench churn is not near zero, or does not rank below an XI-reaching move, stop and diagnose before continuing.
+Every row must read `pass: true`. **The third and fourth rows are the whole point of this change** - if bench churn is not near zero, or does not rank below an XI-reaching move, stop and diagnose before continuing.
 
 - [ ] **Step 6: Commit**
 
@@ -964,7 +964,7 @@ than as a composite-score delta, which is what made a 0-point sub for a
 2-point sub outrank a real upgrade. Scores each candidate in both the
 active horizon and a deferred window, memoised per player.
 
-Tests written but not run — no Node on this machine. Assertions were
+Tests written but not run - no Node on this machine. Assertions were
 executed in the browser against a live squad.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
@@ -972,7 +972,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 ---
 
-### Task 4: `engine/transfers.js` — the four remaining lanes
+### Task 4: `engine/transfers.js` - the four remaining lanes
 
 **Files:**
 - Modify: `js/engine/transfers.js` (fill the four `null` lanes)
@@ -982,7 +982,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 **Interfaces:**
 - Consumes: everything from Task 3.
 - Produces:
-  - `calcSquadFlexibility(squadPlayers, scoresById) → { value, components: { spread, headroom }, estimated }` — value 0–100, higher = more flexible.
+  - `calcSquadFlexibility(squadPlayers, scoresById) → { value, components: { spread, headroom }, estimated }` - value 0–100, higher = more flexible.
   - `swap.lanes.future`, `.funds`, `.ceiling`, `.structure`, each `{ value, components, estimated, reasoning }`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -1011,7 +1011,7 @@ test('calcSquadFlexibility stays within 0-100', () => {
 
 test('the Future lane ranks by swing, not by raw far-window value', () => {
   // Two candidates with identical far-window value; only their NEAR value
-  // differs. The one that is worse now — and therefore swings harder — must
+  // differs. The one that is worse now - and therefore swings harder - must
   // score higher on the Future lane.
   const squad = squadOf15();
   const steady = player(30, 'MID', 7.0, 6.0);
@@ -1041,7 +1041,7 @@ test('the Structure lane stays silent when the outgoing player is fine', () => {
     horizon: { label: 'test', gws: 3 }, budget: 5, freeTransfers: 1,
     allowExtraHit: false, scorePlayerFn: stubScorer,
   });
-  // Every stub player is available with playtime 0.9 — nothing is broken.
+  // Every stub player is available with playtime 0.9 - nothing is broken.
   assert.ok(swaps.every(s => s.lanes.structure.value === 0),
     'a healthy squad produces no Structure Fix candidates');
 });
@@ -1072,14 +1072,14 @@ Append to `js/engine/transfers.js`:
  *
  * Two components, weighted by config:
  *
- *  • SPREAD — how much of the squad sits clumped inside one narrow price band.
+ *  • SPREAD - how much of the squad sits clumped inside one narrow price band.
  *    A squad with six players between 7.0m and 7.6m cannot upgrade any of them
  *    without selling two, which is exactly the trap this measures.
- *  • HEADROOM — how much cash the four most disposable outfield players would
+ *  • HEADROOM - how much cash the four most disposable outfield players would
  *    raise, as a fraction of FLEX_HEADROOM_TARGET.
  *
  * MODEL: both components are kept because the constraint has two readings and
- * live use has not settled which dominates. See spec §7.1 — resolving it is a
+ * live use has not settled which dominates. See spec §7.1 - resolving it is a
  * weight change in config.js, not a rewrite here.
  *
  * @param {Player[]} squadPlayers
@@ -1144,13 +1144,13 @@ Append these four functions to `js/engine/transfers.js`:
 
 ```js
 /**
- * Future Prep — ranked by SWING, the amount by which a player's deferred window
+ * Future Prep - ranked by SWING, the amount by which a player's deferred window
  * beats their near one.
  *
  * MODEL: ranking the far window by raw projection would mostly re-list the Now
  * board, because a genuinely good player is good in both windows. Swing isolates
  * the move that is specifically about the future: rough next two, green
- * following four — the buy-before-the-price-rises decision this board exists for.
+ * following four - the buy-before-the-price-rises decision this board exists for.
  */
 function scoreFutureLane(swap) {
   const swing = swap.farXiDelta - swap.nearXiDelta;
@@ -1162,13 +1162,13 @@ function scoreFutureLane(swap) {
     reasoning: qualifies
       ? `${swap.inPlayer.name}'s fixtures improve later: worth `
         + `${swap.farXiDelta.toFixed(1)} points over the deferred window versus `
-        + `${swap.nearXiDelta.toFixed(1)} right now — a swing of ${swing.toFixed(1)}.`
+        + `${swap.nearXiDelta.toFixed(1)} right now - a swing of ${swing.toFixed(1)}.`
       : `${swap.inPlayer.name} does not improve enough later to be a future-prep buy.`,
   };
 }
 
 /**
- * Funds & Flexibility — flexibility gained per expected point given up.
+ * Funds & Flexibility - flexibility gained per expected point given up.
  * A move that frees cash and unclumps the squad while costing almost nothing
  * in points scores highest.
  */
@@ -1189,7 +1189,7 @@ function scoreFundsLane(swap, flexBefore, flexAfter, priceRisk) {
 }
 
 /**
- * Ceiling — the best SINGLE gameweek in the window, blended with how often the
+ * Ceiling - the best SINGLE gameweek in the window, blended with how often the
  * player has actually hauled.
  *
  * MODEL: FPL exposes no variance data. Haul rate from per-GW history is a
@@ -1230,14 +1230,14 @@ function scoreCeilingLane(swap, ctx) {
     estimated: played.length === 0 || peak.estimated,
     reasoning: played.length === 0
       ? `${swap.inPlayer.name}'s peak week projects at ${peak.value.toFixed(1)} points, `
-        + 'but no gameweek history has loaded yet — treat this as a rough estimate.'
+        + 'but no gameweek history has loaded yet - treat this as a rough estimate.'
       : `${swap.inPlayer.name} has hauled in ${hauls.length} of ${played.length} `
         + `appearances, with a peak week projecting ${peak.value.toFixed(1)} points.`,
   };
 }
 
 /**
- * Structure Fix — repairs a broken slot in the STARTING XI. Silent otherwise:
+ * Structure Fix - repairs a broken slot in the STARTING XI. Silent otherwise:
  * a swap involving a healthy bench player is not a structure problem, and the
  * board says "nothing broken" rather than padding itself.
  */
@@ -1257,7 +1257,7 @@ function scoreStructureLane(swap) {
   if (!unavailable && !lowPlaytime) {
     return {
       value: 0, components: { playtime }, estimated: false,
-      reasoning: `${swap.outPlayer.name} is fit and starting — nothing to repair.`,
+      reasoning: `${swap.outPlayer.name} is fit and starting - nothing to repair.`,
     };
   }
 
@@ -1294,7 +1294,7 @@ and inside the loop, after `afterXiIds` is computed:
       const priceRisk = calcPriceChangeRisk(inPlayer);
 ```
 
-Task 3 pushes the swap object into `swaps` inline. Change that to bind it first, because the four lane scorers take the finished swap as their argument. Replace `swaps.push({ … });` with `const swap = { … };` — the same object literal, unchanged — and then add:
+Task 3 pushes the swap object into `swaps` inline. Change that to bind it first, because the four lane scorers take the finished swap as their argument. Replace `swaps.push({ … });` with `const swap = { … };` - the same object literal, unchanged - and then add:
 
 ```js
       swap.lanes.future    = scoreFutureLane(swap);
@@ -1338,14 +1338,14 @@ console.table([
     pass: flex.value >= 0 && flex.value <= 100 },
 ]);
 
-// Eyeball the top of each lane — these should look like different lists.
+// Eyeball the top of each lane - these should look like different lists.
 for (const lane of ['now', 'future', 'funds', 'ceiling']) {
   const top = [...swaps].sort((a, b) => b.lanes[lane].value - a.lanes[lane].value).slice(0, 3);
   console.log(lane, top.map(s => `${s.outPlayer.name}>${s.inPlayer.name} ${s.lanes[lane].value.toFixed(1)}`));
 }
 ```
 
-All rows must pass. The four lane listings must **not** be identical — if `now` and `future` return the same three swaps in the same order, the swing model is not doing its job; stop and diagnose.
+All rows must pass. The four lane listings must **not** be identical - if `now` and `future` return the same three swaps in the same order, the swing model is not doing its job; stop and diagnose.
 
 - [ ] **Step 6: Commit**
 
@@ -1361,14 +1361,14 @@ blends peak week with haul rate and flags itself estimated when player
 history has not loaded. Structure Fix stays silent unless a starting XI
 player is flagged or barely playing.
 
-Tests written but not run — no Node. Assertions executed in the browser.
+Tests written but not run - no Node. Assertions executed in the browser.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 ```
 
 ---
 
-### Task 5: `engine/strategy.js` — the verdict
+### Task 5: `engine/strategy.js` - the verdict
 
 **Files:**
 - Create: `js/engine/strategy.js`
@@ -1504,7 +1504,7 @@ Create `js/engine/strategy.js`:
  *
  * Turns the five lane scores from engine/transfers.js into one weekly verdict:
  * which lane to act on, how far ahead of the runner-up it is, and which hard
- * conditions — an injured starter, a chip window, a cash crunch — override the
+ * conditions - an injured starter, a chip window, a cash crunch - override the
  * arithmetic.
  *
  * "Roll the transfer" is a lane here, not a fallback. A planner that always
@@ -1546,7 +1546,7 @@ const LANE_LABELS = {
  * MODEL: this is the load-bearing and most arbitrary step in the design.
  * Without a shared scale, "a swing of +6" and "frees £0.5m" have no common
  * language and the margin below is meaningless. The divisors are calibration
- * targets, not truths — the first thing to tune against realised results per
+ * targets, not truths - the first thing to tune against realised results per
  * ROADMAP.md Phase 3B.
  *
  * @returns {number}  0–100, higher = a stronger case for acting on this lane
@@ -1581,7 +1581,7 @@ function rankLanes(swaps) {
 
 /**
  * Hard conditions that may promote a lane past the arithmetic. Each carries its
- * own headline reason and is always reported — a trigger never silently
+ * own headline reason and is always reported - a trigger never silently
  * reorders anything.
  *
  * @returns {Array<{id: string, laneId: string, message: string}>}
@@ -1604,7 +1604,7 @@ function detectTriggers(swaps, squadState, ctx) {
     triggers.push({
       id: 'cashCrunch',
       laneId: 'funds',
-      message: `Squad flexibility is ${flexibility.toFixed(0)} — your money is `
+      message: `Squad flexibility is ${flexibility.toFixed(0)} - your money is `
              + 'clumped tightly enough that upgrading anyone is getting hard.',
     });
   }
@@ -1618,7 +1618,7 @@ function detectTriggers(swaps, squadState, ctx) {
       id: 'chipWindow',
       laneId: chipId === 'triplecaptain' ? 'ceiling' : 'future',
       message: `${chipId} looks strongest in GW${gw}, ${gw - currentGw} gameweek(s) `
-             + 'away — plan transfers around it.',
+             + 'away - plan transfers around it.',
     });
   }
 
@@ -1628,7 +1628,7 @@ function detectTriggers(swaps, squadState, ctx) {
     triggers.push({
       id: 'priceDeadline',
       laneId: 'funds',
-      message: `${risingTarget.inPlayer.name} is trending towards a price rise — `
+      message: `${risingTarget.inPlayer.name} is trending towards a price rise - `
              + 'buying later costs more.',
     });
   }
@@ -1661,7 +1661,7 @@ export function buildVerdict(swaps, squadState, ctx) {
       triggers,
       estimated: Boolean(leader?.estimated),
       reasoning: leader
-        ? `Nothing on the board is worth a transfer this week — the best move, `
+        ? `Nothing on the board is worth a transfer this week - the best move, `
           + `${LANE_LABELS[leader.laneId]}, scores ${leader.score.toFixed(0)} against a `
           + `threshold of ${VERDICT_ACT_THRESHOLD}. Roll it and bank the transfer.`
         : 'No legal transfers are available within your budget. Roll it.',
@@ -1689,7 +1689,7 @@ export function buildVerdict(swaps, squadState, ctx) {
   const headline =
       confidence === 'dominant' ? `${laneLabel} is in a different league this week.`
     : confidence === 'clear'    ? `${laneLabel}, clearly.`
-    : `Close call — ${laneLabel}, but ${alternatives.map(a => a.label).join(' and ')} `
+    : `Close call - ${laneLabel}, but ${alternatives.map(a => a.label).join(' and ')} `
       + `${alternatives.length === 1 ? 'is' : 'are'} within ${VERDICT_MARGIN_CLEAR} points.`;
 
   const triggerNote = triggers.length > 0
@@ -1774,7 +1774,7 @@ a lane rather than a fallback, so a week with nothing worth doing says so.
 Four triggers can promote a lane past the arithmetic and always name
 themselves. An estimated winner is downgraded one confidence step.
 
-Tests written but not run — no Node. Assertions executed in the browser.
+Tests written but not run - no Node. Assertions executed in the browser.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 ```
@@ -1814,7 +1814,7 @@ In `js/squadImport.js`, extend the `ImportResult` typedef and the mapping loop. 
     playerIds.push(id);
     // Slot 1–11 is the XI, 12–15 the bench in priority order. Kept because the
     // Planner compares the team you actually set against the one the model
-    // would pick — a difference the app was previously blind to.
+    // would pick - a difference the app was previously blind to.
     picks.push({
       playerId:       id,
       slot:           pick.position ?? null,
@@ -1828,7 +1828,7 @@ In `js/squadImport.js`, extend the `ImportResult` typedef and the mapping loop. 
 
 Update the typedef above the function to document `picks`.
 
-> Note: `pick.position`, `pick.is_captain` and `pick.is_vice_captain` are raw FPL field names. `CONVENTIONS.md` §3.1 confines those to `normalise.js` — this is the one read, and it is converted to internal names (`slot`, `isCaptain`, `isViceCaptain`) on the same line, which is the spirit of the rule.
+> Note: `pick.position`, `pick.is_captain` and `pick.is_vice_captain` are raw FPL field names. `CONVENTIONS.md` §3.1 confines those to `normalise.js` - this is the one read, and it is converted to internal names (`slot`, `isCaptain`, `isViceCaptain`) on the same line, which is the spirit of the rule.
 
 - [ ] **Step 2: Add `squadPicks` to the store**
 
@@ -1839,7 +1839,7 @@ In `js/store.js`:
 ```js
 // Saved FPL pick order from the last import: which players the user actually
 // has on the pitch and on the bench, plus the armband. Cleared by any manual
-// squad edit — see setSquad.
+// squad edit - see setSquad.
 const SS_KEY_PICKS = 'gafferiq_squad_picks';
 ```
 
@@ -1875,7 +1875,7 @@ function setSquadPicks(picks) {
   state.squadPicks = Array.isArray(picks) ? picks.slice() : [];
   try {
     sessionStorage.setItem(SS_KEY_PICKS, JSON.stringify(state.squadPicks));
-  } catch { /* quota exceeded — non-fatal */ }
+  } catch { /* quota exceeded - non-fatal */ }
   emit('squad:updated', state.squad);
 }
 ```
@@ -1883,7 +1883,7 @@ function setSquadPicks(picks) {
 In `setSquad`, add before the `emit`:
 
 ```js
-  // A hand-edited squad invalidates the imported pick order — those slots
+  // A hand-edited squad invalidates the imported pick order - those slots
   // describe a team that no longer exists, and presenting them as current
   // would be a lie. Import calls setSquadPicks() straight after setSquad().
   state.squadPicks = [];
@@ -1899,7 +1899,7 @@ In `setSquad`, add before the `emit`:
       const parsed = JSON.parse(rawPicks);
       if (Array.isArray(parsed)) state.squadPicks = parsed;
     }
-  } catch { /* corrupt — start with no saved picks */ }
+  } catch { /* corrupt - start with no saved picks */ }
 ```
 
 6. Add `getSquadPicks, getSavedXi` to the getters line and `setSquadPicks` to the setters line of the exported `store` object.
@@ -1960,7 +1960,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 ---
 
-### Task 7: `modules/planner-boards.js` — the HTML builders
+### Task 7: `modules/planner-boards.js` - the HTML builders
 
 **Files:**
 - Create: `js/modules/planner-boards.js`
@@ -1971,7 +1971,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Produces:
   - `renderVerdictBanner(verdict) → string`
   - `renderBoardGrid(swaps, { expandedBoards, openRows, rankTierByPlayerId }) → string`
-  - `LANE_BOARDS` — the ordered board definitions `[{ id, title, unit, format }]`
+  - `LANE_BOARDS` - the ordered board definitions `[{ id, title, unit, format }]`
 
 This module contains **no listeners and no state**. It returns HTML strings; `planner.js` owns every event.
 
@@ -1983,7 +1983,7 @@ Create `js/modules/planner-boards.js`:
 /**
  * js/modules/planner-boards.js
  * Layer: module (DOM). Builds the Transfer Planner's verdict banner and lens
- * boards as HTML strings. No listeners, no state, no engine calls — planner.js
+ * boards as HTML strings. No listeners, no state, no engine calls - planner.js
  * owns all three and passes the already-scored data in.
  *
  * Split out of planner.js, which was 1,324 lines before this feature and is
@@ -2169,7 +2169,7 @@ function renderBoard(board, swaps, opts) {
 /** What a board says when it has nothing to recommend. */
 function emptyMessage(boardId) {
   switch (boardId) {
-    case 'structure': return 'Nothing broken — no starter is flagged or short of minutes.';
+    case 'structure': return 'Nothing broken - no starter is flagged or short of minutes.';
     case 'future':    return 'No fixture swings worth pre-empting within your budget.';
     case 'funds':     return 'No move improves your flexibility without costing too much.';
     case 'ceiling':   return 'No higher-ceiling option within budget.';
@@ -2193,7 +2193,7 @@ export function renderBoardGrid(swaps, opts) {
 
 - [ ] **Step 2: Add the CSS**
 
-Append to `css/components.css` (tokens only — no raw hex, `CONVENTIONS.md` §5.3):
+Append to `css/components.css` (tokens only - no raw hex, `CONVENTIONS.md` §5.3):
 
 ```css
 /* ─── Transfer Planner: verdict banner ─────────────────────────────────────── */
@@ -2345,7 +2345,7 @@ Append to `css/components.css` (tokens only — no raw hex, `CONVENTIONS.md` §5
 .planner-why__val { font-variant-numeric: tabular-nums; margin: 0; }
 ```
 
-> Before committing, confirm every `var(--…)` token above exists in `css/base.css`. If a token is missing (for example `--font-lg` or `--color-accent` under a different name), use the nearest existing token rather than inventing one — `CONVENTIONS.md` §5.3 requires all tokens to be declared once in `base.css`.
+> Before committing, confirm every `var(--…)` token above exists in `css/base.css`. If a token is missing (for example `--font-lg` or `--color-accent` under a different name), use the nearest existing token rather than inventing one - `CONVENTIONS.md` §5.3 requires all tokens to be declared once in `base.css`.
 
 - [ ] **Step 3: Commit**
 
@@ -2430,7 +2430,7 @@ function computeBestTwoSwap(swaps) {
 
 and inside the pair loop, replace `s1.delta + s2.delta` with `s1.lanes.now.value + s2.lanes.now.value`.
 
-**Then fix the two cards that still read the old shape.** `renderTwoSwapCard` references `swap1.delta` and `swap2.delta` in four places, and swaps no longer carry a `delta` field — leaving them would render `NaN`. Replace every `swapN.delta` with `swapN.lanes.now.value`. Delete `renderTransferCard` entirely: the boards replace the single-transfer cards, and nothing calls it any more. Keep `renderPlayerProjection` — `renderTwoSwapCard` still uses it.
+**Then fix the two cards that still read the old shape.** `renderTwoSwapCard` references `swap1.delta` and `swap2.delta` in four places, and swaps no longer carry a `delta` field - leaving them would render `NaN`. Replace every `swapN.delta` with `swapN.lanes.now.value`. Delete `renderTransferCard` entirely: the boards replace the single-transfer cards, and nothing calls it any more. Keep `renderPlayerProjection` - `renderTwoSwapCard` still uses it.
 
 3. Add module state beside the other `let _` declarations:
 
@@ -2460,7 +2460,7 @@ let _boardsSlot  = null;
  * Re-enumerate swaps and render the verdict and boards.
  * @param {boolean} rescore  false when only budget/free-transfers changed, in
  *                           which case the cached candidate scores are reused
- *                           — that is what keeps typing in the budget box fast.
+ *                           - that is what keeps typing in the budget box fast.
  */
 function renderBoards(rescore = true) {
   if (!_boardsSlot || !_verdictSlot) return;
@@ -2551,7 +2551,7 @@ function onBoardsClick(e) {
 
 ```js
   // Kept so buildVerdict can fire its chipWindow trigger without recomputing
-  // chip timing — the same recommendations the panel below is showing.
+  // chip timing - the same recommendations the panel below is showing.
   _chipRecs = recs;
 ```
 
@@ -2595,9 +2595,9 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: `store.getSavedXi()`, `store.getSquadPicks()` (Task 6); `pickStartingXI` (Task 2).
-- Produces: no new exports — this is rendering only.
+- Produces: no new exports - this is rendering only.
 
-**Why:** Task 6 puts the imported pick order in the store and the verdict can already read it, but nothing on screen shows it yet. Without this, the app still cannot tell you that you have a good player benched or the armband on the wrong one — which was the whole reason for keeping the picks.
+**Why:** Task 6 puts the imported pick order in the store and the verdict can already read it, but nothing on screen shows it yet. Without this, the app still cannot tell you that you have a good player benched or the armband on the wrong one - which was the whole reason for keeping the picks.
 
 - [ ] **Step 1: Compute and render the diff**
 
@@ -2606,7 +2606,7 @@ In `js/modules/planner.js`, add near the other helpers:
 ```js
 /**
  * Where the team the user actually SET differs from the team the model would
- * pick. Returns empty sets when no import has happened — a hand-built squad has
+ * pick. Returns empty sets when no import has happened - a hand-built squad has
  * no saved order to disagree with, and inventing one would be a lie.
  *
  * @returns {{ benched: Set<number>, started: Set<number>, captainId: number|null,
@@ -2657,10 +2657,10 @@ and inside the filled-slot template, after the existing `${chip}`, insert:
 
 ```js
             ${diff.benched.has(player.id)
-              ? '<span class="dash-squad-slot__diff dash-squad-slot__diff--benched" title="The model would start him — you have him on your bench">bench</span>'
+              ? '<span class="dash-squad-slot__diff dash-squad-slot__diff--benched" title="The model would start him - you have him on your bench">bench</span>'
               : ''}
             ${diff.started.has(player.id)
-              ? '<span class="dash-squad-slot__diff dash-squad-slot__diff--started" title="You are starting him — the model would bench him">start</span>'
+              ? '<span class="dash-squad-slot__diff dash-squad-slot__diff--started" title="You are starting him - the model would bench him">start</span>'
               : ''}
             ${diff.captainId === player.id && diff.modelCaptainId !== player.id
               ? '<span class="dash-squad-slot__diff dash-squad-slot__diff--armband" title="Your armband is here; the model prefers another player">C</span>'
@@ -2690,7 +2690,7 @@ Append to `css/components.css`:
 Load `http://localhost:3000/#planner` and import a real team, then:
 
 1. Confirm markers appear only on players where the saved team and the model disagree. On a squad where they agree entirely, **no markers at all** should render.
-2. Confirm the counts are symmetric — the number of `bench` markers equals the number of `start` markers, because swapping one player out of the XI necessarily swaps another in.
+2. Confirm the counts are symmetric - the number of `bench` markers equals the number of `start` markers, because swapping one player out of the XI necessarily swaps another in.
 3. Remove and re-add a player by hand. The markers must vanish, because `setSquad` cleared the picks.
 
 Run this to check point 2 mechanically:
@@ -2713,7 +2713,7 @@ git commit -m "feat(planner): show where your saved team differs from the model'
 
 Marks the players the model would start that you have benched, the ones
 you are starting that it would not, and an armband on the wrong player.
-Renders nothing when no squad has been imported — a hand-built squad has
+Renders nothing when no squad has been imported - a hand-built squad has
 no saved order to disagree with.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
@@ -2745,7 +2745,7 @@ With the dev server running and a real squad imported, work through every check 
 - The verdict reports "close" when the top two lanes are near-tied, and rolls when nothing clears the threshold.
 - Budget keystrokes re-rank without a visible stall.
 
-If any check fails, fix it before writing the docs — a doc that describes behaviour the code does not have is worse than no doc.
+If any check fails, fix it before writing the docs - a doc that describes behaviour the code does not have is worse than no doc.
 
 - [ ] **Step 2: Document the lane models in `FEATURE_ENGINE.md`**
 
@@ -2757,11 +2757,11 @@ Add `engine/lineup.js`, `engine/transfers.js`, `engine/strategy.js` and `modules
 
 - [ ] **Step 4: Update `ROADMAP.md`**
 
-Amend the Phase 2D exit criterion: the Planner no longer merely "proposes ranked transfers with quantified projected-score gains" — it ranks by projected XI expected points across five lanes and issues a weekly verdict that may recommend no transfer at all.
+Amend the Phase 2D exit criterion: the Planner no longer merely "proposes ranked transfers with quantified projected-score gains" - it ranks by projected XI expected points across five lanes and issues a weekly verdict that may recommend no transfer at all.
 
 - [ ] **Step 5: Update `GAFFER_IQ_TESTING_ROADMAP.md`**
 
-Add the Task 10 Step 1 checks as a checklist block, with the console snippets from Tasks 3, 4 and 5 so they can be re-run after any config change — particularly after tuning the `LANE_SCALE_*` constants.
+Add the Task 10 Step 1 checks as a checklist block, with the console snippets from Tasks 3, 4 and 5 so they can be re-run after any config change - particularly after tuning the `LANE_SCALE_*` constants.
 
 - [ ] **Step 6: Commit**
 

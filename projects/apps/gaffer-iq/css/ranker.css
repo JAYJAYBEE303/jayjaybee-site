@@ -1,5 +1,5 @@
 /* css/ranker.css
-   PLAYER RANKER — ported from the design export's FINAL - Ranker.dc.html
+   PLAYER RANKER - ported from the design export's FINAL - Ranker.dc.html
    (with its src/ranker-*.js primitives, "md" theme). Behaviour in
    js/modules/ranker.js; the shell markup in index.html.
 
@@ -28,10 +28,10 @@
   --pad: clamp(16px, 3vw, 40px);
   --ease: cubic-bezier(.2, .7, .2, 1);
   --shadow-pop: 0 16px 40px rgba(1, 4, 9, .6);
-  --rk-neutral-ink: #a2abb5;   /* neutral band text — grey is too dark on its tint */
+  --rk-neutral-ink: #a2abb5;   /* neutral band text - grey is too dark on its tint */
   --rk-scrim: rgba(1, 4, 9, .55);
   --rk-hatch: repeating-linear-gradient(-45deg, transparent 0 3px, color-mix(in srgb, var(--band-neutral) 28%, transparent) 3px 5px);
-  --rk-cmd-h: 56px;            /* measured by ranker.js — the command bar wraps */
+  --rk-cmd-h: 56px;            /* measured by ranker.js - the command bar wraps */
   --band-tough: var(--band-orange);
   --band-tough-bg: var(--band-orange-bg);
 
@@ -61,13 +61,13 @@
 
   /* ─── Shared primitives ─────────────────────────────────────────────────── */
 
-  /* score chip — tint + 60% hue ring; only excellent is solid gold. */
+  /* score chip - tint + 60% hue ring; only excellent is solid gold. */
   .chip { display: inline-flex; align-items: center; justify-content: center; height: 24px; min-width: 34px; padding: 0 6px; border-radius: 4px; background: var(--bb); color: var(--bt); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--b) 60%, transparent); font: 700 13px/1 var(--font-sans); font-variant-numeric: tabular-nums; white-space: nowrap; }
   .chip[data-band=excellent] { background: var(--band-gold); color: var(--color-bg); box-shadow: 0 0 0 1px var(--band-gold), 0 0 14px color-mix(in srgb, var(--band-gold) 40%, transparent); }
   .chip--sm { height: 20px; min-width: 28px; padding: 0 4px; font-size: 12px; }
   .chip--lg { height: 32px; min-width: 46px; padding: 0 8px; font-size: 16px; }
   .chip.is-est { border: 1px dashed currentColor; opacity: .82; }
-  /* No tier: the bare figure — "not ranked here" (loading, no record). */
+  /* No tier: the bare figure - "not ranked here" (loading, no record). */
   .chip--plain { min-width: 0; padding: 0; background: none; box-shadow: none; color: var(--color-text); }
   .chip--plain.muted { color: var(--color-muted); }
 
@@ -112,7 +112,7 @@
   .big { position: relative; display: inline-block; isolation: isolate; white-space: nowrap; font: 700 var(--fs, 56px)/.82 var(--font-score); letter-spacing: 0; font-variant-numeric: tabular-nums; }
   .big__o { position: absolute; top: .05em; left: .05em; z-index: -1; color: var(--b); filter: url(#gq-outline); }
 
-  /* fixture strip — one slot per gameweek */
+  /* fixture strip - one slot per gameweek */
   .strip { --cw: 30px; --ch: 22px; --cf: .65rem; display: flex; gap: 2px; align-items: flex-start; }
   .strip--sm { --cw: 26px; --ch: 18px; --cf: .5625rem; }
   /* Fixture run: each cell prints its score under the opponent. */
@@ -280,7 +280,7 @@
   .run__score .big { --fs: clamp(96px, 10vw, 152px); }
   .run__score > span:last-child { display: flex; align-items: center; gap: 10px; }
   .tiles { display: grid; grid-template-columns: repeat(var(--n, 5), minmax(0, 1fr)); gap: 6px; }
-  /* Run tiles take the plain tint, no ring — only Excellent is outlined
+  /* Run tiles take the plain tint, no ring - only Excellent is outlined
      (gold ring, soft glow, silver ink), so the best week is the one that
      reads first. */
   .tile { position: relative; display: grid; align-content: space-between; gap: 6px; min-width: 0; min-height: 148px; padding: 14px; background: var(--bb); }
@@ -408,7 +408,7 @@
   .pop p { color: var(--color-muted); font-size: 13px; text-wrap: pretty; }
   .pop .btn { justify-self: end; }
 
-  /* ─── Entrances — reader-caused renders only ────────────────────────────── */
+  /* ─── Entrances - reader-caused renders only ────────────────────────────── */
 
   [data-anim] {
     .lead, .chase, .side, .run__card, .tile, .runrow, .ld { animation: rk-in 380ms var(--ease) both; animation-delay: var(--d, 0ms); }

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Full Season — Matchup page strip</title>
+<title>Full Season - Matchup page strip</title>
 <style>
 :root{
   --color-bg:#0d1117; --color-surface:#161b22; --color-surface-raised:#1c2128;
@@ -54,7 +54,7 @@ body{background:var(--color-bg);color:var(--color-text);
 .readout b{color:var(--color-text)}
 
 /* Fixed-width columns in a horizontal scroller. Squeezing 38 weeks into the
-   page width made every tile unreadable; the scroller was never the problem —
+   page width made every tile unreadable; the scroller was never the problem -
    the panel escaping its clipping was, and a fixed-position float does that
    whether or not the track scrolls. */
 .scroller{overflow-x:auto;padding-bottom:4px}
@@ -75,7 +75,7 @@ body{background:var(--color-bg);color:var(--color-text);
 .gw.gw--wide{width:var(--col-wide)}
 .rail__cell.rail__cell--wide{width:var(--col-wide)}
 
-/* Chip rail — now BELOW the ribbon, because the panel expands upward and would
+/* Chip rail - now BELOW the ribbon, because the panel expands upward and would
    otherwise cover it. Mirrors the ribbon's flex sizing exactly so every band
    stays locked to its column. */
 .rail{display:flex;gap:var(--col-gap);height:7px;margin-top:6px}
@@ -86,7 +86,7 @@ body{background:var(--color-bg);color:var(--color-text);
 .rail__cell--fh{background:var(--band-tough)}
 /* Paints the run across the flex gap using an overlay, NOT a negative margin.
    A negative margin consumes layout width, which pushed every cell after a
-   bridged one leftward — 32px of cumulative drift by the end of the season and
+   bridged one leftward - 32px of cumulative drift by the end of the season and
    the bands no longer sat over their gameweeks. */
 .rail__cell--bridge::after{content:"";position:absolute;top:0;bottom:0;
   left:100%;width:var(--col-gap);background:inherit}
@@ -103,7 +103,7 @@ body{background:var(--color-bg);color:var(--color-text);
 /* The collapsed number lives INSIDE .summary and the open "GW n" title inside
    .body, so each fades with the group it belongs to. They used to be one
    element that was simply retitled, which left it at full opacity while
-   everything around it faded — the header stayed lit on a panel whose content
+   everything around it faded - the header stayed lit on a panel whose content
    had already gone. */
 .gw__n{flex:none;text-align:center;font-size:10px;font-weight:700;color:var(--color-muted);
   font-variant-numeric:tabular-nums;line-height:1.4;transition:color .16s}
@@ -123,7 +123,7 @@ body{background:var(--color-bg);color:var(--color-text);
 .dot{width:6px;height:6px;border-radius:50%;background:var(--band-good)}
 .dot--hi{background:var(--band-light-green);box-shadow:0 0 5px rgba(111,207,120,.9)}
 
-/* ── the floating panel — grows UPWARD ───────────────────────────────── */
+/* ── the floating panel - grows UPWARD ───────────────────────────────── */
 /* Pinned by its BOTTOM edge to the column's bottom, so animating height makes
    it climb into the page rather than push everything below it down. Fixed so
    it paints over the matchup cards above. */
@@ -131,7 +131,7 @@ body{background:var(--color-bg);color:var(--color-text);
 .gw.gw--float.is-open{position:fixed;z-index:60;margin:0;flex:0 0 auto;
   background:var(--color-surface)}
 /* The accent chrome is its OWN class, deliberately not .is-open.
-   .is-open carries layout — the summary's positioning, the header size — and
+   .is-open carries layout - the summary's positioning, the header size - and
    `position` cannot be transitioned, so it can only be dropped at the start of
    phase 3. The chrome must be dropped at the START of the collapse instead, so
    its 2t transition-delay is what schedules the fade rather than compounding
@@ -191,7 +191,7 @@ body{background:var(--color-bg);color:var(--color-text);
 <div class="nav"><b>Gaffer IQ</b><span>Matchup</span><span>Fixtures</span><span>Ranker</span><span>Dashboard</span><span>Planner</span></div>
 
 <div class="wrap">
-  <p class="mockhint">Mock Matchup page. The two cards stand in for the real ones — open a gameweek below and the panel climbs over them.</p>
+  <p class="mockhint">Mock Matchup page. The two cards stand in for the real ones - open a gameweek below and the panel climbs over them.</p>
   <div class="cards">
     <div class="card card--good"><h3>Liverpool</h3>
       <div class="row">Base FPL Difficulty<div class="bar"><i style="width:30%"></i></div>30</div>
@@ -241,7 +241,7 @@ body{background:var(--color-bg);color:var(--color-text);
         <div class="key__grp">
           <span class="key__h">Players</span>
           <span class="key__i"><i class="sw sw--dot" style="background:var(--band-good)"></i> In the week's top five</span>
-          <span class="key__i"><i class="sw sw--dot" style="background:var(--band-light-green);box-shadow:0 0 6px rgba(111,207,120,.9)"></i> Standout — captaincy shout</span>
+          <span class="key__i"><i class="sw sw--dot" style="background:var(--band-light-green);box-shadow:0 0 6px rgba(111,207,120,.9)"></i> Standout - captaincy shout</span>
           <span class="key__i"><i class="sw" style="border:1px solid var(--band-light-green);background:rgba(111,207,120,.1)"></i> Favoured side of a matchup</span>
         </div>
         <div class="key__grp">
@@ -252,7 +252,7 @@ body{background:var(--color-bg);color:var(--color-text);
         </div>
         <div class="key__grp">
           <span class="key__h">Week strength</span>
-          <span class="key__i"><i class="sw" style="border:1px solid var(--band-good);box-shadow:0 0 8px rgba(63,185,80,.5)"></i> Loaded — several one-sided ties</span>
+          <span class="key__i"><i class="sw" style="border:1px solid var(--band-good);box-shadow:0 0 8px rgba(63,185,80,.5)"></i> Loaded - several one-sided ties</span>
         </div>
       </div>
     </div>
@@ -296,11 +296,11 @@ function gwData(n){
     const p=NAMES[(seed+i*3)%NAMES.length], base=hot?9.4:6.8;
     return {pos:p[0],nm:p[1],px:p[2],pts:(base-i*.7+((seed+i)%3)*.4).toFixed(1),hi:hot&&i<(n===8?3:2)};
   });
-  return {n,hot,fx:rows,pl,note:pp>1?`${pp} fixtures postponed — only one matchup left to plan around.`
+  return {n,hot,fx:rows,pl,note:pp>1?`${pp} fixtures postponed - only one matchup left to plan around.`
     :pp===1?'One fixture postponed; it will be rescheduled into a later gameweek.'
     :DGW.has(n)?'Double gameweek. Strongest captaincy week of this stretch.'
     :hot?'Several heavily one-sided fixtures land together here.'
-    :'An ordinary week — nothing worth holding a transfer for.'};
+    :'An ordinary week - nothing worth holding a transfer for.'};
 }
 const DATA=Array.from({length:LAST},(_,i)=>gwData(i+1));
 
@@ -317,7 +317,7 @@ function colHTML(d){
 const side=(c,f)=>`<span class="side${f?' side--fav':''}">${badge(c)}<span class="side__t">${c}</span></span>`;
 function bodyHTML(d){
   const fx=d.fx.map(f=>f.pp
-    ?`<div class="fxrow fxrow--pp">${side(f.h,false)}<span class="v">v</span>${side(f.a,false)}<span class="pptag">PP</span><span class="sc">—</span></div>`
+    ?`<div class="fxrow fxrow--pp">${side(f.h,false)}<span class="v">v</span>${side(f.a,false)}<span class="pptag">PP</span><span class="sc">-</span></div>`
     :`<div class="fxrow fxrow--${f.band}">${side(f.h,f.favHome)}<span class="v">v</span>${side(f.a,!f.favHome)}${f.dgw?'<span class="dgwtag">DGW</span>':''}<span class="sc">${f.sc}</span></div>`).join('');
   const pl=d.pl.map(p=>`<div class="prow${p.hi?' prow--hi':''}">
     <span class="prow__pos">${p.pos}</span><span class="prow__nm">${p.nm}</span>
@@ -394,7 +394,7 @@ const EASE=bezier(.32,.72,0,1);
 const GROW=COL_WIDE-COL_W;
 
 /**
- * How far to scroll the track right while the column widens — which is what
+ * How far to scroll the track right while the column widens - which is what
  * decides the DIRECTION the expansion appears to happen in.
  *
  *   0        the panel opens rightward, the column's left edge stays put
@@ -403,7 +403,7 @@ const GROW=COL_WIDE-COL_W;
  *
  * Centre is the default because it disturbs the least on each side. Near the
  * right-hand edge there is no room to open rightward at all, so the shift
- * rises to whatever keeps the full panel on screen — up to GROW, which is the
+ * rises to whatever keeps the full panel on screen - up to GROW, which is the
  * "expand fully left" case. Near the left-hand edge the shift is capped by how
  * much track actually exists to the column's left, so the column can never be
  * pushed off the start of the ribbon.
@@ -419,7 +419,7 @@ function scrollShiftFor(col,scEl){
 /**
  * Scroll `el` from→to along EASE, starting after `delay`, over `dur`.
  *
- * The rAF loop runs even when from === to. It is not only driving the scroll —
+ * The rAF loop runs even when from === to. It is not only driving the scroll -
  * it is also what re-glues every open panel to its column each frame, and the
  * column moves during this window whether or not the track scrolls: a week
  * collapsing earlier in the ribbon drags everything after it. Returning early
@@ -482,8 +482,8 @@ async function expand(col,prev){
   el.style.height=r0.height+'px';
   document.body.appendChild(el);
   // Decided once, at open time, from where the panel WOULD end up at full
-  // width — so the anchor never flips mid-animation.
-  // `nudge` is now only a last-resort clamp — the adaptive scroll below is
+  // width - so the anchor never flips mid-animation.
+  // `nudge` is now only a last-resort clamp - the adaptive scroll below is
   // what normally keeps the panel on screen, so this is 0 in every ordinary
   // case. It still matters when the track has no room left to scroll.
   const scEl=document.querySelector('.scroller');
@@ -530,8 +530,8 @@ async function expand(col,prev){
   // made the whole season drift, because they fought over one scrollLeft.
   //
   // They are resolved into ONE target instead. If the collapsing week sits
-  // EARLIER in the ribbon, its shrink drags everything after it — this column
-  // included — GROW to the left, so the scroll has to give that back before
+  // EARLIER in the ribbon, its shrink drags everything after it - this column
+  // included - GROW to the left, so the scroll has to give that back before
   // applying the direction. A later one has no effect on this column at all.
   pair.shift=scrollShiftFor(col,scEl);
   const flowDelta=(prev&&prev.col!==col&&+prev.col.dataset.gw<+col.dataset.gw)?-GROW:0;
@@ -554,7 +554,7 @@ async function collapse(el,col,skipScroll){
   const t=D();
   const body=el.querySelector('.body');
 
-  // The collapsed height to land on — read from the real column, not from the
+  // The collapsed height to land on - read from the real column, not from the
   // --col-h string, so it stays honest if the summary's content ever changes.
   const hEnd=col.offsetHeight;
 
@@ -562,11 +562,11 @@ async function collapse(el,col,skipScroll){
   body.classList.remove('body--in');
   el.style.height=el.offsetHeight+'px';
   el.offsetHeight;
-  // ALL THREE PHASES ARMED AT ONCE, chained by delay — the mirror of expand.
+  // ALL THREE PHASES ARMED AT ONCE, chained by delay - the mirror of expand.
   //
   // The height target is assigned HERE, not inside a setTimeout. It used to be
   // set at 2t while the rule ALSO carried a 2t delay, so the vertical collapse
-  // did not begin until 4t and would have ended at 5t — but the element is
+  // did not begin until 4t and would have ended at 5t - but the element is
   // removed at 3t, so it never played at all. That was the "delayed, then
   // sharp" collapse: a stalled phase followed by the node vanishing.
   el.style.transition=`width ${t}ms var(--ease) ${t}ms, height ${t}ms var(--ease) ${2*t}ms,`
@@ -588,7 +588,7 @@ async function collapse(el,col,skipScroll){
   // At the start of phase 3, hand the column back at the same moment the float
   // begins shedding its own open state. Both then fade their summaries in
   // together behind an opaque panel, so by the time the float is removed the
-  // column underneath is ALREADY at full opacity — previously it started
+  // column underneath is ALREADY at full opacity - previously it started
   // fading in only after the float vanished, which read as the same graphics
   // flickering back in.
   setTimeout(()=>{

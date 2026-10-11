@@ -1,12 +1,12 @@
 # ROADMAP.md
 
-> Phased build plan for **Gaffer IQ**. Each phase has concrete, checkable deliverables and an exit criterion. Build phases in order — later phases assume the earlier ones are done and stable. This document defines *what* and *in what order*; `ARCHITECTURE.md`, `CONVENTIONS.md`, and `FEATURE_ENGINE.md` define *how*.
+> Phased build plan for **Gaffer IQ**. Each phase has concrete, checkable deliverables and an exit criterion. Build phases in order - later phases assume the earlier ones are done and stable. This document defines *what* and *in what order*; `ARCHITECTURE.md`, `CONVENTIONS.md`, and `FEATURE_ENGINE.md` define *how*.
 >
 > Guiding sequencing principle: **get real data flowing end-to-end before building any analytics, and get one full vertical slice working before going wide.** Do not build all four modules half-way. Build one module fully, prove the pipeline, then expand.
 
 ---
 
-## Phase 0 — Scaffold (half a day; do this first, it's not optional)
+## Phase 0 - Scaffold (half a day; do this first, it's not optional)
 
 Before any feature work, stand up the skeleton exactly as `ARCHITECTURE.md` §3 specifies.
 
@@ -14,33 +14,33 @@ Before any feature work, stand up the skeleton exactly as `ARCHITECTURE.md` §3 
 - Repo scaffolded with the full folder/file tree (empty but present files, each with its header comment per `CONVENTIONS.md` §7.1).
 - `js/main.js` entry module created and referenced from `index.html` via `<script type="module">`.
 - `vercel.json` + `package.json` in place; project deploys to Vercel as an empty shell that loads without console errors.
-- `config.js` populated with the constants named in `FEATURE_ENGINE.md` (weights, windows, horizon defs, bands) — values can be the documented defaults.
+- `config.js` populated with the constants named in `FEATURE_ENGINE.md` (weights, windows, horizon defs, bands) - values can be the documented defaults.
 - README documents local dev (`vercel dev` / `npx serve`) and the deploy flow.
 
 **Exit criterion:** the empty app loads on the live Vercel URL with no errors; ES modules resolve; `config.js` imports work.
 
 ---
 
-## Phase 1 — MVP: data flowing + the Matchup Analyser working end-to-end
+## Phase 1 - MVP: data flowing + the Matchup Analyser working end-to-end
 
 The goal of Phase 1 is a **single proven vertical slice**: real FPL data → proxy → normalise → engine → one rendered module. The chosen MVP module is the **Matchup Analyser**, because it exercises the most of the engine (it shows the full breakdown) and validates the scoring model visually before anything is built on top of it.
 
 ### 1A. Data pipeline (build first)
 - `api/fpl.js` proxy: working, allowlisted (`bootstrap-static/`, `fixtures/`, `element-summary/<id>/`), correct CORS + cache headers, error envelope. (`ARCHITECTURE.md` §5)
-- `api.js`: `fetchBootstrap()`, `fetchFixtures()`, `fetchPlayerSummary(id)` — the only `fetch` calls in the app.
+- `api.js`: `fetchBootstrap()`, `fetchFixtures()`, `fetchPlayerSummary(id)` - the only `fetch` calls in the app.
 - `store.js`: in-memory + `sessionStorage` cache, pub/sub (`data:ready`, `data:error`), manual refresh.
 - `engine/normalise.js`: raw FPL payloads → `Team`, `Player`, `Fixture` internal models (`ARCHITECTURE.md` §8). Nothing downstream ever touches raw FPL field names again.
 
 **Exit criterion for 1A:** from the browser console you can load the app and inspect a fully normalised list of 20 teams, ~700 players, and the season's fixtures, all in the internal model shape, fetched live through the proxy.
 
-### 1B. Engine — enough to score a fixture
+### 1B. Engine - enough to score a fixture
 Implement, as pure functions with the formulas in `FEATURE_ENGINE.md`:
-- `calcBaseDifficulty` (§2) — always available, the floor.
+- `calcBaseDifficulty` (§2) - always available, the floor.
 - `calcHomeAwaySplit` (§3).
 - `calcTeamForm` (§5).
-- `calcCounterMatchup` (§7.2) — the signature metric; position-based.
-- `calcStyleClash` (§6) — proxy version is fine for MVP.
-- `calcFixtureHistory` (§4) — minimal; may return mostly-estimated values initially.
+- `calcCounterMatchup` (§7.2) - the signature metric; position-based.
+- `calcStyleClash` (§6) - proxy version is fine for MVP.
+- `calcFixtureHistory` (§4) - minimal; may return mostly-estimated values initially.
 - `composite.js → scoreFixture` (§8) combining all of the above with `WEIGHTS`, producing `CompositeScore` with full `breakdown` + `confidence` + `band`.
 
 **Exit criterion for 1B:** `scoreFixture` returns a sensible `CompositeScore` for any fixture, and the §12 sanity benchmark passes (obvious fixtures land in the obvious bands).
@@ -55,7 +55,7 @@ Implement, as pure functions with the formulas in `FEATURE_ENGINE.md`:
 
 ---
 
-## Phase 2 — Expand the modules
+## Phase 2 - Expand the modules
 
 With the pipeline and scoring proven, go wide. Build the remaining three modules on the **same** engine. Also implement full horizon aggregation, which Phase 1 only stubbed.
 
@@ -83,15 +83,15 @@ With the pipeline and scoring proven, go wide. Build the remaining three modules
 
 ### 2D. Transfer Planner
 - `modules/planner.js` + `modules/planner-boards.js`: takes current squad + budget + free transfers, enumerates every legal out→in swap (`engine/transfers.js`), models the −4 point hit, respects budget.
-- Ranks by the change in projected **starting-XI** expected points (`engine/lineup.js`'s shared `pickStartingXI`/`calcXiExpectedPoints`), not by within-position composite — the axis that made a bench-to-bench swap able to outrank a genuine upgrade to a starter. See `FEATURE_ENGINE.md` §14.1.
-- Scores every swap on five independent lanes — Now, Future Prep, Funds & Flexibility, Ceiling, Structure Fix — and normalises them (`engine/strategy.js`) into one weekly verdict: act on the strongest lane, or roll the transfer when nothing clears the acting threshold. Four hard triggers (an unavailable XI starter, a near chip window, a cash crunch, an imminent high-confidence price rise) can promote a lane past the raw arithmetic, always naming what it jumped ahead of.
+- Ranks by the change in projected **starting-XI** expected points (`engine/lineup.js`'s shared `pickStartingXI`/`calcXiExpectedPoints`), not by within-position composite - the axis that made a bench-to-bench swap able to outrank a genuine upgrade to a starter. See `FEATURE_ENGINE.md` §14.1.
+- Scores every swap on five independent lanes - Now, Future Prep, Funds & Flexibility, Ceiling, Structure Fix - and normalises them (`engine/strategy.js`) into one weekly verdict: act on the strongest lane, or roll the transfer when nothing clears the acting threshold. Four hard triggers (an unavailable XI starter, a near chip window, a cash crunch, an imminent high-confidence price rise) can promote a lane past the raw arithmetic, always naming what it jumped ahead of.
 - Surfaces top N single transfers per lane, plus the best 2-transfer combination over the active horizon.
 
-**Exit criterion:** for a given squad and budget, the planner ranks transfers by projected starting-XI expected-points gain across five lanes and issues a weekly verdict — including "no transfer this week" — that is hit-aware and states its own confidence.
+**Exit criterion:** for a given squad and budget, the planner ranks transfers by projected starting-XI expected-points gain across five lanes and issues a weekly verdict - including "no transfer this week" - that is hit-aware and states its own confidence.
 
 ---
 
-## Phase 3 — Refinement & additional data sources
+## Phase 3 - Refinement & additional data sources
 
 Now the tool is feature-complete on FPL-only data. Phase 3 raises analytical quality and trustworthiness.
 
@@ -105,7 +105,7 @@ Now the tool is feature-complete on FPL-only data. Phase 3 raises analytical qua
 - Empirically tune `WEIGHTS`, `RECENCY_DECAY`, `HORIZON_DECAY`, `COUNTER_SENSITIVITY` against realised results. Document any change in `FEATURE_ENGINE.md` and the commit (`CONVENTIONS.md` §10).
 
 ### 3C. UX & robustness refinement
-- Refine counter-matchup position grouping beyond raw `element_type` (use positional/role data to better assign wingers vs central mids, etc. — `FEATURE_ENGINE.md` §7.2).
+- Refine counter-matchup position grouping beyond raw `element_type` (use positional/role data to better assign wingers vs central mids, etc. - `FEATURE_ENGINE.md` §7.2).
 - Graceful degradation polish: estimated/low-confidence scores visually distinct everywhere; data-error banner + retry.
 - Performance pass: ensure lazy player-summary loading and caching keep the ranker responsive across all ~700 players.
 
@@ -113,7 +113,7 @@ Now the tool is feature-complete on FPL-only data. Phase 3 raises analytical qua
 
 ---
 
-## Phase 4 — Stretch goals (only after Phases 1–3 are solid)
+## Phase 4 - Stretch goals (only after Phases 1–3 are solid)
 
 These are explicitly optional and out of the core scope. Do not start any of these while earlier phases have open exit criteria.
 
@@ -122,7 +122,7 @@ These are explicitly optional and out of the core scope. Do not start any of the
 - **Chip planning:** model Wildcard / Free Hit / Bench Boost / Triple Captain timing against horizon scores and blank/double GW structure.
 - **Price-change prediction:** integrate an ownership-trend source to flag imminent rises/falls (affects transfer timing).
 - **Multi-season fixture-history depth:** richer H2H once more historical data is wired in, raising the (currently tiny) `history` weight if it proves predictive.
-- **Public/shareable mode:** only if the tool ever stops being personal — would require auth, rate-limit-friendly caching, and a review of the proxy's open-CORS posture (`ARCHITECTURE.md` §5, §12). Not in scope now.
+- **Public/shareable mode:** only if the tool ever stops being personal - would require auth, rate-limit-friendly caching, and a review of the proxy's open-CORS posture (`ARCHITECTURE.md` §5, §12). Not in scope now.
 - **Mobile layout:** make the desktop tool genuinely mobile-friendly (Phase 1 only avoids actively breaking it).
 
 ---

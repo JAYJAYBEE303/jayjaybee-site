@@ -3,24 +3,24 @@
  * Layer: module. Owns the DOM for the Fixtures view.
  * Side effects: DOM writes; one lazy call to api.js's fetchLivePoints().
  * Reads from store; calls engine/standings.js, engine/h2h.js and
- * engine/composite.js. No analytical logic lives here — the league table is
+ * engine/composite.js. No analytical logic lives here - the league table is
  * accumulated by engine/standings.js, the head-to-head record by
  * engine/h2h.js and every Gaffer IQ score by composite.scoreFixture, not by
  * this file (ARCHITECTURE.md §3 hard rule 2).
  *
  * Layout and motion are the design export's FINAL - Fixtures.dc.html, styled
- * by css/fixtures.css. Four modes, switched by the .mode tabs — all four run
+ * by css/fixtures.css. Four modes, switched by the .mode tabs - all four run
  * on live data:
- *   gameweek  — "Matchday": one GW as a clock — a 38-bar season ruler, the
+ *   gameweek  - "Matchday": one GW as a clock - a 38-bar season ruler, the
  *               fixtures as tiles grouped by kickoff day and time, each with
  *               both sides' Gaffer IQ score and an FDR / Gaffer IQ / H2H edge
  *               strip. A tile opens the match report drawer: match events,
  *               both teamsheets and the pairing's H2H record.
- *   table     — The league table, accumulated from played fixtures, with an
+ *   table     - The league table, accumulated from played fixtures, with an
  *               Overall/Home/Away split and European/relegation zones.
- *   team      — One club's season as a ribbon: every result so far and every
+ *   team      - One club's season as a ribbon: every result so far and every
  *               fixture still to come, its table row and its home/away split.
- *   h2h       — Every meeting between two clubs across the seasons loaded,
+ *   h2h       - Every meeting between two clubs across the seasons loaded,
  *               with the tallies, a meeting-by-meeting chart or table, the
  *               venue split and the notable runs.
  *
@@ -29,8 +29,8 @@
  * that pairing.
  *
  * The match-events feed comes from UNDERSTAT, not FPL. FPL publishes only
- * unordered per-fixture totals — no minute for anything, and no link between a
- * goal and its assist — so a chronological feed cannot be built from it.
+ * unordered per-fixture totals - no minute for anything, and no link between a
+ * goal and its assist - so a chronological feed cannot be built from it.
  * Understat's match page carries a server-rendered timeline (every goal, card
  * and substitution with its minute) and its shots JSON ties each goal to its
  * assister. Both are fetched lazily when a fixture is opened, and the feed
@@ -40,7 +40,7 @@
  * position and substitution linkage, so the panel shows a real starting XI
  * with a derived formation. FPL has no teamsheet at all. Understat lists only
  * players who APPEARED, so the second list is the substitutes used, never a
- * full bench — unused subs exist in neither feed.
+ * full bench - unused subs exist in neither feed.
  *
  * Subscriptions: data:ready, route:changed, live:updated, match:updated
  * Renders only while on screen: data:ready does the cheap bookkeeping
@@ -76,9 +76,9 @@ const LAST_GW  = 38;
 // Status a fixture can carry. `label` is what a tile reads; `hint` is the
 // tile's accessible description of it.
 const STATUS_CHIPS = [
-  { key: 'ft',       label: 'FT',   hint: 'Full time — final score' },
+  { key: 'ft',       label: 'FT',   hint: 'Full time - final score' },
   { key: 'live',     label: 'LIVE', hint: 'Kicked off, not yet finished' },
-  { key: 'upcoming', label: 'KO',   hint: 'Upcoming — kickoff time shown' },
+  { key: 'upcoming', label: 'KO',   hint: 'Upcoming - kickoff time shown' },
 ];
 
 // Per-fixture stat identifiers worth showing as a match event, in feed order.
@@ -155,7 +155,7 @@ const SPLIT_COLUMNS = [
 ];
 
 // Head-to-head meeting table, left to right. Date carries its year, so there
-// is no separate Season column — which season a match fell in is a detail the
+// is no separate Season column - which season a match fell in is a detail the
 // date already answers, and two columns saying the same thing read as noise.
 const H2H_COLUMNS = ['Date', 'Venue', 'Home', 'Score', 'Away', 'Result'];
 
@@ -179,8 +179,8 @@ const RM = window.matchMedia('(prefers-reduced-motion: reduce)');
 // ─── Module-level state ───────────────────────────────────────────────────────
 
 let _root    = null;   // [data-module="fixtures"] section
-let _panel   = null;   // #fc-panel — the one pane, rebuilt per mode
-let _drawer  = null;   // #fc-drawer — match report
+let _panel   = null;   // #fc-panel - the one pane, rebuilt per mode
+let _drawer  = null;   // #fc-drawer - match report
 let _scrim   = null;
 let _tabs    = [];     // .mode tab buttons
 let _mode    = 'gameweek';
@@ -191,7 +191,7 @@ let _scope = 'overall';    // league table venue split
 let _teamId = null;        // club the By team pane is showing
 let _h2hA   = null;        // the two clubs the Head-to-head pane is comparing
 let _h2hB   = null;
-let _h2hView = 'chart';    // 'chart' | 'table' — the meeting-by-meeting display
+let _h2hView = 'chart';    // 'chart' | 'table' - the meeting-by-meeting display
 let _cell   = null;        // By team ribbon: selected index (null = next up)
 let _ribbon = [];          // By team ribbon entries, as last rendered
 
@@ -211,7 +211,7 @@ const _scores = new Map();
 const _liveRequested = new Set();
 
 // GWs whose live fetch failed. Rendered as a message instead of retrying in a
-// loop — a dead upstream must not turn into a request storm.
+// loop - a dead upstream must not turn into a request storm.
 const _liveFailed = new Set();
 
 // Same pair of guards for the Understat timeline, keyed by fixture id.
@@ -229,9 +229,9 @@ function esc(str) {
     .replace(/"/g, '&quot;');
 }
 
-/** "1st", "2nd", "13th" — league positions, in prose. */
+/** "1st", "2nd", "13th" - league positions, in prose. */
 function ordinal(n) {
-  if (!Number.isInteger(n) || n < 1) return '—';
+  if (!Number.isInteger(n) || n < 1) return '-';
   return `${n}${ORDINALS[n] ?? 'th'}`;
 }
 
@@ -265,14 +265,14 @@ function watermark(team, right = false) {
 
 // ─── Date formatting ─────────────────────────────────────────────────────────
 // Kickoffs arrive as ISO strings in UTC and are rendered in the viewer's local
-// zone — deliberate: a personal tool should show the time you'd actually watch
+// zone - deliberate: a personal tool should show the time you'd actually watch
 // the match at. All formatting is display-only and stays in this module.
 
 /**
  * Both feeds' date strings. FPL writes ISO-8601 with a trailing Z; Understat
  * (which reaches these formatters through the H2H meeting list) writes
  * 'YYYY-MM-DD HH:MM:SS' with a space and no zone, which only some engines
- * parse — normalising the separator makes it unambiguous everywhere.
+ * parse - normalising the separator makes it unambiguous everywhere.
  */
 function toDate(iso) {
   if (!iso) return null;
@@ -304,14 +304,14 @@ function fmtDateLong(iso) {
   return d ? d.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) : '';
 }
 
-/** "19 Apr 2026" — short, but unambiguous across seasons. */
+/** "19 Apr 2026" - short, but unambiguous across seasons. */
 function fmtDateYear(iso) {
   const d = toDate(iso);
   return d ? d.toLocaleDateString(undefined,
     { day: 'numeric', month: 'short', year: 'numeric' }) : 'TBC';
 }
 
-/** "Apr 2026" — the meeting chart's foot label. */
+/** "Apr 2026" - the meeting chart's foot label. */
 function fmtMonthYear(iso) {
   const d = toDate(iso);
   return d ? d.toLocaleDateString(undefined, { month: 'short', year: 'numeric' }) : '';
@@ -345,7 +345,7 @@ function dayKey(iso) {
  * @param {number} [d0]    entrance delay of the first box, in ms
  */
 function pips(form, d0 = null, cls = '') {
-  if (!form?.length) return '<span class="muted">—</span>';
+  if (!form?.length) return '<span class="muted">-</span>';
   return `<span class="pips${cls ? ` ${cls}` : ''}">${form.map((r, i) => {
     const o = OUTCOMES[r];
     const d = d0 === null ? '' : ` style="--d:${d0 + i * 60}ms"`;
@@ -359,7 +359,7 @@ function emptyState(message) {
 }
 
 /**
- * A "still arriving" block — the same slot emptyState fills, but for a wait
+ * A "still arriving" block - the same slot emptyState fills, but for a wait
  * rather than a verdict.
  *
  * These two states used to look identical: both rendered a line of muted text,
@@ -382,7 +382,7 @@ function loadingState(message, lines = 2) {
 
 /**
  * The context object engine/h2h.js reads. Assembled here rather than held in
- * the store because it is a plain view over state the store already owns —
+ * the store because it is a plain view over state the store already owns -
  * the same shape composite.js's buildScoreContext passes that engine.
  */
 function h2hCtx() {
@@ -399,7 +399,7 @@ function h2hCtx() {
  * How many Understat seasons are actually loaded. Reported to the user rather
  * than a hardcoded number, because each season's payload is fetched
  * independently at boot (main.js, Promise.allSettled) and any of them can fail
- * without taking the others down — "across 4 seasons" would then be a lie.
+ * without taking the others down - "across 4 seasons" would then be a lie.
  */
 function loadedSeasonCount() {
   return [store.getLeagueXg(), store.getLeagueXgPrev()].filter(Boolean).length
@@ -421,7 +421,7 @@ function teamOptions(selected, placeholder) {
 // ─── Gaffer IQ score (engine calls only) ──────────────────────────────────────
 
 /**
- * Build a fresh score context from the current store state — the same inputs
+ * Build a fresh score context from the current store state - the same inputs
  * every other module's buildCtx passes.
  */
 function buildCtx() {
@@ -460,7 +460,7 @@ function sideScore(teamId, fixture) {
  * Is every input to this fixture's scores in yet?
  *
  * A CompositeScore blends counter-matchup, which cannot be computed until BOTH
- * teams' Understat payloads have landed in the boot-time prefetch — so a score
+ * teams' Understat payloads have landed in the boot-time prefetch - so a score
  * shown before then is provisional and will rewrite itself when they do. Same
  * test the Matchup page gates its skeletons on.
  */
@@ -486,7 +486,7 @@ function chip(score, settled, cls = '') {
     .filter(Boolean).join(' ');
   const label = !settled ? 'Gaffer IQ still calculating'
     : has ? `Gaffer IQ ${Math.round(score.value)} ${BAND_LABEL[band]}` : 'Gaffer IQ: no data';
-  const text = !settled ? '00' : has ? Math.round(score.value) : '—';
+  const text = !settled ? '00' : has ? Math.round(score.value) : '-';
   return `<span class="${classes}" data-band="${band}" aria-label="${esc(label)}">${text}</span>`;
 }
 
@@ -495,7 +495,7 @@ function chip(score, settled, cls = '') {
 /**
  * @returns {'ft'|'live'|'upcoming'}  which status a fixture carries.
  *   `started` is set at kickoff and `finished` (→ played) at full time, so
- *   started && !played is exactly "in progress" — no clock arithmetic needed.
+ *   started && !played is exactly "in progress" - no clock arithmetic needed.
  */
 function statusOf(fixture) {
   if (fixture.played)  return 'ft';
@@ -522,7 +522,7 @@ function outcomesFor(fixture) {
  * Index one gameweek's live payload down to a single fixture.
  *
  * FPL reports a player's stats for the GW as a whole in `stats`, and splits
- * them per fixture in `explain` — so in a double gameweek only `explain`
+ * them per fixture in `explain` - so in a double gameweek only `explain`
  * attributes correctly, which is why that is what this reads.
  *
  * @param {object} live      raw event/{gw}/live/ payload
@@ -593,7 +593,7 @@ function groupByDay(fixtures) {
 /**
  * The gameweek this tab opens on, and the one its "back" button returns to.
  *
- * `upcomingGw` — the round still to be played — rather than FPL's `is_current`,
+ * `upcomingGw` - the round still to be played - rather than FPL's `is_current`,
  * which stays pointing at a round from its own deadline until the next one
  * opens and so names a finished gameweek for most of every week. Landing on a
  * round whose last whistle blew days ago made the pane read as stale on the
@@ -659,7 +659,7 @@ function tileHTML(f, delay) {
 
   // A score is shown as soon as FPL publishes one, so a match in progress
   // carries its running score; the LIVE status beside it is what says the
-  // score is not final. A fixture yet to kick off shows none — its time is
+  // score is not final. A fixture yet to kick off shows none - its time is
   // the slot heading above it.
   const r = f.result;
   const hn = home?.name ?? '???', an = away?.name ?? '???';
@@ -719,7 +719,7 @@ function dayHTML(g, di, isHomeGw) {
 }
 
 /**
- * Postponed fixtures — no gameweek assigned, awaiting a rearranged date.
+ * Postponed fixtures - no gameweek assigned, awaiting a rearranged date.
  *
  * These were previously invisible everywhere in the app: they sit in the
  * fixtures array with gw === null, and every view filters by gameweek. A team
@@ -776,7 +776,7 @@ function gameweekHTML() {
 
   const ruler = Array.from({ length: LAST_GW }, (_, i) => {
     const g = i + 1;
-    const label = `Gameweek ${g}${g === home ? ' — current' : g < home ? ' — played' : ''}`;
+    const label = `Gameweek ${g}${g === home ? ' - current' : g < home ? ' - played' : ''}`;
     const cls = g === home ? 'is-home' : g < home ? 'is-past' : '';
     return `<button type="button" data-gw-to="${g}" class="${cls}" aria-label="${label}" title="${label}"`
       + ` aria-current="${g === gw}" style="--d:${i * 10}ms"></button>`;
@@ -805,7 +805,7 @@ function gameweekHTML() {
         <div class="days" style="--n:${Math.max(groups.length, 1)}">
           ${groups.map((g, di) => dayHTML(g, di, gw === home)).join('')}
         </div>
-        <p class="note">Each tile reads home over away: goals, then the Gaffer IQ score for that side. Below, home left v away right — FPL FDR, Gaffer IQ composite and head-to-head wins (grey is draws); each bar leans toward the side with the edge. Select a tile for the match report.</p>`
+        <p class="note">Each tile reads home over away: goals, then the Gaffer IQ score for that side. Below, home left v away right - FPL FDR, Gaffer IQ composite and head-to-head wins (grey is draws); each bar leans toward the side with the edge. Select a tile for the match report.</p>`
       : `
         <div class="blank hatch">
           <h3>Blank gameweek</h3>
@@ -874,7 +874,7 @@ function timelineHtml(fixture) {
     <section class="blk">
       <h3 class="h-sm">Match events</h3>
       <ol class="tl">${events.map(timelineEventHtml).join('')}</ol>
-      <p class="note">In order of minute, home team left of the centre line and away team right of it. Timings and goal/assist pairings come from Understat — FPL publishes neither.</p>
+      <p class="note">In order of minute, home team left of the centre line and away team right of it. Timings and goal/assist pairings come from Understat - FPL publishes neither.</p>
     </section>`;
 }
 
@@ -895,7 +895,7 @@ function lineupMarksText(p) {
 /** One player row in the XI or the substitutes list. */
 function lineupRowHtml(p, isSub) {
   // A starter who was replaced, and a substitute who came on, each carry the
-  // minute it happened — the same number, read from opposite ends.
+  // minute it happened - the same number, read from opposite ends.
   const swap = isSub
     ? (p.cameOnFor ? `${p.onAt}' for ${p.cameOnFor}` : '')
     : (p.replacedBy ? `${p.minutes}' → ${p.replacedBy}` : '');
@@ -938,17 +938,17 @@ function lineupsHtml(fixture, home, away) {
         ${lineupColumnHtml(lineups.home, home)}
         ${lineupColumnHtml(lineups.away, away)}
       </div>
-      <p class="note">Starting XI in position order, with the formation derived from those positions. Understat lists only players who appeared, so the second list is the substitutes USED — unused subs are published nowhere.</p>
+      <p class="note">Starting XI in position order, with the formation derived from those positions. Understat lists only players who appeared, so the second list is the substitutes USED - unused subs are published nowhere.</p>
     </section>`;
 }
 
 /**
  * The head-to-head record for one fixture's pairing, shown in its match
- * report. Rendered for UPCOMING fixtures as well as played ones — the record
+ * report. Rendered for UPCOMING fixtures as well as played ones - the record
  * is exactly what you want before a match, not only after it.
  */
 function h2hMiniHtml(fixture, home, away) {
-  // Same window as the full pane — a peek that counted a different set of
+  // Same window as the full pane - a peek that counted a different set of
   // matches from the view it links to would be worse than no peek at all.
   const record = pairRecord(fixture.homeTeamId, fixture.awayTeamId);
 
@@ -1018,12 +1018,12 @@ function matchReportHtml(fixture, home, away) {
   const status = statusOf(fixture);
 
   if (status === 'upcoming') {
-    return emptyState(`Not played yet — kicks off ${fmtDateTime(fixture.kickoff)}.`);
+    return emptyState(`Not played yet - kicks off ${fmtDateTime(fixture.kickoff)}.`);
   }
 
   if (_liveFailed.has(fixture.gw)) {
     return emptyState(
-      'Match data unavailable — the live endpoint could not be reached. Reload to retry.');
+      'Match data unavailable - the live endpoint could not be reached. Reload to retry.');
   }
 
   const live = store.getLive(fixture.gw);
@@ -1074,7 +1074,7 @@ function matchReportHtml(fixture, home, away) {
           ${featuredHtml(featured.home, home)}
           ${featuredHtml(featured.away, away)}
         </div>
-        <p class="note">Every player with minutes, longest first within each position — FPL publishes no teamsheet. The real XI comes from Understat and is not available for this match.</p>
+        <p class="note">Every player with minutes, longest first within each position - FPL publishes no teamsheet. The real XI comes from Understat and is not available for this match.</p>
       </section>`)}`;
 }
 
@@ -1132,7 +1132,7 @@ function renderDrawer(animate = false) {
 }
 
 /**
- * Opening a fixture is what triggers its GW's live fetch — the payload is
+ * Opening a fixture is what triggers its GW's live fetch - the payload is
  * needed by nothing else, so nothing pays for it until a user asks.
  */
 function openDrawer(fixtureId, from) {
@@ -1172,7 +1172,7 @@ function closeDrawer() {
  * re-renders off the store's 'live:updated' event when it lands.
  *
  * Failures are swallowed to a console warning and a per-GW flag, never
- * store.setError() — match detail is an ENRICHMENT of the fixture list, so a
+ * store.setError() - match detail is an ENRICHMENT of the fixture list, so a
  * dead live endpoint must not blank the tab. Same policy as the Understat
  * fetches in main.js (ROADMAP §3A, CONVENTIONS.md §9).
  */
@@ -1234,7 +1234,7 @@ function queueDrawerRepaint() {
  *
  * Fire-and-forget; the drawer re-renders off 'match:updated'. Failures are
  * swallowed to a console warning and a per-fixture flag, never
- * store.setError() — this is an ENRICHMENT of a feed that already renders from
+ * store.setError() - this is an ENRICHMENT of a feed that already renders from
  * FPL data. Same policy as the Understat fetches in main.js (CONVENTIONS.md §9).
  */
 function ensureTimeline(fixture) {
@@ -1243,14 +1243,14 @@ function ensureTimeline(fixture) {
 
   // The fixture→match mapping is derived from Understat's league payload, which
   // arrives asynchronously at boot. Opening a fixture before it lands is a
-  // "not yet", NOT a failure — flagging it here would permanently deny this
+  // "not yet", NOT a failure - flagging it here would permanently deny this
   // fixture a timeline for the rest of the session.
   const leagueXg = store.getLeagueXg();
   if (!leagueXg) return;
 
   const matchId = findUnderstatMatchId(fixture, leagueXg, store.getSeason()?.teamsById);
   if (!matchId) {
-    // League data IS loaded and still no match — Understat genuinely has no
+    // League data IS loaded and still no match - Understat genuinely has no
     // record of this fixture. Flag it so the FPL fallback replaces the loading
     // placeholder instead of the placeholder sitting there for ever.
     failTimeline(fixture.id, `no Understat match found for fixture ${fixture.id}`);
@@ -1305,7 +1305,7 @@ function movementHtml(movement) {
 
 /** The Next column: opponent crest, short name, venue and official FDR. */
 function nextFixtureHtml(next) {
-  if (!next) return '<span class="muted">—</span>';
+  if (!next) return '<span class="muted">-</span>';
   return `<span class="club">${crest(next.opponent, '18')}`
        + `<b title="${esc(next.opponent?.name ?? '')}">${esc(next.opponent?.shortName ?? '???')}</b>`
        + `<span>(${next.isHome ? 'H' : 'A'})</span>`
@@ -1342,7 +1342,7 @@ function tableHTML() {
   const teams    = store.getTeams();
   const played   = fixtures.filter(f => f.played && f.result);
 
-  // "Completed gameweeks" is the highest GW that has any finished fixture —
+  // "Completed gameweeks" is the highest GW that has any finished fixture -
   // the movement baseline is the table as it stood one GW earlier.
   const lastGw = played.reduce((max, f) => (f.gw !== null && f.gw > max ? f.gw : max), 0);
 
@@ -1360,7 +1360,7 @@ function tableHTML() {
 
   const scopeNote = _scope === 'overall'
     ? 'All fixtures.'
-    : `${_scope === 'home' ? 'Home' : 'Away'} fixtures only — positions are for this split, not the real table.`;
+    : `${_scope === 'home' ? 'Home' : 'Away'} fixtures only - positions are for this split, not the real table.`;
 
   const scopes = [['overall', 'Overall'], ['home', 'Home'], ['away', 'Away']].map(([k, label]) =>
     `<button type="button" data-scope="${k}" aria-pressed="${_scope === k}">${label}</button>`).join('');
@@ -1398,7 +1398,7 @@ function tableHTML() {
           </table>
         </div>
 
-        <p class="note">Accumulated from finished fixtures — FPL publishes no standings endpoint. Ordering is points, then goal difference, then goals scored; clubs level on all three are shown alphabetically rather than split by head-to-head. Form is the last ${LEAGUE_FORM_WINDOW} results, most recent last. Next shows the official FPL 1–5 difficulty, not the Gaffer IQ score.</p>`
+        <p class="note">Accumulated from finished fixtures - FPL publishes no standings endpoint. Ordering is points, then goal difference, then goals scored; clubs level on all three are shown alphabetically rather than split by head-to-head. Form is the last ${LEAGUE_FORM_WINDOW} results, most recent last. Next shows the official FPL 1–5 difficulty, not the Gaffer IQ score.</p>`
         : '<p class="empty">No fixtures have been played yet this season.</p>'}
     </section>`;
 }
@@ -1413,8 +1413,8 @@ function tableHTML() {
 function ribbonEntries(team) {
   const { results, upcoming } = buildTeamSchedule(
     team.id, store.getFixtures(), store.getSeason().teamsById);
-  // "Next up" is the gameweek whose deadline comes next — the one a manager is
-  // picking for — not the round that may still be in progress.
+  // "Next up" is the gameweek whose deadline comes next - the one a manager is
+  // picking for - not the round that may still be in progress.
   const pickGw = store.getNextGw() ?? homeGw();
 
   return [...results, ...upcoming].map(e => {
@@ -1436,7 +1436,7 @@ function ribbonEntries(team) {
   });
 }
 
-/** The cell's accessible name — everything the tile shows, in a sentence. */
+/** The cell's accessible name - everything the tile shows, in a sentence. */
 function cellAria(e) {
   const where = `${e.gw === null ? 'Unscheduled' : `GW${e.gw}`}, ${e.opponent?.name ?? 'TBC'} ${e.isHome ? 'home' : 'away'}`;
   if (e.played) return `${where}, ${OUTCOMES[e.outcome].label} ${e.scored}–${e.conceded}`;
@@ -1444,7 +1444,7 @@ function cellAria(e) {
   const band = bandOf(e.score, e.settled);
   const giq = !e.settled ? 'Gaffer IQ still calculating'
     : typeof e.score?.value === 'number' ? `Gaffer IQ ${Math.round(e.score.value)} ${BAND_LABEL[band]}` : 'no Gaffer IQ score';
-  return `${e.isNext ? 'Next up, ' : ''}${where}, ${e.live ? `live ${e.running}, ` : ''}${giq}, FPL difficulty ${e.difficulty ?? '—'}`;
+  return `${e.isNext ? 'Next up, ' : ''}${where}, ${e.live ? `live ${e.running}, ` : ''}${giq}, FPL difficulty ${e.difficulty ?? '-'}`;
 }
 
 function cellHTML(e, i, sel, nPlayed) {
@@ -1456,7 +1456,7 @@ function cellHTML(e, i, sel, nPlayed) {
   else if (e.postponed) val = 'PP';
   else if (!e.settled) val = '<span class="sk-t">00</span>';
   else if (e.live) val = `${esc(e.running)} live`;
-  else val = has ? `${Math.round(e.score.value)}${e.isNext ? ` ${BAND_LABEL[band]}` : ''}` : '—';
+  else val = has ? `${Math.round(e.score.value)}${e.isNext ? ` ${BAND_LABEL[band]}` : ''}` : '-';
 
   const cls = ['cell', e.isNext && 'is-next', e.live && 'is-live', e.postponed && 'is-pp',
     e.settled && e.score?.provisional && 'is-est'].filter(Boolean).join(' ');
@@ -1466,9 +1466,9 @@ function cellHTML(e, i, sel, nPlayed) {
     <button type="button" role="gridcell" class="${cls}"${attrs} id="fc-cell-${i}" data-cell="${i}"
             tabindex="${sel ? 0 : -1}" aria-selected="${sel}" aria-label="${esc(cellAria(e))}"
             style="--d:${delay}ms;--dt:${delay + 420}ms">
-      <span class="cell__top"><span class="cell__gw">${e.gw === null ? '—' : `GW${e.gw}`}</span>${e.isNext ? '<span class="cell__tag">Next up</span>' : ''}</span>
+      <span class="cell__top"><span class="cell__gw">${e.gw === null ? '-' : `GW${e.gw}`}</span>${e.isNext ? '<span class="cell__tag">Next up</span>' : ''}</span>
       <span class="cell__opp"><span class="cell__o">${crest(e.opponent, '16')}${esc(e.opponent?.shortName ?? 'TBC')}</span><span class="cell__v">${e.isHome ? 'HOME' : 'AWAY'}</span></span>
-      ${e.isNext ? `<span class="cell__meta">${esc(fmtDateTime(e.kickoff))} · FDR ${e.difficulty ?? '—'}</span>` : ''}
+      ${e.isNext ? `<span class="cell__meta">${esc(fmtDateTime(e.kickoff))} · FDR ${e.difficulty ?? '-'}</span>` : ''}
       <span class="cell__val">${val}</span>
     </button>`;
 }
@@ -1476,7 +1476,7 @@ function cellHTML(e, i, sel, nPlayed) {
 /** The selected cell, read out in full under the ribbon. */
 function cellDetailHTML(e) {
   if (!e) return '<b>No fixtures</b>';
-  const when = e.postponed ? 'Postponed — awaiting a date' : fmtDateTime(e.kickoff);
+  const when = e.postponed ? 'Postponed - awaiting a date' : fmtDateTime(e.kickoff);
   let detail = '';
   if (e.played) {
     detail = `${OUTCOMES[e.outcome].label} ${e.scored}–${e.conceded}`;
@@ -1484,9 +1484,9 @@ function cellDetailHTML(e) {
     const band = bandOf(e.score, e.settled);
     const giq = !e.settled ? 'Gaffer IQ still calculating'
       : typeof e.score?.value === 'number' ? `Gaffer IQ ${Math.round(e.score.value)} ${BAND_LABEL[band]}` : 'No Gaffer IQ score';
-    detail = `${e.live ? `Live ${e.running} · ` : ''}${giq} · FPL FDR ${e.difficulty ?? '—'}`;
+    detail = `${e.live ? `Live ${e.running} · ` : ''}${giq} · FPL FDR ${e.difficulty ?? '-'}`;
   }
-  return `<b>${e.gw === null ? '—' : `GW${e.gw}`} · ${esc(e.opponent?.name ?? 'TBC')}</b>`
+  return `<b>${e.gw === null ? '-' : `GW${e.gw}`} · ${esc(e.opponent?.name ?? 'TBC')}</b>`
     + `<span class="muted">${e.isHome ? 'Home' : 'Away'} · ${esc(when)}</span>`
     + (detail ? `<span>${esc(detail)}</span>` : '')
     + (e.opponent ? `<button type="button" class="btn" data-h2h-a="${e.team.id}" data-h2h-b="${e.opponent.id}">Head-to-head →</button>` : '');
@@ -1510,8 +1510,8 @@ function defaultCell(entries) {
  */
 function splitRowHtml(label, row) {
   const cell = (c) => {
-    if (!row) return '—';
-    if (c.key === 'position' && !row.played) return '—';
+    if (!row) return '-';
+    if (c.key === 'position' && !row.played) return '-';
     return c.signed ? signed(row[c.key]) : row[c.key];
   };
   return `<tr><th scope="row">${esc(label)}</th>${SPLIT_COLUMNS.map(c => `<td>${cell(c)}</td>`).join('')}</tr>`;
@@ -1524,7 +1524,7 @@ function teamHTML() {
 
   if (!team) {
     _ribbon = [];
-    return `<section>${picker}<p class="empty">Pick a team above — or click a club in the Table — to see its season.</p></section>`;
+    return `<section>${picker}<p class="empty">Pick a team above - or click a club in the Table - to see its season.</p></section>`;
   }
 
   const fixtures  = store.getFixtures();
@@ -1553,7 +1553,7 @@ function teamHTML() {
 
   const pos = overall?.played ? overall.position : null;
   const stat = (s) => {
-    if (!overall) return '—';
+    if (!overall) return '-';
     const v = overall[s.key];
     return s.signed || v < 0 ? signed(v) : `<span data-cu="${v}">${v}</span>`;
   };
@@ -1571,7 +1571,7 @@ function teamHTML() {
         </div>
         <div class="tm__pos">
           <span class="lbl">In the table</span>
-          <span class="tm__ord">${pos ? `<span data-cu="${pos}" data-min="1">${pos}</span>${ORDINALS[pos] ?? 'th'}` : '—'}</span>
+          <span class="tm__ord">${pos ? `<span data-cu="${pos}" data-min="1">${pos}</span>${ORDINALS[pos] ?? 'th'}` : '-'}</span>
         </div>
       </div>
 
@@ -1605,7 +1605,7 @@ function teamHTML() {
         </table>
       </div>
 
-      <p class="note">Accumulated from FPL's fixture list — there is no standings endpoint to read this from. A fixture appears under Played only once it carries a final score, so one flagged finished while FPL is still processing the round stays under To come until its score lands. Kickoffs are shown in your local time; FDR is the official FPL 1–5 difficulty, the band is the Gaffer IQ score. Double-click a fixture, or press Enter on it, for the full head-to-head.</p>
+      <p class="note">Accumulated from FPL's fixture list - there is no standings endpoint to read this from. A fixture appears under Played only once it carries a final score, so one flagged finished while FPL is still processing the round stays under To come until its score lands. Kickoffs are shown in your local time; FDR is the official FPL 1–5 difficulty, the band is the Gaffer IQ score. Double-click a fixture, or press Enter on it, for the full head-to-head.</p>
     </section>`;
 }
 
@@ -1661,7 +1661,7 @@ function onRibbonKey(e) {
 
 /** The current unbroken run, in prose, read from team A's end. */
 function streakText(streak, teamA, teamB) {
-  if (!streak) return '—';
+  if (!streak) return '-';
   const { outcome, count } = streak;
 
   if (count === 1) {
@@ -1707,7 +1707,7 @@ function chartHTML(meetings, teamA, teamB) {
     const o = OUTCOMES[m.outcomeA];
     const home = m.aWasHome ? teamA : teamB;
     const away = m.aWasHome ? teamB : teamA;
-    const aria = `${fmtDateYear(m.date)}: ${home.shortName} ${m.homeGoals}–${m.awayGoals} ${away.shortName} — ${teamA.shortName} ${o.label.toLowerCase()}`;
+    const aria = `${fmtDateYear(m.date)}: ${home.shortName} ${m.homeGoals}–${m.awayGoals} ${away.shortName} - ${teamA.shortName} ${o.label.toLowerCase()}`;
     const clsA = m.outcomeA === 'W' ? ' is-win' : m.outcomeA === 'D' ? ' is-draw' : '';
     const clsB = m.outcomeA === 'L' ? ' is-win' : m.outcomeA === 'D' ? ' is-draw' : '';
     return `
@@ -1747,8 +1747,8 @@ function h2hHTML() {
     return message('Pick two different teams', `${teamA.name} cannot play itself.`);
   }
 
-  // The window is applied HERE, once: everything below — tallies, venue
-  // split, run of form, table — then describes the same set of matches.
+  // The window is applied HERE, once: everything below - tallies, venue
+  // split, run of form, table - then describes the same set of matches.
   const onRecord = buildH2hMeetings(teamA.id, teamB.id, h2hCtx());
   const meetings = takeRecentMeetings(onRecord);
   const record   = summariseH2h(meetings);
@@ -1757,7 +1757,7 @@ function h2hHTML() {
 
   if (!record.played) {
     return message(`${teamA.name} vs ${teamB.name}`, seasonsLoaded
-      ? `No league meeting in the ${seasonsLoaded} ${seasonsLoaded === 1 ? 'season' : 'seasons'} loaded — the two have not been in this division together in that window.`
+      ? `No league meeting in the ${seasonsLoaded} ${seasonsLoaded === 1 ? 'season' : 'seasons'} loaded - the two have not been in this division together in that window.`
       : 'Historical results are still loading.');
   }
 
@@ -1832,14 +1832,14 @@ function h2hHTML() {
               onRecord.length - meetings.length} older ${
               onRecord.length - meetings.length === 1 ? 'meeting is' : 'meetings are'} on record but not shown.`
           : record.played === 1
-            ? `Their only league meeting on record — the search reaches back ${seasonsLoaded} ${
+            ? `Their only league meeting on record - the search reaches back ${seasonsLoaded} ${
                 seasonsLoaded === 1 ? 'season' : 'seasons'}, and these two have not met more often in this division.`
-            : `All ${record.played} league meetings these two have on record — the search reaches back ${seasonsLoaded} ${
+            : `All ${record.played} league meetings these two have on record - the search reaches back ${seasonsLoaded} ${
                 seasonsLoaded === 1 ? 'season' : 'seasons'}, and they have not met more often in this division.`}
         The window is a fixed count of meetings rather than a fixed number of
         seasons, so it means the same thing for every pairing and does not shrink
         each August. Sourced from Understat's full-league fixture lists, merged
-        with this season's FPL results — each pairing appears once per venue per
+        with this season's FPL results - each pairing appears once per venue per
         season, so a match carried by both feeds is counted once. Cups and
         play-offs are in neither feed. Venue, form and the run are all read from
         ${esc(teamA.name)}’s end; swap the two to mirror them.
@@ -1923,7 +1923,7 @@ function selectH2h(teamAId, teamBId) {
 /**
  * Seed both panes so they open onto something real rather than a prompt.
  *
- * The first fixture of the current gameweek supplies all three selections —
+ * The first fixture of the current gameweek supplies all three selections -
  * one rule, both panes, and it is always available the moment data lands. Runs
  * once: a later re-emit must not yank the user back off a club they chose.
  */
@@ -2077,7 +2077,7 @@ function onKeydown(e) {
 /**
  * Season data has landed, or been re-emitted as an enrichment arrives (main.js
  * re-fires data:ready when each Understat payload lands, which is what brings
- * the cross-season half of the H2H record — and settled Gaffer IQ scores —
+ * the cross-season half of the H2H record - and settled Gaffer IQ scores -
  * into view).
  *
  * The opening gameweek and the seeded selections are picked the FIRST TIME
@@ -2097,9 +2097,9 @@ function onDataReady() {
   _ctx = null;
   _scores.clear();
 
-  // Seeding above is cheap. The pane below rebuilds real markup — the H2H
+  // Seeding above is cheap. The pane below rebuilds real markup - the H2H
   // pane alone walks several seasons of meetings, the Matchday tiles score
-  // every fixture — so skip it while hidden. See store.js's activeModule note.
+  // every fixture - so skip it while hidden. See store.js's activeModule note.
   if (store.getActiveModule() !== 'fixtures') {
     _pendingRender = true;
     return;
@@ -2118,7 +2118,7 @@ function onRouteChanged(module) {
   render('fade');
 }
 
-/** A GW's live payload landed — only the match report reads it. */
+/** A GW's live payload landed - only the match report reads it. */
 function onLiveUpdated() {
   renderDrawer();
 }

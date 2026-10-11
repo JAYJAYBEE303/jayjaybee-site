@@ -1,12 +1,12 @@
 /* css/landing.css
-   LANDING — the front page at /projects/apps/gaffer-iq/ ("Matchnight
+   LANDING - the front page at /projects/apps/gaffer-iq/ ("Matchnight
    Scoreboard", ported from the design export's FINAL - Landing page.html).
    Behaviour lives in js/modules/landing.js; markup in index.html.
 
    Every rule is nested under `.landing`, so nothing here can reach a module
    view, and the design's short class names (.top, .board, .chip, .btn …) stay
    local to this section. The colour, radius and band tokens are base.css's
-   own — the design export copied them verbatim — so only the values the
+   own - the design export copied them verbatim - so only the values the
    landing alone needs are declared below, on the section itself. Two
    scope-level re-points (CONVENTIONS.md §5.2): Tough reads orange here. */
 
@@ -37,7 +37,7 @@ body:has(.landing.is-active) {
   --band-tough: var(--band-orange);
   --band-tough-bg: var(--band-orange-bg);
 
-  /* scoreboard depth/feel — tune here and in CFG (landing.js) */
+  /* scoreboard depth/feel - tune here and in CFG (landing.js) */
   --sb-depth: clamp(16px, 2.6vw, 38px);
   --sb-recess: 14px;
   --sb-lift: 10px;
@@ -99,7 +99,7 @@ body:has(.landing.is-active) {
 
   .main { padding: 0 max(var(--pad), calc((100vw - 1240px) / 2)); min-height: 0; min-width: 0; display: grid; align-content: center; gap: clamp(14px, 3.2dvh, 44px); }
 
-  /* scoreboard — a hanging, floodlit split-flap object */
+  /* scoreboard - a hanging, floodlit split-flap object */
   .rigwrap { position: relative; }
   .cast { position: absolute; left: 4%; right: 4%; top: calc(100% - 10px); height: clamp(40px, 8dvh, 96px); z-index: -1; pointer-events: none; }
   .cast i { position: absolute; inset: 0; background: radial-gradient(50% 50% at 50% 30%, rgba(0, 0, 0, .62), rgba(0, 0, 0, .26) 45%, transparent 75%); will-change: transform; }
@@ -217,7 +217,7 @@ body:has(.landing.is-active) {
 
   .foot { display: flex; justify-content: space-between; gap: 16px; padding: clamp(8px, 1.4dvh, 16px) max(var(--pad), calc((100vw - 1240px) / 2)); font-size: 11.5px; color: var(--color-muted); }
 
-  /* fixture ticker — doubles as the scoreboard's fixture picker */
+  /* fixture ticker - doubles as the scoreboard's fixture picker */
   .ticker { position: relative; z-index: 3; display: flex; align-items: stretch; height: clamp(32px, 4.4dvh, 48px); background: var(--color-text); color: var(--color-bg); overflow: hidden; }
   .ticker__tag { flex: none; display: flex; align-items: center; padding: 0 26px 0 var(--pad); background: var(--color-bg); color: var(--color-text); font: 600 clamp(13px, 1.7dvh, 18px)/1 var(--font-head); letter-spacing: .05em; text-transform: uppercase; clip-path: polygon(0 0, 100% 0, calc(100% - 16px) 100%, 0 100%); position: relative; z-index: 2; }
   .ticker__view { flex: 1; min-width: 0; overflow: hidden; margin-left: -16px; }
@@ -250,7 +250,7 @@ body:has(.landing.is-active) {
   .dlg__close:hover { border-color: var(--color-muted); background: var(--color-surface); }
   .dlg__close:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 
-  /* ─── Responsive — order matters, later blocks override earlier ones ──── */
+  /* ─── Responsive - order matters, later blocks override earlier ones ──── */
   @media (min-aspect-ratio: 1/1) and (max-height: 860px) {
     .mod__hint { display: none; }
     .board__foot span:last-child { display: none; }

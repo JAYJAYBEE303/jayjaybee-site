@@ -38,11 +38,11 @@ import { calcChannelCounter } from './channel.js';
  * Classify a player into one of GKP, CB, FB, DM, CM, WM, SS, ST.
  *
  * Tiered by evidence quality:
- *   1. Understat chain signature (buildupShare × createBias) — preferred.
- *   2. FPL ICT component shares — fallback when the player has no Understat
+ *   1. Understat chain signature (buildupShare × createBias) - preferred.
+ *   2. FPL ICT component shares - fallback when the player has no Understat
  *      match, too few minutes, or too little chain involvement.
  *
- * MODEL: chain data is preferred because ICT `threat` is a QUALITY measure —
+ * MODEL: chain data is preferred because ICT `threat` is a QUALITY measure -
  * a poor winger has little of it and reads as a central midfielder. The chain
  * signature is a ratio of the player's own involvement and is therefore
  * quality-neutral (see buildRoleSignature).
@@ -50,7 +50,7 @@ import { calcChannelCounter } from './channel.js';
  * Pure: depends only on its arguments. Returns null when neither tier has
  * enough signal, so callers can fall back to element_type grouping.
  *
- * @param {Player} player  internal Player — see ARCHITECTURE.md §8
+ * @param {Player} player  internal Player - see ARCHITECTURE.md §8
  * @param {object} [ctx]   buildScoreContext result; only
  *                         ctx.understatPlayersByName is read. Omit to force
  *                         the ICT path.
@@ -59,11 +59,11 @@ import { calcChannelCounter } from './channel.js';
 export function classifyRole(player, ctx) {
   if (!player) return null;
 
-  // GKP: trivial — element_type is unambiguous and neither ICT nor chain is
+  // GKP: trivial - element_type is unambiguous and neither ICT nor chain is
   // meaningful for a keeper.
   if (player.position === 'GKP') return 'GKP';
 
-  // Tier 1 — Understat chain signature.
+  // Tier 1 - Understat chain signature.
   const lookup = ctx?.understatPlayersByName;
   const key    = (player.fullName || '').toLowerCase().trim();
   const up     = (lookup && key) ? lookup[key] : null;
@@ -71,14 +71,14 @@ export function classifyRole(player, ctx) {
     const minutes = parseFloat(up.time);
     const chain   = parseFloat(up.xGChain);
     // MODEL: below either floor the ratios are still dominated by sampling
-    // noise, and ICT — which accumulates from minute one — is the better read.
+    // noise, and ICT - which accumulates from minute one - is the better read.
     if (minutes >= ROLE_SIGNATURE_MIN_MINUTES && chain >= ROLE_SIGNATURE_MIN_CHAIN) {
       const role = classifyRoleFromSignature(player.position, buildRoleSignature(up));
       if (role) return role;
     }
   }
 
-  // Tier 2 — ICT shares (Phase 3C). Everything below is the existing body.
+  // Tier 2 - ICT shares (Phase 3C). Everything below is the existing body.
   const ict = player.ict;
   if (!ict) return null;
   const threat     = ict.threat     ?? 0;
@@ -87,7 +87,7 @@ export function classifyRole(player, ctx) {
   const total      = threat + influence + creativity;
 
   // MODEL: a player with literally no ICT activity (back-up keepers, fringe
-  // squad) has no signal to refine on — let the caller fall back.
+  // squad) has no signal to refine on - let the caller fall back.
   if (total <= 0) return null;
 
   const threatShare     = threat     / total;
@@ -97,7 +97,7 @@ export function classifyRole(player, ctx) {
   const T = ROLE_CLASSIFY_THRESHOLDS;
 
   if (player.position === 'DEF') {
-    // MODEL: full-backs get into the final third — they produce shots, crosses
+    // MODEL: full-backs get into the final third - they produce shots, crosses
     // and assists, so their ICT threat share runs higher than a CB's. CBs are
     // influence-dominant (defensive contribution, clearances, headers).
     return threatShare >= T.defThreatShare ? 'FB' : 'CB';
@@ -120,7 +120,7 @@ export function classifyRole(player, ctx) {
 
   if (player.position === 'FWD') {
     // MODEL: a "shadow striker" / deep-lying forward drops into pockets and
-    // creates rather than purely finishing — creativity share is the cleanest
+    // creates rather than purely finishing - creativity share is the cleanest
     // separator from an out-and-out ST. Lower threshold than for MIDs because
     // every FWD threats; the question is whether they *also* create.
     return creativityShare >= T.fwdSsCreativityShare ? 'SS' : 'ST';
@@ -136,10 +136,10 @@ export function classifyRole(player, ctx) {
  * possessions where they took the shot or made the key pass, so buildupShare
  * is a positional depth axis: ~0.95 for a centre-back, ~0.20 for a striker.
  * Because it is a ratio of the player's own involvement it is quality-neutral
- * — measured at corr(buildupShare, xGChain/90) = +0.008 across 102 regular
+ * - measured at corr(buildupShare, xGChain/90) = +0.008 across 102 regular
  * 2025 defenders, versus corr(buildupShare, xA/90) = −0.654.
  *
- * MODEL: buildupShare alone misfiles two groups in OPPOSITE directions — a
+ * MODEL: buildupShare alone misfiles two groups in OPPOSITE directions - a
  * set-piece centre-back reads low (corner headers are final actions) and a
  * defensive fullback reads low (little of anything). createBias separates
  * them: a centre-back's final action is a shot, a fullback's is a cross.
@@ -147,7 +147,7 @@ export function classifyRole(player, ctx) {
  * See FEATURE_ENGINE.md §7.2 and the design spec
  * docs/superpowers/specs/2026-08-20-understat-channel-counters-design.md §4.
  *
- * @param {object} understatPlayer  raw record from leagueXg.playersData —
+ * @param {object} understatPlayer  raw record from leagueXg.playersData -
  *                                  numeric fields arrive as STRINGS
  * @returns {{buildupShare: number, createBias: number, npxg90: number,
  *            chain90: number} | null}
@@ -170,7 +170,7 @@ export function buildRoleSignature(understatPlayer) {
 
   return {
     buildupShare: buildup / chain,
-    // MODEL: a player with no final action at all has no bias either way —
+    // MODEL: a player with no final action at all has no bias either way -
     // 0.5 is the honest neutral, not 0 (which would read as pure finisher).
     createBias: final > 0 ? xa90 / final : 0.5,
     npxg90,
@@ -223,7 +223,7 @@ export function classifyRoleFromSignature(position, sig) {
 
 // Role-based attacking / defending unit per pairing (Phase 3C refinement).
 // MODEL: SS sits in both stVsCb (acts as a second striker) and cmVsCbDm (drops
-// between the lines into the CM band) — it appears in both pairings by design,
+// between the lines into the CM band) - it appears in both pairings by design,
 // reflecting that a shadow striker contributes to both interactions.
 const ROLE_ATTACK_GROUPS = {
   stVsCb:   ['ST', 'SS'],
@@ -286,7 +286,7 @@ function minutesWeightedMeanForm(players, ctx) {
  * shot, so the winger whose cross another player converts is rewarded. FPL
  * points and ICT `threat` both under-reward exactly that contribution, which
  * is why this replaces calcPlayerForm on the ATTACKING side of a pairing.
- * The defending side keeps calcPlayerForm — Understat publishes no per-player
+ * The defending side keeps calcPlayerForm - Understat publishes no per-player
  * defensive data at any endpoint, so there is nothing to replace it with.
  *
  * Minutes-weighted so likely starters drive the read; players with no minutes
@@ -338,14 +338,14 @@ function fallbackPairingFromStrength(teamA, teamB) {
  * MODEL: per-player tiering, NOT fail-closed. Phase 3C dropped the whole team
  * to element_type grouping when under 90% of outfielders classified, because
  * mixing refined and unrefined players understates whichever side has worse
- * coverage. That argument applies to mixing TAXONOMIES — chain and ICT emit
+ * coverage. That argument applies to mixing TAXONOMIES - chain and ICT emit
  * the same eight labels from different evidence, so a per-player fallback is
  * sound and strictly more informative than collapsing the squad.
  *
  * @param {Player[]} players
  * @param {object}   ctx  buildScoreContext result (read for chain signatures)
  * @returns {{rolesByPlayerId: Object<number,string>, estimated: boolean}|null}
- *          null when no outfielder has any minutes — caller falls back to
+ *          null when no outfielder has any minutes - caller falls back to
  *          element_type grouping. estimated:true when chain data covered less
  *          than ROLE_CHAIN_COVERAGE_MIN of outfield minutes.
  */
@@ -398,7 +398,7 @@ export function classifyTeamRoles(players, ctx) {
  *
  * MODEL: minutes-weighted mean per unit, so likely starters drive the score
  * rather than fringe-squad players who happen to share a role. Defender form
- * uses the defensive read of calcPlayerForm (mode === 'defence') —
+ * uses the defensive read of calcPlayerForm (mode === 'defence') -
  * clean-sheet + saves-driven rather than attacking returns.
  *
  * @param {Team} teamA
@@ -407,7 +407,7 @@ export function classifyTeamRoles(players, ctx) {
  * @returns {{value: number|null, estimated: boolean, maturity: number,
  *            pairings: Object, mode: 'channel'}}
  *          value is null and maturity 0 when Understat has published nothing
- *          for either team — the UI renders blank rows and the composite gives
+ *          for either team - the UI renders blank rows and the composite gives
  *          the metric no weight at all.
  */
 export function calcCounterMatchup(teamA, teamB, ctx) {
@@ -425,8 +425,8 @@ export function calcCounterMatchup(teamA, teamB, ctx) {
   // TO RE-ENABLE: uncomment the block below and restore the `if (channel)
   // return channel;` guard in place of the unconditional return. classifyRole,
   // buildRoleSignature, classifyRoleFromSignature, ROLE_ATTACK_GROUPS and
-  // ROLE_DEFENCE_GROUPS are all still live — the channel tier's personnel
-  // weighting and duelsForPairing depend on them — so only this block and
+  // ROLE_DEFENCE_GROUPS are all still live - the channel tier's personnel
+  // weighting and duelsForPairing depend on them - so only this block and
   // classifyTeamRoles need waking up.
   return calcChannelCounter(teamA, teamB, ctx);
 
@@ -448,7 +448,7 @@ export function calcCounterMatchup(teamA, teamB, ctx) {
 //   let weightedSum = 0;
 //   let totalWeight = 0;
 //   // MODEL: an element_type fallback for either side flags the whole metric as
-//   // estimated, and so does thin chain coverage — a role grouping built mostly
+//   // estimated, and so does thin chain coverage - a role grouping built mostly
 //   // from ICT is materially less trustworthy than one built from chain data.
 //   let anyEstimated = !useRoles
 //     || (roleResultA?.estimated ?? false)
@@ -500,7 +500,7 @@ export function calcCounterMatchup(teamA, teamB, ctx) {
 //     totalWeight += pairingWeights[key];
 //   }
 // 
-//   // MODEL: totalWeight is 0 only if the active pairing-weights table is empty —
+//   // MODEL: totalWeight is 0 only if the active pairing-weights table is empty -
 //   // a config bug. Defensive 50/estimated rather than NaN if that ever happens.
 //   const value = totalWeight === 0
 //     ? 50
@@ -518,7 +518,7 @@ export function calcCounterMatchup(teamA, teamB, ctx) {
 
 // Attacking pairing key → its defending mirror. Covers both the role-mode keys
 // (ROLE_ATTACK_GROUPS/ROLE_DEFENCE_GROUPS) and the element-fallback keys
-// (ELEMENT_ATTACK_GROUPS/ELEMENT_DEFENCE_GROUPS) — either can be the active
+// (ELEMENT_ATTACK_GROUPS/ELEMENT_DEFENCE_GROUPS) - either can be the active
 // mode depending on ICT data availability, so both need a mirror.
 const MIRRORED_PAIRING_KEYS = {
   stVsCb:      'cbVsSt',
@@ -528,7 +528,7 @@ const MIRRORED_PAIRING_KEYS = {
   wideMidVsFb: 'fbVsWideMid',
   camVsCbMid:  'cbMidVsCam',
   // Channel tier. The mirror is still arithmetic (100 − attacking value), NOT
-  // a second read from the defending team's own statistics.against — deriving
+  // a second read from the defending team's own statistics.against - deriving
   // it independently would break the sum-to-100 identity §7.2 depends on.
   setPieceThreat: 'setPieceDefence',
   wideTransition: 'transitionDefence',
@@ -537,7 +537,7 @@ const MIRRORED_PAIRING_KEYS = {
 
 /**
  * Derive "Defending Counters" from an already-computed calcCounterMatchup()
- * result — the same attack-vs-defence interaction, re-read from the defending
+ * result - the same attack-vs-defence interaction, re-read from the defending
  * side. NOT a second independent calculation: each mirrored pairing's value
  * is exactly `100 - attackingPairing.value`, so the two are guaranteed to sum
  * to 100 by construction (see FEATURE_ENGINE.md §7.2). This holds even
@@ -545,7 +545,7 @@ const MIRRORED_PAIRING_KEYS = {
  * every real y, so the identity survives the attacking side's own clamping.
  *
  * Call with the OPPONENT's attacking result to get THIS team's defending
- * pairings — e.g. for home team's "my defence vs their attack" section, pass
+ * pairings - e.g. for home team's "my defence vs their attack" section, pass
  * awayTeam's calcCounterMatchup(awayTeam, homeTeam, ctx) result.
  *
  * @param {{pairings: Object, estimated: boolean}} attackingResult
@@ -562,7 +562,7 @@ export function calcCounterMatchupMirrored(attackingResult) {
   for (const [key, p] of Object.entries(attackingResult.pairings)) {
     const mirroredKey = MIRRORED_PAIRING_KEYS[key] ?? `${key}Mirrored`;
     // MODEL: a blank pairing mirrors to blank, never to 100. `100 - null` is
-    // 100 in JS — a confident-looking score invented out of no data at all.
+    // 100 in JS - a confident-looking score invented out of no data at all.
     const mirroredValue = p.value === null || p.value === undefined ? null : 100 - p.value;
     if (mirroredValue === null) {
       pairings[mirroredKey] = { ...p, value: null };
@@ -570,14 +570,14 @@ export function calcCounterMatchupMirrored(attackingResult) {
     }
 
     // SPREAD, not an explicit field list. This used to enumerate the fields to
-    // carry across — attackForm/defenceForm/attackerCount/defenderCount — which
+    // carry across - attackForm/defenceForm/attackerCount/defenderCount - which
     // were the RETIRED position tier's fields. When the channel tier replaced it
     // (2026-08-21) the list was never updated, so every mirrored pairing copied
     // four fields that no longer exist (all undefined) and silently dropped the
     // three that do: attackShare, concedeShare, personnel. The Matchup card
     // decides how to render a pairing by testing `attackShare !== undefined`, so
     // every Defending Counters row fell through to the retired tier's formatter
-    // and printed "Def — / Atk —" — the values were right, the detail line was
+    // and printed "Def - / Atk -" - the values were right, the detail line was
     // empty. Spreading keeps whichever fields the active tier actually produces,
     // and cannot go stale again if the position tier is ever switched back on.
     // The blank-pairing branch above already did this correctly.
@@ -587,7 +587,7 @@ export function calcCounterMatchupMirrored(attackingResult) {
     totalWeight += p.weight;
   }
 
-  // totalWeight is 0 when every pairing was blank — mirror that as blank too,
+  // totalWeight is 0 when every pairing was blank - mirror that as blank too,
   // rather than a defensive 50 that reads like a real neutral score.
   const value = totalWeight === 0
     ? null
@@ -609,7 +609,7 @@ export function calcCounterMatchupMirrored(attackingResult) {
  * composite weights (`WEIGHTS.counterMatchup`, engine/composite.js).
  *
  * MODEL: before this, the composite's Counter-Matchup term reflected ONLY a
- * team's own attacking prowess against the opponent's defence — its defensive
+ * team's own attacking prowess against the opponent's defence - its defensive
  * strength against THIS opponent's attack earned no direct credit on its own
  * card, only an indirect, heavily-diluted one via the opponent's raw score in
  * the §8.7 zero-sum relative step. A team with an elite defence but a
@@ -641,24 +641,24 @@ export function calcCombinedCounterMatchup(attackingCounter, defendingCounter) {
     attackingValue: attackingCounter.value,
     defendingValue: defendingCounter.value,
     // Which tier produced the pairings above ('channel' | 'role' | 'element').
-    // Taken from the ATTACKING read because `pairings` is the attacking read —
+    // Taken from the ATTACKING read because `pairings` is the attacking read -
     // the two must always describe the same object. Surfaced so the testing
     // roadmap's tier check and the channel-vs-role comparison can see it
     // without re-deriving which tier ran.
     mode: attackingCounter.mode,
     // MODEL: the LOWER of the two, for the same reason calcChannelCounter takes
-    // the lower of two teams' — a blend is only as well-evidenced as its weaker
+    // the lower of two teams' - a blend is only as well-evidenced as its weaker
     // half. Dropping this field entirely (as this function originally did) made
     // metricMaturity see `undefined` and fall back to 1, handing a one-match
-    // profile full composite weight — the exact failure the ramp prevents.
+    // profile full composite weight - the exact failure the ramp prevents.
     maturity: Math.min(attackingCounter.maturity ?? 1, defendingCounter.maturity ?? 1),
   };
 }
 
 // ─── Pairing → individual-duel bridge ────────────────────────────────────────
 
-// Every pairing key in the app — role-mode (stVsCb…), element-fallback
-// (fwdVsCb…), and defending mirror (cbVsSt…) — describes the same three
+// Every pairing key in the app - role-mode (stVsCb…), element-fallback
+// (fwdVsCb…), and defending mirror (cbVsSt…) - describes the same three
 // underlying unit interactions, so one alias table collapses all of them onto
 // the canonical role-mode key. Lives here, not in matchup.js, so the knowledge
 // of which roles constitute a pairing stays in the module that defines it.
@@ -667,13 +667,13 @@ const PAIRING_ROLE_ALIAS = {
   stVsCb: 'stVsCb',       wmVsFb: 'wmVsFb',           cmVsCbDm: 'cmVsCbDm',
   // attacking, element fallback
   fwdVsCb: 'stVsCb',      wideMidVsFb: 'wmVsFb',      camVsCbMid: 'cmVsCbDm',
-  // defending mirrors — same two units, viewed from the defending side
+  // defending mirrors - same two units, viewed from the defending side
   cbVsSt: 'stVsCb',       fbVsWm: 'wmVsFb',           cbDmVsCm: 'cmVsCbDm',
   cbVsFwd: 'stVsCb',      fbVsWideMid: 'wmVsFb',      cbMidVsCam: 'cmVsCbDm',
 };
 
 /**
- * Select the individual duels that sit behind a given position-group pairing —
+ * Select the individual duels that sit behind a given position-group pairing -
  * i.e. the actual named players whose form produced that pairing's score.
  *
  * Pure filter over an existing calcIndividualDuels() result. Deliberately does
@@ -705,7 +705,7 @@ export function duelsForPairing(duels, pairingKey) {
 // ─── Phase 4-2: individual player-vs-player duels ────────────────────────────
 
 // MODEL: a baseline 4-4-2 used to pick a likely starting XI by minutes security
-// alone. Not formation-aware (no detection of 4-3-3 vs 3-5-2) — the goal is
+// alone. Not formation-aware (no detection of 4-3-3 vs 3-5-2) - the goal is
 // to surface the eleven players most likely to be on the pitch, not to predict
 // the manager's exact shape. The duels module is supplementary and tolerates
 // the simplification; a fancier formation pick would be overfitting given the
@@ -715,7 +715,7 @@ const LIKELY_XI_FORMATION = { GKP: 1, DEF: 4, MID: 4, FWD: 2 };
 // MODEL: which defender role(s) each attacker role most likely duels with.
 // Mirrors the unit pairings used by calcCounterMatchup but applied per player:
 //   ST  → CB        out-and-out striker vs centre-back
-//   SS  → CB or DM  shadow striker drops between the lines — both apply
+//   SS  → CB or DM  shadow striker drops between the lines - both apply
 //   WM  → FB        wide attacker vs the full-back on his flank
 //   CM  → CB or DM  central creator vs CBs and the shielding mid
 // DM / CB / FB / GKP omitted: those are defenders, not attackers initiating
@@ -772,7 +772,7 @@ function buildLikelyXi(players, ctx) {
  * with no ICT signal are silently skipped (they wouldn't have a meaningful
  * role read anyway).
  *
- * Duel score: same shape as the position-group pairing — clamp(50 + edge * COUNTER_SENSITIVITY).
+ * Duel score: same shape as the position-group pairing - clamp(50 + edge * COUNTER_SENSITIVITY).
  * "Most interesting" = largest absolute form differential: a striker on fire
  * vs a struggling CB is as worth surfacing as the inverse.
  *
@@ -781,7 +781,7 @@ function buildLikelyXi(players, ctx) {
  * defender in the opposing XI, returns []. The Matchup Analyser falls back
  * to the position-group counter pairings already on screen.
  *
- * @param {Team} teamA   attacker side — we want this team's attacking duels
+ * @param {Team} teamA   attacker side - we want this team's attacking duels
  * @param {Team} teamB   defender side
  * @param {object} ctx   same context shape as calcCounterMatchup
  * @returns {{attacker: object, defender: object, duelScore: number, band: string}[]}
@@ -824,7 +824,7 @@ export function calcIndividualDuels(teamA, teamB, ctx) {
   // every WM onto the same FB. A defender becomes "taken" the moment it's picked
   // as a primary opponent; subsequent attackers in the same role family prefer
   // an untaken candidate. Reuse is only allowed when the candidate pool is
-  // exhausted (small unit — e.g. three CMs sharing two CBs).
+  // exhausted (small unit - e.g. three CMs sharing two CBs).
   const takenDefenderIds = new Set();
   const duels = [];
   for (const atk of xiA) {
@@ -871,7 +871,7 @@ export function calcIndividualDuels(teamA, teamB, ctx) {
     });
   }
 
-  // MODEL: rank by absolute form differential — the most lopsided duels are
+  // MODEL: rank by absolute form differential - the most lopsided duels are
   // the most decision-relevant whether they favour the attacker or the
   // defender. A 60-vs-30 striker-favoured duel is no less interesting than a
   // 30-vs-60 defender-favoured one.

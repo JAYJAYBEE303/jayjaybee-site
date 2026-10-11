@@ -11,7 +11,7 @@ import { FUNDS_MIN_CASH_FREED, FUTURE_WINDOW_GWS, HIT_PENALTY } from '../../js/c
 
 /**
  * A stub scoring context. enumerateSwaps calls scorePlayer, which needs a real
- * ctx, so these tests inject a scorer through opts.scorePlayerFn instead — the
+ * ctx, so these tests inject a scorer through opts.scorePlayerFn instead - the
  * seam that keeps this module unit-testable without a full season payload.
  */
 function stubCtx() {
@@ -24,7 +24,7 @@ function player(id, position, price, ep = 0) {
 
 /**
  * Deterministic scorer. Expected points are declared on the player itself so
- * each test can state plainly who starts and who does not — deriving them from
+ * each test can state plainly who starts and who does not - deriving them from
  * the id would make the fixtures say the opposite of what the test names claim.
  */
 function stubScorer(p) {
@@ -41,7 +41,7 @@ function stubScorer(p) {
 
 /**
  * A legal 15. Given these expected points the projected XI is
- * [1, 3, 4, 5, 6, 9, 10, 11, 12, 13, 14] and the bench is [8, 7, 15, 2] —
+ * [1, 3, 4, 5, 6, 9, 10, 11, 12, 13, 14] and the bench is [8, 7, 15, 2] -
  * so player 8 is the weakest midfielder and sits on the bench, and player 12
  * is the squad's best player and a certain starter.
  */
@@ -150,7 +150,7 @@ test('the Future lane ranks by raw deferred-window value, not by swing', () => {
   // Deliberately adversarial fixture: the candidate with the WEAKER deferred
   // window has the LARGER swing. Under the old swing ranking it won; under the
   // window-total ranking it must lose. The swing assertion below is part of the
-  // test — without it a fixture that stopped discriminating would pass silently.
+  // test - without it a fixture that stopped discriminating would pass silently.
   const squad = squadOf15();
   const bigRun   = player(32, 'MID', 7.0, 0);   // strong now, stronger later
   const bigSwing = player(33, 'MID', 7.0, 0);   // poor now, middling later
@@ -206,7 +206,7 @@ test('the deferred window starts FUTURE_WINDOW_START gameweeks after the current
     horizon: { label: 'test', gws: 5 }, budget: 5, freeTransfers: 1,
     scorePlayerFn: scorer,
   });
-  // stubCtx()'s currentGw is 10, so the deferred window runs GW12-GW14 — the
+  // stubCtx()'s currentGw is 10, so the deferred window runs GW12-GW14 - the
   // 3rd, 4th and 5th upcoming gameweeks.
   assert.ok(seen.has('test:5:10'),  `long window missing, saw ${[...seen]}`);
   assert.ok(seen.has('Now:1:10'),   `now window missing, saw ${[...seen]}`);
@@ -316,7 +316,7 @@ test('the Funds lane scores a cheaper-but-worse move negative, so the board drop
 
 test('the Funds lane still reports flexibility in components for the why-panel', () => {
   // calcSquadFlexibility no longer ranks this lane but must not have been
-  // orphaned — strategy.js's cashCrunch trigger and the why-panel both read it.
+  // orphaned - strategy.js's cashCrunch trigger and the why-panel both read it.
   const swap = fundsSwapFor(player(56, 'MID', 11.0, 11.0));
   assert.ok(Number.isFinite(swap.lanes.funds.components.flexGain));
   assert.ok(Number.isFinite(swap.lanes.funds.components.cashFreed));
@@ -329,7 +329,7 @@ test('the Structure lane stays silent when the outgoing player is fine', () => {
     horizon: { label: 'test', gws: 3 }, budget: 5, freeTransfers: 1,
     scorePlayerFn: stubScorer,
   });
-  // Every stub player is available with playtime 0.9 — nothing is broken.
+  // Every stub player is available with playtime 0.9 - nothing is broken.
   assert.ok(swaps.every(s => s.lanes.structure.value === 0),
     'a healthy squad produces no Structure Fix candidates');
 });
@@ -338,7 +338,7 @@ test('the Structure lane fires for an unavailable XI player', () => {
   const squad = squadOf15();
   squad[11].status = 'injured';                      // player 12, a certain starter
   // stubScorer ignores `status`, so player 12 still projects its declared ep
-  // (9.0) despite being injured — the repair only reads as a genuine gain if
+  // (9.0) despite being injured - the repair only reads as a genuine gain if
   // the incoming player's ep (9.5) is HIGHER than that, giving a positive
   // longXiDelta for scoreStructureLane to scale into a window total and report.
   const swaps = enumerateSwaps(squad.map(p => p.id), [...squad, player(40, 'MID', 12.0, 9.5)], stubCtx(), {

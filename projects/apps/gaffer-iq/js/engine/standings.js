@@ -2,15 +2,15 @@
  * js/engine/standings.js
  * Layer: engine (pure). No DOM, no network, no store mutation.
  * Derives the league table from played fixtures, and one team's season from
- * the same schedule (buildTeamSchedule — the Fixtures tab's By team view).
+ * the same schedule (buildTeamSchedule - the Fixtures tab's By team view).
  *
- * WHY THIS EXISTS: the FPL API ships no standings payload — bootstrap-static
+ * WHY THIS EXISTS: the FPL API ships no standings payload - bootstrap-static
  * carries team strengths but not points, and there is no /standings endpoint.
  * The table therefore has to be accumulated from `fixtures/`. That is an
  * analytical derivation, so per ARCHITECTURE.md §3 hard rule 2 it lives here
  * and not in js/modules/fixtures.js, which only renders the result.
  *
- * Unlike the rest of engine/, these outputs are NOT 0–100 scores — they are
+ * Unlike the rest of engine/, these outputs are NOT 0–100 scores - they are
  * literal counts (points, goals, position). Nothing here feeds the composite.
  */
 
@@ -64,7 +64,7 @@ function applyResult(row, scored, conceded) {
  * The real competition breaks a remaining tie by head-to-head record and
  * ultimately a play-off; neither is derivable here, so club name is the final
  * tiebreak purely to keep the sort STABLE and reproducible across renders.
- * Two clubs level on all three are genuinely tied — the ordering between them
+ * Two clubs level on all three are genuinely tied - the ordering between them
  * is presentational, not a ranking claim.
  */
 function compareRows(a, b) {
@@ -90,7 +90,7 @@ function countsForTeam(fixture, teamId, venue) {
 /**
  * Build the league table from a season's fixtures.
  *
- * Only fixtures with `played === true` AND a non-null `result` contribute —
+ * Only fixtures with `played === true` AND a non-null `result` contribute -
  * a fixture flagged finished but still missing its score (which happens
  * briefly while FPL processes a round) is skipped rather than counted as 0–0.
  *
@@ -142,7 +142,7 @@ export function calcLeagueTable(fixtures, teams, {
  * Attach each team's next unplayed fixture to its row, in place.
  *
  * Kept separate from calcLeagueTable because "next fixture" is a property of
- * the schedule, not of the standings — a Home-only table still wants the true
+ * the schedule, not of the standings - a Home-only table still wants the true
  * next fixture, whichever venue it happens to be at.
  *
  * @param {object[]} rows      output of calcLeagueTable (mutated)
@@ -167,7 +167,7 @@ export function attachNextFixtures(rows, fixtures, teamsById) {
       kickoff:    next.kickoff,
       opponent:   teamsById[isHome ? next.awayTeamId : next.homeTeamId] ?? null,
       // The official FPL 1–5 rating for THIS team in that fixture. Shown for
-      // reference only — the Gaffer IQ composite is what the rest of the app
+      // reference only - the Gaffer IQ composite is what the rest of the app
       // scores on (FEATURE_ENGINE.md §1).
       difficulty: isHome ? next.fplDifficulty?.home : next.fplDifficulty?.away,
     };
@@ -181,13 +181,13 @@ export function attachNextFixtures(rows, fixtures, teamsById) {
  *
  * The two halves are split on the same test calcLeagueTable folds a fixture in
  * on (`played` AND a non-null `result`), so a fixture flagged finished but
- * still missing its score — which happens briefly while FPL processes a round
- * — lands in `upcoming` rather than in `results` as a phantom 0–0. That is the
+ * still missing its score - which happens briefly while FPL processes a round
+ * - lands in `upcoming` rather than in `results` as a phantom 0–0. That is the
  * conservative side to err on: a result the table has not yet counted is not
  * shown as a result here either.
  *
- * Each entry carries the fixture read from THIS team's end — `scored` /
- * `conceded` rather than home/away goals — so the caller never re-derives the
+ * Each entry carries the fixture read from THIS team's end - `scored` /
+ * `conceded` rather than home/away goals - so the caller never re-derives the
  * orientation per row.
  *
  * @param {number} teamId
@@ -212,7 +212,7 @@ export function buildTeamSchedule(teamId, fixtures, teamsById = {}) {
       isHome,
       opponent:   teamsById[isHome ? f.awayTeamId : f.homeTeamId] ?? null,
       // The official FPL 1–5 rating for THIS team in this fixture. Reference
-      // only — the Gaffer IQ composite is what the rest of the app scores on.
+      // only - the Gaffer IQ composite is what the rest of the app scores on.
       difficulty: isHome ? f.fplDifficulty?.home : f.fplDifficulty?.away,
       started:    Boolean(f.started),
       scored:     null,

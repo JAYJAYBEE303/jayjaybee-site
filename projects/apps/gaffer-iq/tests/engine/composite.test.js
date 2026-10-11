@@ -23,7 +23,7 @@ test('metricMaturity passes a partial maturity straight through', () => {
 });
 
 test('metricMaturity lets estimated override any maturity claim', () => {
-  // estimated means "do not use this reading at all" — it must win.
+  // estimated means "do not use this reading at all" - it must win.
   assert.equal(metricMaturity({ value: 62, estimated: true, maturity: 0.9 }), 0);
 });
 
@@ -55,7 +55,7 @@ test('applyDgwUplift lifts a poor double above a single poor fixture', () => {
 });
 
 test('applyDgwUplift lifts a good double toward the ceiling', () => {
-  // 70 + (100-70)*0.35 = 80.5 — better than a single 70, still short of 100.
+  // 70 + (100-70)*0.35 = 80.5 - better than a single 70, still short of 100.
   assert.equal(applyDgwUplift(70, 2), 80.5);
 });
 
@@ -90,7 +90,7 @@ test('calcExpectedPoints is unchanged for a single-fixture gameweek', () => {
 });
 
 test('calcExpectedPoints nearly doubles for a double gameweek', () => {
-  // 1 + 0.9*(2-1) = 1.9 — a rotation-risk haircut on a straight doubling.
+  // 1 + 0.9*(2-1) = 1.9 - a rotation-risk haircut on a straight doubling.
   const r = calcExpectedPoints({ value: 5, estimated: false }, EP_NEUTRAL_FIXTURE, EP_FULL_PLAYING, 2);
   assert.equal(r.value, 9.5);
 });

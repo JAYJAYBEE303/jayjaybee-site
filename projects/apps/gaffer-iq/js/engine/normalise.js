@@ -77,9 +77,9 @@ const CANONICAL_BY_ALIAS = (() => {
 /**
  * Resolves any club name/short-form to its canonical normalised key via
  * TEAM_NAME_ALIASES, falling back to the value's own normalised form when it
- * isn't a known alias (i.e. it's already canonical, or genuinely unmatched —
+ * isn't a known alias (i.e. it's already canonical, or genuinely unmatched -
  * the caller decides which). Shared by buildPlTenure below and by
- * engine/style.js's Understat team matcher — both are the same class of
+ * engine/style.js's Understat team matcher - both are the same class of
  * problem (reconcile one source's club-name spelling against another's), and
  * both must NEVER join on FPL's numeric team id (see buildPlTenure's doc).
  *
@@ -97,7 +97,7 @@ const TENURE_TOTAL_WEIGHT = SEASONS_NEWEST_FIRST
 
 /**
  * Recency-weighted Premier League tenure for a club, matched by name then short
- * name (never by FPL team id — ids are reassigned as clubs are promoted and
+ * name (never by FPL team id - ids are reassigned as clubs are promoted and
  * relegated, so an id join silently mismatches exactly the clubs this measures).
  *
  * MODEL: recent seasons dominate. A club relegated last season loses the full
@@ -143,20 +143,20 @@ export function buildPlTenure(name, shortName) {
 
 /**
  * @param {object} raw  one entry from bootstrap-static.teams[]
- * @returns {Team}      internal Team — see ARCHITECTURE.md §8
+ * @returns {Team}      internal Team - see ARCHITECTURE.md §8
  */
 export function normaliseTeam(raw) {
   return {
     id: raw.id,
     // FPL's own `name` is what every view renders, and it is not always the
-    // club's actual name — Nottingham Forest ships as the abbreviation
+    // club's actual name - Nottingham Forest ships as the abbreviation
     // "Nott'm Forest". TEAM_DISPLAY_NAME_OVERRIDES (config.js) corrects it
     // here, at the one place raw FPL field names are allowed, so every
     // downstream reader of team.name gets the fix for free.
     name: TEAM_DISPLAY_NAME_OVERRIDES[raw.name] ?? raw.name,
     shortName: raw.short_name,
     // raw.code is a separate, stable per-club id (distinct from raw.id, which
-    // is this season's fixture-list index) — it's what the official crest CDN
+    // is this season's fixture-list index) - it's what the official crest CDN
     // keys badges on. badgeUrl is precomputed here rather than built ad hoc
     // at render time so every module (matchup, ranker, dashboard, …) gets the
     // same URL for free. See PREMIER_LEAGUE badge pattern in ARCHITECTURE.md.
@@ -171,7 +171,7 @@ export function normaliseTeam(raw) {
       defenceHome:  raw.strength_defence_home,
       defenceAway:  raw.strength_defence_away,
     },
-    // Recency-weighted top-flight history — drives the promoted-team penalty in
+    // Recency-weighted top-flight history - drives the promoted-team penalty in
     // engine/fixtures.js → calcBaseDifficulty. See FEATURE_ENGINE.md §2.1.
     plTenure: buildPlTenure(raw.name, raw.short_name),
     fixtures: [],   // fixture ids, populated by normaliseSeason
@@ -182,7 +182,7 @@ export function normaliseTeam(raw) {
 
 /**
  * @param {object} raw  one entry from bootstrap-static.elements[]
- * @returns {Player}    internal Player — see ARCHITECTURE.md §8
+ * @returns {Player}    internal Player - see ARCHITECTURE.md §8
  */
 export function normalisePlayer(raw) {
   return {
@@ -198,14 +198,14 @@ export function normalisePlayer(raw) {
     statusNote: raw.news || null,
     // FPL's own forward-looking playing chance (0–100), set from press-conference
     // news. null for most players because FPL populates it only when there IS
-    // news — so null means "no doubt reported", NOT "no data". Consumed by
+    // news - so null means "no doubt reported", NOT "no data". Consumed by
     // engine/form.js → calcPlayingLikelihood, which falls back to STATUS_PLAY_CHANCE.
     chanceOfPlayingNext: typeof raw.chance_of_playing_next_round === 'number'
       ? raw.chance_of_playing_next_round
       : null,
     // FPL's own rolling form figure: average points per match over the last 30
     // days, as a decimal string upstream. NOT the same thing as `form` below,
-    // which engine/form.js computes — hence the distinct name. Surfaced raw in
+    // which engine/form.js computes - hence the distinct name. Surfaced raw in
     // the Ranker's Form column so it can be read against our own model.
     fplForm: parseFloat(raw.form) || 0,
     totals: {
@@ -233,12 +233,12 @@ export function normalisePlayer(raw) {
       creativity: parseFloat(raw.creativity) || 0,
       threat:     parseFloat(raw.threat)     || 0,
     },
-    // In-GW transfer counts — used by engine/prices.js for price change prediction.
+    // In-GW transfer counts - used by engine/prices.js for price change prediction.
     // Phase 4-4: present in bootstrap-static.elements[]; zero-safe.
     transfersInEvent:  raw.transfers_in_event  || 0,
     transfersOutEvent: raw.transfers_out_event || 0,
     // Total price movement since the season opened, in TENTHS of a million
-    // (3 → +£0.3m, -1 → -£0.1m) — same unit as now_cost above, NOT the same
+    // (3 → +£0.3m, -1 → -£0.1m) - same unit as now_cost above, NOT the same
     // unit as `price`. Kept in raw tenths here so the divide happens once, in
     // engine/prices.js → calcSeasonPriceChange, rather than at every call site.
     // Present in bootstrap-static.elements[]; zero-safe.
@@ -250,7 +250,7 @@ export function normalisePlayer(raw) {
 
 /**
  * @param {object} raw  one entry from fixtures[]
- * @returns {Fixture}   internal Fixture — see ARCHITECTURE.md §8
+ * @returns {Fixture}   internal Fixture - see ARCHITECTURE.md §8
  */
 export function normaliseFixture(raw) {
   // FPL uses THREE flags, not two, and the difference matters:
@@ -259,7 +259,7 @@ export function normaliseFixture(raw) {
   //   finished             → flipped LATER, once bonus points are confirmed.
   //
   // Reading `finished` alone (as this did) meant a match that ended hours ago
-  // still counted as unplayed and carried no result — so the league table sat
+  // still counted as unplayed and carried no result - so the league table sat
   // empty, completed fixtures showed a LIVE chip, and every engine metric fed
   // by ctx.playedFixtures (team form, style profile, venue split, H2H) quietly
   // ignored the round for the rest of the evening. `played` therefore means
@@ -273,7 +273,7 @@ export function normaliseFixture(raw) {
     id: raw.id,
     gw: raw.event,                  // null for unscheduled fixtures (rare)
     kickoff: raw.kickoff_time,       // ISO string; engine never reformats
-    // FPL sets provisional_start_time while a kickoff is unconfirmed — often the
+    // FPL sets provisional_start_time while a kickoff is unconfirmed - often the
     // precursor to a postponement. This is SCHEDULE confidence, a different axis
     // from the MODEL confidence that `provisional` carries on a CompositeScore,
     // so it must never be rendered with --estimated-border-style: that style is
@@ -284,10 +284,10 @@ export function normaliseFixture(raw) {
     played: complete,
     started,
     // Bonus points are still provisional between finished_provisional and
-    // finished; the SCORELINE is not — it is final at full time. Only a
+    // finished; the SCORELINE is not - it is final at full time. Only a
     // consumer that cares about bonus (not the scoreline) should read this.
     bonusConfirmed: Boolean(raw.finished),
-    // The score as it currently stands — set as soon as FPL publishes one, so
+    // The score as it currently stands - set as soon as FPL publishes one, so
     // an in-progress match can show its running score. `played` is what says
     // whether that score is final, and every engine consumer reaches results
     // through ctx.playedFixtures (composite.js: f.played && f.result), so a
@@ -329,7 +329,7 @@ export function normaliseGwStat(raw) {
 }
 
 /**
- * Normalises a single element-summary payload — a player's history and upcoming fixtures.
+ * Normalises a single element-summary payload - a player's history and upcoming fixtures.
  * @param {object} raw  the full element-summary/{id}/ response
  * @returns {PlayerSummary}  { history, historyPast, upcoming }
  */
@@ -353,20 +353,20 @@ export function normalisePlayerSummary(raw) {
 }
 
 /**
- * Stamp each event with `complete` — whether its football is actually over.
+ * Stamp each event with `complete` - whether its football is actually over.
  *
  * MODEL: FPL's `event.finished` does NOT flip at full time. Like the fixture
  * flag of the same name it waits for BONUS CONFIRMATION, which lands hours
  * after the last whistle and, across an international break, can sit unset for
  * days. On 2026-09-07 all ten GW3 matches read `finished_provisional` while
- * event 3 still read `finished: false` — so every view anchored on the event
+ * event 3 still read `finished: false` - so every view anchored on the event
  * flag (Full Season strip, the Matchup Outlook window, the Ranker horizon) was
  * still offering a round that had finished the previous afternoon, while the
  * fixture rails beside them, reading `played`, had already moved on.
  *
  * The fixtures are the authority: a round is complete when every fixture
  * assigned to it has been played. This is the event-level twin of the
- * `finished || finished_provisional` rule normaliseFixture already applies —
+ * `finished || finished_provisional` rule normaliseFixture already applies -
  * see its comment for why reading `finished` alone is never enough.
  *
  * `event.finished` stays as a floor. Once FPL agrees, so do we.
@@ -377,7 +377,7 @@ export function normalisePlayerSummary(raw) {
  *     open.
  *   - A round with NO fixtures assigned falls back to the raw flag. An empty
  *     `every()` is true, which would otherwise report a round nobody has
- *     played as finished — the state before the fixtures payload lands.
+ *     played as finished - the state before the fixtures payload lands.
  *
  * @param {{id: number, finished: boolean}[]} events
  * @param {{gw: number|null, played: boolean}[]} fixtures  normalised fixtures
@@ -406,7 +406,7 @@ export function deriveEventCompletion(events, fixtures) {
  *
  * MODEL: FPL's `is_current` is NOT "the round we are looking forward to". It
  * is set at a round's own deadline and stays there until the NEXT round's
- * deadline — so from Sunday full time until the following Friday it names a
+ * deadline - so from Sunday full time until the following Friday it names a
  * gameweek in which every match has already been played. Anything that asks
  * "which round is coming up" and reads currentGw therefore offers a finished
  * gameweek as the next matchup, which is what the Ranker's fixture horizon and
@@ -418,14 +418,14 @@ export function deriveEventCompletion(events, fixtures) {
  * horizon.
  *
  * Distinct from planner.js's `planningGw`, which advances at KICKOFF rather
- * than at full time — a transfer deadline is gone the moment the round starts,
+ * than at full time - a transfer deadline is gone the moment the round starts,
  * so the planner must look further ahead than a fixture horizon does. Both
  * live alongside `currentGw`, which the Dashboard's live scoreboard and
  * calibration's snapshot still want in its raw FPL meaning.
  *
  * @param {{id: number, finished: boolean, complete?: boolean,
  *          isCurrent: boolean, isNext: boolean}[]} events
- *   `complete` from deriveEventCompletion — the round's real full-time state.
+ *   `complete` from deriveEventCompletion - the round's real full-time state.
  *   Falls back to the raw `finished` flag when absent.
  * @returns {number} a gameweek id; 1 when there is nothing to go on
  */
@@ -447,7 +447,7 @@ export function deriveUpcomingGw(events) {
 
 /**
  * Composes the full normalised season from the two static payloads.
- * Pure — does not mutate inputs; constructs fresh objects throughout.
+ * Pure - does not mutate inputs; constructs fresh objects throughout.
  * @param {object}   rawBootstrap   bootstrap-static/ response
  * @param {object[]} rawFixtures    fixtures/ response (raw array)
  * @returns {Season}  { teams, teamsById, players, playersById,
@@ -472,7 +472,7 @@ export function normaliseSeason(rawBootstrap, rawFixtures) {
 
   // Build per-team fixture id lists without mutating the inputs.
   // Fixtures sort by GW first, then kickoff, so each team's `fixtures` array
-  // is in chronological order — what downstream horizon code expects.
+  // is in chronological order - what downstream horizon code expects.
   const sortedFixtures = fixtures.slice().sort((a, b) => {
     const gwA = a.gw ?? 999;
     const gwB = b.gw ?? 999;
@@ -487,11 +487,11 @@ export function normaliseSeason(rawBootstrap, rawFixtures) {
   }
   const teams = teamsRaw.map(t => ({ ...t, fixtures: fixtureIdsByTeam[t.id] || [] }));
 
-  // Postponed fixtures — no gameweek assigned yet, awaiting a rearranged date.
+  // Postponed fixtures - no gameweek assigned yet, awaiting a rearranged date.
   //
   // A DERIVED VIEW, not a separate list: these entries stay in `fixtures` where
   // they have always been (the sort above parks them at the end via `?? 999`).
-  // Removing them would be a behaviour change nothing asked for — every
+  // Removing them would be a behaviour change nothing asked for - every
   // aggregation already skips them through the `f.gw === null` guard in
   // composite.js's fixturesForTeamInWindow, so they are harmless where they sit.
   // What was missing is a way to FIND them, which is what this index provides.
@@ -520,14 +520,14 @@ export function normaliseSeason(rawBootstrap, rawFixtures) {
     // Dashboard's bonus-sensitive displays legitimately want the raw signal.
     finished:     Boolean(e.finished),
     // data_checked becomes true once FPL has processed at least one fixture's
-    // live data — used by dashboard.js to distinguish "live" from "pre-deadline".
+    // live data - used by dashboard.js to distinguish "live" from "pre-deadline".
     dataChecked:  Boolean(e.data_checked),
     isCurrent:    Boolean(e.is_current),
     isNext:       Boolean(e.is_next),
     averageScore: e.average_entry_score || 0,
   }));
 
-  // `complete` — full time by the fixtures, not by FPL's bonus clock. Stamped
+  // `complete` - full time by the fixtures, not by FPL's bonus clock. Stamped
   // here so every view shares one answer to "is this round over".
   const events = deriveEventCompletion(rawEvents, sortedFixtures);
 
@@ -537,7 +537,7 @@ export function normaliseSeason(rawBootstrap, rawFixtures) {
 
   const currentGw = events.find(e => e.isCurrent)?.id ?? null;
   const nextGw    = events.find(e => e.isNext)?.id    ?? null;
-  // "Which round is coming up" — see deriveUpcomingGw. Kept beside the two raw
+  // "Which round is coming up" - see deriveUpcomingGw. Kept beside the two raw
   // FPL flags rather than derived at each call site so every view agrees.
   const upcomingGw = deriveUpcomingGw(events);
 
@@ -554,14 +554,14 @@ export function normaliseSeason(rawBootstrap, rawFixtures) {
 // ─── Understat match lineups ─────────────────────────────────────────────────
 // The one place in this file that speaks a NON-FPL raw payload. It lives here
 // for the same reason the rest does: a schema drift upstream should break
-// exactly one file. FPL publishes no teamsheet at all — no XI, no bench, no
-// formation — so this is the only route to a real lineup.
+// exactly one file. FPL publishes no teamsheet at all - no XI, no bench, no
+// formation - so this is the only route to a real lineup.
 
 /**
  * Understat position codes, grouped into the lines a formation is written in.
  * Order matters: it is the order the numbers appear in "4-2-3-1".
  *
- * The prefixes are easy to misread — DMC is a defensive MIDFIELDER, not a
+ * The prefixes are easy to misread - DMC is a defensive MIDFIELDER, not a
  * defender, so a naive "starts with D" test puts it in the back line and
  * turns 4-2-3-1 into 6-3-1.
  */
@@ -598,7 +598,7 @@ function formationOf(starters) {
 
 /**
  * Normalise one side's roster.
- * @param {object} roster  rosters.h or rosters.a — keyed by roster id
+ * @param {object} roster  rosters.h or rosters.a - keyed by roster id
  * @returns {{formation: string|null, starters: object[], subs: object[]}}
  */
 function normaliseSide(roster) {
@@ -632,7 +632,7 @@ function normaliseSide(roster) {
       const replaced = byRosterId.get(p.cameOnForId);
       p.cameOnFor = replaced?.name ?? null;
       // The minute a substitute came on is exactly the minutes the player he
-      // replaced had been on for — no arithmetic against a match length that
+      // replaced had been on for - no arithmetic against a match length that
       // stoppage time makes unreliable.
       p.onAt = replaced ? replaced.minutes : null;
     }
@@ -653,11 +653,11 @@ function normaliseSide(roster) {
  * Build both teams' lineups from an Understat match payload.
  *
  * NOTE ON "BENCH": Understat lists only players who actually appeared, so
- * `subs` is the players who CAME ON, not a full bench — unused substitutes are
+ * `subs` is the players who CAME ON, not a full bench - unused substitutes are
  * absent from the feed entirely. The UI labels it accordingly rather than
  * implying a complete teamsheet.
  *
- * @param {object} matchData  from api.js fetchMatchData() — needs `rosters`
+ * @param {object} matchData  from api.js fetchMatchData() - needs `rosters`
  * @returns {{home: object, away: object}|null}  null when there is no roster
  */
 export function normaliseMatchLineups(matchData) {

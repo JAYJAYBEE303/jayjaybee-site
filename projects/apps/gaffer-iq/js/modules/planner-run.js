@@ -2,7 +2,7 @@
  * js/modules/planner-run.js
  * Layer: module (pure). The Transfer Planner's staged "run": moves and chips
  * queued into the next six gameweeks, checked against FPL's transfer rules.
- * No DOM, no store, no engine calls — planner.js passes everything in.
+ * No DOM, no store, no engine calls - planner.js passes everything in.
  *
  * This is rules arithmetic, not analysis. Every number a move carries (its
  * price difference, its projected gain) is an engine output that planner.js
@@ -14,7 +14,7 @@
  *   - Free transfers roll over: one new each week, carried up to RUN_FT_CAP.
  *   - A Wildcard or Free Hit week has unlimited transfers and neither spends
  *     nor accrues free transfers.
- *   - Each move past the free count costs HIT_PENALTY points — allowed only
+ *   - Each move past the free count costs HIT_PENALTY points - allowed only
  *     when the reader has turned hits on.
  *   - The bank carries forward; a move's price difference comes out of it.
  *   - One chip per gameweek.
@@ -85,7 +85,7 @@ export function evaluateRun(moves, chipsAt, o) {
   for (const [team, n] of clubs) {
     if (n <= CLUB_LIMIT) continue;
     for (const m of moves) if (o.teamOf(m.inId) === team) badMoves.add(m.id);
-    issues.push({ lvl: 'error', text: `${n} ${o.teamName(team)} players — the limit is ${CLUB_LIMIT}.` });
+    issues.push({ lvl: 'error', text: `${n} ${o.teamName(team)} players - the limit is ${CLUB_LIMIT}.` });
   }
 
   const chipsByGw = new Map();
@@ -109,9 +109,9 @@ export function evaluateRun(moves, chipsAt, o) {
     const w = { gw, moves: ms, chips, ftAvail: avail, used, unlimited, hits, hitCost: hits * HIT_PENALTY,
                 bank: cash, gain: weekGain, problems: [] };
 
-    if (chips.length > 1) w.problems.push(`Two chips in GW${gw} — only one chip per gameweek.`);
+    if (chips.length > 1) w.problems.push(`Two chips in GW${gw} - only one chip per gameweek.`);
     if (cash < 0) w.problems.push(`£${Math.abs(cash).toFixed(1)}m over budget by GW${gw}.`);
-    if (hits && !o.hit) w.problems.push(`${used} moves with ${avail} free — allow hits or move one to a later week.`);
+    if (hits && !o.hit) w.problems.push(`${used} moves with ${avail} free - allow hits or move one to a later week.`);
     if (hits && o.hit) issues.push({ lvl: 'warn', text: `−${hits * HIT_PENALTY} in hits in GW${gw}.`, gw });
 
     gain += weekGain;

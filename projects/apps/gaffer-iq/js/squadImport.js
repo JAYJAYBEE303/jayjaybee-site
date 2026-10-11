@@ -1,7 +1,7 @@
 /**
  * js/squadImport.js
  * Layer: module utility. Shared squad-import logic used by dashboard.js and
- * planner.js. Read-only — never writes to the FPL account, never touches
+ * planner.js. Read-only - never writes to the FPL account, never touches
  * credentials. Team ID is persisted in localStorage only, never in a URL param.
  *
  * Exports:
@@ -43,7 +43,7 @@ export function loadSavedTeamId() {
 export function saveTeamId(teamId) {
   try {
     localStorage.setItem(LS_KEY, String(teamId));
-  } catch { /* quota exceeded or private-mode restriction — non-fatal */ }
+  } catch { /* quota exceeded or private-mode restriction - non-fatal */ }
 }
 
 // ─── GW resolution ───────────────────────────────────────────────────────────
@@ -98,7 +98,7 @@ export async function fetchAndMapSquad(teamId, gw) {
     fetchEntryInfo(teamId),
   ]);
 
-  // Picks are required — propagate the error to the caller.
+  // Picks are required - propagate the error to the caller.
   if (picksRes.status !== 'fulfilled') {
     throw picksRes.reason;
   }
@@ -107,7 +107,7 @@ export async function fetchAndMapSquad(teamId, gw) {
   const entryInfo = entryRes.status === 'fulfilled' ? entryRes.value : null;
 
   if (entryRes.status !== 'fulfilled') {
-    console.warn('[squadImport] fetchEntryInfo failed — entry name/rank unavailable:',
+    console.warn('[squadImport] fetchEntryInfo failed - entry name/rank unavailable:',
       entryRes.reason?.message ?? entryRes.reason);
   }
 
@@ -128,9 +128,9 @@ export async function fetchAndMapSquad(teamId, gw) {
     playerIds.push(id);
     // Slot 1–11 is the XI, 12–15 the bench in priority order. Kept because the
     // Planner compares the team you actually set against the one the model
-    // would pick — a difference the app was previously blind to.
+    // would pick - a difference the app was previously blind to.
     // Note: pick.position, pick.is_captain and pick.is_vice_captain are raw
-    // FPL field names. CONVENTIONS.md §3.1 confines those to normalise.js —
+    // FPL field names. CONVENTIONS.md §3.1 confines those to normalise.js -
     // this is the one read, converted to internal names (slot, isCaptain,
     // isViceCaptain) on the same line, which is the spirit of the rule.
     picks.push({

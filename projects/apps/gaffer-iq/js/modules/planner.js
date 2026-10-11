@@ -5,8 +5,8 @@
  * from store; delegates all scoring to engine/composite.js exclusively via
  * scorePlayer(), and every recommendation to engine/transfers.js,
  * engine/strategy.js and engine/chips.js.
- * No analytical logic lives here — see FEATURE_ENGINE.md §10 and §11.
- * Layout: design export FINAL - Planner.dc.html (styles css/planner.css) —
+ * No analytical logic lives here - see FEATURE_ENGINE.md §10 and §11.
+ * Layout: design export FINAL - Planner.dc.html (styles css/planner.css) -
  * the week's verdict as an Out → In tape, then "the run": moves and chips
  * staged into the next six gameweeks, checked by planner-run.js and saved on
  * this device, fed from a move tray that shows one lens board at a time.
@@ -49,7 +49,7 @@ const CHIPS_USED_KEY = 'gafferiq_chips_used';
  *  transfers and hit setting. Written only by Save run. */
 const RUN_KEY = 'gafferiq_planner_run';
 
-// CHIP_IDS and CHIP_LABELS now live in config.js — shared with
+// CHIP_IDS and CHIP_LABELS now live in config.js - shared with
 // engine/strategy.js's chipWindow trigger message, so a raw id never
 // leaks into rendered text on either surface.
 
@@ -74,7 +74,7 @@ const EASE = 'cubic-bezier(.2,.7,.2,1)';
 
 // ─── Module-level state ───────────────────────────────────────────────────────
 //
-// NOTE: the squad itself is NOT module-level state — it lives in store.js
+// NOTE: the squad itself is NOT module-level state - it lives in store.js
 // (store.getSquad()/setSquad()), shared with the Dashboard. See
 // afterSquadChange() and initPlanner()'s 'squad:updated' subscription.
 
@@ -86,7 +86,7 @@ let _importedTeamId = null;
 /** Raw FPL entry object from last import (name, rank, etc.), or null. */
 let _importedEntryInfo = null;
 
-/** True while an import fetch is in flight — prevents concurrent imports. */
+/** True while an import fetch is in flight - prevents concurrent imports. */
 let _importInFlight = false;
 
 /** Remaining transfer budget in £m (e.g. 2.5 = £2.5m). The run's bank. */
@@ -98,15 +98,15 @@ let _freeTransfers = 1;
 /** If true, the run may take transfers beyond the free count (each a hit). */
 let _allowExtraHit = false;
 
-/** Map<playerId, scorePlayer result> — rebuilt on squad/horizon changes. */
+/** Map<playerId, scorePlayer result> - rebuilt on squad/horizon changes. */
 let _scores = new Map();
 
 /**
- * Map<playerId, rankTier|null> — every player's standing against the full
+ * Map<playerId, rankTier|null> - every player's standing against the full
  * pool (FEATURE_ENGINE.md §13), keyed by whichever horizon last built it.
  * null until computed. Rebuilding this depends on horizon (a player's score,
  * and therefore rank, differs by horizon) but NOT on squad membership, so it
- * is invalidated on data:ready/horizon:changed only — not re-scored on every
+ * is invalidated on data:ready/horizon:changed only - not re-scored on every
  * add/remove, which would cost ~700 scorePlayer calls per click for no reason.
  */
 let _rankTierByPlayerId = null;
@@ -114,7 +114,7 @@ let _rankTierByPlayerId = null;
 /** Set<chipId> of chips the user has marked as already used this season. */
 let _chipsUsed = new Set();
 
-/** Cached candidate scores, one Map per scoring window (long / now1 / far —
+/** Cached candidate scores, one Map per scoring window (long / now1 / far -
  *  see engine/transfers.js). Cleared together on data or horizon change: a
  *  window-specific cache outliving its window would silently serve scores from
  *  the wrong number of gameweeks. */
@@ -132,7 +132,7 @@ let _boardState = 'short';
 /**
  * Chip timing recommendations, computed by computeChipRecs() so buildVerdict()
  * can read them without recomputing chip timing itself. computeChipRecs() runs
- * before computeBoards() — without that ordering the very first verdict would
+ * before computeBoards() - without that ordering the very first verdict would
  * silently lose its chipWindow trigger, because this starts empty.
  */
 let _chipRecs = {};
@@ -185,8 +185,8 @@ let _drawer  = null;
 let _scrim   = null;
 let _cmd     = null;
 
-// Import refs (Phase 4-1). Two forms share handleImport — the empty-state
-// hero and the squad drawer — so these point at whichever one was submitted.
+// Import refs (Phase 4-1). Two forms share handleImport - the empty-state
+// hero and the squad drawer - so these point at whichever one was submitted.
 let _importIdInput = null;
 let _importStatus  = null;
 let _importInfo    = null;
@@ -215,7 +215,7 @@ function isScoreEstimated(score) {
  * scoreboard relates to it.
  *
  * MODEL: `season.currentGw` is FPL's `is_current`, which stays pointing at a
- * round from its deadline until the next one opens — so for most of a
+ * round from its deadline until the next one opens - so for most of a
  * weekend it names a gameweek whose deadline has GONE. A planner is a tool
  * for spending transfers, and transfers cannot be spent into a round that has
  * kicked off, so planning against currentGw once it is live produced advice
@@ -244,7 +244,7 @@ function getPlanningTiming() {
     };
   }
 
-  // `dataChecked` is FPL's data_checked — true once at least one fixture in the
+  // `dataChecked` is FPL's data_checked - true once at least one fixture in the
   // round has been processed. Kept alongside the deadline comparison because
   // the deadline alone is a clock read, and a wrong client clock would
   // otherwise silently skip a gameweek. Either signal is enough.
@@ -252,7 +252,7 @@ function getPlanningTiming() {
   const started = Boolean(ev.complete || ev.dataChecked || deadlinePassed);
 
   // `complete` is full time by the fixtures. `ev.finished` waits for bonus
-  // confirmation, so it would report a played-out round as still 'live' — with
+  // confirmation, so it would report a played-out round as still 'live' - with
   // an unplayed count of zero, which is the state planner-boards.js's lead
   // sentence has to special-case away. See normalise.js deriveEventCompletion.
   const phase = ev.complete ? 'finished' : started ? 'live' : 'pre-deadline';
@@ -260,7 +260,7 @@ function getPlanningTiming() {
   // Only meaningful while the round is under way: how many of its matches have
   // yet to be played, because each one still to come can move every number on
   // this page. Postponed fixtures carry gw === null and are excluded by the
-  // equality check, which is correct — they are not pending results for THIS
+  // equality check, which is correct - they are not pending results for THIS
   // round.
   const unplayed = phase === 'live'
     ? store.getFixtures().filter(f => f.gw === currentGw && !f.played).length
@@ -283,7 +283,7 @@ function buildCtx() {
     leagueXgPrev: store.getLeagueXgPrev(),
     leagueXgHistory: store.getLeagueXgHistory(),
     teamXgBySlug: store.getAllTeamXg(),
-    // The planning gameweek, NOT the live one — this is what moves every
+    // The planning gameweek, NOT the live one - this is what moves every
     // fixture window on the page (and therefore the chip timings below) off a
     // round the user can no longer act on. See getPlanningTiming.
     currentGw: getPlanningTiming().planningGw ?? store.getNextGw() ?? 1,
@@ -304,7 +304,7 @@ function runGws() {
 // ─── Chip-usage persistence (Phase 4-3) ──────────────────────────────────────
 
 /**
- * Load chip-used state from localStorage. Survives page reloads — chip usage
+ * Load chip-used state from localStorage. Survives page reloads - chip usage
  * is a season-long decision, not a session one. No FPL API endpoint reports
  * chip usage without auth, so this is manually toggled per ROADMAP Phase 4-3.
  */
@@ -316,13 +316,13 @@ function loadChipsUsed() {
     if (Array.isArray(parsed)) {
       _chipsUsed = new Set(parsed.filter(id => CHIP_IDS.includes(id)));
     }
-  } catch { /* corrupt — ignore and start fresh */ }
+  } catch { /* corrupt - ignore and start fresh */ }
 }
 
 function saveChipsUsed() {
   try {
     localStorage.setItem(CHIPS_USED_KEY, JSON.stringify([..._chipsUsed]));
-  } catch { /* quota exceeded — non-fatal */ }
+  } catch { /* quota exceeded - non-fatal */ }
 }
 
 // ─── Run persistence ─────────────────────────────────────────────────────────
@@ -348,7 +348,7 @@ function loadRun() {
       _allowExtraHit = Boolean(saved.hit);
       _budget = Number.isFinite(saved.bank) && saved.bank >= 0 ? saved.bank : 0;
     }
-  } catch { /* corrupt — start from an empty run */ }
+  } catch { /* corrupt - start from an empty run */ }
   _savedSnap = runSnapshot();
 }
 
@@ -358,7 +358,7 @@ function saveRun() {
       moves: _moves, chipsAt: _chipsAt, ft: _freeTransfers, hit: _allowExtraHit, bank: _budget,
     }));
   } catch {
-    toast('Couldn’t save — storage is blocked.');
+    toast('Couldn’t save - storage is blocked.');
     return;
   }
   _savedSnap = runSnapshot();
@@ -366,12 +366,12 @@ function saveRun() {
   const gws = runGws();
   toast(ev.valid
     ? `Run saved, GW${gws[0]}–${gws[gws.length - 1]}.`
-    : `Saved — ${ev.errors} problem${ev.errors > 1 ? 's' : ''} still to fix.`);
+    : `Saved - ${ev.errors} problem${ev.errors > 1 ? 's' : ''} still to fix.`);
   renderCmd();
 }
 
 // ─── Squad management ─────────────────────────────────────────────────────────
-// Reads store.getSquad() directly rather than caching a local copy — the
+// Reads store.getSquad() directly rather than caching a local copy - the
 // store is the only source of truth (CONVENTIONS.md §8), and afterSquadChange()
 // (subscribed to 'squad:updated') is what re-renders after any mutation, from
 // either this module or the Dashboard.
@@ -396,7 +396,7 @@ function addPlayer(playerId) {
   const player = store.getPlayer(playerId);
   if (!player || !canAdd(player)) return;
   // afterSquadChange() runs via the 'squad:updated' subscription, not a direct
-  // call here — the same path the Dashboard's edits take, so both modules
+  // call here - the same path the Dashboard's edits take, so both modules
   // react identically regardless of which one made the change.
   store.setSquad([...store.getSquad(), playerId]);
 }
@@ -434,7 +434,7 @@ function scoreSquad() {
 /**
  * Rank tier (FEATURE_ENGINE.md §13) needs a player's standing against the
  * FULL player pool, not just the squad or the swap candidates a single search
- * happens to touch — "top 30 in the game" has to mean the same thing here as
+ * happens to touch - "top 30 in the game" has to mean the same thing here as
  * on the Ranker/Dashboard. Cached because it depends only on ctx/horizon, not
  * on squad membership: re-scoring ~700 players on every add/remove click
  * would be wasted work. _rankTierByPlayerId is invalidated by the caller
@@ -457,7 +457,7 @@ function ensureRankTiers(ctx, horizon) {
  * Re-enumerate swaps and build the verdict.
  * @param {boolean} rescore  false when only budget/free-transfers changed, in
  *                           which case the cached candidate scores are reused
- *                           — that is what keeps typing in the bank box fast.
+ *                           - that is what keeps typing in the bank box fast.
  */
 function computeBoards(rescore = true) {
   _verdict = null;
@@ -470,7 +470,7 @@ function computeBoards(rescore = true) {
 
   // Before enumerateSwaps, deliberately. Every swap is scored against the
   // counter-matchup metric, so running the enumeration now would produce a
-  // ranked board that reorders itself when the Understat prefetch finishes —
+  // ranked board that reorders itself when the Understat prefetch finishes -
   // and the enumeration is the most expensive thing this module does, so the
   // work would be thrown away as well as misleading. Placeholders until then;
   // the data:ready that follows the last settle brings us back here.
@@ -502,7 +502,7 @@ function computeBoards(rescore = true) {
     _swaps = [];
   }
 
-  // FIX 6: an empty enumeration is ambiguous on its own — it is the correct,
+  // FIX 6: an empty enumeration is ambiguous on its own - it is the correct,
   // honest result of "no legal transfer beats your budget", but it is ALSO
   // what a squad member failing to score produces (enumerateSwaps requires
   // every squad member to score before it enumerates anything; see its
@@ -511,8 +511,8 @@ function computeBoards(rescore = true) {
   // which would be a confident, wrong statement in the second case. _scores
   // is populated by this module's own per-player scoreSquad() over the same
   // squad/horizon/ctx just before this runs, so a squad member missing from
-  // it is the simplest available signal that a scoring failure — not a
-  // legitimately empty budget search — is why _swaps is empty.
+  // it is the simplest available signal that a scoring failure - not a
+  // legitimately empty budget search - is why _swaps is empty.
   const squadScored = store.getSquad().every(id => _scores.has(id));
   if (_swaps.length === 0 && !squadScored) {
     _boardState = 'unscored';
@@ -546,9 +546,9 @@ function priceChangeNote(player, score) {
   const isFallWarning = risk.direction === 'fall' && risk.confidence >= 0.3;
 
   if (!isBuyNow && !isFallWarning && risk.direction !== 'rise') return '';
-  if (isBuyNow) return `↑ Buy now — price likely to rise (${pct}% confidence)`;
+  if (isBuyNow) return `↑ Buy now - price likely to rise (${pct}% confidence)`;
   if (risk.direction === 'rise') return `↑ Price may rise soon (${pct}% confidence)`;
-  return `↓ Price may fall — consider alternatives (${pct}% confidence)`;
+  return `↓ Price may fall - consider alternatives (${pct}% confidence)`;
 }
 
 // ─── Chip timing (Phase 4-3) ─────────────────────────────────────────────────
@@ -574,7 +574,7 @@ function pickBenchPlayerIds() {
  * candidate. Returns null when the squad is empty or no scores exist yet.
  *
  * Ranks by `expectedPoints` (real points-scale projection), NOT the 0-100
- * composite `score.value` — same reasoning as the dashboard captaincy pick:
+ * composite `score.value` - same reasoning as the dashboard captaincy pick:
  * the composite is a within-position quality score and doesn't scale with a
  * position's actual scoring ceiling. See calcExpectedPoints in
  * engine/composite.js and FEATURE_ENGINE.md §10.2.
@@ -595,7 +595,7 @@ function pickTcCandidate() {
 /**
  * Compute all four chip recommendations into _chipRecs. Pure-engine calls; the
  * module only owns DOM. Always keeps the reasoning per ROADMAP rule "always
- * show the reasoning" — when a chip can't be scored (e.g. empty squad for
+ * show the reasoning" - when a chip can't be scored (e.g. empty squad for
  * BB/TC) the fallback reasoning says why.
  */
 function computeChipRecs() {
@@ -773,7 +773,7 @@ function chipHTML(value, band, est, cls = '') {
 }
 
 function pendingChip(cls = '') {
-  return `<span class="chip${cls} is-pending" aria-hidden="true" title="Still calculating — waiting on league-wide counter-matchup data">00</span>`;
+  return `<span class="chip${cls} is-pending" aria-hidden="true" title="Still calculating - waiting on league-wide counter-matchup data">00</span>`;
 }
 
 function crestHTML(team) {
@@ -829,11 +829,11 @@ function heroHTML() {
   }
   if (_boardState === 'settling') {
     return '<div class="ld" aria-busy="true"><span class="sk"></span><span class="sk"></span><span class="sk"></span>'
-      + '<p role="status">Counter-matchup data is still settling — the verdict, the move tray and chip weeks are held back.</p></div>';
+      + '<p role="status">Counter-matchup data is still settling - the verdict, the move tray and chip weeks are held back.</p></div>';
   }
   if (_boardState === 'unscored') {
     return '<div class="empty" role="status"><h2>No verdict this week</h2>'
-      + '<p class="muted">Some of your squad could not be scored this week, so no honest verdict can be built — this is not '
+      + '<p class="muted">Some of your squad could not be scored this week, so no honest verdict can be built - this is not '
       + 'the same as “no legal transfers”. Check the console for which player failed and try again once data has finished loading.</p></div>';
   }
   if (_boardState === 'noctx' || !_verdict) {
@@ -962,15 +962,15 @@ function weekHTML(w, ev, gws, i) {
       + `<button type="button" class="icon" data-move-shift="${m.id}" data-d="1" ${m.gw === last ? 'disabled' : ''} aria-label="Move ${esc(o)} to ${esc(n)} to GW${m.gw + 1}">›</button>`
       + `<button type="button" class="icon icon--rm" data-move-rm="${m.id}" aria-label="Remove ${esc(o)} to ${esc(n)}">×</button></span></li>`;
   }).join('');
-  const empty = w.unlimited ? 'Chip week — unlimited transfers'
-    : w.ftAvail >= 2 ? `Rolling — ${Math.min(5, w.ftAvail + 1)} free next week` : 'Roll the transfer';
+  const empty = w.unlimited ? 'Chip week - unlimited transfers'
+    : w.ftAvail >= 2 ? `Rolling - ${Math.min(5, w.ftAvail + 1)} free next week` : 'Roll the transfer';
   const aria = `GW${w.gw}: ${w.moves.length} move${w.moves.length === 1 ? '' : 's'}`
     + (w.chips.length ? `, ${w.chips.map(c => CHIP_LABELS[c]).join(', ')}` : '') + (bad ? ', has problems' : '');
   return `<div class="wk${target ? ' is-target' : ''}${bad ? ' is-bad' : ''}" role="listitem" data-wk="${w.gw}" aria-label="${esc(aria)}" style="--d:${200 + i * 55}ms">`
     + `<button type="button" class="wk__hd" data-target="${w.gw}" aria-pressed="${target}">`
     + `<span class="wk__gw">GW${w.gw}</span>`
     + `<span class="wk__ft"><span class="dots" aria-label="${w.ftAvail} free transfers, ${w.used} used">${dots}</span>`
-    + `<small>${w.unlimited ? 'Unlimited — chip week' : `${w.ftAvail} free · ${w.used} used`}</small></span>`
+    + `<small>${w.unlimited ? 'Unlimited - chip week' : `${w.ftAvail} free · ${w.used} used`}</small></span>`
     + `<span class="wk__tg">${target ? 'Adding here' : 'Select week'}</span></button>`
     + `<div class="wk__chips">${chips}</div>`
     + `<ol class="wk__moves">${moves || `<li class="wk__empty">${empty}</li>`}</ol>`
@@ -1010,8 +1010,8 @@ function renderRun() {
   const stale = _moves.filter(m => m.gw < gws[0]);
   const list = ev.issues.filter(x => x.lvl === 'error').map(x => ({ e: true, text: x.text }))
     .concat(ev.issues.filter(x => x.lvl === 'warn').map(x => ({ e: false, text: x.text })))
-    .concat(offBoard.map(m => ({ e: false, text: `${moveLabel(m)} isn’t on the boards any more — its figures are from when you added it.` })))
-    .concat(stale.length ? [{ e: false, text: `${stale.length} move${stale.length === 1 ? ' is' : 's are'} for gameweeks that have passed — clear the run to drop ${stale.length === 1 ? 'it' : 'them'}.` }] : []);
+    .concat(offBoard.map(m => ({ e: false, text: `${moveLabel(m)} isn’t on the boards any more - its figures are from when you added it.` })))
+    .concat(stale.length ? [{ e: false, text: `${stale.length} move${stale.length === 1 ? ' is' : 's are'} for gameweeks that have passed - clear the run to drop ${stale.length === 1 ? 'it' : 'them'}.` }] : []);
   const issues = _root.querySelector('#pl-issues');
   issues.hidden = list.length === 0;
   issues.classList.toggle('is-error', list.some(x => x.e));
@@ -1051,7 +1051,7 @@ function renderTray(animate = false) {
   let body;
   if (_boardState === 'short') body = `<p class="tray__empty">Add ${SQUAD_TOTAL} players to see moves.</p>`;
   else if (_boardState === 'settling' || !_dataReady) body = '<div class="cards cards--sk" aria-busy="true"><span class="sk"></span><span class="sk"></span><span class="sk"></span></div>';
-  else if (_boardState === 'unscored') body = '<p class="tray__empty">No moves — some of your squad could not be scored. See the note above.</p>';
+  else if (_boardState === 'unscored') body = '<p class="tray__empty">No moves - some of your squad could not be scored. See the note above.</p>';
   else if (_boardState === 'noctx') body = '<p class="tray__empty">No data available yet.</p>';
   else {
     // An empty lens says so plainly. Padding it with the next-best generic
@@ -1102,15 +1102,15 @@ function renderRunAndTray() {
 
 /**
  * Where the team the user actually SET differs from the team the model would
- * pick. Returns empty sets when no import has happened — a hand-built squad has
+ * pick. Returns empty sets when no import has happened - a hand-built squad has
  * no saved order to disagree with, and inventing one would be a lie.
  *
  * A saved-XI player id that is no longer in the squad (replaceSquad() can drop
  * an imported player that exceeds SQUAD_LIMITS while the picks are stored
  * unconditionally) simply never matches a rendered player: it still lands in
  * `started` by set arithmetic, but renderDrawer() only ever tests
- * diff.started.has(player.id) against players it is actually rendering — i.e.
- * players still in the squad — so a phantom id produces no marker, no crash,
+ * diff.started.has(player.id) against players it is actually rendering - i.e.
+ * players still in the squad - so a phantom id produces no marker, no crash,
  * and does not double-count against a real player.
  *
  * @returns {{ benched: Set<number>, started: Set<number>, captainId: number|null,
@@ -1152,7 +1152,7 @@ function renderSearch() {
   _root.querySelector('#pl-add-grp').hidden = store.getSquad().length >= SQUAD_TOTAL;
   if (query.length < 2) { note.textContent = 'Type two letters to search.'; list.innerHTML = ''; return; }
   const allPlayers = store.getPlayers();
-  if (!allPlayers.length) { note.textContent = 'Player data not yet loaded — please wait.'; list.innerHTML = ''; return; }
+  if (!allPlayers.length) { note.textContent = 'Player data not yet loaded - please wait.'; list.innerHTML = ''; return; }
 
   const results = allPlayers.filter(p => {
     if (isInSquad(p.id)) return false;
@@ -1169,7 +1169,7 @@ function renderSearch() {
     const squadFull    = store.getSquad().length >= SQUAD_TOTAL;
     const reason       = squadFull ? 'Squad full' : posSlotsFull ? `${POS_FULL[p.position]} full` : '';
     return `<li><button type="button" data-add-player="${p.id}" ${reason ? 'disabled' : ''} title="${esc(reason || p.fullName || p.name || '')}">`
-      + `<span>${crestHTML(team)}<span><b>${esc(p.name ?? '?')}</b> <small>${esc(p.position)} · ${esc(team?.name ?? '—')} · ${money(p.price ?? 0)}</small></span></span>`
+      + `<span>${crestHTML(team)}<span><b>${esc(p.name ?? '?')}</b> <small>${esc(p.position)} · ${esc(team?.name ?? '-')} · ${money(p.price ?? 0)}</small></span></span>`
       + `<span>${esc(reason || 'Add')}</span></button></li>`;
   }).join('');
 }
@@ -1188,10 +1188,10 @@ function renderDrawer() {
         const team = store.getTeam(p.teamId);
         const score = _scores.get(p.id);
         const chip = !score ? '<span></span>' : settled ? chipHTML(Math.round(score.value), score.band, isScoreEstimated(score)) : pendingChip();
-        const tags = (diff.benched.has(p.id) ? '<span class="diff" title="The model would start him — you have him on your bench">bench</span>' : '')
-          + (diff.started.has(p.id) ? '<span class="diff" title="You are starting him — the model would bench him">start</span>' : '')
+        const tags = (diff.benched.has(p.id) ? '<span class="diff" title="The model would start him - you have him on your bench">bench</span>' : '')
+          + (diff.started.has(p.id) ? '<span class="diff" title="You are starting him - the model would bench him">start</span>' : '')
           + (diff.captainId === p.id && diff.modelCaptainId !== p.id ? '<span class="diff" title="Your armband is here; the model prefers another player">C</span>' : '');
-        return `<div class="sq"><span>${crestHTML(team)}<span><b>${esc(p.name)}</b> <small>${esc(team?.shortName ?? '—')} · ${money(p.price ?? 0)}</small>${tags}`
+        return `<div class="sq"><span>${crestHTML(team)}<span><b>${esc(p.name)}</b> <small>${esc(team?.shortName ?? '-')} · ${money(p.price ?? 0)}</small>${tags}`
           + `${p.status !== 'available' ? ` <small class="warn">⚠ ${esc(p.statusNote || p.status)}</small>` : ''}</span></span>`
           + `${chip}<button type="button" class="icon icon--rm" data-rm-player="${p.id}" aria-label="Remove ${esc(p.name)} from squad">×</button></div>`;
       }).join('') + '</div>';
@@ -1279,7 +1279,7 @@ function playFlip(fl) {
 function render(animate = false) {
   if (!_root) return;
   renderHero(animate);
-  // An empty squad with nothing staged has no run to show — the hero's
+  // An empty squad with nothing staged has no run to show - the hero's
   // import form is the whole page then.
   const showRun = _dataReady && (store.getSquad().length > 0 || _moves.length > 0);
   _runWrap.hidden = !showRun;
@@ -1290,7 +1290,7 @@ function render(animate = false) {
   renderDrawer();
 }
 
-/** Score, time the chips, enumerate, then paint — in that order (see _chipRecs). */
+/** Score, time the chips, enumerate, then paint - in that order (see _chipRecs). */
 function recomputeAndRender(rescore = true, animate = false) {
   scoreSquad();
   computeChipRecs();
@@ -1301,7 +1301,7 @@ function recomputeAndRender(rescore = true, animate = false) {
 // ─── After squad change ───────────────────────────────────────────────────────
 
 function afterSquadChange() {
-  // Cheap bookkeeping stays unconditional — both Dashboard and Planner call
+  // Cheap bookkeeping stays unconditional - both Dashboard and Planner call
   // store.setSquad(), so this fires whichever module made the edit.
   _q = '';
   const search = _root?.querySelector('#pl-search');
@@ -1527,7 +1527,7 @@ async function handleImport() {
     const { playerIds, picks, entryInfo, missingCount } = await fetchAndMapSquad(teamId, gw);
 
     if (playerIds.length === 0) {
-      showImportStatus('No recognised players found — check the Team ID and try again.', 'error');
+      showImportStatus('No recognised players found - check the Team ID and try again.', 'error');
       return;
     }
 
@@ -1542,10 +1542,10 @@ async function handleImport() {
 
     const warn = missingCount > 0 ? ` (${missingCount} player${missingCount === 1 ? '' : 's'} not recognised)` : '';
     showImportStatus(`Imported ${playerIds.length} players from GW${gw}.${warn}`, 'success');
-    toast(`Imported ${entryInfo?.name ?? 'your team'} — ${playerIds.length} players`);
+    toast(`Imported ${entryInfo?.name ?? 'your team'} - ${playerIds.length} players`);
   } catch (err) {
     const detail = err?.upstreamStatus === 404
-      ? 'Team not found — check the ID. Private leagues may block access.'
+      ? 'Team not found - check the ID. Private leagues may block access.'
       : (err?.message ?? String(err));
     showImportStatus(`Import failed: ${detail}`, 'error');
     console.warn('[planner] Squad import failed:', err);
@@ -1580,7 +1580,7 @@ function wireDom() {
   document.addEventListener('keydown', onKeydown);
   window.addEventListener('beforeunload', onBeforeUnload);
 
-  // The settings bar wraps at some widths — keep its real height for anything
+  // The settings bar wraps at some widths - keep its real height for anything
   // that wants to sit under it.
   new ResizeObserver(() => _root.style.setProperty('--pl-cmd-h', `${_cmd.offsetHeight}px`)).observe(_cmd);
 
@@ -1609,7 +1609,7 @@ function onDataReady() {
   _rankTierByPlayerId = null;
   _dataReady = true;
 
-  // Invalidate always, recompute lazily — same split as Dashboard. The
+  // Invalidate always, recompute lazily - same split as Dashboard. The
   // bookkeeping above is cheap and must stay eager; scoreSquad() below drives
   // ensureRankTiers, a full-pool ranking measured at ~920ms. data:ready fires
   // once per team-xG payload at boot, so off-screen recomputes here were
@@ -1636,11 +1636,11 @@ function onRouteChanged(module) {
 
 /**
  * 'squadPicks:updated' fires when the pick order (slot + armband) changes
- * without the squad's MEMBERSHIP changing — the only thing that depends on
+ * without the squad's MEMBERSHIP changing - the only thing that depends on
  * it is the squad drawer's saved-XI diff markers (calcSavedXiDiff, inside
  * renderDrawer). Deliberately does NOT run the rest of afterSquadChange:
  * re-scoring and re-enumerating swaps here would be the exact double cold
- * pass this event was split out of 'squad:updated' to avoid — see the
+ * pass this event was split out of 'squad:updated' to avoid - see the
  * comment on store.js's setSquadPicks.
  */
 function onSquadPicksChanged() {
@@ -1650,7 +1650,7 @@ function onSquadPicksChanged() {
 function onHorizonChanged() {
   if (!_dataReady) return;
   // Rank tiers depend on horizon (a player's score, and therefore rank,
-  // differs by horizon) — force a fresh computation alongside the re-score.
+  // differs by horizon) - force a fresh computation alongside the re-score.
   _rankTierByPlayerId = null;
   // Re-score squad against the new horizon and re-compute transfer
   // recommendations + chip timing (chips depend on the same fixture data).
@@ -1667,7 +1667,7 @@ function onHorizonChanged() {
  * before the first data:ready.
  *
  * Also subscribes to 'squad:updated' so a squad built or imported on the
- * Dashboard — or anywhere else — re-scores and re-renders here too, with no
+ * Dashboard - or anywhere else - re-scores and re-renders here too, with no
  * rebuild step.
  */
 export function initPlanner() {

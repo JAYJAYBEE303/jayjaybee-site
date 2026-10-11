@@ -4,7 +4,7 @@
 
 **Goal:** Replace ICT-based role classification with Understat chain data, and add a third counter-matchup tier that scores a team's threat profile against its opponent's conceding profile using Understat's per-team `statistics` block.
 
-**Architecture:** Three-tier ladder selected by data availability — `channel` (team `statistics` axes) → `role` (chain-based classification, form units) → `element` (unchanged floor). Channel logic lives in a new pure engine module `js/engine/channel.js`; `engine/counter.js` selects the tier. All new constants land in `js/config.js`. The sum-to-100 mirroring identity is preserved by keeping `calcCounterMatchupMirrored` arithmetic.
+**Architecture:** Three-tier ladder selected by data availability - `channel` (team `statistics` axes) → `role` (chain-based classification, form units) → `element` (unchanged floor). Channel logic lives in a new pure engine module `js/engine/channel.js`; `engine/counter.js` selects the tier. All new constants land in `js/config.js`. The sum-to-100 mirroring identity is preserved by keeping `calcCounterMatchupMirrored` arithmetic.
 
 **Tech Stack:** Vanilla ES2022 modules, no runtime dependencies. Tests use Node's built-in `node --test` runner (no packages installed).
 
@@ -56,7 +56,7 @@ Create `tests/engine/counter.test.js`:
 ```js
 /**
  * tests/engine/counter.test.js
- * Unit tests for engine/counter.js. Pure-function tests only — plain object
+ * Unit tests for engine/counter.js. Pure-function tests only - plain object
  * inputs, no DOM, no network (CONVENTIONS.md §3.3).
  */
 
@@ -118,7 +118,7 @@ test('buildRoleSignature gives createBias 0.5 when a player has neither xA nor n
 npm test
 ```
 
-Expected: FAIL — `SyntaxError: The requested module '../../js/engine/counter.js' does not provide an export named 'buildRoleSignature'`.
+Expected: FAIL - `SyntaxError: The requested module '../../js/engine/counter.js' does not provide an export named 'buildRoleSignature'`.
 
 - [ ] **Step 4: Implement `buildRoleSignature`**
 
@@ -132,10 +132,10 @@ In `js/engine/counter.js`, insert immediately after the `classifyRole` function 
  * possessions where they took the shot or made the key pass, so buildupShare
  * is a positional depth axis: ~0.95 for a centre-back, ~0.20 for a striker.
  * Because it is a ratio of the player's own involvement it is quality-neutral
- * — measured at corr(buildupShare, xGChain/90) = +0.008 across 102 regular
+ * - measured at corr(buildupShare, xGChain/90) = +0.008 across 102 regular
  * 2025 defenders, versus corr(buildupShare, xA/90) = −0.654.
  *
- * MODEL: buildupShare alone misfiles two groups in OPPOSITE directions — a
+ * MODEL: buildupShare alone misfiles two groups in OPPOSITE directions - a
  * set-piece centre-back reads low (corner headers are final actions) and a
  * defensive fullback reads low (little of anything). createBias separates
  * them: a centre-back's final action is a shot, a fullback's is a cross.
@@ -143,7 +143,7 @@ In `js/engine/counter.js`, insert immediately after the `classifyRole` function 
  * See FEATURE_ENGINE.md §7.2 and the design spec
  * docs/superpowers/specs/2026-08-20-understat-channel-counters-design.md §4.
  *
- * @param {object} understatPlayer  raw record from leagueXg.playersData —
+ * @param {object} understatPlayer  raw record from leagueXg.playersData -
  *                                  numeric fields arrive as STRINGS
  * @returns {{buildupShare: number, createBias: number, npxg90: number,
  *            chain90: number} | null}
@@ -166,7 +166,7 @@ export function buildRoleSignature(understatPlayer) {
 
   return {
     buildupShare: buildup / chain,
-    // MODEL: a player with no final action at all has no bias either way —
+    // MODEL: a player with no final action at all has no bias either way -
     // 0.5 is the honest neutral, not 0 (which would read as pure finisher).
     createBias: final > 0 ? xa90 / final : 0.5,
     npxg90,
@@ -189,7 +189,7 @@ Expected: PASS, 7 tests.
 git add package.json tests/engine/counter.test.js js/engine/counter.js
 git commit -m "feat(engine/counter): add chain-based role signature helper
 
-Adds buildRoleSignature() and a node --test harness. No scoring change yet —
+Adds buildRoleSignature() and a node --test harness. No scoring change yet -
 nothing calls the helper until the next commit."
 ```
 
@@ -213,7 +213,7 @@ In `js/config.js`, insert directly after the closing `};` of `ROLE_CLASSIFY_THRE
 
 ```js
 // Classification thresholds for classifyRoleFromSignature(position, sig) in
-// engine/counter.js — the Understat-chain replacement for the ICT-share
+// engine/counter.js - the Understat-chain replacement for the ICT-share
 // thresholds above (which remain as the per-player fallback).
 //
 // MODEL: derived from the 2025 season, 139 DEF / 153 MID / 24 FWD with at
@@ -224,7 +224,7 @@ In `js/config.js`, insert directly after the closing `};` of `ROLE_CLASSIFY_THRE
 export const ROLE_SIGNATURE_THRESHOLDS = {
   // DEF: a fullback is BOTH shallower than a centre-back (more final-third
   // involvement) AND a creator rather than a finisher. Both conditions are
-  // required — a set-piece CB satisfies the first alone.
+  // required - a set-piece CB satisfies the first alone.
   defFbBuildupShareMax: 0.82,
   defFbCreateBiasMin:   0.50,
   // MID: a winger / inside-forward is a primary shot threat. Tested first
@@ -308,7 +308,7 @@ test('classifyRoleFromSignature: null signature yields null for outfielders', ()
 npm test
 ```
 
-Expected: FAIL — no export named `classifyRoleFromSignature`.
+Expected: FAIL - no export named `classifyRoleFromSignature`.
 
 - [ ] **Step 4: Implement `classifyRoleFromSignature`**
 
@@ -371,7 +371,7 @@ Expected: PASS, 18 tests.
 git add js/config.js js/engine/counter.js tests/engine/counter.test.js
 git commit -m "feat(engine/counter): classify roles from chain signature
 
-Adds classifyRoleFromSignature() and its thresholds. Still unwired — no
+Adds classifyRoleFromSignature() and its thresholds. Still unwired - no
 scoring change until classifyRole() starts calling it."
 ```
 
@@ -386,7 +386,7 @@ scoring change until classifyRole() starts calling it."
 
 **Interfaces:**
 - Consumes: `buildRoleSignature`, `classifyRoleFromSignature` from Tasks 1–2.
-- Produces: **breaking signature change** — `classifyRole(player, ctx)` replaces `classifyRole(player)`. `ctx` is a `buildScoreContext` result; only `ctx.understatPlayersByName` is read. Passing `ctx` as `undefined` is legal and forces the ICT path, so existing behaviour is recoverable.
+- Produces: **breaking signature change** - `classifyRole(player, ctx)` replaces `classifyRole(player)`. `ctx` is a `buildScoreContext` result; only `ctx.understatPlayersByName` is read. Passing `ctx` as `undefined` is legal and forces the ICT path, so existing behaviour is recoverable.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -455,7 +455,7 @@ test('classifyRole returns null when neither chain nor ICT has signal', () => {
 npm test
 ```
 
-Expected: FAIL — the first test returns `'FB'` (ICT path) because `classifyRole` ignores `ctx`.
+Expected: FAIL - the first test returns `'FB'` (ICT path) because `classifyRole` ignores `ctx`.
 
 - [ ] **Step 3: Rewrite `classifyRole`**
 
@@ -466,11 +466,11 @@ In `js/engine/counter.js`, add `ROLE_SIGNATURE_MIN_MINUTES` and `ROLE_SIGNATURE_
  * Classify a player into one of GKP, CB, FB, DM, CM, WM, SS, ST.
  *
  * Tiered by evidence quality:
- *   1. Understat chain signature (buildupShare × createBias) — preferred.
- *   2. FPL ICT component shares — fallback when the player has no Understat
+ *   1. Understat chain signature (buildupShare × createBias) - preferred.
+ *   2. FPL ICT component shares - fallback when the player has no Understat
  *      match, too few minutes, or too little chain involvement.
  *
- * MODEL: chain data is preferred because ICT `threat` is a QUALITY measure —
+ * MODEL: chain data is preferred because ICT `threat` is a QUALITY measure -
  * a poor winger has little of it and reads as a central midfielder. The chain
  * signature is a ratio of the player's own involvement and is therefore
  * quality-neutral (see buildRoleSignature).
@@ -478,7 +478,7 @@ In `js/engine/counter.js`, add `ROLE_SIGNATURE_MIN_MINUTES` and `ROLE_SIGNATURE_
  * Pure: depends only on its arguments. Returns null when neither tier has
  * enough signal, so callers can fall back to element_type grouping.
  *
- * @param {Player} player  internal Player — see ARCHITECTURE.md §8
+ * @param {Player} player  internal Player - see ARCHITECTURE.md §8
  * @param {object} [ctx]   buildScoreContext result; only
  *                         ctx.understatPlayersByName is read. Omit to force
  *                         the ICT path.
@@ -487,11 +487,11 @@ In `js/engine/counter.js`, add `ROLE_SIGNATURE_MIN_MINUTES` and `ROLE_SIGNATURE_
 export function classifyRole(player, ctx) {
   if (!player) return null;
 
-  // GKP: trivial — element_type is unambiguous and neither ICT nor chain is
+  // GKP: trivial - element_type is unambiguous and neither ICT nor chain is
   // meaningful for a keeper.
   if (player.position === 'GKP') return 'GKP';
 
-  // Tier 1 — Understat chain signature.
+  // Tier 1 - Understat chain signature.
   const lookup = ctx?.understatPlayersByName;
   const key    = (player.fullName || '').toLowerCase().trim();
   const up     = (lookup && key) ? lookup[key] : null;
@@ -499,14 +499,14 @@ export function classifyRole(player, ctx) {
     const minutes = parseFloat(up.time);
     const chain   = parseFloat(up.xGChain);
     // MODEL: below either floor the ratios are still dominated by sampling
-    // noise, and ICT — which accumulates from minute one — is the better read.
+    // noise, and ICT - which accumulates from minute one - is the better read.
     if (minutes >= ROLE_SIGNATURE_MIN_MINUTES && chain >= ROLE_SIGNATURE_MIN_CHAIN) {
       const role = classifyRoleFromSignature(player.position, buildRoleSignature(up));
       if (role) return role;
     }
   }
 
-  // Tier 2 — ICT shares (Phase 3C). Everything below is the existing body.
+  // Tier 2 - ICT shares (Phase 3C). Everything below is the existing body.
   const ict = player.ict;
   if (!ict) return null;
 ```
@@ -516,7 +516,7 @@ export function classifyRole(player, ctx) {
 Replace the JSDoc block and the signature line, keep the `!player` and GKP guards where
 they are, insert the new "Tier 1" block between the GKP guard and `const ict = player.ict;`,
 and leave every line from `const ict = player.ict;` to the function's closing brace exactly
-as it is. Do not retype the ICT branch — a transcription error there silently changes the
+as it is. Do not retype the ICT branch - a transcription error there silently changes the
 fallback classification for every unmatched player.
 
 - [ ] **Step 4: Update the three call sites to pass `ctx`**
@@ -533,7 +533,7 @@ fallback classification for every unmatched player.
     const r = classifyRole(e.player, ctx);
 ```
 
-`classifyTeamRoles` does not currently receive `ctx` — add it as a second parameter now and thread it through; Task 4 rewrites the body:
+`classifyTeamRoles` does not currently receive `ctx` - add it as a second parameter now and thread it through; Task 4 rewrites the body:
 
 ```js
 function classifyTeamRoles(players, ctx) {
@@ -594,7 +594,7 @@ stop mixing units. Scores move on most fixtures."
 
 **Interfaces:**
 - Consumes: `classifyRole(player, ctx)` from Task 3.
-- Produces: **breaking return-type change** — `classifyTeamRoles(players, ctx)` returns `{rolesByPlayerId: Object<number,string>, estimated: boolean} | null` instead of `Object|null`. `null` still means "no outfielder has minutes, fall back to element_type". `estimated: true` means the roles are usable but chain coverage was thin.
+- Produces: **breaking return-type change** - `classifyTeamRoles(players, ctx)` returns `{rolesByPlayerId: Object<number,string>, estimated: boolean} | null` instead of `Object|null`. `null` still means "no outfielder has minutes, fall back to element_type". `estimated: true` means the roles are usable but chain coverage was thin.
 - Produces: `ROLE_CHAIN_COVERAGE_MIN` from `js/config.js`.
 
 - [ ] **Step 1: Add the config constant**
@@ -606,7 +606,7 @@ In `js/config.js`, directly after `ROLE_SIGNATURE_MIN_CHAIN`:
 // before the role grouping is treated as fully data-backed.
 // MODEL: replaces Phase 3C's fail-closed 90% player-count bar. That bar existed
 // because mixing refined and unrefined players understates whichever side has
-// worse coverage — but that reasoning applies to mixing TAXONOMIES, and chain
+// worse coverage - but that reasoning applies to mixing TAXONOMIES, and chain
 // and ICT emit the same eight labels from different evidence. Minutes-weighted
 // rather than headcount so a fringe squad player can't drag a team below the
 // bar. Below this share the roles are still used, just flagged estimated.
@@ -653,7 +653,7 @@ test('classifyTeamRoles still classifies, but flags estimated, on thin chain cov
   const out = classifyTeamRoles(players, ctx);
   // 500 of 3000 outfield minutes chain-covered = 0.167, below 0.75.
   assert.equal(out.estimated, true);
-  // Both still get a role — the unmatched one via ICT.
+  // Both still get a role - the unmatched one via ICT.
   assert.equal(out.rolesByPlayerId[1], 'CB');
   assert.equal(out.rolesByPlayerId[2], 'WM');
 });
@@ -682,7 +682,7 @@ test('classifyTeamRoles no longer fails closed on one unclassifiable player', ()
 npm test
 ```
 
-Expected: FAIL — `classifyTeamRoles` returns a bare map, so `out.estimated` is `undefined` and `out.rolesByPlayerId` does not exist.
+Expected: FAIL - `classifyTeamRoles` returns a bare map, so `out.estimated` is `undefined` and `out.rolesByPlayerId` does not exist.
 
 - [ ] **Step 4: Rewrite `classifyTeamRoles`**
 
@@ -696,14 +696,14 @@ Replace the whole function body (`js/engine/counter.js:185-208`), keeping its po
  * MODEL: per-player tiering, NOT fail-closed. Phase 3C dropped the whole team
  * to element_type grouping when under 90% of outfielders classified, because
  * mixing refined and unrefined players understates whichever side has worse
- * coverage. That argument applies to mixing TAXONOMIES — chain and ICT emit
+ * coverage. That argument applies to mixing TAXONOMIES - chain and ICT emit
  * the same eight labels from different evidence, so a per-player fallback is
  * sound and strictly more informative than collapsing the squad.
  *
  * @param {Player[]} players
  * @param {object}   ctx  buildScoreContext result (read for chain signatures)
  * @returns {{rolesByPlayerId: Object<number,string>, estimated: boolean}|null}
- *          null when no outfielder has any minutes — caller falls back to
+ *          null when no outfielder has any minutes - caller falls back to
  *          element_type grouping. estimated:true when chain data covered less
  *          than ROLE_CHAIN_COVERAGE_MIN of outfield minutes.
  */
@@ -759,7 +759,7 @@ and extend the existing `anyEstimated` initialiser (currently `let anyEstimated 
 
 ```js
   // MODEL: an element_type fallback for either side flags the whole metric as
-  // estimated, and so does thin chain coverage — a role grouping built mostly
+  // estimated, and so does thin chain coverage - a role grouping built mostly
   // from ICT is materially less trustworthy than one built from chain data.
   let anyEstimated = !useRoles
     || (roleResultA?.estimated ?? false)
@@ -809,7 +809,7 @@ resolve at role level on most fixtures."
 
 **Interfaces:**
 - Consumes: `buildRoleSignature` from Task 1.
-- Produces: `minutesWeightedMeanChain(players, ctx)` → `number | null` — minutes-weighted mean of `xGChain/90` across the unit, `null` when no player has both minutes and a chain record.
+- Produces: `minutesWeightedMeanChain(players, ctx)` → `number | null` - minutes-weighted mean of `xGChain/90` across the unit, `null` when no player has both minutes and a chain record.
 - Produces: `CHAIN_UNIT_ANCHORS` from `js/config.js`.
 
 - [ ] **Step 1: Add the config constant**
@@ -820,7 +820,7 @@ In `js/config.js`, after `COUNTER_FALLBACK_EDGE`:
 // Anchors mapping a unit's minutes-weighted mean xGChain per 90 onto 0–100,
 // so the chain read of an attacking unit is on the same scale as the
 // calcPlayerForm read it replaces.
-// MODEL: 2025 season per-90 chain distribution — defenders p10 0.165 / p90
+// MODEL: 2025 season per-90 chain distribution - defenders p10 0.165 / p90
 // 0.503, midfielders p10 0.272 / p90 0.751, forwards p10 0.358 / p90 0.783.
 // A single pair of anchors spanning 0.15–0.80 covers every attacking unit
 // without needing per-role scales; units below 0.15 are fringe-squad noise.
@@ -877,7 +877,7 @@ test('minutesWeightedMeanChain returns null for an empty unit', () => {
 npm test
 ```
 
-Expected: FAIL — no export named `minutesWeightedMeanChain`.
+Expected: FAIL - no export named `minutesWeightedMeanChain`.
 
 - [ ] **Step 4: Implement it**
 
@@ -891,7 +891,7 @@ In `js/engine/counter.js`, insert directly after `minutesWeightedMeanForm` (afte
  * shot, so the winger whose cross another player converts is rewarded. FPL
  * points and ICT `threat` both under-reward exactly that contribution, which
  * is why this replaces calcPlayerForm on the ATTACKING side of a pairing.
- * The defending side keeps calcPlayerForm — Understat publishes no per-player
+ * The defending side keeps calcPlayerForm - Understat publishes no per-player
  * defensive data at any endpoint, so there is nothing to replace it with.
  *
  * Minutes-weighted so likely starters drive the read; players with no minutes
@@ -955,8 +955,8 @@ Expected: PASS, 33 tests.
 In §7.2, after the `attackUnitForm`/`defenceUnitForm` formula block, add:
 
 ```markdown
-`attackUnitForm` prefers the **chain** read — the minutes-weighted mean of
-`xGChain/90` across the unit, normalised through `CHAIN_UNIT_ANCHORS` — and
+`attackUnitForm` prefers the **chain** read - the minutes-weighted mean of
+`xGChain/90` across the unit, normalised through `CHAIN_UNIT_ANCHORS` - and
 falls back to the minutes-weighted `calcPlayerForm` mean when Understat has no
 match. Each pairing reports which was used as `attackSource: 'chain'|'form'`.
 `defenceUnitForm` is unchanged: Understat publishes no per-player defensive
@@ -986,7 +986,7 @@ low-possession teams lose slightly."
 
 **Interfaces:**
 - Produces: `buildUnderstatSlugsByTeamId(leagueXg, teamsById)` → `Object<number,string>` mapping FPL team id → Understat URL slug (e.g. `42 → 'Arsenal'`, `43 → 'Manchester_City'`). Empty object when `leagueXg` is absent.
-- Produces: `store.getAllTeamXg()` → `Object<string,object>` — a shallow copy of every cached team payload keyed by slug.
+- Produces: `store.getAllTeamXg()` → `Object<string,object>` - a shallow copy of every cached team payload keyed by slug.
 
 - [ ] **Step 1: Add the store getter**
 
@@ -1056,7 +1056,7 @@ test('buildUnderstatSlugsByTeamId omits teams it cannot match', () => {
 npm test
 ```
 
-Expected: FAIL — `Cannot find module '../../js/engine/channel.js'`.
+Expected: FAIL - `Cannot find module '../../js/engine/channel.js'`.
 
 - [ ] **Step 4: Create `js/engine/channel.js`**
 
@@ -1079,7 +1079,7 @@ import { canonicalClubKey } from './normalise.js';
  * is already loaded rather than a hardcoded table.
  *
  * MODEL: matched by NAME via canonicalClubKey, never by Understat's numeric
- * team id — FPL reassigns ids every season as clubs are promoted and
+ * team id - FPL reassigns ids every season as clubs are promoted and
  * relegated, which is exactly what silently broke the previous id-keyed
  * UNDERSTAT_TEAM_SLUGS table (see engine/style.js buildXgProfilesByTeamId).
  * The slug is Understat's own convention: the team title with spaces replaced
@@ -1126,7 +1126,7 @@ Expected: PASS, 37 tests.
 git add js/engine/channel.js js/store.js tests/engine/channel.test.js
 git commit -m "feat(engine/channel): resolve Understat team slugs from league data
 
-New pure engine module plus a store.getAllTeamXg() getter. No scoring change —
+New pure engine module plus a store.getAllTeamXg() getter. No scoring change -
 nothing fetches or consumes team statistics yet."
 ```
 
@@ -1134,9 +1134,9 @@ nothing fetches or consumes team statistics yet."
 
 ### Task 7: Prefetch team statistics for every team at startup
 
-**Revised 2026-08-21** — replaces a per-fixture lazy fetch (see design spec §8's revision
+**Revised 2026-08-21** - replaces a per-fixture lazy fetch (see design spec §8's revision
 note). The original version cached a team's `statistics` only once its fixture was opened
-in Matchup, then let every other module pick it up — which meant a team's score could
+in Matchup, then let every other module pick it up - which meant a team's score could
 visibly change mid-session purely from click order, not from any real data update. Eagerly
 fetching all 20 teams at boot costs the same order of magnitude in proxy calls as the
 existing `leagueXg` fetch and removes the inconsistency outright instead of flagging it.
@@ -1161,7 +1161,7 @@ import { buildUnderstatSlugsByTeamId } from './engine/channel.js';
 
 - [ ] **Step 2: Pass `teamXgBySlug` from every context builder**
 
-There are **five** `buildScoreContext` call sites, and all five need the new option — this is what makes the tier availability-driven rather than tab-scoped (spec §8). Each is a `buildScoreContext(season, { … })` call with an options object literal; add this one property to each, next to the existing `leagueXgPrev3` line:
+There are **five** `buildScoreContext` call sites, and all five need the new option - this is what makes the tier availability-driven rather than tab-scoped (spec §8). Each is a `buildScoreContext(season, { … })` call with an options object literal; add this one property to each, next to the existing `leagueXgPrev3` line:
 
 ```js
     teamXgBySlug: store.getAllTeamXg(),
@@ -1177,11 +1177,11 @@ The five sites:
 | `js/modules/ranker.js` | 111 | `buildCtx()` |
 | `js/main.js` | 266 | `window.__engine.context()` |
 
-`js/main.js` uses a deeper indent (6 spaces, not 4) inside `window.__engine.context()` — match the surrounding lines.
+`js/main.js` uses a deeper indent (6 spaces, not 4) inside `window.__engine.context()` - match the surrounding lines.
 
 Missing any of these does not break the build; it silently pins that module to the role tier, which is exactly the divergence spec §8 rules out. `js/main.js:266` in particular feeds every browser verification step in Tasks 9, 10 and 13, so those checks will report the wrong tier if it is skipped.
 
-`js/calibration.js:34` also calls `buildScoreContext` and is deliberately **excluded** — backtests must score historical gameweeks on a tier that does not depend on which fixtures a user happened to open.
+`js/calibration.js:34` also calls `buildScoreContext` and is deliberately **excluded** - backtests must score historical gameweeks on a tier that does not depend on which fixtures a user happened to open.
 
 - [ ] **Step 3: Add the fetch orchestration**
 
@@ -1203,7 +1203,7 @@ and add this function near the other boot-sequence helpers in `js/main.js`:
  *
  * MODEL: replaces a per-fixture lazy fetch. That version cached a team's
  * statistics only once its fixture was opened in Matchup, then let every
- * other module pick up the same cached entry — which meant the SAME team
+ * other module pick up the same cached entry - which meant the SAME team
  * could score differently for two users, or in two tabs of the same
  * session, purely from click order rather than any real data change. 20
  * proxy calls at boot is the same order of magnitude as the existing
@@ -1213,7 +1213,7 @@ and add this function near the other boot-sequence helpers in `js/main.js`:
  *
  * Fire-and-forget: the app renders immediately on whatever tier the data
  * supports and upgrades in place as each team's payload lands. Failures are
- * swallowed to a console warning, never store.setError() — the channel tier
+ * swallowed to a console warning, never store.setError() - the channel tier
  * is an ENRICHMENT, so a dead Understat upstream must not surface as a page
  * error. Same policy as the league-xG fetch (see js/api.js, ROADMAP §3A).
  */
@@ -1240,7 +1240,7 @@ function prefetchAllTeamXg() {
 ```
 
 `renderActiveTab()` is the existing dispatcher `js/main.js` already calls on tab switch and
-on other post-boot data arrivals (e.g. once `leagueXg` itself resolves) — reuse it rather
+on other post-boot data arrivals (e.g. once `leagueXg` itself resolves) - reuse it rather
 than adding a second re-render path.
 
 - [ ] **Step 4: Call it once during boot**
@@ -1256,7 +1256,7 @@ first render (slug resolution needs `leagueXg.teamsData`), insert:
 
 - [ ] **Step 5: Verify in the browser**
 
-Serve the app and load it — no fixture needs to be opened. In the console:
+Serve the app and load it - no fixture needs to be opened. In the console:
 
 ```js
 Object.keys(window.__store.getAllTeamXg())
@@ -1280,7 +1280,7 @@ already on the channel tier on first load rather than changing after a fixture i
 npm test
 ```
 
-Expected: PASS, 37 tests (no new tests — this task is DOM/network wiring, which CONVENTIONS §3.3 keeps out of the engine and therefore out of the unit suite).
+Expected: PASS, 37 tests (no new tests - this task is DOM/network wiring, which CONVENTIONS §3.3 keeps out of the engine and therefore out of the unit suite).
 
 - [ ] **Step 7: Update ARCHITECTURE.md**
 
@@ -1289,11 +1289,11 @@ In the Understat data-flow section, add:
 ```markdown
 `team/{slug}/{season}` is fetched eagerly for every team at startup, once
 `leagueXg` and fixtures have loaded, and cached in `store.teamXg` for the
-session. Consumed as `ctx.teamXgBySlug`. Fetched up front — not lazily per
-fixture — so every module scores every team on the same counter-matchup tier
+session. Consumed as `ctx.teamXgBySlug`. Fetched up front - not lazily per
+fixture - so every module scores every team on the same counter-matchup tier
 from the first render; no score can differ between two sessions, or two tabs
 in the same session, based on which fixture happened to be opened first.
-Failures are swallowed to a console warning — the channel counter tier
+Failures are swallowed to a console warning - the channel counter tier
 degrades to the role tier per team, so a dead Understat upstream must never
 surface as a page error.
 ```
@@ -1306,7 +1306,7 @@ git commit -m "feat(main): prefetch Understat team statistics for every team at 
 
 20 eager proxy calls at startup, cached per session, swallowed on failure.
 Replaces a per-fixture lazy fetch that let a team's tier depend on click
-order. No scoring change yet — nothing reads ctx.teamXgBySlug until the
+order. No scoring change yet - nothing reads ctx.teamXgBySlug until the
 channel engine lands."
 ```
 
@@ -1329,7 +1329,7 @@ In `js/config.js`, after `COUNTER_DEFENCE_WEIGHT`:
 
 ```js
 // ─── Channel counter-matchup (Understat team statistics) ────────────────────
-// Three INDEPENDENT partitions of the same shots — not one partition of
+// Three INDEPENDENT partitions of the same shots - not one partition of
 // threat. An open-play axis is deliberately absent: openPlayShare is
 // identically 1 − setPieceShare, so it carries no extra information.
 //
@@ -1340,7 +1340,7 @@ In `js/config.js`, after `COUNTER_DEFENCE_WEIGHT`:
 
 // Pooled standard deviation of (attacking share − conceding share) per axis,
 // used to z-score each edge so all three contribute on a common scale.
-// MODEL: sqrt(sd_for² + sd_against²) from the 2025 league distribution —
+// MODEL: sqrt(sd_for² + sd_against²) from the 2025 league distribution -
 // setPiece 0.0555/0.0410, box 0.0170/0.0091, fast 0.0229/0.0263.
 export const CHANNEL_AXIS_POOLED_SD = {
   setPieceThreat: 0.0690,
@@ -1366,7 +1366,7 @@ export const CHANNEL_SENSITIVITY = 14;
 
 // Minimum shots in a team's situation partition before its channel profile is
 // trusted. MODEL: a PL side takes ~13 shots a game, so 120 is roughly nine
-// matches — the point at which the set-piece share (the thinnest bucket, ~25%
+// matches - the point at which the set-piece share (the thinnest bucket, ~25%
 // of shots) stops being dominated by sampling noise.
 export const MIN_CHANNEL_SHOTS = 120;
 ```
@@ -1460,7 +1460,7 @@ test('buildChannelProfile handles a partial statistics block without throwing', 
 npm test
 ```
 
-Expected: FAIL — no export named `buildChannelProfile`.
+Expected: FAIL - no export named `buildChannelProfile`.
 
 - [ ] **Step 4: Implement `buildChannelProfile`**
 
@@ -1475,7 +1475,7 @@ import { MIN_CHANNEL_SHOTS } from '../config.js';
 // absent. MODEL: a neutral-looking 0.5 is indistinguishable from a genuine
 // mid-table reading, and the scoring below would multiply it into a
 // confident-looking edge. hasChannelAxes is the single flag every consumer
-// checks — same policy as NO_STYLE_AXES in engine/style.js.
+// checks - same policy as NO_STYLE_AXES in engine/style.js.
 const NO_CHANNEL_AXES = Object.freeze({
   hasChannelAxes: false,
   setPieceThreat: Object.freeze({ for: null, against: null }),
@@ -1508,14 +1508,14 @@ function share(part, rest) {
  * Build the three-axis channel profile for one team from its Understat
  * `statistics` block.
  *
- * MODEL: penalties are excluded from the set-piece denominator — a penalty is
+ * MODEL: penalties are excluded from the set-piece denominator - a penalty is
  * a restart, not evidence about how a team plays in open field. Same reasoning
  * as the npxG choice in engine/style.js. Own goals are excluded from the shot
  * zone denominator for the same reason.
  *
  * MODEL: the shares are not perfectly quality-neutral. Across the 2025 league,
  * corr(boxShare_for, npxG_for) = +0.408 and corr(setPieceShare_for, npxG_for)
- * = −0.370 — better teams take more of their shots inside the box and rely
+ * = −0.370 - better teams take more of their shots inside the box and rely
  * less on dead balls. At |r| ≤ 0.46 that is ~20% shared variance, far better
  * than raw totals but not zero, and CHANNEL_WEIGHTS leans away from the most
  * confounded axis accordingly.
@@ -1582,7 +1582,7 @@ git add js/config.js js/engine/channel.js tests/engine/channel.test.js
 git commit -m "feat(engine/channel): derive three-axis profiles from team statistics
 
 Adds buildChannelProfile() and its league-calibrated constants. No scoring
-change — nothing consumes the profiles until calcChannelCounter lands."
+change - nothing consumes the profiles until calcChannelCounter lands."
 ```
 
 ---
@@ -1597,7 +1597,7 @@ change — nothing consumes the profiles until calcChannelCounter lands."
 **Interfaces:**
 - Consumes: `buildChannelProfile` (Task 8), `buildUnderstatSlugsByTeamId` (Task 6).
 - Produces: `buildChannelProfilesByTeamId(teamXgBySlug, slugsByTeamId)` → `Object<number,object>` keyed by FPL team id, containing only teams whose payload yielded `hasChannelAxes: true`.
-- Produces: `ctx.channelProfilesByTeamId` — `{}` when no team payloads are cached.
+- Produces: `ctx.channelProfilesByTeamId` - `{}` when no team payloads are cached.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1639,7 +1639,7 @@ test('buildChannelProfilesByTeamId returns {} for empty inputs', () => {
 npm test
 ```
 
-Expected: FAIL — no export named `buildChannelProfilesByTeamId`.
+Expected: FAIL - no export named `buildChannelProfilesByTeamId`.
 
 - [ ] **Step 3: Implement it**
 
@@ -1688,7 +1688,7 @@ Directly after the `understatPlayersByName` precompute (currently ends around li
   // Channel tier: the per-team Understat `statistics` block, fetched eagerly
   // for every team at startup (js/main.js prefetchAllTeamXg). {} only until
   // that boot-time fetch resolves, in which case calcCounterMatchup degrades
-  // to the role tier — see the design spec §8 for why the tier is chosen by
+  // to the role tier - see the design spec §8 for why the tier is chosen by
   // data availability rather than by which module is asking.
   const teamXgBySlug = opts.teamXgBySlug ?? null;
   const channelProfilesByTeamId = buildChannelProfilesByTeamId(
@@ -1713,14 +1713,14 @@ Expected: PASS, 48 tests.
 
 - [ ] **Step 6: Verify in the browser**
 
-Load the app and wait for the boot-time prefetch (Task 7) to resolve — no fixture needs to
+Load the app and wait for the boot-time prefetch (Task 7) to resolve - no fixture needs to
 be opened. Then in the console:
 
 ```js
 Object.keys(window.__engine.context().channelProfilesByTeamId)
 ```
 
-Expected: all ~20 FPL team ids, populating as each team's prefetch resolves — not gated on
+Expected: all ~20 FPL team ids, populating as each team's prefetch resolves - not gated on
 any fixture being selected.
 
 - [ ] **Step 7: Commit**
@@ -1730,7 +1730,7 @@ git add js/engine/channel.js js/engine/composite.js tests/engine/channel.test.js
 git commit -m "feat(engine/composite): precompute channel profiles per context
 
 ctx.channelProfilesByTeamId now carries a profile for every team whose
-statistics payload is cached. No scoring change — the counter engine does not
+statistics payload is cached. No scoring change - the counter engine does not
 read it yet."
 ```
 
@@ -1746,7 +1746,7 @@ read it yet."
 
 **Interfaces:**
 - Consumes: `ctx.channelProfilesByTeamId` (Task 9), `CHANNEL_WEIGHTS`, `CHANNEL_AXIS_POOLED_SD`, `CHANNEL_SENSITIVITY` (Task 8).
-- Produces: `calcChannelCounter(teamA, teamB, ctx)` → `{value: number, estimated: boolean, pairings: Object, mode: 'channel'} | null`. Returns `null` — not a neutral score — when either team has no channel profile, so `calcCounterMatchup` can fall through to the role tier. Pairing keys are `setPieceThreat`, `wideTransition`, `boxThreat`.
+- Produces: `calcChannelCounter(teamA, teamB, ctx)` → `{value: number, estimated: boolean, pairings: Object, mode: 'channel'} | null`. Returns `null` - not a neutral score - when either team has no channel profile, so `calcCounterMatchup` can fall through to the role tier. Pairing keys are `setPieceThreat`, `wideTransition`, `boxThreat`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1810,7 +1810,7 @@ test('calcChannelCounter reports estimated false when both profiles are real', (
 });
 ```
 
-Append to `tests/engine/counter.test.js` — the invariant that must survive:
+Append to `tests/engine/counter.test.js` - the invariant that must survive:
 
 ```js
 import { calcCounterMatchupMirrored } from '../../js/engine/counter.js';
@@ -1846,7 +1846,7 @@ test('mirroring identity holds for channel-mode pairings', () => {
 npm test
 ```
 
-Expected: FAIL — no export named `calcChannelCounter`, and the mirroring test fails because `MIRRORED_PAIRING_KEYS` has no channel entries.
+Expected: FAIL - no export named `calcChannelCounter`, and the mirroring test fails because `MIRRORED_PAIRING_KEYS` has no channel entries.
 
 - [ ] **Step 3: Implement `calcChannelCounter`**
 
@@ -1864,13 +1864,13 @@ import { clamp } from '../util.js';
  * Channel counter-matchup: team A's threat profile against team B's
  * conceding profile, axis by axis.
  *
- * Asymmetric by design, exactly like calcCounterMatchup — A's attack against
+ * Asymmetric by design, exactly like calcCounterMatchup - A's attack against
  * B's defence is a different number from B's attack against A's defence.
  *
  * MODEL: the league baseline cancels out of the edge. Every team's xG-for in
  * an axis is another team's xG-against, so league-mean-for equals
  * league-mean-against to within 0.004 on all three axes (2025, n=20).
- * Subtracting the two shares therefore removes the baseline automatically —
+ * Subtracting the two shares therefore removes the baseline automatically -
  * which is what makes a two-teams-at-a-time fetch viable, since no league-wide
  * sweep is needed to centre the score.
  *
@@ -1885,7 +1885,7 @@ import { clamp } from '../util.js';
  * @returns {{value: number, estimated: boolean, pairings: Object,
  *            mode: 'channel'} | null}
  *          0–100, higher = better for teamA. null when either team has no
- *          usable profile — the caller falls through to the role tier.
+ *          usable profile - the caller falls through to the role tier.
  */
 export function calcChannelCounter(teamA, teamB, ctx) {
   const profiles = ctx?.channelProfilesByTeamId;
@@ -1900,7 +1900,7 @@ export function calcChannelCounter(teamA, teamB, ctx) {
   for (const key of Object.keys(CHANNEL_WEIGHTS)) {
     const attackShare  = a[key]?.for;
     const concedeShare = b[key]?.against;
-    // Guarded even though hasChannelAxes implies both are numbers — a future
+    // Guarded even though hasChannelAxes implies both are numbers - a future
     // axis added to CHANNEL_WEIGHTS but not to buildChannelProfile would
     // otherwise silently score NaN.
     if (typeof attackShare !== 'number' || typeof concedeShare !== 'number') continue;
@@ -1938,7 +1938,7 @@ const MIRRORED_PAIRING_KEYS = {
   wideMidVsFb: 'fbVsWideMid',
   camVsCbMid:  'cbMidVsCam',
   // Channel tier. The mirror is still arithmetic (100 − attacking value), NOT
-  // a second read from the defending team's own statistics.against — deriving
+  // a second read from the defending team's own statistics.against - deriving
   // it independently would break the sum-to-100 identity §7.2 depends on.
   setPieceThreat: 'setPieceDefence',
   wideTransition: 'transitionDefence',
@@ -1957,7 +1957,7 @@ import { calcChannelCounter } from './channel.js';
 and insert at the very top of `calcCounterMatchup`'s body, before `const playersA = …`:
 
 ```js
-  // Tier 1 — channel mode, when both teams' Understat statistics are cached.
+  // Tier 1 - channel mode, when both teams' Understat statistics are cached.
   // MODEL: the tier is chosen by DATA AVAILABILITY, not by which module is
   // asking, so a fixture's score can only improve as payloads land and can
   // never disagree with itself at a single point in time. See the design spec
@@ -2003,7 +2003,7 @@ value        = Σ axisScore(a) * CHANNEL_WEIGHTS[a] / Σ CHANNEL_WEIGHTS[a]
 
 Axes: `setPieceThreat` (dead-ball share of non-penalty xG, weight 0.50),
 `wideTransition` (Fast share of attack-speed xG, 0.30), `boxThreat` (in-box
-share of shot-zone xG, 0.20). No open-play axis exists — `openPlayShare` is
+share of shot-zone xG, 0.20). No open-play axis exists - `openPlayShare` is
 identically `1 − setPieceShare`. The league baseline cancels out of every edge
 because each team's xG-for in an axis is another team's xG-against, so no
 league-wide sweep is needed to centre the scores. The mirrored Defending
@@ -2020,7 +2020,7 @@ git commit -m "feat(engine/counter): add channel tier above role pairings
 
 calcCounterMatchup now prefers a three-axis threat-vs-vulnerability read when
 both teams' Understat statistics are cached. Expected effect: set-piece-reliant
-sides gain against poor set-piece defences and lose against good ones — a
+sides gain against poor set-piece defences and lose against good ones - a
 dimension the composite previously had no signal on at all."
 ```
 
@@ -2054,7 +2054,7 @@ In `js/config.js`, after `MIN_CHANNEL_SHOTS`:
 export const CHANNEL_ROLE_AXES = {
   boxThreat:      ['ST', 'SS'],
   wideTransition: ['WM', 'FB'],
-  // MODEL: set pieces are attacked by the aerial targets, not the whole XI —
+  // MODEL: set pieces are attacked by the aerial targets, not the whole XI -
   // weighting by all eleven would make the factor a constant.
   setPieceThreat: ['CB', 'ST', 'SS'],
 };
@@ -2119,7 +2119,7 @@ test('channelPersonnelFactor is a neutral 1.0 when the unit is empty', () => {
 npm test
 ```
 
-Expected: FAIL — no export named `channelPersonnelFactor`.
+Expected: FAIL - no export named `channelPersonnelFactor`.
 
 - [ ] **Step 4: Implement it**
 
@@ -2134,7 +2134,7 @@ import { buildRoleSignature } from './counter.js';
  * How much of an axis's usual chain contribution is actually available this
  * week, as a multiplier on that axis's attacking share.
  *
- * MODEL: self-normalising — availability-weighted chain over total chain for
+ * MODEL: self-normalising - availability-weighted chain over total chain for
  * the SAME unit. No league constant is needed, and a team whose whole unit is
  * fit scores exactly 1.0 regardless of how good that unit is, so the factor
  * corrects for availability without smuggling in a second quality term.
@@ -2164,7 +2164,7 @@ export function channelPersonnelFactor(players, roles, axisKey, ctx) {
     const seasonChain = sig.chain90 * (minutes / 90);
     totalChain += seasonChain;
 
-    // chanceOfPlayingNext is null for most players — FPL populates it only
+    // chanceOfPlayingNext is null for most players - FPL populates it only
     // when there is news, so null means "no doubt reported" (FEATURE_ENGINE
     // §7.3), never "no data".
     const availability = (p.chanceOfPlayingNext ?? 100) / 100;
@@ -2193,7 +2193,7 @@ export function channelPersonnelFactor(players, roles, axisKey, ctx) {
 and add, immediately after the `if (!a?.hasChannelAxes || !b?.hasChannelAxes) return null;` guard:
 
 ```js
-  // Roles for A only — the factor scales A's attacking share, and B's
+  // Roles for A only - the factor scales A's attacking share, and B's
   // conceding share needs no personnel read.
   const rolesA = {};
   for (const p of ctx.playersByTeamId?.[teamA.id] || []) {
@@ -2208,7 +2208,7 @@ importing `classifyRole` alongside `buildRoleSignature`. Record the factor on th
     pairings[key] = { value, weight, estimated: false, attackShare, concedeShare, personnel };
 ```
 
-**Circular import note:** `channel.js` now imports from `counter.js`, which already imports `calcChannelCounter` from `channel.js`. ES modules handle this cycle correctly because every binding is a hoisted function declaration, resolved at call time rather than module-evaluation time. If any of these are ever converted to `const fn = () => …`, the cycle breaks — keep them as `function` declarations.
+**Circular import note:** `channel.js` now imports from `counter.js`, which already imports `calcChannelCounter` from `channel.js`. ES modules handle this cycle correctly because every binding is a hoisted function declaration, resolved at call time rather than module-evaluation time. If any of these are ever converted to `const fn = () => …`, the cycle breaks - keep them as `function` declarations.
 
 - [ ] **Step 6: Run the tests to verify they pass**
 
@@ -2216,14 +2216,14 @@ importing `classifyRole` alongside `buildRoleSignature`. Record the factor on th
 npm test
 ```
 
-Expected: PASS, 60 tests. The Task 10 test `calcChannelCounter is asymmetric` must still pass — if it now fails, the factor is being applied to both sides.
+Expected: PASS, 60 tests. The Task 10 test `calcChannelCounter is asymmetric` must still pass - if it now fails, the factor is being applied to both sides.
 
 - [ ] **Step 7: Update FEATURE_ENGINE.md**
 
 Append to the channel-tier subsection added in Task 10:
 
 ```markdown
-`attackShare` is scaled by `channelPersonnelFactor` — the availability-weighted
+`attackShare` is scaled by `channelPersonnelFactor` - the availability-weighted
 share of the axis unit's season xGChain that is fit this week, clamped to
 0.80–1.20. Self-normalising against the same unit, so a fully fit team scores
 exactly 1.0 regardless of quality. This is what lets a season aggregate react
@@ -2294,7 +2294,7 @@ Channel axes are not built from named player pairings, so the info disclosure mu
   if (!(pairingKey in PAIRING_ROLE_ALIAS)) return [];
 ```
 
-Confirm `PAIRING_ROLE_ALIAS` is not extended with channel keys — the three channel keys must stay absent from it for this guard to work.
+Confirm `PAIRING_ROLE_ALIAS` is not extended with channel keys - the three channel keys must stay absent from it for this guard to work.
 
 - [ ] **Step 4: Run the tests**
 
@@ -2308,7 +2308,7 @@ Expected: PASS, 60 tests.
 
 Open a fixture, wait for both team fetches to land, and confirm on the card:
 
-- The Attacking Counters section shows three rows labelled **Set Pieces**, **Transition Speed**, **Box Occupation** — no raw camelCase keys anywhere.
+- The Attacking Counters section shows three rows labelled **Set Pieces**, **Transition Speed**, **Box Occupation** - no raw camelCase keys anywhere.
 - The Defending Counters section shows **Set-Piece Defence**, **Transition Defence**, **Box Defence**.
 - Each attacking row's score plus its mirrored defending row's score on the *other* card totals 100.
 - Expanding a channel row's info disclosure shows the "no player data available" state, not a stale duel list.
@@ -2336,7 +2336,7 @@ git commit -m "feat(matchup): label channel-tier counter pairings"
 - [ ] **Step 1: Add an automated role-threshold regression test**
 
 **Added 2026-08-21.** §9's original safeguard against threshold drift was a manual
-browser spot-check inside this task's Step 4 checklist — easy to skip, and nothing
+browser spot-check inside this task's Step 4 checklist - easy to skip, and nothing
 fails loudly if it is. Give it an executable form so `npm test` catches drift on every
 run, not only when someone remembers to check by hand.
 
@@ -2349,12 +2349,12 @@ Create `tests/engine/roleThresholds.test.js`:
  * (ROLE_SIGNATURE_THRESHOLDS) against a small set of named, well-known
  * players whose position is unambiguous. This is what makes the §4/§9
  * "known players still land correctly" check run in CI instead of only in
- * a manual browser spot-check — a threshold edit that silently reclassifies
+ * a manual browser spot-check - a threshold edit that silently reclassifies
  * Robertson as a CB, or Xhaka as a CM, fails here.
  *
  * MAINTENANCE: the records below are real Understat per-player season
  * totals (time, xG, xA, npxG, xGChain, xGBuildup), captured from a live
- * `fetchTeamXg`/league pull at the time this test was written — NOT
+ * `fetchTeamXg`/league pull at the time this test was written - NOT
  * fabricated. They go stale as a season progresses and a player's role
  * changes clubs or systems. Refresh this fixture set from a live pull each
  * pre-season, and whenever Task 13 Step 2's manual spot-check disagrees
@@ -2368,7 +2368,7 @@ import { buildRoleSignature, classifyRoleFromSignature } from '../../js/engine/c
 
 // TODO before this task is executed: replace each record below with a real
 // pull of that player's current-season Understat totals (time, xG, xA,
-// npxG, xGChain, xGBuildup) — do not commit placeholder numbers. Keep one
+// npxG, xGChain, xGBuildup) - do not commit placeholder numbers. Keep one
 // player per role this design spec names as a spot-check in §4: a
 // first-choice attacking fullback, a set-piece-taking centre-back, a
 // holding midfielder, a high-volume winger, and an out-and-out striker.
@@ -2389,14 +2389,14 @@ for (const { name, position, role, record } of SPOT_CHECK) {
 
 test('role threshold spot-check fixture is populated', () => {
   // Fails loudly if Step 1 above was skipped and the TODO records were
-  // never filled in — a silent empty array would make every test in this
+  // never filled in - a silent empty array would make every test in this
   // file vacuously pass.
   assert.ok(SPOT_CHECK.length >= 5, 'populate SPOT_CHECK with real current-season records before merging');
 });
 ```
 
 Populate `SPOT_CHECK` with real records for the current season before this task is
-considered done — the same names the design spec already names in §4 (FB: Robertson,
+considered done - the same names the design spec already names in §4 (FB: Robertson,
 Muñoz, Bradley, Dalot; CB: Tarkowski, Ballard, Milenković; DM: Xhaka, Ward-Prowse,
 Baleba; WM: Saka, Gordon, Mbeumo; ST: Haaland) are the natural choices, since their
 expected roles are already documented and spot-checked once.
@@ -2411,7 +2411,7 @@ Expected: PASS, one test per populated `SPOT_CHECK` entry plus the non-empty gua
 
 **Revised 2026-08-21.** Task 7's boot-time prefetch means every team is on the channel tier
 from first load, so "before" can no longer be captured by simply checking the app before
-navigating anywhere — that no longer produces the role tier. Force the role tier for the
+navigating anywhere - that no longer produces the role tier. Force the role tier for the
 "before" table by building a second context with `teamXgBySlug` overridden to `{}`, using
 the same `buildScoreContext` options the app already builds. With the branch checked out
 and the app loaded, in the console:
@@ -2433,7 +2433,7 @@ const after  = compare(ctxChannel);  // channel tier throughout
 ```
 
 If `window.__engine.context()` does not accept an options override, add one before this
-step — a one-line change, since `buildScoreContext` already takes an `opts` object and
+step - a one-line change, since `buildScoreContext` already takes an `opts` object and
 Task 7 wires `teamXgBySlug` through it. Record both tables.
 
 - [ ] **Step 3: Sanity-check the deltas**
@@ -2442,14 +2442,14 @@ Confirm all three hold. Any failure is a bug in Tasks 10–11, not a tuning prob
 
 - No fixture's composite moves by more than 15 points between tiers. A larger swing means `CHANNEL_SENSITIVITY` is overpowered relative to the role tier it replaces.
 - The home and away composites for the same fixture still total ~100 (the §8.7 relative property).
-- `confidence` does not *fall* when moving to the channel tier — channel pairings are never `estimated`, so it should rise or hold.
+- `confidence` does not *fall* when moving to the channel tier - channel pairings are never `estimated`, so it should rise or hold.
 
 - [ ] **Step 4: Add the checks to the testing roadmap**
 
 In `GAFFER_IQ_TESTING_ROADMAP.md`, under the Technical Checklist, add:
 
 ```markdown
-- [ ] Counter-matchup reaches channel mode — load the app, wait for the
+- [ ] Counter-matchup reaches channel mode - load the app, wait for the
       boot-time team-statistics prefetch (Task 7) to resolve, and check
       `window.__engine.counterMatchup(home, away, ctx).mode` returns
       `'channel'` for any fixture, not only one that has been opened
@@ -2457,13 +2457,13 @@ In `GAFFER_IQ_TESTING_ROADMAP.md`, under the Technical Checklist, add:
       Occupation, never raw camelCase keys
 - [ ] Attacking + Defending counter values still total exactly 100 per pairing
 - [ ] `npm test` passes `tests/engine/roleThresholds.test.js` with its
-      `SPOT_CHECK` fixture refreshed for the current season (Step 1 above) —
+      `SPOT_CHECK` fixture refreshed for the current season (Step 1 above) -
       this is the automated form of "known players still land correctly"
       (a first-choice fullback reads FB, a set-piece centre-back reads CB, a
       holding midfielder reads DM). The thresholds were derived on
       900+ minute players from a COMPLETE season and are applied in-season
       at a 450-minute floor, so this is the check that the extrapolation
-      holds — re-run it whenever squads change materially, not only once.
+      holds - re-run it whenever squads change materially, not only once.
 ```
 
 - [ ] **Step 5: Commit**
@@ -2479,7 +2479,7 @@ when someone remembers the manual browser check."
 
 ---
 
-## Deferred — not in this plan
+## Deferred - not in this plan
 
 Per the spec §10, these are explicitly out of scope: `gameState` game-script
 modelling, `formation`-driven likely XIs (replacing the 4-4-2 baseline in

@@ -1,4 +1,4 @@
-# Transfer Planner — multi-lens recommendations, XI awareness, and a weekly verdict
+# Transfer Planner - multi-lens recommendations, XI awareness, and a weekly verdict
 
 **Date:** 2026-08-30
 **Status:** design approved, implementation plan pending
@@ -10,7 +10,7 @@
 
 The Planner ranks transfers by `inScore.value − outScore.value`, computed in
 `computeSingleSwaps()` (`modules/planner.js`). `value` is the 0–100 composite
-from `scorePlayer()` — a *within-position quality index*, not points.
+from `scorePlayer()` - a *within-position quality index*, not points.
 
 Two consequences, both observed in use:
 
@@ -27,7 +27,7 @@ Two consequences, both observed in use:
 Beyond the defect, the page optimises a single axis. It has no way to express
 preparing for a fixture swing three gameweeks out, freeing cash, fixing a squad
 whose value is clumped so tightly that upgrading is impossible, chasing a
-ceiling, or — most importantly — **deciding not to transfer at all**.
+ceiling, or - most importantly - **deciding not to transfer at all**.
 
 ## 2. Goals
 
@@ -62,30 +62,30 @@ ceiling, or — most importantly — **deciding not to transfer at all**.
 
 ### 5.1 New files
 
-- `js/engine/lineup.js` — XI/bench selection and XI expected-points totals.
-- `js/engine/transfers.js` — swap enumeration and the five lane scores.
-- `js/engine/strategy.js` — lane normalisation, the roll lane, triggers, verdict.
-- `js/modules/planner-boards.js` — verdict banner and board/row/why-panel HTML.
+- `js/engine/lineup.js` - XI/bench selection and XI expected-points totals.
+- `js/engine/transfers.js` - swap enumeration and the five lane scores.
+- `js/engine/strategy.js` - lane normalisation, the roll lane, triggers, verdict.
+- `js/modules/planner-boards.js` - verdict banner and board/row/why-panel HTML.
 
 All three engine files are pure per `CONVENTIONS.md` §3.3: explicit inputs, no
 DOM, no network, no store access, no mutation of arguments.
 
 ### 5.2 Changed files
 
-- `js/modules/planner.js` — loses transfer analytics and most rendering; keeps
+- `js/modules/planner.js` - loses transfer analytics and most rendering; keeps
   state, wiring, events, squad rail, import panel, orchestration.
-- `js/modules/dashboard.js` — `pickStartingXI` deleted, imported from
+- `js/modules/dashboard.js` - `pickStartingXI` deleted, imported from
   `engine/lineup.js` instead.
-- `js/squadImport.js` — returns pick slot and armband alongside ids.
-- `js/store.js` — gains `squadPicks` state and `getSavedXi()`.
-- `js/config.js` — all new constants (§10), plus three existing ones promoted
+- `js/squadImport.js` - returns pick slot and armband alongside ids.
+- `js/store.js` - gains `squadPicks` state and `getSavedXi()`.
+- `js/config.js` - all new constants (§10), plus three existing ones promoted
   out of module scope (below).
-- `index.html`, `css/components.css` — new planner layout.
+- `index.html`, `css/components.css` - new planner layout.
 
 ### 5.3 Constants promoted to `config.js`
 
 `HIT_PENALTY` and `BENCH_SIZE` are currently module-local in `planner.js`
-(lines 46 and 55), and `SQUAD_LIMITS` is defined *twice* — once in `planner.js`
+(lines 46 and 55), and `SQUAD_LIMITS` is defined *twice* - once in `planner.js`
 and again in `dashboard.js`. The new engine modules need all three, and engine
 code may not carry magic numbers (`CONVENTIONS.md` §7.3) or read module state
 (§3.3). They move to `config.js` and both modules import them, retiring the
@@ -113,7 +113,7 @@ the same axis error as the transfer bug, in a second place.
 `calcXiExpectedPoints` sums the XI's expected points, plus the bench weighted by
 `BENCH_CONTRIBUTION_WEIGHT`.
 
-> **MODEL:** a benched player is not worth zero — autosubs mean a bench player
+> **MODEL:** a benched player is not worth zero - autosubs mean a bench player
 > whose XI counterpart blanks does score. The weight is small but non-zero, so
 > that improving your bench registers as a faint positive rather than nothing,
 > without ever rivalling an XI upgrade.
@@ -160,10 +160,10 @@ explainable number available for display.
 
 ### 7.1 Lane definitions
 
-**Now** — `nearXiDelta`, less `HIT_PENALTY` when the move requires a hit.
+**Now** - `nearXiDelta`, less `HIT_PENALTY` when the move requires a hit.
 Expected points into your XI over the active horizon. Nothing else.
 
-**Future Prep** — ranked by *swing*:
+**Future Prep** - ranked by *swing*:
 
 ```
 swing = farXiDelta − nearXiDelta,  gated on farXiDelta > FUTURE_MIN_FAR_GAIN
@@ -171,18 +171,18 @@ swing = farXiDelta − nearXiDelta,  gated on farXiDelta > FUTURE_MIN_FAR_GAIN
 
 > **MODEL:** ranking the far window by raw projection would mostly re-list the
 > Now board, because a genuinely good player is good in both windows. Swing
-> isolates the move that is *specifically* about the future — a player whose
-> next two fixtures are rough but whose following four are green — which is the
+> isolates the move that is *specifically* about the future - a player whose
+> next two fixtures are rough but whose following four are green - which is the
 > buy-before-the-price-rises decision this board exists to serve.
 
-**Funds & Flexibility** — flexibility gained per expected point sacrificed.
+**Funds & Flexibility** - flexibility gained per expected point sacrificed.
 Flexibility comes from a new `calcSquadFlexibility(squad)` with two weighted
 components:
 
-- *Spread* (`FLEX_W_SPREAD`) — how much squad value is clumped inside a
+- *Spread* (`FLEX_W_SPREAD`) - how much squad value is clumped inside a
   `FLEX_CLUMP_BAND`-wide price band. A squad with six players at 7.0–7.5m cannot
   upgrade anyone without selling two, which is the constraint being measured.
-- *Headroom* (`FLEX_W_HEADROOM`) — how much could be raised toward a premium by
+- *Headroom* (`FLEX_W_HEADROOM`) - how much could be raised toward a premium by
   selling the most disposable assets.
 
 > **ASSUMPTION (unresolved):** the user described the problem as price clumping
@@ -194,7 +194,7 @@ components:
 Cash freed (`−priceDiff`) and `calcPriceChangeRisk()` (already built, in
 `engine/prices.js`) fold into this lane's components.
 
-**Ceiling** — peak rather than mean:
+**Ceiling** - peak rather than mean:
 
 ```
 ceiling = CEILING_W_PEAK × (best single-GW expectedPoints in the near window)
@@ -210,10 +210,10 @@ Haul rate comes from `summary.history[].points` via `ctx.playerSummariesById`.
 > downgrades its own confidence accordingly (§8.4). It is the least trustworthy
 > of the five and must never present as equally solid.
 
-**Structure Fix** — fires only when the OUT player is in the *projected XI* and
+**Structure Fix** - fires only when the OUT player is in the *projected XI* and
 is broken by at least one of: `status !== 'available'`; `breakdown.playtime.value`
 below `STRUCTURE_PLAYTIME_FLOOR`; rank tier `bottomPercentile`. Scored by how
-much of the XI total the repair restores. Legitimately empty in most weeks — the
+much of the XI total the repair restores. Legitimately empty in most weeks - the
 board renders an explicit "nothing broken" state rather than padding itself with
 the next-best generic swap.
 
@@ -232,7 +232,7 @@ Each lane's best move is mapped onto 0–100 through its own config threshold
 > **MODEL:** this is the load-bearing and most arbitrary step in the whole
 > design. Without a shared scale, "a swing of +6" and "frees £0.5m" have no
 > common language and the margin below is meaningless. The thresholds are
-> calibration targets, not truths — they are the first thing to tune against
+> calibration targets, not truths - they are the first thing to tune against
 > realised results per `ROADMAP.md` Phase 3B.
 
 ### 8.2 The roll lane
@@ -245,14 +245,14 @@ verdict is **roll it**.
 ### 8.3 Triggers
 
 Four overrides may promote a lane past the arithmetic. Each supplies its own
-headline reason and is always named in the output — a trigger never silently
+headline reason and is always named in the output - a trigger never silently
 reorders:
 
-1. `xiPlayerUnavailable` — a projected-XI player is injured, suspended or flagged.
-2. `chipWindow` — a chip's recommended GW falls within `CHIP_WINDOW_GWS`,
+1. `xiPlayerUnavailable` - a projected-XI player is injured, suspended or flagged.
+2. `chipWindow` - a chip's recommended GW falls within `CHIP_WINDOW_GWS`,
    reusing `engine/chips.js`.
-3. `cashCrunch` — squad flexibility below `FLEX_FLOOR`.
-4. `priceDeadline` — high-confidence imminent rise on a lane-leading target.
+3. `cashCrunch` - squad flexibility below `FLEX_FLOOR`.
+4. `priceDeadline` - high-confidence imminent rise on a lane-leading target.
 
 ### 8.4 Verdict shape
 
@@ -268,7 +268,7 @@ reorders:
 
 When the winning lane's inputs are estimated, `confidence` is downgraded one
 step and `estimated` is set. `reasoning` strings are built here, in the engine,
-and merely rendered by the module — matching how `engine/chips.js` already works.
+and merely rendered by the module - matching how `engine/chips.js` already works.
 
 ## 9. Store, import, and UI
 
@@ -287,7 +287,7 @@ presented as current.
 ### 9.2 Layout
 
 Full-width verdict banner. Below it, the squad rail on the left and the five
-boards in a grid on the right. The chips panel moves *below* the grid — it is
+boards in a grid on the right. The chips panel moves *below* the grid - it is
 season-level advice, and its urgent signal now reaches the user through the
 verdict's `chipWindow` trigger. The "Best 2-Transfer Combo" section survives
 unchanged, full-width beneath the grid: it answers a different question and does
@@ -297,7 +297,7 @@ not belong in a lane.
 
 Each board shows `BOARD_TOP_N` rows; "more" expands to `BOARD_EXPANDED_N`. A row
 is one line: `OUT → IN`, the lane's own headline number in its natural unit,
-price delta, and badges — the existing schedule marks and price warnings, plus a
+price delta, and badges - the existing schedule marks and price warnings, plus a
 new urgency badge for Structure Fix conditions.
 
 `why` expands the row in place to reveal the current rich card: both players'
@@ -311,8 +311,8 @@ after each render.
 
 ### 9.4 Module split
 
-- `planner.js` — state, events, wiring, squad rail, import panel, orchestration.
-- `planner-boards.js` — verdict banner, board grid, compact row, why-panel.
+- `planner.js` - state, events, wiring, squad rail, import panel, orchestration.
+- `planner-boards.js` - verdict banner, board grid, compact row, why-panel.
   HTML builders only; no listeners, no state.
 
 `planner.js` is 1,324 lines before this change, which is already past the point
@@ -347,12 +347,12 @@ All in `config.js` under a new "§14 Transfer lanes and strategy" section.
 ## 11. Performance
 
 `computeSingleSwaps()` today scores every same-position candidate on every
-render — roughly 2,000 `scorePlayer` calls, fired on each budget keystroke. Two
+render - roughly 2,000 `scorePlayer` calls, fired on each budget keystroke. Two
 windows would double it. Three mitigations, part of the design rather than a
 later optimisation:
 
 1. A `(playerId, windowKey)` score cache surviving across renders, invalidated
-   only on `data:ready` / `horizon:changed` — the same invalidate-always,
+   only on `data:ready` / `horizon:changed` - the same invalidate-always,
    recompute-lazily contract `CONVENTIONS.md` §8 already imposes on modules.
 2. `CANDIDATE_POOL_PER_POS` pre-filters candidates by rank *before* scoring,
    bounding the work rather than hoping it stays small.
@@ -397,10 +397,10 @@ live FPL data in the browser pane. Specific checks:
 
 Per `CONVENTIONS.md` §10, code and docs never disagree in `main`:
 
-- `FEATURE_ENGINE.md` — a new section for the lane models and the verdict.
-- `ARCHITECTURE.md` — the three new engine files and the planner module split.
-- `ROADMAP.md` — this supersedes the Phase 2D exit criterion.
-- `GAFFER_IQ_TESTING_ROADMAP.md` — the behavioural checks in §13.
+- `FEATURE_ENGINE.md` - a new section for the lane models and the verdict.
+- `ARCHITECTURE.md` - the three new engine files and the planner module split.
+- `ROADMAP.md` - this supersedes the Phase 2D exit criterion.
+- `GAFFER_IQ_TESTING_ROADMAP.md` - the behavioural checks in §13.
 
 ## 15. Risks
 
