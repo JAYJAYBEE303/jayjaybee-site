@@ -1,40 +1,49 @@
 /* ═══════════════════════════════════════════════════════════════
-   FEEL CALCULATOR — core math and stat rendering
+   FEEL CALCULATOR — the engine. Pure maths, no DOM.
    ───────────────────────────────────────────────────────────────
-   Owns the calculation pipeline (movement, passing, defending,
-   shooting feel) plus the DOM updates that display the results.
-   Cross-file: UI state is read from ui.js (e.g. isDark for stat
-   colour selection); inline onclick handlers in the HTML invoke
-   functions defined here through the shared global scope.
-   ═══════════════════════════════════════════════════════════════ */
+   computeFeel(state) → { flat, base, verdicts, rows, slip }
+     flat      the 21 effective feel stats (effA … effShootFk)
+     base      card values behind the four movement stats
+     verdicts  one paragraph per layer
+     rows      modifier breakdown per layer ({ label, base?, note?, chips[{k,v,sign}] })
+     slip      slipperiness breakdown ({ rows[{label,v,base?}], total })
+   recalcEffStats(state) is the older pure re-implementation kept verbatim
+   from the previous UI; it drifts from computeFeel on several modifiers.
 
-/* ── State driven by UI (mutated by selectAccel/selectBuild/togglePS in ui.js) ── */
-  let accelType = 'controlled';
-  let buildType = 'normal';
-  let activePS = new Set();
+   computeFeel is a line-for-line extraction of the legacy DOM-bound
+   calculate(): tests/golden.json (captured from that version) pins every
+   number, verdict and breakdown row. Change the maths here only with a
+   matching golden refresh.
+   Loads as a classic script (window.FC26) or a CommonJS module (tests).
+   ═══════════════════════════════════════════════════════════════ */
+(function (root) {
+  'use strict';
 
   const DEFAULT_HEIGHT  = 183;
   const DEFAULT_WEIGHT  = 80;
   const DEFAULT_STR     = 70;
   const DEFAULT_BAL     = 75;
   const MAX_VAL         = 150;
-
-  let activeChem = null;
+  const EXT_DEFAULT     = 70;
+  const SPRINT_CAP      = 120;
+  const TENACITY_CAP    = 130;
+  const BAR_VISUAL_MAX  = 120; // All stat bars visually fill on a 0-120 scale for consistency
 
   function clamp(v) { return Math.max(1, Math.min(MAX_VAL, v)); }
 
-  /* ── Memoised element lookup ──────────────────────────────────
-     calculate() resolves ~100 element ids per run. The stat-row,
-     input and bar nodes are static for the life of the page, so
-     caching the references keeps that churn off the hot path.
-     A disconnected node falls back to a fresh lookup. */
-  const _elCache = Object.create(null);
-  function $id(id) {
-    const cached = _elCache[id];
-    if (cached && cached.isConnected) return cached;
-    const e = document.getElementById(id);
-    if (e) _elCache[id] = e;
-    return e;
+  function cmToFtIn(cm) {
+    const totalIn = cm / 2.54;
+    const ft = Math.floor(totalIn / 12);
+    const inch = Math.round(totalIn % 12);
+    return `${ft}'${inch}"`;
+  }
+
+  /* Four-tier semantic progression — low <85 · mid 85-99 · high 100-114 · peak 115+. */
+  function statTier(v) {
+    if (v >= 115) return 'cyan';
+    if (v >= 100) return 'green';
+    if (v >= 85)  return 'amber';
+    return 'magenta';
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -72,25 +81,49 @@
     backbone:  { vision:3, shortPass:3, longPass:6, interceptions:6, defAwareness:3, standTackle:6, slideTackle:3, stamina:6, strength:3, aggression:6 },
   };
 
-  // Returns how many points a given stat key is boosted by the current active chem style
-  function chemBoost(key) {
-    if (!activeChem) return 0;
-    const table = CHEM_BOOSTS[activeChem];
-    return (table && table[key]) || 0;
-  }
+  // Ordered list of extended stat ids — the saved-state shape
+  const EXT_STAT_IDS = [
+    'shortPass','longPass','vision','crossing','curve','fkAccuracy',
+    'standTackle','slideTackle','interceptions','headingAcc','defAwareness','aggression','jumping',
+    'finishing','shotPower','longShots','volleys','attPositioning',
+    'composure','reactions','ballControl','dribbling','stamina'
+  ];
 
-  function calculate() {
-    const baseAccel    = Math.min(99, (+$id('baseAccel').value   || 0) + chemBoost('accel'));
-    const baseSprint   = Math.min(99, (+$id('baseSprint').value  || 0) + chemBoost('sprint'));
-    const baseAgility  = Math.min(99, (+$id('baseAgility').value || 0) + chemBoost('agility'));
+  // A fresh player — the values the legacy Reset button restored.
+  const DEFAULTS = {
+    chemStyle: null, baseAccel: 80, baseSprint: 80, baseAgility: 80,
+    heightCm: DEFAULT_HEIGHT, weight: DEFAULT_WEIGHT, strength: DEFAULT_STR, balance: DEFAULT_BAL,
+    accelType: 'controlled', buildType: 'normal', activePS: [],
+  };
+  EXT_STAT_IDS.forEach(id => { DEFAULTS[id] = EXT_DEFAULT; });
+
+  const PASS_STATS  = [{ key:'sp', label:'SP' }, { key:'lp', label:'LP' }, { key:'tb', label:'TB' }, { key:'cr', label:'CR' }];
+  const DEF_STATS   = [{ key:'tk', label:'TK' }, { key:'pos', label:'POS' }, { key:'int', label:'INT' }, { key:'aer', label:'AER' }, { key:'bully', label:'BULLY' }, { key:'slide', label:'SLIDE' }];
+  const SHOOT_STATS = [{ key:'fin', label:'FIN' }, { key:'pwr', label:'PWR' }, { key:'fnse', label:'FNSE' }, { key:'vol', label:'VOL' }, { key:'ldr', label:'LDR' }, { key:'fk', label:'FK' }];
+  const round150 = v => Math.max(0, Math.min(150, Math.round(v)));
+
+  function computeFeel(input) {
+    const s = Object.assign({}, DEFAULTS, input);
+    const accelType = s.accelType || 'controlled';
+    const buildType = s.buildType || 'normal';
+    const activePS = new Set(s.activePS || []);
+    const chemTable = s.chemStyle ? CHEM_BOOSTS[s.chemStyle] : null;
+    // Returns how many points a given stat key is boosted by the active chem style
+    const chemBoost = key => (chemTable && chemTable[key]) || 0;
+    // Extended stat ids pass through chemBoost directly; chem keys match stat ids
+    const ext = id => Math.min(99, (+s[id] || EXT_DEFAULT) + chemBoost(id));
+
+    const baseAccel    = Math.min(99, (+s.baseAccel   || 0) + chemBoost('accel'));
+    const baseSprint   = Math.min(99, (+s.baseSprint  || 0) + chemBoost('sprint'));
+    const baseAgility  = Math.min(99, (+s.baseAgility || 0) + chemBoost('agility'));
     const baseTenacity = 75;
-    const heightCm     = +$id('heightCm').value     || DEFAULT_HEIGHT;
-    const weight       = +$id('weight').value       || DEFAULT_WEIGHT;
-    const strength     = Math.min(99, (+$id('strength').value    || DEFAULT_STR) + chemBoost('strength'));
-    const balance      = Math.min(99, (+$id('balance').value     || DEFAULT_BAL) + chemBoost('balance'));
+    const heightCm     = +s.heightCm     || DEFAULT_HEIGHT;
+    const weight       = +s.weight       || DEFAULT_WEIGHT;
+    const strength     = Math.min(99, (+s.strength || DEFAULT_STR) + chemBoost('strength'));
+    const balance      = Math.min(99, (+s.balance  || DEFAULT_BAL) + chemBoost('balance'));
 
     let dA = 0, dS = 0, dG = 0, dT = 0;
-    let breakdown = [];
+    const breakdown = [];
 
     // Acceleration type
     if (accelType === 'explosive') {
@@ -169,198 +202,89 @@
     if (activePS.has('game_changer_plus'))               { dG+=4; breakdown.push({ source:'Game Changer+', a:0, s:0, g:+4, t:0 }); }
 
     // ──── Dribbling + Ball Control affect Agility feel ────
-    // High dribbling → tighter ball control → ball feels more agile under your feet
     // Average of base Dribbling + Ball Control, every 5 points from 75 contributes ±1 to Agility
-    const dribBaseStat = ext('dribbling');
-    const ballCtrlStat = ext('ballControl');
-    const dribAvg = (dribBaseStat + ballCtrlStat) / 2;
+    const dribAvg = (ext('dribbling') + ext('ballControl')) / 2;
     const dribAgilityMod = Math.round((dribAvg - 75) / 5);
     if (dribAgilityMod !== 0) {
       dG += dribAgilityMod;
-      breakdown.push({
-        source: `Dribbling + Ball Control (avg ${Math.round(dribAvg)})`,
-        a: 0, s: 0, g: dribAgilityMod, t: 0
-      });
+      breakdown.push({ source: `Dribbling + Ball Control (avg ${Math.round(dribAvg)})`, a: 0, s: 0, g: dribAgilityMod, t: 0 });
     }
 
     const effA = clamp(baseAccel    + dA);
     const effS = clamp(baseSprint   + dS);
     const effG = clamp(baseAgility  + dG);
     const effT = clamp(baseTenacity + dT);
-
-    updateRow('Accel',    baseAccel,    effA, dA, 'var(--neutral)');
     const cappedEffS = Math.min(effS, SPRINT_CAP);
-    updateRow('Sprint', baseSprint, cappedEffS, Math.min(effS, SPRINT_CAP) - baseSprint, 'var(--neutral)', true);
-    updateRow('Agility',  baseAgility,  effG, dG, 'var(--neutral)');
     const cappedEffT = Math.min(effT, TENACITY_CAP);
-    updateRow('Tenacity', baseTenacity, cappedEffT, cappedEffT - baseTenacity, 'var(--accent4)', false, true);
 
     const techSlipBonus = activePS.has('technical_plus') ? 5 : activePS.has('technical') ? 2 : 0;
     const buildSlipBonus = buildType === 'very_lean' ? 5 : buildType === 'lean' ? 2 : buildType === 'stocky' ? -2 : buildType === 'very_stocky' ? -5 : 0;
     const pressSlipBonus = activePS.has('press_proven_plus') ? 5 : activePS.has('press_proven') ? 2 : 0;
     const ftSlipBonus = activePS.has('first_touch_plus') ? 5 : activePS.has('first_touch') ? 2 : 0;
     const slip = Math.round((180 + (effG - heightCm)) + ((effT - 100) / 2) + techSlipBonus + buildSlipBonus + pressSlipBonus + ftSlipBonus);
-    updateSlip(slip);
-    renderSlipBreakdown(effG, heightCm, effT, techSlipBonus, buildSlipBonus, slip);
 
-    renderBreakdown(breakdown);
-    renderVerdict(effA, effS, effG, effT, dT, weight, heightCm, strength, accelType, buildType);
-
+    const ctx = { s, ext, activePS, accelType, buildType, strength, balance, heightCm, weight };
     // Extended feel layers — all consume the movement-layer outputs
-    calculatePassingFeel(effA, cappedEffS, effG, cappedEffT, heightCm, weight);
-    calculateDefendingFeel(effA, cappedEffS, effG, cappedEffT, heightCm, weight);
-    calculateShootingFeel(effA, cappedEffS, effG, cappedEffT, slip, heightCm, weight, balance);
+    const P = passingFeel(ctx, effA, cappedEffS, effG, cappedEffT);
+    const D = defendingFeel(ctx, effA, cappedEffS, effG, cappedEffT);
+    const S = shootingFeel(ctx, effA, cappedEffS, effG, cappedEffT, slip);
+
+    return {
+      flat: {
+        effA, effS: cappedEffS, effG, effT: cappedEffT, effSlip: slip,
+        effPassShort: round150(P.sp), effPassLong: round150(P.lp), effPassThrough: round150(P.tb), effPassCross: round150(P.cr),
+        effDefTackle: round150(D.tk), effDefPos: round150(D.pos), effDefInt: round150(D.intc), effDefAer: round150(D.aer), effDefBully: round150(D.bully), effDefSlide: round150(D.slide),
+        effShootFin: round150(S.fin), effShootPwr: round150(S.pwr), effShootFine: round150(S.fnse), effShootVol: round150(S.vol), effShootLdr: round150(S.ldr), effShootFk: round150(S.fk),
+      },
+      base: { effA: baseAccel, effS: baseSprint, effG: baseAgility, effT: baseTenacity },
+      verdicts: {
+        movement: movementVerdict(effT, weight, heightCm, strength, accelType, buildType, activePS),
+        passing: P.verdict, defending: D.verdict, shooting: S.verdict,
+      },
+      rows: {
+        movement: movementRows(breakdown),
+        passing: extRows(P.bd, PASS_STATS), defending: extRows(D.bd, DEF_STATS), shooting: extRows(S.bd, SHOOT_STATS),
+      },
+      slip: {
+        rows: slipRows(effG, heightCm, effT, techSlipBonus, buildSlipBonus, pressSlipBonus, ftSlipBonus),
+        total: slip,
+      },
+    };
   }
 
-  function sc(v) {
-    // stat colour for saved player cards — same thresholds as effColor
-    if (v >= 115) return 'var(--neutral)';
-    if (v >= 100) return 'var(--gain)';
-    if (v >= 85)  return '#E4953C';
-    return 'var(--loss)';
-  }
-
-  /* Four-tier semantic progression — magenta <85 · amber 85-99 ·
-     green 100-114 · cyan 115+. Shared by every effective feel bar. */
-  function statTier(v) {
-    if (v >= 115) return 'cyan';
-    if (v >= 100) return 'green';
-    if (v >= 85)  return 'amber';
-    return 'magenta';
-  }
-
-  // Apply the matching tier class to a bar element — background + glow
-  // are defined in CSS (.stat-bar-effective.tier-*).
-  function setBarTier(bar, v) {
-    if (!bar) return;
-    bar.classList.remove('tier-magenta', 'tier-amber', 'tier-green', 'tier-cyan');
-    bar.classList.add('tier-' + statTier(v));
-  }
-
-  function effColor(eff)      { return `var(--tier-${statTier(eff)})`; }
-  function sprintColor(eff)   { return `var(--tier-${statTier(eff)})`; }
-
-  const SPRINT_CAP = 120;
-  const TENACITY_CAP = 130;
-
-  function tenacityColor(eff) { return `var(--tier-${statTier(eff)})`; }
-
-  /* ── Shared number-tween ticker ───────────────────────────────
-     Every effective-stat readout used to spawn its own rAF chain
-     (~21 concurrent loops per calculate). One ticker now advances
-     them all and writes every textContent inside a single frame —
-     no interleaved layout reads, far less rAF/closure overhead. */
-  const _numAnims = new Map();
-  let _numRAF = 0;
-  function _numTick() {
-    _numRAF = 0;
-    for (const [el, a] of _numAnims) {
-      a.step++;
-      a.val += a.inc;
-      el.textContent = Math.round(a.step < a.steps ? a.val : a.target);
-      if (a.step >= a.steps) _numAnims.delete(el);
-    }
-    if (_numAnims.size) _numRAF = requestAnimationFrame(_numTick);
-  }
-  function animateNumber(el, target, color) {
-    if (!el) return;
-    el.style.color = color;
-    const current = parseInt(el.textContent) || 0;
-    if (current === target) { _numAnims.delete(el); return; }
-    const steps = Math.min(Math.abs(target - current), 16) || 1;
-    _numAnims.set(el, {
-      val: current, target, step: 0, steps,
-      inc: (target - current) / steps,
-    });
-    if (!_numRAF) _numRAF = requestAnimationFrame(_numTick);
-  }
-
-  const BAR_VISUAL_MAX = 120; // All stat bars visually fill on a 0-120 scale for consistency
-
-  function updateRow(prefix, base, eff, delta, neutralColor, isSprint, isTenacity) {
-    animateNumber($id(`num${prefix}Eff`), eff, isSprint ? sprintColor(eff) : isTenacity ? tenacityColor(eff) : effColor(eff));
-    $id(`bar${prefix}Base`).style.width = `${Math.min(100,(base/BAR_VISUAL_MAX)*100)}%`;
-
-    const effBar = $id(`bar${prefix}Eff`);
-    effBar.style.width = `${Math.min(100,(eff/BAR_VISUAL_MAX)*100)}%`;
-    setBarTier(effBar, eff);
-  }
-
-  function updateSlip(slip) {
-    const el = $id('numSlipEff');
-    const bar = $id('barSlipEff');
-    animateNumber(el, slip, effColor(slip));
-    bar.style.width = `${Math.max(0, Math.min(100, (slip / BAR_VISUAL_MAX) * 100))}%`;
-    setBarTier(bar, slip);
-    $id('barSlipBase').style.width = '0%';
-  }
-
-  function renderSlipBreakdown(effG, heightCm, effT, techBonus, buildBonus, total) {
-    const el = $id('slipBreakdownList');
-    const items = [];
-
-    const baseSlip = 180 + (effG - heightCm);
-    items.push({ source: 'Default (180 + Agility feel − height)', v: Math.round(baseSlip) });
-
+  // Slipperiness breakdown. Effective tenacity here is uncapped, as in the total.
+  function slipRows(effG, heightCm, effT, techBonus, buildBonus, pressBonus, ftBonus) {
+    const items = [{ label: 'Default (180 + Agility feel − height)', v: Math.round(180 + (effG - heightCm)), base: true }];
     const tenBonus = (effT - 100) / 2;
-    if (tenBonus !== 0) items.push({ source: `(Tenacity − 100) ÷ 2`, v: Math.round(tenBonus) });
-
-    if (techBonus !== 0) {
-      const label = techBonus === 5 ? 'Technical+' : 'Technical';
-      items.push({ source: label, v: techBonus });
-    }
-
+    if (tenBonus !== 0) items.push({ label: '(Tenacity − 100) ÷ 2', v: Math.round(tenBonus) });
+    if (techBonus !== 0) items.push({ label: techBonus === 5 ? 'Technical+' : 'Technical', v: techBonus });
     if (buildBonus !== 0) {
       const label = buildBonus === 5 ? 'Very Lean Build' : buildBonus === 2 ? 'Lean Build' : buildBonus === -2 ? 'Stocky Build' : 'Very Stocky Build';
-      items.push({ source: label, v: buildBonus });
+      items.push({ label, v: buildBonus });
     }
-
-    el.innerHTML = items.map((item, idx) => {
-      const isDefault = idx === 0;
-      const chip = isDefault
-        ? `<span class="bd" style="color:#b0a8a0">${item.v}</span>`
-        : `<span class="bd ${item.v > 0 ? 'pos' : item.v < 0 ? 'neg' : ''}" style="color:${item.v > 0 ? 'var(--gain)' : item.v < 0 ? 'var(--loss)' : '#a07cc0'}">${item.v > 0 ? '+' : ''}${item.v}</span>`;
-      return `<div class="breakdown-item"><span class="source">${item.source}</span><div class="breakdown-deltas">${chip}</div></div>`;
-    }).join('') + `<div class="breakdown-item" style="border-top:1px solid var(--border);margin-top:4px;padding-top:6px;">
-      <span class="source slip-total-label">Total Slipperiness</span>
-      <div class="breakdown-deltas"><span class="bd" class="slip-total-val">${total}</span></div>
-    </div>`;
+    // Already in the total; the legacy list never itemised them.
+    if (pressBonus !== 0) items.push({ label: pressBonus === 5 ? 'Press Proven+' : 'Press Proven', v: pressBonus });
+    if (ftBonus !== 0) items.push({ label: ftBonus === 5 ? 'First Touch+' : 'First Touch', v: ftBonus });
+    return items;
   }
 
-  function renderBreakdown(items) {
-    const el = $id('breakdownList');
-    const active = items.filter(i => i.a||i.s||i.g||i.t||i.note);
-    if (!active.length) {
-      el.innerHTML = '<div class="breakdown-item"><span style="color:var(--muted);font-size:0.68rem;">No modifiers — all stats at face value</span></div>';
-      return;
-    }
-    el.innerHTML = active.map(item => {
-      if (item.note) {
-        return `<div class="breakdown-item"><span style="color:var(--muted);font-style:italic;">${item.source}</span></div>`;
-      }
-      const chips = [
-        item.a ? `<span class="bd ${item.a>0?'pos':'neg'}">ACC ${item.a>0?'+':''}${item.a}</span>` : '',
-        item.s ? `<span class="bd ${item.s>0?'pos':'neg'}">SPR ${item.s>0?'+':''}${item.s}</span>` : '',
-        item.g ? `<span class="bd ${item.g>0?'pos':'neg'}">AGI ${item.g>0?'+':''}${item.g}</span>` : '',
-        item.t ? `<span class="bd ${item.t>0?'pos':'neg'}" style="color:${item.t>0?'var(--accent4)':'var(--loss)'}">TEN ${item.t>0?'+':''}${item.t}</span>` : '',
-      ].filter(Boolean).join('');
-      return `<div class="breakdown-item"><span class="source">${item.source}</span><div class="breakdown-deltas">${chips}</div></div>`;
-    }).join('');
+  function movementRows(items) {
+    const active = items.filter(i => i.a||i.s||i.g||i.t);
+    if (!active.length) return [{ label: 'No modifiers — all stats at face value', note: true, chips: [] }];
+    const chip = (k, v) => ({ k, v, sign: v > 0 ? 1 : -1 });
+    return active.map(i => ({
+      label: i.source,
+      chips: [i.a && chip('ACC', i.a), i.s && chip('SPR', i.s), i.g && chip('AGI', i.g), i.t && chip('TEN', i.t)].filter(Boolean),
+    }));
   }
 
-  // Generic breakdown renderer for extended feel sections (passing / defending / shooting).
-  // statDefs: [{ key, label }] — the sub-stat columns to render chips for.
+  // Breakdown rows for the extended layers (passing / defending / shooting).
   // Items are grouped by input source (e.g. Height → Bully and Height → Aerial collapse
   // into one row), the redundant "→ Stat" suffix is dropped (the chip already labels
-  // its target), and chips are formatted as integers when the rounded value is exact.
-  function renderExtBreakdown(listId, items, statDefs) {
-    const el = $id(listId);
-    if (!el) return;
-    const active = items.filter(i => i.note || i.isBase || statDefs.some(s => i[s.key]));
-    if (!active.length) {
-      el.innerHTML = '<div class="breakdown-item"><span style="color:var(--muted);font-size:0.68rem;">No modifiers active</span></div>';
-      return;
-    }
+  // its target), and values are integers when the rounded value is exact.
+  function extRows(items, statDefs) {
+    const active = items.filter(i => i.isBase || statDefs.some(s => i[s.key]));
+    if (!active.length) return [{ label: 'No modifiers active', note: true, chips: [] }];
 
     const stripArrow = s => s.replace(/\s*→\s*.+$/, '');
     const deriveGroup = s => {
@@ -369,65 +293,37 @@
       if (/^Aggression/i.test(prefix)) return 'aggression';
       return prefix.toLowerCase();
     };
-    const fmt = v => {
+    const num = v => {
       const r = Math.round(v);
-      if (Math.abs(v - r) < 0.05) return (r >= 0 ? '+' : '') + r;
-      const o = Math.round(v * 10) / 10;
-      return (o >= 0 ? '+' : '') + o;
+      return Math.abs(v - r) < 0.05 ? r : Math.round(v * 10) / 10;
     };
 
-    const rendered = [];
+    const groups = [];
     const groupMap = new Map();
     for (const item of active) {
-      if (item.isBase || item.note) {
-        rendered.push({ kind: item.isBase ? 'base' : 'note', items: [item], label: item.source });
-        continue;
-      }
+      if (item.isBase) { groups.push({ base: true, items: [item], label: item.source }); continue; }
       const key = deriveGroup(item.source);
-      if (groupMap.has(key)) {
-        groupMap.get(key).items.push(item);
-      } else {
-        const entry = { kind: 'mod', items: [item], label: stripArrow(item.source) };
-        groupMap.set(key, entry);
-        rendered.push(entry);
-      }
+      if (groupMap.has(key)) groupMap.get(key).items.push(item);
+      else { const entry = { items: [item], label: stripArrow(item.source) }; groupMap.set(key, entry); groups.push(entry); }
     }
 
-    el.innerHTML = rendered.map(entry => {
-      if (entry.kind === 'note') {
-        return `<div class="breakdown-item"><span style="color:var(--muted);font-style:italic;">${entry.label}</span></div>`;
-      }
-      if (entry.kind === 'base') {
+    return groups.map(entry => {
+      if (entry.base) {
         const item = entry.items[0];
-        const chips = statDefs.map(s => {
-          const v = item[s.key];
-          if (v == null) return '';
-          return `<span class="bd" style="color:#b0a8a0">${s.label} ${Math.round(v)}</span>`;
-        }).filter(Boolean).join('');
-        return `<div class="breakdown-item"><span class="source">${entry.label}</span><div class="breakdown-deltas">${chips}</div></div>`;
+        return { label: entry.label, base: true, chips: statDefs.filter(s => item[s.key] != null).map(s => ({ k: s.label, v: Math.round(item[s.key]), sign: 0 })) };
       }
       const totals = {};
-      for (const item of entry.items) {
-        for (const s of statDefs) {
-          if (item[s.key]) totals[s.key] = (totals[s.key] || 0) + item[s.key];
-        }
-      }
-      const chips = statDefs.map(s => {
-        const v = totals[s.key];
-        if (!v || Math.abs(v) < 0.05) return '';
-        return `<span class="bd ${v > 0 ? 'pos' : 'neg'}">${s.label} ${fmt(v)}</span>`;
-      }).filter(Boolean).join('');
-      if (!chips) return '';
-      return `<div class="breakdown-item"><span class="source">${entry.label}</span><div class="breakdown-deltas">${chips}</div></div>`;
-    }).join('');
+      for (const item of entry.items) for (const s of statDefs) if (item[s.key]) totals[s.key] = (totals[s.key] || 0) + item[s.key];
+      const chips = statDefs.filter(s => totals[s.key] && Math.abs(totals[s.key]) >= 0.05).map(s => {
+        const v = num(totals[s.key]);
+        return { k: s.label, v, sign: v >= 0 ? 1 : -1 };
+      });
+      return chips.length ? { label: entry.label, chips } : null;
+    }).filter(Boolean);
   }
 
-  const PASS_STATS  = [{ key:'sp', label:'SP' }, { key:'lp', label:'LP' }, { key:'tb', label:'TB' }, { key:'cr', label:'CR' }];
-  const DEF_STATS   = [{ key:'tk', label:'TK' }, { key:'pos', label:'POS' }, { key:'int', label:'INT' }, { key:'aer', label:'AER' }, { key:'bully', label:'BULLY' }, { key:'slide', label:'SLIDE' }];
-  const SHOOT_STATS = [{ key:'fin', label:'FIN' }, { key:'pwr', label:'PWR' }, { key:'fnse', label:'FNSE' }, { key:'vol', label:'VOL' }, { key:'ldr', label:'LDR' }, { key:'fk', label:'FK' }];
-
-  function renderVerdict(effA, effS, effG, effT, dT, weight, heightCm, strength, type, build) {
-    let lines = [];
+  function movementVerdict(effT, weight, heightCm, strength, type, build, activePS) {
+    const lines = [];
     if (type==='explosive') lines.push('Explosive type — immediate burst off the mark, bleeds off at top end.');
     else if (type==='lengthy') lines.push('Lengthy type — slow off the mark but hard to catch once moving.');
     else lines.push('Controlled type — balanced, predictable acceleration curve.');
@@ -452,37 +348,12 @@
     if (activePS.has('rapid_plus') && type==='lengthy') lines.push('Rapid+ on lengthy — top end amplified further, almost impossible to catch once moving.');
     if (activePS.has('enforcer_plus') && strength > 80) lines.push('Enforcer+ with high strength — physical resistance unlocked, dominant in all contact situations.');
 
-    $id('verdictText').textContent = lines.join(' ');
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  // EXTENDED FEEL LAYERS — Passing / Defending / Shooting
-  // All read the effective movement stats as already computed.
-  // ═══════════════════════════════════════════════════════════════
-
-  const EXT_DEFAULT = 70;
-  function ext(id) {
-    const el = $id(id);
-    const base = el ? (+el.value || EXT_DEFAULT) : EXT_DEFAULT;
-    // Extended stat ids pass through chemBoost directly; chem keys match input ids
-    return Math.min(99, base + chemBoost(id));
-  }
-
-  // Helper: update a sub-stat bar (used by all three layers)
-  function updateSubRow(prefix, eff) {
-    const effBar = $id(`bar${prefix}Eff`);
-    const baseBar = $id(`bar${prefix}Base`);
-    const numEl = $id(`num${prefix}Eff`);
-    if (!effBar || !numEl) return;
-    const capped = Math.max(0, Math.min(150, Math.round(eff)));
-    animateNumber(numEl, capped, effColor(capped));
-    effBar.style.width = `${Math.min(100, (capped / BAR_VISUAL_MAX) * 100)}%`;
-    setBarTier(effBar, capped);
-    if (baseBar) baseBar.style.width = '0%';
+    return lines.join(' ');
   }
 
   // ──────── PASSING FEEL ────────
-  function calculatePassingFeel(effA, effS, effG, effT, heightCm, weight) {
+  function passingFeel(c, effA, effS, effG, effT) {
+    const { ext, activePS, buildType, heightCm, weight } = c;
     const shortPass = ext('shortPass');
     const longPass  = ext('longPass');
     const vision    = ext('vision');
@@ -569,22 +440,10 @@
     if (activePS.has('outside_foot'))      { tb += 3;        bd.push({ source: 'Inventive',    tb: +3 }); }
     if (activePS.has('outside_foot_plus')) { tb += 6;       bd.push({ source: 'Inventive+',   tb: +6 }); }
 
-    updateSubRow('PassShort',   sp);
-    updateSubRow('PassLong',    lp);
-    updateSubRow('PassThrough', tb);
-    updateSubRow('PassCross',   cr);
-    renderExtBreakdown('passingBreakdownList', bd, PASS_STATS);
-    renderPassingVerdict(sp, lp, tb, cr);
-
-    return {
-      effPassShort:   Math.max(0, Math.min(150, Math.round(sp))),
-      effPassLong:    Math.max(0, Math.min(150, Math.round(lp))),
-      effPassThrough: Math.max(0, Math.min(150, Math.round(tb))),
-      effPassCross:   Math.max(0, Math.min(150, Math.round(cr))),
-    };
+    return { sp, lp, tb, cr, bd, verdict: passingVerdict(sp, lp, tb, cr) };
   }
 
-  function renderPassingVerdict(sp, lp, tb, cr) {
+  function passingVerdict(sp, lp, tb, cr) {
     const lines = [];
     const max = Math.max(sp, lp, tb, cr);
     const min = Math.min(sp, lp, tb, cr);
@@ -602,12 +461,12 @@
     if (sp - tb > 25) lines.push('Short-game specialist — struggles to break lines.');
     if (cr >= 120) lines.push('Whipped deliveries land consistently on target.');
 
-    $id('passingVerdictText').textContent =
-      lines.length ? lines.join(' ') : 'Passing profile is broadly average.';
+    return lines.length ? lines.join(' ') : 'Passing profile is broadly average.';
   }
 
   // ──────── DEFENDING FEEL ────────
-  function calculateDefendingFeel(effA, effS, effG, effT, heightCm, weight) {
+  function defendingFeel(c, effA, effS, effG, effT) {
+    const { ext, activePS, buildType, heightCm, weight, strength, balance } = c;
     const standTackle = ext('standTackle');
     const slideTackle = ext('slideTackle');
     const interceptions = ext('interceptions');
@@ -617,8 +476,6 @@
     const jumping = ext('jumping');
     const composure = ext('composure');
     const reactions = ext('reactions');
-    const strength = Math.min(99, (+$id('strength').value || DEFAULT_STR) + chemBoost('strength'));
-    const balance  = Math.min(99, (+$id('balance').value  || DEFAULT_BAL) + chemBoost('balance'));
 
     let tk = standTackle;
     let pos = defAwareness;
@@ -649,7 +506,7 @@
     let effABullyDelta = 0;
     if (effA > 85) effABullyDelta = (effA - 85) / 10;
     bullyDelta += effABullyDelta;
-    let balBullyDelta = Math.max(0, (balance - 70) / 8);
+    const balBullyDelta = Math.max(0, (balance - 70) / 8);
     bullyDelta += balBullyDelta;
     let heightBullyDelta = 0;
     if (heightCm > 185) heightBullyDelta = (heightCm - 185) / 4;
@@ -758,26 +615,10 @@
     if (activePS.has('slide_tackle_ps'))     { slide += 8;  bd.push({ source: 'Slide Tackle',      slide: +8 }); }
     if (activePS.has('slide_tackle_ps_plus')) { slide += 15; bd.push({ source: 'Slide Tackle+',    slide: +15 }); }
 
-    updateSubRow('DefTackle', tk);
-    updateSubRow('DefPos',    pos);
-    updateSubRow('DefInt',    intc);
-    updateSubRow('DefAer',    aer);
-    updateSubRow('DefBully',  bully);
-    updateSubRow('DefSlide',  slide);
-    renderExtBreakdown('defendingBreakdownList', bd, DEF_STATS);
-    renderDefendingVerdict(tk, pos, intc, aer, bully, slide);
-
-    return {
-      effDefTackle: Math.max(0, Math.min(150, Math.round(tk))),
-      effDefPos:    Math.max(0, Math.min(150, Math.round(pos))),
-      effDefInt:    Math.max(0, Math.min(150, Math.round(intc))),
-      effDefAer:    Math.max(0, Math.min(150, Math.round(aer))),
-      effDefBully:  Math.max(0, Math.min(150, Math.round(bully))),
-      effDefSlide:  Math.max(0, Math.min(150, Math.round(slide))),
-    };
+    return { tk, pos, intc, aer, bully, slide, bd, verdict: defendingVerdict(tk, pos, intc, aer, bully, slide) };
   }
 
-  function renderDefendingVerdict(tk, pos, intc, aer, bully, slide) {
+  function defendingVerdict(tk, pos, intc, aer, bully, slide) {
     const lines = [];
     const max = Math.max(tk, pos, intc, aer);
     const min = Math.min(tk, pos, intc, aer);
@@ -803,12 +644,12 @@
     if (slide >= 115)         lines.push('Elite slide-tackler — times recoveries with precision.');
     else if (slide < 70)      lines.push('Mistimes slide tackles — liable to give away dangerous fouls.');
 
-    $id('defendingVerdictText').textContent =
-      lines.length ? lines.join(' ') : 'Defending profile is broadly average.';
+    return lines.length ? lines.join(' ') : 'Defending profile is broadly average.';
   }
 
   // ──────── SHOOTING FEEL ────────
-  function calculateShootingFeel(effA, effS, effG, effT, effSlip, heightCm, weight, balance) {
+  function shootingFeel(c, effA, effS, effG, effT, effSlip) {
+    const { ext, activePS, accelType, buildType, heightCm, weight, balance } = c;
     const finishing = ext('finishing');
     const shotPower = ext('shotPower');
     const longShots = ext('longShots');
@@ -925,26 +766,10 @@
     if (activePS.has('dead_ball'))          { fk += 15;             bd.push({ source: 'Dead Ball',          fk: +15 }); }
     if (activePS.has('dead_ball_plus'))     { fk += 28;             bd.push({ source: 'Dead Ball+',         fk: +28 }); }
 
-    updateSubRow('ShootFin',  fin);
-    updateSubRow('ShootPwr',  pwr);
-    updateSubRow('ShootFine', fnse);
-    updateSubRow('ShootVol',  vol);
-    updateSubRow('ShootLdr',  ldr);
-    updateSubRow('ShootFk',   fk);
-    renderExtBreakdown('shootingBreakdownList', bd, SHOOT_STATS);
-    renderShootingVerdict(fin, pwr, fnse, vol, ldr, fk);
-
-    return {
-      effShootFin:  Math.max(0, Math.min(150, Math.round(fin))),
-      effShootPwr:  Math.max(0, Math.min(150, Math.round(pwr))),
-      effShootFine: Math.max(0, Math.min(150, Math.round(fnse))),
-      effShootVol:  Math.max(0, Math.min(150, Math.round(vol))),
-      effShootLdr:  Math.max(0, Math.min(150, Math.round(ldr))),
-      effShootFk:   Math.max(0, Math.min(150, Math.round(fk))),
-    };
+    return { fin, pwr, fnse, vol, ldr, fk, bd, verdict: shootingVerdict(fin, pwr, fnse, vol, ldr, fk) };
   }
 
-  function renderShootingVerdict(fin, pwr, fnse, vol, ldr, fk) {
+  function shootingVerdict(fin, pwr, fnse, vol, ldr, fk) {
     const lines = [];
     const max = Math.max(fin, pwr, fnse, vol);
     const min = Math.min(fin, pwr, fnse, vol);
@@ -967,17 +792,8 @@
     if (fk >= 115)                    lines.push('Elite free-kick taker — a genuine set-piece threat.');
     else if (fk < 65)                 lines.push('Not a free-kick option — hand the ball to someone else.');
 
-    $id('shootingVerdictText').textContent =
-      lines.length ? lines.join(' ') : 'Shooting profile is broadly average.';
+    return lines.length ? lines.join(' ') : 'Shooting profile is broadly average.';
   }
-
-  // Ordered list of extended stat ids — used by getState, applyState, recalc
-  const EXT_STAT_IDS = [
-    'shortPass','longPass','vision','crossing','curve','fkAccuracy',
-    'standTackle','slideTackle','interceptions','headingAcc','defAwareness','aggression','jumping',
-    'finishing','shotPower','longShots','volleys','attPositioning',
-    'composure','reactions','ballControl','dribbling','stamina'
-  ];
 
   function recalcEffStats(s) {
     if (!s) return { effA:0, effS:0, effG:0, effT:0 };
@@ -1064,7 +880,6 @@
 
     // ──── Extended layers: pure-function equivalents of the DOM calculators ────
     const g = (k) => Math.min(99, (s[k] != null ? +s[k] : 70) + rcBoost(k));
-    const round150 = (v) => Math.max(0, Math.min(150, Math.round(v)));
 
     // Passing
     let sp = g('shortPass'), lp = g('longPass'),
@@ -1256,11 +1071,10 @@
     };
   }
 
-  function statColor(v, isSprint, isTenacity) {
-    if (isSprint) return sprintColor(v);
-    if (isTenacity) return tenacityColor(v);
-    if (v >= 115) return 'var(--neutral)';
-    if (v >= 100) return 'var(--gain)';
-    if (v >= 85)  return '#E4953C';
-    return 'var(--loss)';
-  }
+  const FC26 = {
+    computeFeel, recalcEffStats, cmToFtIn, statTier,
+    CHEM_BOOSTS, DEFAULTS, EXT_STAT_IDS, SPRINT_CAP, TENACITY_CAP, BAR_VISUAL_MAX,
+  };
+  if (typeof module !== 'undefined' && module.exports) module.exports = FC26;
+  else root.FC26 = FC26;
+})(typeof window !== 'undefined' ? window : globalThis);
