@@ -1,0 +1,99 @@
+---
+import Base from '../../../../layouts/Base.astro';
+import { wiki, wikiFront } from '../../../../lib/site.js';
+
+export function getStaticPaths() {
+  return wiki.apps.map(app => ({ params: { app: app.slug }, props: { app } }));
+}
+const wk = wikiFront(Astro.props.app);
+---
+<Base title={`${wk.appTitle} - The write-up - Josh Bailey`} description={wk.lede} page="wiki">
+  <article data-page="wiki-front">
+    <section class="phead">
+      <a href="/projects/" class="back">← All projects</a>
+      <p data-ci class="kicker">Write-up · {wk.written} of {wk.total} sections written · revised {wk.revised}</p>
+      <h1 class="h1">
+        <span class="ln"><span data-cl data-tx={`pjn-${wk.appSlug}`} class="ln-in">{wk.appTitle}.</span></span>
+        <span class="ln"><span data-cl class="ln-in thin">The write-up.</span></span>
+      </h1>
+      <div class="intro">
+        <div data-ci class="intro-main">
+          <p class="lede">{wk.lede}</p>
+          <div class="btns">
+            <a href={wk.startHref} class="btn">Start reading →</a>
+            <a href={wk.app} class="btn btn--ghost">Launch app ↗</a>
+          </div>
+        </div>
+        <dl data-ci class="facts facts--side">
+          {wk.facts.map(f => <div><dt>{f.k}</dt><dd>{f.v}</dd></div>)}
+        </dl>
+      </div>
+      {wk.isDraftApp && <p data-ci class="note-card note-card--draft"><span class="b">Still a draft.</span> The structure, links and facts are real. The wording isn’t final.</p>}
+    </section>
+
+    <section data-wn class="sec sec--white">
+      <div class="narr narr--wk">
+        <h2 class="narr-l">In short</h2>
+        <p class="narr-p">{wk.summary.map(w => <span data-ww>{w}</span>)}</p>
+      </div>
+    </section>
+
+    <section class="sec">
+      <div class="wrap-sec wrap-sec--wk">
+        <div data-rv class="shead shead--wk">
+          <h2 class="shead-l">Contents</h2>
+          <p class="statement">Start anywhere. Each section stands on its own.</p>
+        </div>
+        <div data-hvg="wk" class="groups">
+          {wk.groups.map(g => (
+            <div data-rv class="group">
+              <div class="group-l"><h3 class="group-h">{g.name}</h3><span class="small-875">{g.count}</span></div>
+              <ol class="rows rows--wk">
+                {g.rows.map(r => (
+                  <li data-hv={r.slug} class:list={[{ 'is-plan': !r.isLink }]}>
+                    {r.isLink ? (
+                      <a href={r.href} class="wrow hd-a"><span class="wrow-n">{r.n}</span><span class="wrow-main"><span data-tx={`wk-${r.slug}`} data-tx-to={r.to} class="wrow-t">{r.title}</span><span class="wrow-lede hd-sub">{r.lede}</span></span><span class="wrow-meta hd-sub"><span class="tnum">{r.meta}</span><span aria-hidden="true" class="arrow arrow--x">→</span></span></a>
+                    ) : (
+                      <div class="wrow hd-a"><span class="wrow-n">{r.n}</span><span class="wrow-main"><span class="wrow-t">{r.title}</span><span class="wrow-lede hd-sub">{r.lede}</span></span><span class="planned">Planned</span></div>
+                    )}
+                  </li>
+                ))}
+              </ol>
+            </div>
+          ))}
+        </div>
+        <p class="note-line note-line--wk">Planned sections aren’t written yet. They’re listed so you can see what’s coming.</p>
+      </div>
+    </section>
+
+    {wk.terms.length > 0 && (
+      <section class="sec sec--white">
+        <div class="wrap-sec wrap-sec--wk">
+          <div data-rv class="shead shead--wk">
+            <h2 class="shead-l">Glossary</h2>
+            <p class="statement">The terms the write-up leans on.</p>
+          </div>
+          <dl id="glossary" class="gloss">
+            {wk.terms.map((t, i) => (
+              <div data-rv={i < 6 ? '' : undefined} data-gx={i < 6 ? undefined : ''} hidden={i >= 6} class="gterm">
+                <dt><span class="gterm-k">{t.kind}</span><span class="gterm-t">{t.term}</span></dt>
+                <dd class="gterm-d">{t.text}</dd>
+                {t.refHref && <dd class="gterm-ref"><a href={t.refHref}>Explained in {t.refTitle}</a></dd>}
+              </div>
+            ))}
+          </dl>
+          {wk.terms.length > 6 && <button type="button" data-gloss data-all={`Show all ${wk.terms.length} terms`} aria-controls="glossary" aria-expanded="false" class="pill pill--gloss">Show all {wk.terms.length} terms</button>}
+        </div>
+      </section>
+    )}
+
+    {wk.other && (
+      <a href={wk.other.href} class="band">
+        <div class="band-in">
+          <div class="band-col band-col--w"><span class="band-k">Other write-up</span><span data-tx={`pjn-${wk.other.slug}`} data-tx-to={wk.other.to} class="band-t balance">{wk.other.title}</span><span class="band-sub pretty">{wk.other.lede}</span></div>
+          <span class="big-arrow">→</span>
+        </div>
+      </a>
+    )}
+  </article>
+</Base>

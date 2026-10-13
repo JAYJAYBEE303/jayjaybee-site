@@ -1,0 +1,130 @@
+---
+import Base from '../layouts/Base.astro';
+import { Image } from 'astro:assets';
+import portrait from '../assets/portrait.png';
+import { homeRoles, segs, words, keeps, projects } from '../lib/site.js';
+---
+<Base title="Josh Bailey - IT Desktop Analyst, Aston Martin F1" page="home">
+  <section class="hero">
+    <p data-hr class="meta">Aston Martin F1 · Silverstone, UK</p>
+    <h1 class="h1">
+      <span class="ln"><span data-line class="ln-in">Pressure-tested delivery.</span></span>
+      <span class="ln"><span data-line class="ln-in thin">People-first support.</span></span>
+    </h1>
+    <div class="intro">
+      <div data-hr class="intro-main">
+        <p class="lede">I keep the laptops, identities, and endpoint policy at Aston Martin F1 quietly out of the way, so people can get on with their work. This page sits alongside my CV and shows how I work.</p>
+        <div class="btns">
+          <a href="/files/CV.pdf" class="btn">Download CV (PDF)</a>
+          <a href="mailto:jjb303@hotmail.co.uk" class="btn btn--ghost">Email me</a>
+        </div>
+      </div>
+      <dl data-hr class="facts facts--home">
+        <div><dt>Currently</dt><dd>IT Desktop Support Analyst, Aston Martin F1</dd></div>
+        <div><dt>In IT support</dt><dd>Since 2017</dd></div>
+        <div><dt>Platforms</dt><dd>Intune, Jamf, Entra, M365</dd></div>
+        <div><dt>Certified</dt><dd>Jamf 200</dd></div>
+      </dl>
+    </div>
+
+    <nav data-index aria-label="On this page" class="index">
+      <p data-hr class="index-label">On this page</p>
+      <div class="cards">
+        <a data-hr href="#work" class="card icard"><span class="icard-t">Work</span><span class="icard-d">Four roles from 2017 to now, each with a full write-up.</span></a>
+        <a data-hr href="#projects" class="card icard"><span class="icard-t">Projects</span><span class="icard-d">Three things I’ve built, each with its own write-up.</span></a>
+        <a data-hr href="#about" class="card icard"><span class="icard-t">About</span><span class="icard-d">How I work, and a little about life outside it.</span></a>
+        <a data-hr href="#contact" class="card icard"><span class="icard-t">Contact</span><span class="icard-d">Email, LinkedIn, GitHub, and the CV.</span></a>
+      </div>
+    </nav>
+  </section>
+
+  <section data-narr class="sec sec--white">
+    <div class="narr">
+      <h2 class="narr-l">In short</h2>
+      <p class="narr-p">{words.map(w => <span data-w class={w.hl ? 'hl' : undefined}>{w.t}</span>)}</p>
+    </div>
+  </section>
+
+  <section id="work" data-sec="work" class="sec sec--white">
+    <div class="wrap-sec">
+      <div data-rv class="shead">
+        <h2 class="shead-l">Work</h2>
+        <p class="statement">Different rooms, the same shape of problem.</p>
+      </div>
+
+      <div data-bar aria-hidden="true" data-hvg="roles" class="bar">
+        <div class="bar-track">
+          {segs.map(s => <div data-hv={s.i} class:list={['bar-col', { 'is-cur': s.current }]} style={`--g:${s.grow}`}><div data-seg class="bar-seg"></div></div>)}
+        </div>
+        <div class="bar-labels">
+          {segs.map(s => <div data-hv={s.i} class:list={['bar-lab', { 'is-cur': s.current }]} style={`--g:${s.grow}`}><span class="bar-name">{s.label}</span><span class="bar-from">{s.from}</span></div>)}
+        </div>
+      </div>
+
+      <ol data-hvg="roles" class="rows">
+        {homeRoles.map(r => (
+          <li data-rv data-hv={r.i}>
+            <a href={r.href} aria-label={r.aria} class="role-a hd-a">
+              <span class="role-when hd-sub">{r.when}</span>
+              <span class="role-id">
+                <img data-tx={`role-${r.slug}`} data-tx-to={r.to} src={r.logo} alt="" class="logo">
+                <span class="role-names"><span class="role-org">{r.org}</span><span data-tx={`rt-${r.slug}`} data-tx-to={r.to} class="hd-sub">{r.title}</span></span>
+              </span>
+              <span class="row-line hd-sub"><span class="row-line-t">{r.line}</span><span aria-hidden="true" class="arrow arrow--x">→</span></span>
+            </a>
+          </li>
+        ))}
+      </ol>
+      <p class="note-line">Select a role for the full write-up, or see the <a href="/files/CV.pdf">CV</a>.</p>
+    </div>
+  </section>
+
+  <section id="projects" data-sec="projects" class="sec">
+    <div class="wrap-sec">
+      <div data-rv class="shead">
+        <h2 class="shead-l">Projects</h2>
+        <p class="statement">Things I build when life allows.</p>
+      </div>
+      <div class="cards cards--proj">
+        {projects.map(p => (
+          <a data-rv href={p.href} class="card pcard">
+            <span class="pcard-head"><span data-tx={`pjm-${p.slug}`} data-tx-to={p.to} data-tx-box class="mono">{p.mono}</span><span class="pcard-names"><span data-tx={`pjn-${p.slug}`} data-tx-to={p.to} class="pcard-name">{p.name}</span><span class="pcard-kind">{p.kind}</span></span></span>
+            <span class="pcard-line">{p.line}</span>
+          </a>
+        ))}
+      </div>
+      <p class="note-line"><a href="/projects/">See all projects</a> for the detail, live apps, and write-ups.</p>
+    </div>
+  </section>
+
+  <a href="/ai-thesis/" class="band band--white">
+    <div data-rv class="essay">
+      <h2 class="shead-l essay-l">Essay</h2>
+      <div class="essay-body">
+        <span class="essay-t"><span data-tx="th1" data-tx-to="thesis:">New frontiers,</span> <span data-tx="th2" data-tx-to="thesis:" class="thin">old risks.</span></span>
+        <span class="essay-d">On AI as the next uncharted frontier, why I built this site, and how the skill set stays worth something. Three chapters, about 20 minutes.</span>
+      </div>
+      <span aria-hidden="true" class="big-arrow">→</span>
+    </div>
+  </a>
+
+  <section id="about" data-sec="about" class="sec">
+    <div class="wrap-sec">
+      <div data-rv class="shead">
+        <h2 class="shead-l">About</h2>
+        <p class="statement">Casual on the surface, serious underneath.</p>
+      </div>
+      <div class="about">
+        <figure data-rv class="portrait">
+          <Image src={portrait} alt="Josh Bailey" widths={[304, 608, 912]} sizes="19rem" />
+        </figure>
+        <div class="about-main">
+          <ul class="keeps">
+            {keeps.map(k => <li data-rv class="keep"><h3 class="keep-h">{k.head}</h3><p class="keep-p">{k.body}</p></li>)}
+          </ul>
+          <p data-rv class="aside-card"><span class="b">Outside work:</span> Milton Keynes, a partner, a daughter born August 2025, metal guitar, Arsenal, and about 190 Spotify playlists.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</Base>

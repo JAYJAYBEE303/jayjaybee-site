@@ -1,0 +1,300 @@
+{
+  "apps": [
+    {
+      "slug": "gaffer-iq", "title": "Gaffer IQ", "mono": "G", "app": "/projects/apps/gaffer-iq/", "revised": "2026-08-25",
+      "lede": "A Fantasy Premier League tool that stops treating fixture difficulty as a property of a team, and starts treating it as a property of a pairing.",
+      "summary": "Five views over one scoring engine - Matchups, Fixtures, Ranker, Dashboard and Planner - replacing FPL's 1–5 difficulty rating with a weighted composite of five sub-metrics, scored relative to the opponent so both sides of a fixture sum to 100.",
+      "glance": [
+        ["App shape", ["Static", "Frontend-built", "Single-page application (SPA)"]],
+        ["Build approach", ["Vanilla JS", "ES modules", "No build step"]],
+        ["Talking to servers", ["CORS", "Serverless", "Proxy", "Allowlist", "REST API"]],
+        ["Runtime behaviour", ["Client-side rendering", "Pure functions", "State management / pub-sub", "Caching / TTL"]]
+      ],
+      "sections": [
+        { "slug": "what-is-this", "group": "Overview", "title": "What is Gaffer IQ?", "revised": "2026-09-03",
+          "lede": "Why a personal FPL tool exists at all, and what is wrong with a difficulty rating that belongs to a team rather than to a fixture.",
+          "body": [
+            "If you play Fantasy Premier League but aren't an expert in football, it can be really tough to make the right transfers, predict the best fixtures, and know when and how to use your chips.",
+            { "h": "The problem with a 1–5 rating" },
+            "There is a built-in difficulty rating for matchups scaling from 1 for easiest to 5 for toughest; that number is attached to a team and left there, but it cannot express that a side is brittle away and stubborn at home, that its form has turned since August, or that this particular attack is the wrong shape to hurt this particular defence.",
+            { "h": "Why the tool exists" },
+            "I made Gaffer IQ to try to mitigate this problem. It is a personal tool, not a product. No accounts, no sign-up, no multi-tenancy. Its purpose is to provide a comprehensive insight into what the Premier League looks like further ahead, and to provide as much clear information as could be needed to make the right call in your Fantasy Premier League season."
+          ] },
+        { "slug": "approach", "group": "Design philosophy", "title": "Approach", "revised": "2026-09-03",
+          "lede": "Pull as much data as possible, process it into a new perspective, and keep the platform modular enough that the data can be parsed globally.",
+          "glance": [["Goal", ["Maximum data intake", "Accurate predictions", "A new perspective"]], ["Constraint", ["Accessibility", "Intuitiveness", "Data density"]], ["Back end", ["Modular", "Global data parsing", "Scalable design"]]],
+          "body": [
+            { "h": "The idea" },
+            "The idea was to pull as much data as possible and use that data to make accurate predictions for every player and every fixture. There is a lot of data to process, so to make this with accessibility and intuitiveness was a fundamental I've tried to stick to. The data comes from two main locations in its current phase and is processed to provide a new perspective on team and player performance.",
+            { "h": "The back end" },
+            "On the back end, it was important to have the platform modular so that data can easily be parsed globally across the site and to allow for a scalable design."
+          ] },
+        { "slug": "the-data", "group": "Design philosophy", "title": "The data", "revised": "2026-09-03",
+          "lede": "Two sources, one serverless function, and everything else running in the browser – plus a frank list of what the FPL API does not give you.",
+          "glance": [["Sources", ["FPL API", "Understat"]], ["Talking to them", ["One Vercel function", "CORS", "Proxy", "Allowlist"]], ["Everything else", ["Client-side rendering"]]],
+          "body": [
+            { "h": "Where the logic runs" },
+            "Every piece of analytical logic runs in the browser. The one serverless function on Vercel exists solely because the FPL API sends no CORS headers – it fetches from an allowlist and forwards, and does nothing else.",
+            { "h": "The FPL API, and what it leaves out" },
+            "The FPL API ([fantasy.premierleague.com/api](https://fantasy.premierleague.com/api/)) supplies the spine: squads, prices, positions, fixtures, per-player histories, live gameweek scoring. What it conspicuously does not supply is most of what makes a matchup readable:",
+            { "ul": ["No standings endpoint, so the league table is accumulated from the fixtures feed instead.", "No access to any season but the current one.", "No minute timings, and no goal-to-assist pairing.", "No teamsheet of any kind."] },
+            { "h": "Understat, which fills the gaps" },
+            "Understat, although not an API ([understat.com](https://understat.com)), fills those gaps: expected goals for the shot-quality FPL never exposes, six seasons of cross-season fixture lists so head-to-head records can reach past August, chronological match timelines with minutes, and rosters carrying position codes and substitution linkage so a real starting XI and formation can be derived."
+          ] },
+        { "slug": "the-engine", "group": "Design philosophy", "title": "The engine", "revised": "2026-09-03",
+          "lede": "All the number-crunching in one place, the settings that control it in another, and a confidence level attached to every output.",
+          "glance": [["Structure", ["engine/", "Config file", "Pure functions"]], ["Rule", ["Settings, not formulas", "No bolted-on shortcuts"]], ["Every output carries", ["A stated direction", "A confidence level", "Max weight contribution"]]],
+          "body": [
+            { "h": "One place for the numbers" },
+            "To be able to predict how strong a player or fixture is, all the number-crunching lives in one place – `engine/`, containing js files. If a view needs a new number, it gets added to the engine properly, not bolted on as a shortcut. That's what keeps every screen showing the same story.",
+            { "h": "Settings, not formulas" },
+            "The settings that control the model (how much recent form matters, how much a tough opponent counts) live in one config file, separate from the formulas. Changing the model means adjusting a setting, never rewriting a formula.",
+            { "h": "Direction and confidence" },
+            "Every calculation has to clearly state which way it points, as well as an acknowledged confidence level in each output according to max weight contribution to the overall player or fixture score. There are automated tests to catch it, and the current weightings are an honest best guess, written down so they can be challenged – not treated as fact – until enough data is available after enough fixtures that can prove them right."
+          ] },
+        { "slug": "the-interface", "group": "Design philosophy", "title": "The interface", "revised": "2026-09-03",
+          "lede": "Splitting dense data so it does not overwhelm, and offering more than one route to the same information.",
+          "glance": [["Problem", ["Data density", "Overwhelming a user"]], ["Devices", ["Clear containers", "Colouring", "Spacing", "Separated views"]], ["Influences", ["Apple accessible design", "Modern English football"]]],
+          "body": [
+            { "h": "Splitting the density" },
+            "Without care and intention towards the UI styling and structuring, the platform is virtually useless. I designed Gaffer IQ to split and separate data in a way that tries to avoid overwhelming a user where it can. Having clear containers, colouring, spacing, and appropriate separate areas for different views and data allows a user to find information relevant to the fixtures they're interested in as easily as possible with the data density considered.",
+            { "h": "More than one route in" },
+            "It's also important that there are multiple ways of finding information so that the platform feels intuitive in a similar way to Apple's accessible design philosophy, with buttons clear and animations in contextually appropriate places to show what items are interactive. I intentionally leant towards a style that feels appropriate for modern English football and I am confident that the styling represents the platform's purpose accurately."
+          ] },
+        { "slug": "matchup-idea-and-approach", "group": "Matchups", "title": "Idea and approach", "revised": "2026-09-03",
+          "lede": "The front page – a comprehensive view of the matchups ahead, with the deep dive on any single fixture sitting inside it.",
+          "glance": [["Role", ["The front page", "General view", "Single-fixture deep dive"]], ["The deep dive shows", ["Both sides scored", "CompositeScore", "Counter-matchup", "The players behind each pairing"]]],
+          "body": [
+            { "h": "The front page" },
+            "The thinking was that this was going to be the front page, giving a very detailed view into matchup predictions and allowing for a deep dive on a single fixture: both sides scored, every [[calculations|sub-metric]] shown, each counter-matchup pairing openable to name the players behind it.",
+            { "h": "More than one way in" },
+            "A page whose general view gives comprehensive perspectives on upcoming matchups has high potential, so it carries multiple ways to get a good idea of the future of the season rather than one."
+          ] },
+        { "slug": "matchup-design", "group": "Matchups", "title": "Design", "revised": "2026-09-03",
+          "lede": "Why the page ended up graphical rather than number-heavy – several containers, each answering a different question about the season ahead.",
+          "glance": [["Questions asked", ["Matchup breakdown", "Which teams have it easy", "Gameweek by gameweek", "Highlights worth holding"]], ["Direction chosen", ["Graphical over number-heavy", "Interactive", "Container-based"]]],
+          "body": [
+            { "h": "The questions a user arrives with" },
+            "There are several ways I could've made it easy for the user to see what they want to see:",
+            { "ul": ["Do they want to see deep dives into specific matchups?", "Do they want to see what teams have strong or weak fixtures coming up?", "Does the user want to go through each gameweek and see what each matchup looks like?", "Do they want to see the key information worth holding onto for each gameweek, to see overall high and low potential weekends?"] },
+            "Well… why not all of it?",
+            { "h": "In concept" },
+            "There are a lot of ways a user might want to see this information, so instead of having the page be number-heavy, I instead went in the direction of something that is more graphical, interactive, and comprehensive to use and understand. I'd do this with different containers of information, some providing more of a deep dive than others, providing the user different perspectives on how to view the season. I was thinking about having the deep dive into specific matchups in the middle as this will provide the most important general info on matchups, views for future gameweeks and a team's upcoming fixtures, and a way to see the highlighted info for all upcoming gameweeks which would improve the user's foresight for the season ahead."
+          ] },
+        { "slug": "matchup-the-tools", "group": "Matchups", "title": "The tools", "revised": "2026-09-03",
+          "lede": "The four areas the page is built from – the central breakdown, the two side columns, and the season strip along the bottom.",
+          "glance": [["The four regions", ["Matchup breakdown", "Matchups by gameweek", "Fixtures by team", "Full season strip"]], ["The breakdown shows", ["Decision weight", "Confidence", "Playstyle counters", "Overall prediction score"]], ["The strip highlights", ["Double gameweeks", "Postponed fixtures", "Captaincy predictions", "Chip windows"]]],
+          "body": [
+            "There are four main areas providing different perspectives, to give the user every tool needed to find the information they're seeking for the season ahead.",
+            { "h": "Central element: matchup breakdown" },
+            "The central element is the deep dive into a specific matchup, allowing for a comprehensive breakdown of what makes a matchup sway one way and by how much. It shows decision weight, confidence, playstyle counters, and a score of the overall prediction. There are small info buttons that the user will see to elaborate on a metric in a way that isn't invasive on the design, allowing the user to understand exactly how a metric comes to show the decided integer.",
+            { "h": "Left column: matchups by gameweek" },
+            "The left column shows all the fixtures that are happening for one specific gameweek, allowing the user to understand who is playing who on what specific weeks. The user can also click on a matchup and the matchup breakdown will appear in the middle. This solely aims to provide the user with a different way to explore what's coming up in the season.",
+            { "h": "Right column: fixtures by team" },
+            "The column on the right shows all the fixtures that are ahead for the chosen team, meaning the user can see how strongly a team fares in its upcoming games. Similarly to the matchups by gameweek, the user can also click matchups to explore a deeper breakdown, and it serves the same purpose of providing alternative ways to filter what comes ahead.",
+            { "h": "Bottom: full season strip" },
+            "The bottom strip provides the view with the best horizon, but this took the most work to get right, balancing interaction mechanics, animation, spacing, and graphic indications. This area is designed to highlight the notable matches when considering FPL specifically. It allows a view that highlights:",
+            { "ul": ["Strong and weak gameweeks.", "Matches with extreme one-sided predictions.", "Strong captaincy predictions.", "Double gameweeks and postponed fixtures.", "Suggested best times to use an FPL chip."] },
+            "The work taken to get the animations, spacing, colour coding and methods, general design philosophy, and presenting errors ironed out took roughly a million tokens of repeated tweaks, bug fixing, and testing to get right, but I think it's one of the most useful tools on the site for FPL users specifically."
+          ] },
+        { "slug": "scoring-philosophy", "group": "Matchups", "title": "Scoring philosophy", "revised": "2026-09-03",
+          "lede": "Not “is this fixture hard” but “is this fixture hard for this player, doing this job, right now” – and how much to believe the answer.",
+          "glance": [["The question", ["For this player", "Doing this job", "Right now"]], ["Weighting", ["Recent form", "Team strength", "Head-to-head"]], ["Honesty", ["No opinion is not a bad fixture", "Thin data lowers confidence", "Reasoning attached"]]],
+          "body": [
+            { "h": "The question it asks" },
+            "Every FPL tool gives you the same thing: a 1-to-5 star rating pulled straight from the official app. Gaffer IQ builds its own rating from scratch, and answers a sharper question: not \"is this fixture hard,\" but \"is this fixture hard for this specific player, doing this specific job, right now.\" FPL's rating calls a match \"easy\" because the opponent's bottom of the table. Gaffer IQ checks whether your striker's opponent specifically has leaky centre-backs, whether that team plays completely differently at home versus away, and whether their rating is outdated and overrated. Several angles, calculated separately, then combined, because \"hard fixture\" and \"hard fixture for a winger\" are different questions, and most tools collapse them into one.",
+            { "h": "Weight and confidence" },
+            "The part that makes it trustworthy is how it handles weight and confidence. Not every signal gets an equal vote; recent form and team strength carry real weight; head-to-head history barely moves the needle, because a rivalry from three managers ago isn't strong evidence today. And when the data's too thin (a promoted team with no track record) the model doesn't fake confidence. It knows the difference between \"no strong opinion\" and \"bad fixture,\" and never confuses the two. Most tools will happily hand you a confident number standing on almost nothing.",
+            { "h": "Reasoning attached" },
+            "Every score also comes with its reasoning attached – you can see exactly what pushed it up or down. It's not \"trust us,\" it's \"here's the case.\" In one line: this isn't a smarter-looking star rating; it's a tool that tells you where an edge is coming from, and how much to believe it."
+          ] },
+        { "slug": "calculations", "group": "Matchups", "title": "Calculations", "revised": "2026-09-03",
+          "lede": "Five weighted sub-metrics, each with its own maturity curve, combined into one CompositeScore and mapped to five colour bands.",
+          "glance": [["The five sub-metrics", ["Base difficulty", "Counter-matchup", "Team form", "Head-to-head", "Home and away"]], ["Controls", ["CompositeScore", "Maturity curve", "Stacking penalty"]], ["Sources", ["FPL API", "Understat"]]],
+          "body": [
+            { "h": "The five sub-metrics" },
+            "Five weighted sub-metrics result in the overall score, known as the `CompositeScore`, as one number:",
+            { "ul": [
+              "**Base difficulty** – the difficulty metric from FPL directly, to use as a base. A fetch from `api/fpl.js` reaches [fantasy.premierleague.com/api/fixtures](https://fantasy.premierleague.com/api/fixtures) through Vercel, and harvests the `team_h_difficulty` and `team_a_difficulty`. This is then converted to a 10 if 1, 30 if 2, 50 if 3, 70 if 4, and 90 if 5.",
+              "**Counter-matchup** – this is the heaviest calculation. What this does, rather than defining a team's strength, it instead calculates where a team is strongest and weakest. For example, if a team who concedes mostly set pieces plays against a team that scores mostly from set pieces, the counter-matchup score will swing strongly one way, but if two teams' strengths and weaknesses don't counter each other, then this will remain balanced. The relevant data is fetched from understat.com's `getTeamData` endpoint. It will fetch shots, goals, situation, and total predicted goals from those shots, and calculate the average predicted goals for that situation, known as shared xG – otherwise where the biggest threat comes from for that team. It will then do this for all situations such as transition play (fast play) and box occupation (close up slow play) as well as set pieces, both for attacking and conceding, calculate a score out of 100 based on how good or bad the counter is, and then calculate the average of all the counters, resulting in Counter-matchup. This also has a maturity value of 10 fixtures, elevating to a max 0.25 weight towards the total CompositeScore in a linear ascent, to weaken the contribution of wild early-season data.",
+              "**Team form** – recent trajectory, opponent-adjusted. It exists to correct base difficulty's preseason-seeded priors in-season. It's simply fetched from [fantasy.premierleague.com/api](https://fantasy.premierleague.com/api) through Vercel, pulls the `bootstrap-static/` endpoint, and harvests the `strength_overall_home` and `strength_overall_away` values. It then runs `oppAdj = oppStrength / leagueAvgStrength` in order to swing form one way or the other based on whether the form is against stronger teams or weaker teams. This also has a maturity, but of 5 fixtures, to reach a max weight of 0.2 – to account for teams that appear in perfect form after only 1 or 2 games.",
+              "**Head-to-head** – real cross-season meetings from the Understat history window. Kept deliberately small, as testing revealed that this weakens prediction accuracy if this holds more than a weight of 0.1. The last 10 meetings (or last 5 seasons) are fetched from [understat.com](https://understat.com) through their `getLeagueData/EPL/{season}` endpoint, looping until 5 seasons are fetched. The head-to-head score is then calculated by `100 × (TotalPointsWon / TotalPossiblePoints)`, to account for the validity of all wins, losses, and draws.",
+              "**Home and away** – home advantage strength compares how many points a team wins per game at home versus away, then measures how big that gap is compared to every other team in the league. A bigger gap means venue matters more for that team. Both teams' gaps get averaged and turned into a boost for the home side and an equal penalty for the away side, centred around a neutral 50."
+            ] },
+            { "h": "The stacking penalty" },
+            "A **stacking penalty** then applies across the sub-metrics. It and the base-difficulty weight are a matched pair – a weight that large would otherwise make a strong favourite's score nearly immovable, and the penalty is what lets several poor secondary signals tip a fixture without letting any single one do it alone. Neither should be tuned without re-checking the other.",
+            { "h": "The five bands" },
+            "The result maps to five bands, symmetric around a neutral midpoint, which drive colour everywhere in the app:",
+            { "bands": [["Great", "75–100"], ["Good", "60–74"], ["Neutral", "41–59"], ["Tough", "26–40"], ["Brutal", "0–25"]] },
+            "Thresholds are config rather than literals, so the palette can be recalibrated after a season's distribution has actually been observed.",
+            { "h": "The signal that was removed" },
+            "There used to be a sixth signal, style clash, and removing it is the most instructive decision in the model. It substantially restated the counter-matchup – two of its three rules described the same interaction, read from the same source data, at half the weight – and two correlated weak predictors are worse than one, because the shared noise gets counted twice while the dependable metrics are diluted. It also assumed season-average pressing is a stable team property, which it is not: a side presses a promoted team and sits off against a title contender. And its observed spread was narrow enough that it could move the composite by roughly half a point – too small to change a decision, large enough to add noise whenever it read a fixture wrong."
+          ] },
+        { "slug": "fixtures-idea-and-approach", "group": "Fixtures", "title": "Idea and approach", "revised": "2026-09-03",
+          "lede": "True historical data, exactly as fetched – a manual, less-processed way to read the game for anyone who doesn't fully trust the engine's guessing.",
+          "glance": [["Purpose", ["True historical data", "Minimal processing", "Open to interpretation"]], ["Audience", ["Manual readers", "Engine sceptics"]], ["Sources", ["Understat", "FPL API"]]],
+          "body": [
+            { "h": "Why a second style of view" },
+            "I wanted to provide a different style of view; instead of providing calculated metrics for what lies ahead, I wanted to provide a page that displays true historical data which relies less on the engine. This gives the user a more open-to-interpretation perspective on fixtures, in the case that they don't fully trust the engine providing the guessing for them – the [[matchup-idea-and-approach|Matchups]] page won't suit everyone, nor will everyone trust the engine's guessing and suggestions, so to expand the target audience I realised I needed a way to allow the user to have a more manual way of reading the game.",
+            { "h": "How it is sourced" },
+            "To do this, I chose to provide more rigid information that focuses on historical data that doesn't go through any processing change, and outputs useful data exactly as it was fetched. The understat.com API had everything needed to make this work effectively, meaning minimal data from the FPL API was needed to fill this area of the site."
+          ] },
+        { "slug": "fixtures-design", "group": "Fixtures", "title": "Design", "revised": "2026-09-03",
+          "lede": "Subtabs over one long page, and numbers over graphics – a deliberate contrast with the Matchups page this section pairs against.",
+          "glance": [["Layouts weighed", ["One page, like Matchups", "Subtabs", "One long scroll"]], ["Chosen", ["Subtabs", "Low graphic intensity", "Numbers as they are"]], ["Because", ["High statistic volume", "Not prediction-based", "Avoid overload"]]],
+          "body": [
+            { "h": "The options" },
+            "There were varying ways I could do this:",
+            { "ol": ["Provide this all on one page, similar to the [[matchup-idea-and-approach|Matchups]] page.", "Have a layout that lays things out with subtabs.", "Have it as one long scrollable page."] },
+            "I also needed to decide whether I'd go down a similar graphic-led design – something interactive and engaging for users – or one that was more numbers-focused, showing the statistics exactly as they are.",
+            { "h": "What I chose, and why" },
+            "I decided to go down the route of subtabs, with lower graphic intensity and just displaying numbers as they are. I decided this was the best direction because there is a lot of statistics to fetch and show, and with it being less prediction-based – i.e. representing a true historical statistic fetch – it was important that this page represented that. With so much information to show, I felt that subtabs were the best direction to avoid overloading the user, causing them to get lost in a sea of metrics when they may be looking for something more specific rather than the general overviews Matchups provides."
+          ] },
+        { "slug": "fixtures-gameweek", "group": "Fixtures", "title": "Gameweek", "revised": "2026-09-03",
+          "lede": "Minimal before kickoff, then a full graphical breakdown once the match has been played.",
+          "glance": [["Before kickoff", ["Home and away", "Recent history of the fixture"]], ["After the match", ["Key events", "Which side, and by whom", "Timings"]], ["Lineups", ["Starting XI", "Substitutions", "Minutes played", "Bench"]]],
+          "body": [
+            "A simple-looking interface that unlocks potential after fixtures are played, allowing a more literal view of the upcoming week's fixtures.",
+            { "h": "Before kickoff" },
+            "Before a matchup is played, information is minimal. You can see who is playing home and away, as well as the recent history of that fixture.",
+            { "h": "After the match" },
+            "After a match has been played, however, its potential becomes apparent. You get a graphically appropriate breakdown of all the key events that happened during that match:",
+            { "ul": ["What side the event happened for, who it was committed by, and when.", "Exactly who was substituted for who, and at what time during the game.", "Who started, how many minutes were played, and who was left on the bench."] },
+            "This allows for a comprehensive view that matches modern interpretations of the same information, in a way that balances comprehensive design and detailed breakdown."
+          ] },
+        { "slug": "fixtures-table", "group": "Fixtures", "title": "Table", "revised": "2026-09-03",
+          "lede": "The least functional page on the site, and still worth including – a straight pull from Understat, sorted like the real thing.",
+          "glance": [["Source", ["Understat", "A simple pull"]], ["Sorting", ["Real-life table logic"]], ["Links out to", ["By team"]]],
+          "body": [
+            { "h": "Why include it" },
+            "The league table is probably the page on the site that holds the least functionality, but I still felt it was important to include. If the user wanted to look at this to understand further the real-life performance in the league, or get a better understanding of team form, they would want this but would need to look elsewhere. Including it only required a simple pull from understat.com of all the relevant statistics users expect from looking at a league table, and a sort with identical logic to how real-life table positions are determined.",
+            { "h": "Where it leads" },
+            "Clicking on a team allows the user to visit a deeper look into how that team has been doing over its matches earlier in the season, by directing them to the [[fixtures-by-team|By team]] area of this page."
+          ] },
+        { "slug": "fixtures-by-team", "group": "Fixtures", "title": "By team", "revised": "2026-09-03",
+          "lede": "One club's wins, draws and losses across the season so far, and what's still to come – styled to match, but on par with official sources.",
+          "glance": [["Shows", ["Wins, draws and losses", "The season so far", "Fixtures still to come"]], ["Design goal", ["Parity with official sources", "Styling consistent with the site"]], ["Links out to", ["Head-to-head"]]],
+          "body": [
+            { "h": "What it shows" },
+            "Users might want to see more regarding specific team performance – i.e. see exactly what their wins, draws, and losses look like across the season so far, and what they can expect to come. This was also designed with the idea of being on par with current designs for the same information from official sources, but in a way where the styling is consistent with the site.",
+            { "h": "Where it leads" },
+            "The user can click one of the teams that appears in their future or past matchups. For example, if the user is viewing Liverpool's fixtures and results and clicks on Man Utd in this tab, it will then direct them to the [[fixtures-head-to-head|Head-to-head]] area of the Fixtures page, allowing for a more specific view into that one specific matchup."
+          ] },
+        { "slug": "fixtures-head-to-head", "group": "Fixtures", "title": "Head-to-head", "revised": "2026-09-03",
+          "lede": "Wins, draws and losses for one pairing, and the patterns that surface in them – the same record that feeds the H2H sub-metric on Matchups.",
+          "glance": [["Shows", ["Wins, draws and losses", "Average goals per meeting", "Unusual patterns"]], ["Window", ["Last 10 meetings", "Five seasons"]], ["Feeds", ["Head-to-head", "Ranker predicted points"]]],
+          "body": [
+            { "h": "The record behind the metric" },
+            "Head-to-head is where the user can see the specific context behind the H2H metric on the Matchup page. It shows how many wins, draws, or losses there are for the selected team against another selected team. This exposes unusual patterns – for example, Man City have won every single meeting with Fulham in the last 8 games despite being a relatively underestimated mid-table team, meanwhile Man City have also lost both games against Aston Villa last season, and have failed to end a match with three points against Brighton, both home and away, for three years running.",
+            { "h": "What it feeds" },
+            "In addition to being able to spot patterns – such as Liverpool having their highest win rate against a pretty decently sided Newcastle – you can also see the average number of goals that occur during their matchups, contributing to how valuable players are in the [[ranker-idea-and-approach|Ranker]] tab by their predicted points, as well as giving the user open-interpretation data on how they can leverage this for their FPL decisions."
+          ] },
+        { "slug": "ranker-idea-and-approach", "group": "Ranker", "title": "Idea and approach",
+          "lede": "The bridge between team-level fixture scores and player-level decisions.",
+          "body": [
+            "The bridge between team-level fixture scores and player-level decisions: a player's own form multiplied by that player's fixture composite across the horizon, producing a ranked projected-value list.",
+            "Sortable by projected value, cost per point, price or minutes security; filterable by position, price threshold, team and minutes security. Permanent Value and Cost/Pt columns sit alongside average points per gameweek, the next fixture with its rank and score, and a per-gameweek fixture strip for each player. Players are listed under their full names rather than FPL's `web_name`, which is compact but ambiguous across a 700-player pool – and the column sorts on the string it displays rather than on a field nobody can see."
+          ] },
+        { "slug": "ranker-design", "group": "Ranker", "title": "Design", "draft": true,
+          "lede": "How the ranked list is laid out, and why every column sorts on the value it actually shows.",
+          "body": ["This entry will cover the Ranker table – its permanent columns, the sorting and filtering controls, and the per-gameweek fixture strip that sits against each player."] },
+        { "slug": "dashboard-idea-and-approach", "group": "Dashboard", "title": "Idea and approach",
+          "lede": "This week only – captaincy, bench order and risk flags, deliberately locked to a single-gameweek horizon.",
+          "body": [
+            "This week only. The Dashboard is deliberately locked to the single-gameweek horizon while every other view runs on the longer one, because captaincy and bench order are not multi-week questions.",
+            "It picks a captain by highest expected points among the players actually in the squad, orders the starting XI and bench, and raises risk flags – low minutes security, a brutal band, a low-confidence score. While a gameweek is in progress it reads the live endpoint and shows points as they land."
+          ] },
+        { "slug": "planner-idea-and-approach", "group": "Planner", "title": "Idea and approach",
+          "lede": "The most horizon-aware view: every candidate transfer evaluated for its change in projected score, with the four-point hit modelled rather than ignored.",
+          "body": [
+            "The most horizon-aware view, and the one furthest down the dependency chain: it depends on the Ranker and, through it, on the whole engine.",
+            "It takes the current squad, the Ranker's projections across the horizon, and the budget and free-transfer constraints, then evaluates every candidate out-and-in swap for its change in projected horizon score. Moves are ranked by gain per cost, with the four-point hit for an extra transfer modelled rather than ignored – the question being whether a move pays for its own hit across the horizon, not just in the week it is made. Triple Captain candidates are picked on the same expected-points basis the Dashboard uses for captaincy."
+          ] },
+        { "slug": "planner-design", "group": "Planner", "title": "Design", "draft": true,
+          "lede": "How a ranked list of transfers is presented so the trade-off in each one stays visible.",
+          "body": ["This entry will cover the Planner layout – the squad it starts from, the ranked list of candidate moves, and how the cost of each move is shown alongside its gain."] },
+        { "slug": "planner-engine", "group": "Planner", "title": "Engine", "draft": true,
+          "lede": "What the Planner actually computes, and how a four-point hit is priced rather than ignored.",
+          "body": ["This entry will cover the Planner engine – how candidate swaps are generated under budget and free-transfer constraints, how each is scored across the horizon, and how the four-point hit is modelled."] }
+      ]
+    },
+    {
+      "slug": "fc26-calculator", "title": "FC26 Feel Calculator", "mono": "FC", "app": "/projects/apps/fc26-calculator/", "revised": "2026-08-25", "draft": true,
+      "lede": "The card says 87 pace. The player does not feel like 87 pace. This works out the difference.",
+      "summary": "About 2,500 lines of HTML and vanilla JS in a single file with no build step, rebuilt in Tailwind once the formulas stopped moving, with separate layouts for a focused mobile read and a comparison-heavy desktop one.",
+      "glance": [["Status", ["Live · iterating"]], ["Stack", ["HTML · JS · Tailwind"]], ["Build step", ["None"]], ["Size", ["~2,500 lines · one file"]], ["Layouts", ["Mobile read · desktop compare"]], ["First shipped", ["2026"]]],
+      "sections": [
+        { "slug": "the-problem", "group": "Overview", "title": "The problem",
+          "lede": "An EA FC card is a list of two-digit numbers. What a player feels like under your thumb is something else.",
+          "body": [
+            "An EA FC card is a list of two-digit numbers. What a player feels like under your thumb is something else: the numbers after chemistry has been applied, after PlayStyles have moved the curves, and after the game's own non-linear scaling has decided that the gap between 84 and 88 is not the same size as the gap between 88 and 92.",
+            "This calculator models that second thing. It exists because I wanted the version of it I could not find."
+          ] },
+        { "slug": "what-it-models", "group": "Overview", "title": "What it models",
+          "lede": "Chemistry as actually applied, PlayStyles including the plus tiers, and the diminishing-returns curves the game runs underneath.",
+          "body": [
+            { "ul": [
+              "**Chemistry** – the actual applied boosts at each chemistry level, not the headline figure.",
+              "**PlayStyles** – including the plus tiers, which change behaviour rather than just adding points.",
+              "**The underlying curves** – the diminishing returns the game runs that make raw stat comparison misleading at the top of the range.((These were derived from in-game testing across several rounds of tuning, not from any published source. They are a model of the game's behaviour, not a reading of its code.))"
+            ] }
+          ] },
+        { "slug": "one-file-no-build", "group": "Build", "title": "One file, no build",
+          "lede": "Around 2,500 lines in a single document, so the thing that ships is the thing I edited.",
+          "body": ["Around 2,500 lines of HTML and vanilla JavaScript in a single document. No bundler, no framework, no build step – which means the thing that ships is the thing I edited, and there is no toolchain to rot between one game cycle and the next."] },
+        { "slug": "two-layouts", "group": "Build", "title": "Two layouts",
+          "lede": "A focused single-player read on mobile, a comparison view on desktop, and the styling deliberately done last.",
+          "body": ["Mobile gets a single focused read: one player, the numbers that matter, nothing else. Desktop gets the comparison view, because comparison is what people actually open a calculator for and it needs horizontal room. The UI was rebuilt in Tailwind once the maths had stopped moving – deliberately in that order, so styling effort was not spent on layouts the formulas were about to invalidate."] },
+        { "slug": "what-it-taught-me", "group": "Notes", "title": "What it taught me",
+          "lede": "More about state management in plain JavaScript than any framework tutorial has.",
+          "body": [
+            "More about state management in plain JavaScript than any framework tutorial has. With no framework holding the state, every stale-value bug is yours, visible, and instructive.",
+            "It also set the pattern the rest of the work follows: model the thing properly first, argue with the model against reality, and only then make it look like something. [[gaffer-iq|Gaffer IQ]] was built the same way round."
+          ] },
+        { "slug": "still-to-write", "group": "Notes", "title": "Still to write", "draft": true,
+          "lede": "The formula-tuning log – what the first version got wrong, and where the model is still knowingly approximate.",
+          "body": ["The formula-tuning log – what the first version got wrong, which in-game tests moved the numbers most, and where the model is still knowingly approximate."] }
+      ]
+    }
+  ],
+  "glossary": {
+    "live · iterating": { "k": "Status", "t": "Deployed and in use, with the model still being retuned between gameweeks. Not a finished product and not pretending to be one." },
+    "one vercel function": { "k": "Backend", "t": "The single serverless function exists only because the FPL API sends no CORS headers. It fetches from an allowlist and forwards. It holds no state, no keys, and no logic of its own.", "r": "the-data" },
+    "fpl api": { "k": "Source", "t": "Supplies the spine – squads, prices, positions, fixtures, per-player histories and live gameweek scoring. It has no standings endpoint and no access to any season but the current one.", "r": "the-data" },
+    "understat": { "k": "Source", "t": "Not an API, but it fills the gaps the FPL feed leaves: expected goals, six seasons of fixture lists, chronological match timelines, and rosters with position codes and substitution linkage.", "r": "the-data" },
+    "none": { "k": "Build step", "t": "No bundler, no framework, no compile. The thing that ships is the thing that was edited, and there is no toolchain to rot between one season and the next." },
+    "html · js · tailwind": { "k": "Stack", "t": "Rebuilt in Tailwind once the formulas had stopped moving – deliberately in that order, so styling effort was not spent on layouts the maths was about to invalidate.", "r": "two-layouts" },
+    "mobile read · desktop compare": { "k": "Layouts", "t": "Mobile gets one player and the numbers that matter. Desktop gets the comparison view, because comparison is what people open a calculator for and it needs horizontal room.", "r": "two-layouts" },
+    "~2,500 lines · one file": { "k": "Size", "t": "A single document holding markup and logic together. Large for one file, and the deliberate trade for having no build step at all.", "r": "one-file-no-build" },
+    "static": { "k": "App shape", "t": "The app's files (HTML/CSS/JS) are served exactly as written, with nothing generated per-request.", "r": "approach" },
+    "frontend-built": { "k": "App shape", "t": "Nearly all the logic runs in the browser, not on a server. This is the app's core design choice.", "r": "approach" },
+    "single-page application (spa)": { "k": "App shape", "t": "One HTML page, JavaScript swaps content in and out instead of loading new pages.", "r": "the-interface" },
+    "vanilla js": { "k": "Build approach", "t": "No framework (no React/Vue). Plain JavaScript, run as-is.", "r": "approach" },
+    "es modules": { "k": "Build approach", "t": "The browser-native way files import each other (import/export), no bundler needed.", "r": "approach" },
+    "no build step": { "k": "Build approach", "t": "The code that runs is exactly the code you wrote, nothing compiles or transforms it first.", "r": "approach" },
+    "cors": { "k": "Servers", "t": "The browser security rule that blocks a webpage from calling a different site's API directly. It's why the proxy exists.", "r": "the-data" },
+    "serverless": { "k": "Servers", "t": "Backend code that runs on-demand in short bursts, with no server you keep running yourself. The proxy is this.", "r": "the-data" },
+    "proxy": { "k": "Servers", "t": "The serverless function's job: forward requests, don't process them.", "r": "the-data" },
+    "allowlist": { "k": "Servers", "t": "The proxy only forwards requests matching pre-approved URL patterns, rejecting everything else.", "r": "the-data" },
+    "rest api": { "k": "Servers", "t": "FPL's data source is fixed-endpoint REST, not GraphQL.", "r": "the-data" },
+    "client-side rendering": { "k": "Runtime", "t": "The browser builds and updates the page with JavaScript, rather than receiving a finished page from a server.", "r": "the-interface" },
+    "pure functions": { "k": "Runtime", "t": "The scoring engine's code style: same input always gives same output, no side effects.", "r": "the-engine" },
+    "state management / pub-sub": { "k": "Runtime", "t": "How the app tracks data and notifies its parts when new data arrives.", "r": "the-engine" },
+    "caching / ttl": { "k": "Runtime", "t": "Storing fetched data temporarily instead of re-fetching, with an expiry rule for staleness.", "r": "the-data" },
+    "compositescore": { "k": "Model", "t": "The single number every fixture is reduced to. Five weighted sub-metrics are scored separately and combined into it, and it is what drives the colour band shown anywhere in the app.", "r": "calculations" },
+    "base difficulty": { "k": "Sub-metric", "t": "FPL's own 1–5 rating, rescaled to 10/30/50/70/90 and used only as a starting point. It is preseason-seeded, which is why team form exists to correct it in-season.", "r": "calculations" },
+    "counter-matchup": { "k": "Sub-metric", "t": "The heaviest calculation. Rather than asking how strong a team is, it asks where each side is strongest and weakest, and whether those shapes counter each other. Matures over 10 fixtures to a maximum 0.25 weight.", "r": "calculations" },
+    "team form": { "k": "Sub-metric", "t": "Recent trajectory, adjusted for the strength of the opponents it was earned against. Matures over 5 fixtures to a maximum 0.2 weight, so two good games in August cannot read as perfect form.", "r": "calculations" },
+    "head-to-head": { "k": "Sub-metric", "t": "The real cross-season record between two clubs. Deliberately capped at a 0.1 weight – testing showed anything larger made predictions worse, because a rivalry from three managers ago is weak evidence.", "r": "fixtures-head-to-head" },
+    "home and away": { "k": "Sub-metric", "t": "How much venue matters to each side, measured as their home-versus-away points gap relative to the rest of the league, then applied as a boost to the home team and an equal penalty to the away team.", "r": "calculations" },
+    "maturity curve": { "k": "Control", "t": "A per-sub-metric ramp that holds a signal's weight down until enough fixtures have been played to trust it, rising linearly to its cap. It is what stops wild early-season data driving the score.", "r": "calculations" },
+    "stacking penalty": { "k": "Control", "t": "Applied across the sub-metrics so several weak secondary signals can tip a fixture without any single one doing it alone. It and the base-difficulty weight are a matched pair; neither is tuned alone.", "r": "calculations" },
+    "matchup breakdown": { "k": "Region", "t": "The central element of the Matchups page – the deep dive on one fixture, showing decision weight, confidence, playstyle counters and the overall prediction score.", "r": "matchup-the-tools" },
+    "full season strip": { "k": "Region", "t": "The bottom strip of the Matchups page, and the view with the longest horizon. It marks the gameweeks worth planning around rather than every fixture equally.", "r": "matchup-the-tools" },
+    "double gameweeks": { "k": "FPL term", "t": "A gameweek in which a club plays twice, usually because an earlier fixture was postponed and rescheduled into it. Highlighted on the season strip because it changes captaincy and chip decisions.", "r": "matchup-the-tools" },
+    "subtabs": { "k": "Pattern", "t": "The Fixtures page is split into four sub-views rather than one long scroll, chosen because the volume of historical statistics would otherwise bury whatever the reader came looking for.", "r": "fixtures-design" },
+    "starting xi": { "k": "Data", "t": "A real teamsheet with formation, derived from Understat's rosters via their position codes and substitution linkage. The FPL API exposes no teamsheet of any kind.", "r": "fixtures-gameweek" },
+    "data density": { "k": "Design problem", "t": "There is more data here than a page can show at once. The interface answers it with clear containers, colour, spacing and separated views rather than by showing less.", "r": "the-interface" },
+    "modular": { "k": "Architecture", "t": "Data is parsed once and made available globally across the site rather than re-fetched per view, which is what allows a new view to be added without a new data path.", "r": "approach" }
+  }
+}

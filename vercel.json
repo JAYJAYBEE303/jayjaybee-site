@@ -1,4 +1,8 @@
 {
+  "framework": "astro",
+  "installCommand": "npm install",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
   "redirects": [
     {
       "source": "/projects/apps/gaffer-iq",
@@ -14,6 +18,26 @@
       "source": "/projects/apps/fc26-calculator",
       "destination": "/projects/apps/fc26-calculator/",
       "permanent": true
+    },
+    {
+      "source": "/projects/wiki",
+      "destination": "/projects/",
+      "permanent": true
+    },
+    {
+      "source": "/projects/wiki/",
+      "destination": "/projects/",
+      "permanent": true
+    },
+    {
+      "source": "/projects/wiki/f1live",
+      "destination": "/projects/",
+      "permanent": false
+    },
+    {
+      "source": "/projects/wiki/f1live/:path*",
+      "destination": "/projects/",
+      "permanent": false
     }
   ],
   "rewrites": [

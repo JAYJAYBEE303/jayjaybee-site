@@ -1,0 +1,75 @@
+---
+// Shared document: head, sticky header (+ optional page sub-bar), <main>, contact.
+// `page` is the route type the header's nav state is drawn for.
+import '../styles/site.css';
+import { order } from '../lib/site.js';
+
+const { title, description = 'Josh Bailey. IT Desktop Analyst at Aston Martin F1. Endpoint work, PowerShell tooling, and the small, sharp tools that should already exist.', page } = Astro.props;
+const navOn = k => (page === 'case' ? k === 'work' : page === 'projects' || page === 'wiki' ? k === 'projects' : page === 'thesis' ? k === 'thesis' : false);
+const nav = [['work', '/#work', 'Work'], ['projects', '/projects/', 'Projects'], ['thesis', '/ai-thesis/', 'AI thesis'], ['about', '/#about', 'About'], ['contact', '/#contact', 'Contact']];
+---
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{title}</title>
+  <meta name="description" content={description}>
+  <link rel="canonical" href={new URL(Astro.url.pathname, Astro.site)}>
+  <script is:inline>
+    (function () {
+      var r = document.documentElement;
+      r.classList.add('js');
+      if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        r.classList.add('tx-boot');
+        setTimeout(function () { r.classList.remove('tx-boot'); }, 3000);
+      }
+    })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300..700&display=swap">
+  <script type="application/json" id="tx-order" is:inline set:html={JSON.stringify(order)}></script>
+</head>
+<body>
+<header class="hdr">
+  <div class="hdr-bar">
+    <a href="/#top" class="brand">Josh Bailey<span>IT Desktop Analyst</span></a>
+    <div class="hdr-right">
+      <nav class:list={['nav', { 'is-hidden': page === 'home' }]} aria-label="Main">
+        {nav.map(([k, href, label]) => <a href={href} data-nav={k} class:list={[{ 'is-on': navOn(k) }]}>{label}</a>)}
+      </nav>
+      <a href="/files/CV.pdf" class="btn-cv">Download CV</a>
+    </div>
+  </div>
+  <div class="subwrap" data-subwrap><slot name="sub" /></div>
+</header>
+
+<main id="top" tabindex="-1">
+<slot />
+  <section id="contact" data-sec="contact" class="contact">
+    <div class="contact-in">
+      <div class="contact-row">
+        <h2 class="contact-l">Contact</h2>
+        <div class="contact-main">
+          <p data-rv class="contact-big">Let’s talk.</p>
+          <a data-rv href="mailto:jjb303@hotmail.co.uk" class="contact-mail">jjb303@hotmail.co.uk</a>
+          <ul class="contact-links">
+            <li><a href="/files/CV.pdf" class="cbtn cbtn--fill">Download CV (PDF)</a></li>
+            <li><a href="https://www.linkedin.com/in/josh-b-238676100/" target="_blank" rel="noopener" class="cbtn">LinkedIn</a></li>
+            <li><a href="https://github.com/JAYJAYBEE303" target="_blank" rel="noopener" class="cbtn">GitHub</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="contact-fine">
+        <span>© Josh Bailey · jayjaybee.com</span>
+        <span>Set in Geist.</span>
+      </div>
+    </div>
+  </section>
+</main>
+<script>
+  import '../scripts/engine.js';
+</script>
+</body>
+</html>

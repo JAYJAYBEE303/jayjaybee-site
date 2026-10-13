@@ -1,0 +1,209 @@
+{
+  "meta": "Josh Bailey · Silverstone",
+  "lede": ["Pressure-tested delivery.", "People-first support."],
+  "narrative": "I'm an IT Desktop Analyst at Aston Martin F1, supporting HR, Finance, and Commercial - the parts of a season nobody puts on television. Before this I ran the helpdesk for Manshead Academy on the MSP side, was on the IT deployment team at Red Bull Racing, and spent five years on the Genius Bar at Apple. Different rooms, the same shape of problem. The throughline is endpoint work done well, and people who leave the conversation in a better mood than they started it.",
+  "roles": [
+    {
+      "id": "exp-amf1", "when": "2025 - Present", "from": "2025", "to": "Now", "current": true,
+      "org": "Aston Martin Aramco Formula One", "tm": "™", "orgTail": " Team", "orgSub": "",
+      "short": "Aston Martin F1", "navLabel": "Aston Martin Aramco - Desktop Support Analyst",
+      "title": "IT Desktop Support Analyst", "titleSub": "",
+      "note": "First and second-line support for the excluded budget functions - HR, Finance, and Commercial. The side of the team that doesn't show up on the broadcast but underpins everything that does. Quiet work, real stakes, and a stakeholder base that runs from first-day new joiners to the people running the business - each conversation pitched accordingly.",
+      "groups": [
+        {"label": "Daily responsibilities", "short": "Responsibilities", "points": [
+          "Sole IT contact for HR, Finance, and Commercial - triage, resolution, and prioritisation called in real time.",
+          "Endpoint and identity work across the fleet - provisioning, compliance, app delivery, and the day-to-day Entra, Intune, and Jamf admin that keeps people working without noticing.",
+          "Operating at the seam between excluded and included functions, managing expectations professionally where scope and ownership overlap.",
+          "Maintaining open ticket count in my own excluded-functions queue to protect first-response times while keeping available enough for high priority requests."
+        ]},
+        {"label": "Skills acquired", "short": "Skills", "points": [
+          "Identity and access at scale across Entra ID and on-prem AD, including the scripting around it - built and maintain AMF1_AD_User_Create, a PowerShell tool that takes new-joiner provisioning from a manual checklist to a signed, repeatable workflow.",
+          "Endpoint management across a mixed Windows and Apple fleet - Intune and Jamf for deployment, compliance, and app delivery, with working knowledge of the bits that usually go wrong (AppLocker, MDM enrolment edge cases, EDR conflicts).",
+          "Exchange Online and M365 administration end-to-end - mailbox lifecycle, GAL, calendar permissions, distribution and security groups, cross-tenant authentication, and the SharePoint and Planner quirks that come with them.",
+          "PowerShell scripting as a daily tool rather than an occasional one - automating provisioning, reporting, and the repetitive work that otherwise eats a support queue.",
+          "Stakeholder management across a wide seniority range, from first-day new joiners to functional heads, with the judgement to know which register fits which conversation.",
+          "Jamf 200 certified, formalising the Apple fleet management work already in flight day-to-day."
+        ]},
+        {"label": "Key achievements", "short": "Achievements", "points": [
+          "Trusted as direct IT support for principal stakeholders including Adrian Newey and Lawrence Stroll, providing the highest standard in quality, resolution time, and descretion.",
+          "Piloted a reworked IT induction now used as the team's standard. Built a reputation across senior stakeholders as the person who closes the loop.",
+          "Designed and shipped AMF1_AD_User_Create.ps1, an internal PowerShell tool that consolidates new-joiner account provisioning into a single signed workflow - adopted by the wider IT function and now part of the standard onboarding process.",
+          "Sustained one of the lowest open ticket counts on the team while covering the excluded functions solo, with first-response times held steady through peak periods."
+        ]}
+      ]
+    },
+    {
+      "id": "exp-partnership", "when": "2023 - 2025", "from": "2023", "to": "2025", "current": false,
+      "org": "Partnership Education", "tm": "", "orgTail": "", "orgSub": "(Manshead C of E Academy)",
+      "short": "Partnership Education", "navLabel": "Partnership Education - IT Engineer",
+      "title": "IT Technician → Team Lead", "titleSub": "",
+      "note": "Two years at an MSP supporting primary and secondary schools - broad-spectrum IT for environments where nothing is ever quite documented and the deadline is always \"before the next lesson.\" Started on the tools, ended up running the team.",
+      "groups": [
+        {"label": "Daily responsibilities", "short": "Responsibilities", "points": [
+          "Delivered first and second-line support across multiple campuses, independently managing diverse estates and hitting 97% of SLAs.",
+          "Administered Microsoft 365 at scale - Intune, Entra, Exchange, SharePoint - for 2,000+ user accounts and 800+ client devices.",
+          "Owned networking infrastructure: switch patching, VLAN structures, Fortinet firewalls, DHCP.",
+          "Managed Windows 10/11 estates alongside Active Directory, Group Policy, and Configuration Manager.",
+          "Supported the wider stack schools actually run on - CCTV, printers, VoIP, Google Workspace."
+        ]},
+        {"label": "Skills acquired", "short": "Skills", "points": [
+          "Multi-site support at scale - diagnosing across estates with inconsistent documentation, no two sites quite the same.",
+          "Team leadership - moving from technician to running a five-person team, with performance management, mentoring, and the standards work that came with it.",
+          "Microsoft 365 administration end-to-end across thousands of accounts, including the identity, mail, and device sides of the stack.",
+          "Networking from the cable up - VLANs, switching, Fortinet firewalls, DHCP - and the troubleshooting that comes with a live school day.",
+          "Windows estate management via AD, Group Policy, and Configuration Manager, including imaging and deployment at scale.",
+          "Incident response under pressure, including ransomware containment and recovery on a live estate."
+        ]},
+        {"label": "Key achievements", "short": "Achievements", "points": [
+          "Drafted new operational standards and templates that were adopted by senior directors across the MSP.",
+          "Led contract renewals and procurement, and ran strategy meetings to align IT spend with school objectives.",
+          "Contained and recovered from a live ransomware incident on a school estate without lasting data loss."
+        ]}
+      ]
+    },
+    {
+      "id": "exp-redbull", "when": "2022 - 2023", "from": "2022", "to": "2023", "current": false,
+      "org": "Red Bull Racing", "tm": "", "orgTail": "", "orgSub": "",
+      "short": "Red Bull Racing", "navLabel": "Red Bull Racing - IT Deployment Engineer",
+      "title": "IT Deployment Engineer", "titleSub": "(FTC)",
+      "note": "A one-year fixed-term contract through the 2023 season. Imaging, deploying, and decommissioning kit - the part of an F1 operation nobody photographs, and the part everyone notices when it slips. Short on the calendar, but the chapter that taught me how F1 IT actually moves.",
+      "groups": [
+        {"label": "Daily responsibilities", "short": "Responsibilities", "points": [
+          "Coordinated deployment of computing systems for employees and departments, ensuring seamless integration of hardware and peripherals.",
+          "Built and configured laptops and desktops using tailored task sequences to meet user-specific requirements.",
+          "Conducted quality checks on deployed devices, validating hardware performance and software compliance.",
+          "Delivered in-person and remote technical support for newly deployed systems."
+        ]},
+        {"label": "Skills acquired", "short": "Skills", "points": [
+          "Imaging and deployment at pace, working to task sequences and validating against device-specific build requirements.",
+          "Hardware lifecycle from build to decommission - provisioning, QA, in-life support, and end-of-life handling on a managed estate.",
+          "Operating inside a season-prep cadence where deployment windows are fixed by the calendar, not by IT.",
+          "Working knowledge of the operational rhythm of a Formula One team's IT function - the volume, the deadlines, and the standard expected."
+        ]},
+        {"label": "Key achievements", "short": "Achievements", "points": [
+          "Delivered the deployment workload across pre-season onboarding and large-scale departmental upgrades inside fixed calendar windows.",
+          "Spent a full season inside the working IT function of a championship-winning F1 team - exposure that shaped how I read F1 IT environments to this day."
+        ]}
+      ]
+    },
+    {
+      "id": "exp-apple", "when": "2017 - 2022", "from": "2017", "to": "2022", "current": false,
+      "org": "Apple", "tm": "", "orgTail": "", "orgSub": "",
+      "short": "Apple", "navLabel": "Apple - Technical Specialist",
+      "title": "Technical Specialist", "titleSub": "(Genius Bar)",
+      "note": "Five years on the Genius Bar - diagnostics, repairs, and the slow craft of explaining what's wrong without making someone feel stupid for asking. The foundation everything since has been built on: pattern recognition, customer trust under pressure, and the discipline of being the calm person in someone else's bad day.",
+      "groups": [
+        {"label": "Daily responsibilities", "short": "Responsibilities", "points": [
+          "Diagnostics, repairs, and in-person technical support across the full Apple hardware and software range.",
+          "Translating technical problems into language customers could actually use - and act on.",
+          "Handling escalations: complaints, warranty disputes, and conversations that arrived already hot."
+        ]},
+        {"label": "Skills acquired", "short": "Skills", "points": [
+          "Active listening as a diagnostic tool - most of the work was getting to the actual problem behind what the customer said the problem was.",
+          "Triage at pace, reading a queue of waiting customers and deciding in seconds where each one needed to go.",
+          "Delivering bad news cleanly - failed repairs, out-of-warranty costs, data loss - without softening it into something misleading.",
+          "Conflict management with customers arriving angry, scared, or both, holding composure while the conversation found its level.",
+          "Public speaking through group sessions and morning briefings, explaining technical material to non-technical audiences in real time.",
+          "Time management against fixed appointment slots and walk-in pressure, with no room for the queue to slip.",
+          "Pattern recognition across thousands of repairs - the foundation of the diagnostic instinct I still rely on.",
+          "The discipline of staying the calm person in the room when the customer can't be.",
+          "A diverse case study of different leadership styles, including what works and what doesn't, what distincts between the good and the great examples, and how I would lead the best myself."
+        ]},
+        {"label": "Key achievements", "short": "Achievements", "points": [
+          "Five years of high-volume, high-pressure customer contact across the Apple product line - the foundation the rest of my career has been built on.",
+          "Built the diagnostic instincts and stakeholder composure that every role since has drawn on, from F1 trackside-adjacent IT to senior principal support."
+        ]}
+      ]
+    }
+  ],
+  "about": {
+    "label": "About · May 2026",
+    "skills": {
+      "num": "01", "kicker": "Skills & competencies",
+      "title": [{"t": "\"", "a": true}, {"t": "What are the "}, {"t": "skills", "a": true}, {"t": " that Josh has to offer?"}, {"t": "\"", "a": true}],
+      "q": "What are the skills that Josh has to offer?",
+      "prose": "My skill set splits fairly cleanly into three: the platforms I administer, the technical craft I use to make them behave, and the people skills that decide whether any of it actually lands. Here's what each looks like up close.",
+      "cols": [
+        {"head": "Hardware & systems", "items": [
+          {"k": "Microsoft Cloud", "v": "365 admin, Intune, Entra, and Exchange Online."},
+          {"k": "Microsoft on-prem", "v": "Active Directory, Group Policy Management, DHCP, Exchange Admin."},
+          {"k": "Jamf Pro", "v": "Deployments & builds, remote management, and remote support."},
+          {"k": "ServiceNow", "v": "Request & incident tracking, asset management, and project management"}
+        ]},
+        {"head": "Technical skills", "items": [
+          {"k": "PowerShell", "v": "Server automation, process implementation, and enhanced resolution."},
+          {"k": "Networking", "v": "Physical architecture, virtual machine management, network switches, and VLAN & IP management."},
+          {"k": "Security", "v": "Best practises, incident detection, and proactive implementation."},
+          {"k": "Artificial Intelligence", "v": "Enhanced troubleshooting, automation, programming & design, and competency development."}
+        ]},
+        {"head": "Interpersonal", "items": [
+          {"k": "Leadership", "v": "Curated learning & development opportunities, maintaining & advocating expected standards, process implementation and refinement, and workload balance."},
+          {"k": "Stakeholders", "v": "Relationship building, expectation setting, active speaking & listening, and conflict resolution."},
+          {"k": "Public speaking", "v": "Morning briefings, inductions, and stakeholder presentations."},
+          {"k": "Standard practise", "v": "Strong integrity, alignment, & consistency, and driving response time, delivery quality, & satisfaction rates."}
+        ]}
+      ],
+      "learningLabel": "Currently learning",
+      "learning": "Educated vibe-coding, using Claude.ai Code and Design tool to create this platform using weeks of prompts to allow the site to be organised, scalable, professional, and fully intentional in its design, layout, and animation choices."
+    },
+    "person": {
+      "num": "02", "kicker": "Who am I",
+      "title": [{"t": "\"", "a": true}, {"t": "Great. "}, {"t": "Tell me more", "a": true}, {"t": " about Josh."}, {"t": "\"", "a": true}],
+      "q": "Great. Tell me more about Josh.",
+      "prose": [
+        "My life outside work mostly happens in a flat in Milton Keynes, with my partner and our daughter - born August 2025, currently in the business of working out gravity. Most days revolve around her, and the rest gets split between the people I care about and the handful of things I do badly enough to keep enjoying.",
+        "I play metal guitar with more enthusiasm than discipline, follow Arsenal in a way that's probably bad for me, and treat my Spotify library like a small private archive. I'm not particularly online - most of my screen time is gaming, where Baldur's Gate, Rocket League, and FC26 take whatever evenings my daughter doesn't."
+      ],
+      "truesHead": "A few things that are true",
+      "trues": [
+        "I have a partner, a beautiful daughter, and a lot of tenacity for sleep deprivation.",
+        "I support Arsenal, with my partner and I loving David Raya every match (for different reasons).",
+        "To no surprise, I do enjoy watching F1 and am fascinated more by the developmental science rather than the driver fueds. Also Max beating Lewis was great, sorry Mercedes.",
+        "I play electric guitar, favouring Metal music. Six strings, low tuning, and playing either DOOM metal or Thall metal.",
+        "I'm very in touch with music. I have about 190-ish Spotify playlists with a surprising variety of genres all for different moods, times, and weathers.",
+        "I'm big on gaming at my PC at home. Baldur's Gate, Rocket League, EA FC26, F1, and League of Legends being in my main rotation currently."
+      ]
+    },
+    "like": {
+      "num": "03", "kicker": "What am I like",
+      "title": [{"t": "\"", "a": true}, {"t": "But "}, {"t": "what is Josh like", "a": true}, {"t": " to work with? "}, {"t": "\"", "a": true}],
+      "q": "But what is Josh like to work with?",
+      "pull": "\"Hire for character, train for skills.\" ~ Michael Josephson",
+      "pullQuote": "Hire for character, train for skills.", "pullBy": "Michael Josephson",
+      "prose": "Most of what makes me good to work with isn't technical. I'm casual on the surface and serious underneath, I read rooms better than I read documentation, and I'm pointed at something further out than my job roles suggests.",
+      "keeps": [
+        {"n": "i.", "head": "Professionally casual.", "body": "I'm a personal worker. I incorporate personality, appropriate humour, and relaxed communication to ensure I have the best working relationship with my peers and clients. I thrive on finding fulfilment in interactions and maintaining an approachability rarely seen with IT workers."},
+        {"n": "ii.", "head": "Serious when it matters", "body": "Despite that, I never let professionalism slip. I've learned how and when casualness can be a liability and professionalism must take centre stage, not as an act, but as a genuine and practised approach to a situation or environment. There is no trust without genuine professionalism."},
+        {"n": "iii.", "head": "Emotional intelligence & self-awareness.", "body": "I'm acutely aware of how I and others around me are likely feeling. Being aware of emotional influence to situations plays a key role in having the best conversations and integrating seamlessly into a business and role."},
+        {"n": "iv.", "head": "Ambitious.", "body": "I strive to achieve above and beyond, and like to show capability for enhanced responsibility. I have a lot to work hard for, but I am conscious that my family depends on bringing home the value of my capability and skills."}
+      ]
+    },
+    "inspire": {
+      "num": "04", "kicker": "What inspires me",
+      "title": [{"t": "\"", "a": true}, {"t": "Okay, so what keeps him going? "}, {"t": "What inspires Josh?\"", "a": true}],
+      "q": "Okay, so what keeps him going? What inspires Josh?",
+      "prose": [
+        [{"t": "I'm Josh, an IT Desktop Analyst at "}, {"t": "Aston Martin F1", "i": true}, {"t": ", based out of the Silverstone factory. Most of my days are spent keeping the laptops, identities, and endpoint policy that the team relies on quietly out of the way - so that on a Sunday morning in Spa, the only thing anyone is thinking about is the car."}],
+        [{"t": "The path here ran through an Apple Genius Bar, a season at Red Bull Racing, and a managed-service stint at a school that taught me more about real-world IT than any certification did. Along the way I picked up the habit of "}, {"t": "building the small, sharp tools that should already exist", "i": true}, {"t": ": PowerShell modules, a player-stats calculator for FC26, internal dashboards, the boring infrastructure that pays for the interesting work."}]
+      ],
+      "rows": [
+        {"k": "People & engagement", "v": "I could work in a job without tech, but I couldn't work in a job without people. Speaking with people keeps me ready and engaged with my work."},
+        {"k": "Challenge & pressure", "v": "Excitement comes from taking on a challenge or experiencing high pressure. It gets my adrenaline high and excercises my critical thinking."},
+        {"k": "Advanced technical exposure", "v": "I like to expand beyond service desk level solutions, and like to gain technical knowledge that enhances delivery and opens doors to new opportunities. Learning keeps me prepared for challenges and new opportunities to grow."},
+        {"k": "Being trusted to lead", "v": "I enjoy the extra responsibility. My spell of leadership experience showed how capable I can be while managing others, and it provides fulfilment to engage with this talent."},
+        {"k": "My family", "v": "I could choose a low effort career path, but I choose to work hard and work smart. My family depends on me, and I strive to give them the best life I possibly can."}
+      ]
+    }
+  },
+  "footer": {
+    "email": "jjb303@hotmail.co.uk",
+    "links": [
+      {"label": "LinkedIn", "href": "https://www.linkedin.com/in/josh-b-238676100/", "ext": true},
+      {"label": "GitHub", "href": "https://github.com/JAYJAYBEE303", "ext": true},
+      {"label": "CV (PDF)", "href": "/files/CV.pdf", "ext": false}
+    ],
+    "colophon": "Set in Newsreader, Hanken Grotesk, and IBM Plex Mono. Built in Silverstone. Last touched September 2026.",
+    "fine": "© Josh Bailey · jayjaybee.com"
+  },
+  "chips": ["Conflict Management", "Powershell", "JAMF", "Networking", "Leadership"]
+}
