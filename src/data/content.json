@@ -1,0 +1,191 @@
+{
+  "narrative": "I'm an IT Desktop Analyst at Aston Martin F1, supporting HR, Finance, and Commercial - the parts of a season nobody puts on television. Before this I ran the helpdesk for Manshead Academy on the MSP side, was on the IT deployment team at Red Bull Racing, and spent five years on the Genius Bar at Apple. Different rooms, the same shape of problem. The throughline is endpoint work done well, and people who leave the conversation in a better mood than they started it.",
+  "roles": [
+    {
+      "id": "exp-amf1",
+      "when": "2025 - Present",
+      "from": "2025",
+      "to": "Now",
+      "current": true,
+      "org": "Aston Martin Aramco Formula One",
+      "tm": "™",
+      "orgTail": " Team",
+      "orgSub": "",
+      "short": "Aston Martin F1",
+      "title": "IT Desktop Support Analyst",
+      "titleSub": "",
+      "note": "First and second-line support for the excluded budget functions - HR, Finance, and Commercial. The side of the team that doesn't show up on the broadcast but underpins everything that does. Quiet work, real stakes, and a stakeholder base that runs from first-day new joiners to the people running the business - each conversation pitched accordingly.",
+      "groups": [
+        {
+          "points": [
+            "Sole IT contact for HR, Finance, and Commercial - triage, resolution, and prioritisation called in real time.",
+            "Endpoint and identity work across the fleet - provisioning, compliance, app delivery, and the day-to-day Entra, Intune, and Jamf admin that keeps people working without noticing.",
+            "Operating at the seam between excluded and included functions, managing expectations professionally where scope and ownership overlap.",
+            "Maintaining open ticket count in my own excluded-functions queue to protect first-response times while keeping available enough for high priority requests."
+          ]
+        },
+        {
+          "points": [
+            "Identity and access at scale across Entra ID and on-prem AD, including the scripting around it - built and maintain AMF1_AD_User_Create, a PowerShell tool that takes new-joiner provisioning from a manual checklist to a signed, repeatable workflow.",
+            "Endpoint management across a mixed Windows and Apple fleet - Intune and Jamf for deployment, compliance, and app delivery, with working knowledge of the bits that usually go wrong (AppLocker, MDM enrolment edge cases, EDR conflicts).",
+            "Exchange Online and M365 administration end-to-end - mailbox lifecycle, GAL, calendar permissions, distribution and security groups, cross-tenant authentication, and the SharePoint and Planner quirks that come with them.",
+            "PowerShell scripting as a daily tool rather than an occasional one - automating provisioning, reporting, and the repetitive work that otherwise eats a support queue.",
+            "Stakeholder management across a wide seniority range, from first-day new joiners to functional heads, with the judgement to know which register fits which conversation.",
+            "Jamf 200 certified, formalising the Apple fleet management work already in flight day-to-day."
+          ]
+        },
+        {
+          "points": [
+            "Trusted as direct IT support for principal stakeholders including Adrian Newey and Lawrence Stroll, providing the highest standard in quality, resolution time, and descretion.",
+            "Piloted a reworked IT induction now used as the team's standard. Built a reputation across senior stakeholders as the person who closes the loop.",
+            "Designed and shipped AMF1_AD_User_Create.ps1, an internal PowerShell tool that consolidates new-joiner account provisioning into a single signed workflow - adopted by the wider IT function and now part of the standard onboarding process.",
+            "Sustained one of the lowest open ticket counts on the team while covering the excluded functions solo, with first-response times held steady through peak periods."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "exp-partnership",
+      "when": "2023 - 2025",
+      "from": "2023",
+      "to": "2025",
+      "current": false,
+      "org": "Partnership Education",
+      "tm": "",
+      "orgTail": "",
+      "orgSub": "(Manshead C of E Academy)",
+      "short": "Partnership Education",
+      "title": "IT Technician → Team Lead",
+      "titleSub": "",
+      "note": "Two years at an MSP supporting primary and secondary schools - broad-spectrum IT for environments where nothing is ever quite documented and the deadline is always \"before the next lesson.\" Started on the tools, ended up running the team.",
+      "groups": [
+        {
+          "points": [
+            "Delivered first and second-line support across multiple campuses, independently managing diverse estates and hitting 97% of SLAs.",
+            "Administered Microsoft 365 at scale - Intune, Entra, Exchange, SharePoint - for 2,000+ user accounts and 800+ client devices.",
+            "Owned networking infrastructure: switch patching, VLAN structures, Fortinet firewalls, DHCP.",
+            "Managed Windows 10/11 estates alongside Active Directory, Group Policy, and Configuration Manager.",
+            "Supported the wider stack schools actually run on - CCTV, printers, VoIP, Google Workspace."
+          ]
+        },
+        {
+          "points": [
+            "Multi-site support at scale - diagnosing across estates with inconsistent documentation, no two sites quite the same.",
+            "Team leadership - moving from technician to running a five-person team, with performance management, mentoring, and the standards work that came with it.",
+            "Microsoft 365 administration end-to-end across thousands of accounts, including the identity, mail, and device sides of the stack.",
+            "Networking from the cable up - VLANs, switching, Fortinet firewalls, DHCP - and the troubleshooting that comes with a live school day.",
+            "Windows estate management via AD, Group Policy, and Configuration Manager, including imaging and deployment at scale.",
+            "Incident response under pressure, including ransomware containment and recovery on a live estate."
+          ]
+        },
+        {
+          "points": [
+            "Drafted new operational standards and templates that were adopted by senior directors across the MSP.",
+            "Led contract renewals and procurement, and ran strategy meetings to align IT spend with school objectives.",
+            "Contained and recovered from a live ransomware incident on a school estate without lasting data loss."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "exp-redbull",
+      "when": "2022 - 2023",
+      "from": "2022",
+      "to": "2023",
+      "current": false,
+      "org": "Red Bull Racing",
+      "tm": "",
+      "orgTail": "",
+      "orgSub": "",
+      "short": "Red Bull Racing",
+      "title": "IT Deployment Engineer",
+      "titleSub": "(FTC)",
+      "note": "A one-year fixed-term contract through the 2023 season. Imaging, deploying, and decommissioning kit - the part of an F1 operation nobody photographs, and the part everyone notices when it slips. Short on the calendar, but the chapter that taught me how F1 IT actually moves.",
+      "groups": [
+        {
+          "points": [
+            "Coordinated deployment of computing systems for employees and departments, ensuring seamless integration of hardware and peripherals.",
+            "Built and configured laptops and desktops using tailored task sequences to meet user-specific requirements.",
+            "Conducted quality checks on deployed devices, validating hardware performance and software compliance.",
+            "Delivered in-person and remote technical support for newly deployed systems."
+          ]
+        },
+        {
+          "points": [
+            "Imaging and deployment at pace, working to task sequences and validating against device-specific build requirements.",
+            "Hardware lifecycle from build to decommission - provisioning, QA, in-life support, and end-of-life handling on a managed estate.",
+            "Operating inside a season-prep cadence where deployment windows are fixed by the calendar, not by IT.",
+            "Working knowledge of the operational rhythm of a Formula One team's IT function - the volume, the deadlines, and the standard expected."
+          ]
+        },
+        {
+          "points": [
+            "Delivered the deployment workload across pre-season onboarding and large-scale departmental upgrades inside fixed calendar windows.",
+            "Spent a full season inside the working IT function of a championship-winning F1 team - exposure that shaped how I read F1 IT environments to this day."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "exp-apple",
+      "when": "2017 - 2022",
+      "from": "2017",
+      "to": "2022",
+      "current": false,
+      "org": "Apple",
+      "tm": "",
+      "orgTail": "",
+      "orgSub": "",
+      "short": "Apple",
+      "title": "Technical Specialist",
+      "titleSub": "(Genius Bar)",
+      "note": "Five years on the Genius Bar - diagnostics, repairs, and the slow craft of explaining what's wrong without making someone feel stupid for asking. The foundation everything since has been built on: pattern recognition, customer trust under pressure, and the discipline of being the calm person in someone else's bad day.",
+      "groups": [
+        {
+          "points": [
+            "Diagnostics, repairs, and in-person technical support across the full Apple hardware and software range.",
+            "Translating technical problems into language customers could actually use - and act on.",
+            "Handling escalations: complaints, warranty disputes, and conversations that arrived already hot."
+          ]
+        },
+        {
+          "points": [
+            "Active listening as a diagnostic tool - most of the work was getting to the actual problem behind what the customer said the problem was.",
+            "Triage at pace, reading a queue of waiting customers and deciding in seconds where each one needed to go.",
+            "Delivering bad news cleanly - failed repairs, out-of-warranty costs, data loss - without softening it into something misleading.",
+            "Conflict management with customers arriving angry, scared, or both, holding composure while the conversation found its level.",
+            "Public speaking through group sessions and morning briefings, explaining technical material to non-technical audiences in real time.",
+            "Time management against fixed appointment slots and walk-in pressure, with no room for the queue to slip.",
+            "Pattern recognition across thousands of repairs - the foundation of the diagnostic instinct I still rely on.",
+            "The discipline of staying the calm person in the room when the customer can't be.",
+            "A diverse case study of different leadership styles, including what works and what doesn't, what distincts between the good and the great examples, and how I would lead the best myself."
+          ]
+        },
+        {
+          "points": [
+            "Five years of high-volume, high-pressure customer contact across the Apple product line - the foundation the rest of my career has been built on.",
+            "Built the diagnostic instincts and stakeholder composure that every role since has drawn on, from F1 trackside-adjacent IT to senior principal support."
+          ]
+        }
+      ]
+    }
+  ],
+  "keeps": [
+    {
+      "head": "Professionally casual.",
+      "body": "I'm a personal worker. I incorporate personality, appropriate humour, and relaxed communication to ensure I have the best working relationship with my peers and clients. I thrive on finding fulfilment in interactions and maintaining an approachability rarely seen with IT workers."
+    },
+    {
+      "head": "Serious when it matters",
+      "body": "Despite that, I never let professionalism slip. I've learned how and when casualness can be a liability and professionalism must take centre stage, not as an act, but as a genuine and practised approach to a situation or environment. There is no trust without genuine professionalism."
+    },
+    {
+      "head": "Emotional intelligence & self-awareness.",
+      "body": "I'm acutely aware of how I and others around me are likely feeling. Being aware of emotional influence to situations plays a key role in having the best conversations and integrating seamlessly into a business and role."
+    },
+    {
+      "head": "Ambitious.",
+      "body": "I strive to achieve above and beyond, and like to show capability for enhanced responsibility. I have a lot to work hard for, but I am conscious that my family depends on bringing home the value of my capability and skills."
+    }
+  ]
+}

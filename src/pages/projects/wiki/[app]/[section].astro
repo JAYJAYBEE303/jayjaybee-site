@@ -1,0 +1,99 @@
+---
+import Base from '../../../../layouts/Base.astro';
+import Spans from '../../../../components/Spans.astro';
+import { wiki, wikiSection, wikiHref } from '../../../../lib/site.js';
+
+export function getStaticPaths() {
+  return wiki.apps.flatMap(app => app.sections.map(s => ({ params: { app: app.slug, section: s.slug }, props: { app, s } })));
+}
+// A draft section has no page yet: its URL forwards to the write-up's front page, as the prototype did.
+const { app, s } = Astro.props, front = wikiHref(app.slug);
+const wk = s.draft ? null : wikiSection(app, s);
+---
+{s.draft ? <html lang="en"><head><meta charset="utf-8"><title>{app.title} - The write-up - Josh Bailey</title><meta name="robots" content="noindex"><link rel="canonical" href={new URL(front, Astro.site)}><meta http-equiv="refresh" content={`0; url=${front}`}></head><body><a href={front}>{app.title}: the write-up</a></body></html> : (
+<Base title={`${wk.title} - ${wk.appTitle} - Josh Bailey`} description={wk.lede} page="wiki">
+  <Fragment slot="sub">
+    <div data-sub class="sub sub--wk">
+      <a href={wk.contentsHref} class="sub-crumb"><span>{wk.appTitle}</span><span aria-hidden="true" class="sep">/</span><span>{wk.group}</span><span aria-hidden="true" class="sep">/</span><span data-wkt class="sub-cur">{wk.title}</span></a>
+      <span class="sub-count"><span class="mask"><span data-wkn class="wkn">{wk.n}</span></span><span>/ {wk.total}</span></span>
+      <nav aria-label="Previous and next section" class="sub-pn">
+        {wk.prev ? <a href={wk.prev.href} aria-label={`Previous: ${wk.prev.title}`} title={wk.prev.title} class="pn">←</a> : <span aria-hidden="true" class="pn-off">←</span>}
+        {wk.nxt ? <a href={wk.nxt.href} aria-label={`Next: ${wk.nxt.title}`} title={wk.nxt.title} class="pn">→</a> : <span aria-hidden="true" class="pn-off">→</span>}
+      </nav>
+    </div>
+    <div aria-hidden="true" class="prog"><div data-prog class="prog-bar"></div></div>
+  </Fragment>
+
+  <article data-page="wiki-sec" data-article>
+    <section class="phead">
+      <a href={wk.contentsHref} class="back"><span>←</span><span>{wk.appTitle}</span><span>contents</span></a>
+      <p data-ci class="kicker">{wk.appTitle} · Section {wk.n} of {wk.total}</p>
+      <h1 class="h1 h1--wk">
+        <span class="ln"><span data-cl data-tx={`wk-${wk.slug}`} class="ln-in">{wk.title}</span></span>
+        <span class="ln"><span data-cl class="ln-in thin">{wk.group}</span></span>
+      </h1>
+      <div class="intro">
+        <p data-ci class="lede lede--wk">{wk.lede}</p>
+        <dl data-ci class="facts facts--wk facts--loose">
+          <div><dt>Read time</dt><dd>{wk.read}</dd></div>
+          <div><dt>Revised</dt><dd>{wk.revised}</dd></div>
+          <div><dt>Status</dt><dd>{wk.status}</dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <section class="sec sec--white">
+      <div class="wk-body">
+        {wk.chunks.map(c => (
+          <div data-rv class="row2">
+            <div class="col-l">{c.label && <h2 class="chunk-h">{c.label}</h2>}</div>
+            <div class="prose">
+              {c.blocks.map(b => b.k === 'p' ? <p class="para"><Spans spans={b.spans} /></p>
+                : b.k === 'ul' ? <ul class="ulist">{b.items.map(it => <li>{it.lead && <span class="strong">{it.lead}</span>}<span><Spans spans={it.spans} /></span></li>)}</ul>
+                : b.k === 'ol' ? <ol class="plist">{b.items.map(it => <li><span class="plist-n plist-n--acc">{it.n}</span><span><Spans spans={it.spans} /></span></li>)}</ol>
+                : b.k === 'bands' ? <ol aria-label="Score bands" class="bands">{b.items.map(it => <li><span class="b">{it.l}</span><span class="small-875 tnum">{it.r}</span></li>)}</ol>
+                : null)}
+            </div>
+          </div>
+        ))}
+
+        {(wk.notes.length > 0 || wk.terms.length > 0 || wk.backs.length > 0) && (
+          <div class="extras">
+            {wk.notes.length > 0 && (
+              <div data-rv class="row2">
+                <h2 class="xh">Notes</h2>
+                <ol class="xcol notes">
+                  {wk.notes.map(nt => <li id={nt.id}><span class="note-n">{nt.n}</span><span>{nt.t}</span></li>)}
+                </ol>
+              </div>
+            )}
+            {wk.terms.length > 0 && (
+              <div data-rv class="row2">
+                <h2 class="xh">Terms used here</h2>
+                <dl class="xcol tlist">
+                  {wk.terms.map(t => <div class="tl"><dt>{t.term}</dt><dd><span>{t.text}</span>{t.refHref && <a href={t.refHref}>Explained in {t.refTitle}</a>}</dd></div>)}
+                </dl>
+              </div>
+            )}
+            {wk.backs.length > 0 && (
+              <div data-rv class="row2">
+                <h2 class="xh">Linked from</h2>
+                <ul class="xcol backs">
+                  {wk.backs.map(bk => <li><a href={bk.href}>{bk.title}</a><span class="small-875">{bk.sub}</span></li>)}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </section>
+
+    <a href={wk.next.href} class="band">
+      <div class="band-in">
+        <div class="band-col"><span class="band-k">{wk.next.label}</span><span data-tx={wk.next.tx || undefined} data-tx-to={wk.next.to || undefined} class="band-t balance">{wk.next.title}</span><span class="band-sub">{wk.next.sub}</span></div>
+        <span class="big-arrow">→</span>
+      </div>
+    </a>
+  </article>
+</Base>
+)}

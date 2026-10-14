@@ -1,0 +1,65 @@
+---
+import Base from '../../layouts/Base.astro';
+import { cases } from '../../lib/site.js';
+
+export function getStaticPaths() {
+  return cases.map((cs, i) => ({ params: { slug: cs.slug }, props: { cs, next: cases[(i + 1) % cases.length], count: String(cases.length).padStart(2, '0') } }));
+}
+const { cs, next, count } = Astro.props;
+---
+<Base title={`${cs.title} - ${cs.orgShort} - Josh Bailey`} description={`${cs.title}, ${cs.org}, ${cs.years}.`} page="case">
+  <article data-page="case">
+    <div class="phead phead--case">
+      <a href="/#work" class="back">← All roles</a>
+      <p data-ci class="kicker kicker--sm">Role {cs.idx} of {count} · {cs.years}</p>
+      <h1 class="h1 h1--case"><span class="ln"><span data-cl data-tx={`rt-${cs.slug}`} data-tx-to="home:" class="ln-in">{cs.title}</span></span></h1>
+      <p data-ci class="case-org">{cs.org}</p>
+      <dl data-ci class="facts facts--case">
+        <div><dt>Period</dt><dd>{cs.years}</dd></div>
+        <div><dt>Role</dt><dd>{cs.role}</dd></div>
+        <div><dt>Organisation</dt><dd>{cs.orgShort}</dd></div>
+        <div><dt>Stack</dt><dd>{cs.stack}</dd></div>
+      </dl>
+    </div>
+    <div class="cover-wrap">
+      <div data-cover data-tx={`role-${cs.slug}`} data-tx-to="home:" data-tx-box class="cover" style={`--tone:${cs.tone}`}>
+        <div role="img" aria-label={cs.orgShort} class="cover-img" style={`--img:url("${cs.img}")`}></div>
+      </div>
+    </div>
+    <div class="case-body">
+      <aside class="toc">
+        <p class="toc-l">On this page</p>
+        <ol class="toc-list">
+          {cs.sections.map((s, i) => <li><button type="button" data-goto={s.domId} class:list={['toc-btn', { 'is-on': i === 0 }]}><span class="toc-n">{s.n}</span>{s.label}</button></li>)}
+        </ol>
+      </aside>
+      <div class="case-main">
+        {cs.sections.map(s => (
+          <section id={s.domId} data-rv class="cs">
+            <h2 class="cs-h"><span class="cs-n">{s.n}</span>{s.label}</h2>
+            {s.text && <p class="say">{s.text}</p>}
+            {s.points.length > 0 && !s.big && (
+              <ul class="plist">
+                {s.points.map(pt => <li><span class="plist-n">{pt.n}</span>{pt.t}</li>)}
+              </ul>
+            )}
+            {s.big && (
+              <ol class="outcomes">
+                {s.points.map(pt => <li><span class="oc-n">Outcome {pt.n}</span><span class="oc-t">{pt.t}</span></li>)}
+              </ol>
+            )}
+          </section>
+        ))}
+      </div>
+    </div>
+    <a href={next.href} class="band band--white">
+      <div class="band-in">
+        <div class="band-role">
+          <img data-tx={`role-${next.slug}`} data-tx-to={next.to} src={next.logo} alt="" class="logo logo--lg">
+          <div class="band-col"><span class="band-k">Next role</span><span data-tx={`rt-${next.slug}`} data-tx-to={next.to} class="band-t balance">{next.title}</span><span class="band-sub">{next.orgShort}</span></div>
+        </div>
+        <span class="big-arrow">→</span>
+      </div>
+    </a>
+  </article>
+</Base>

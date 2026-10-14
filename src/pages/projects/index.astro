@@ -1,0 +1,71 @@
+---
+import Base from '../../layouts/Base.astro';
+import { projects } from '../../lib/site.js';
+---
+<Base title="Projects - Josh Bailey" description="Things I've built when life allows: Gaffer IQ, the FC26 Feel Calculator, and F1 Live, each with its own write-up." page="projects">
+  <article data-page="projects">
+    <div class="phead">
+      <a href="/#top" class="back">← Home</a>
+      <p data-ci class="kicker">Projects · 3 built, 2 written up</p>
+      <h1 class="h1">
+        <span class="ln"><span data-cl class="ln-in">Things I’ve built.</span></span>
+        <span class="ln"><span data-cl class="ln-in thin">When life allows.</span></span>
+      </h1>
+      <p data-ci class="lede lede--proj">Side projects, each with a write-up I’ve done myself. Some show how I’d ship a real product. Others were just for learning and fun.</p>
+      <ol data-hvg="pj" aria-label="Projects on this page" class="rows rows--proj">
+        {projects.map((p, i) => (
+          <li data-ci data-hv={i}>
+            <a href={`#${p.slug}`} data-jump={p.slug} class="prow-a hd-a">
+              <span class="role-id"><span class="mono mono--row">{p.mono}</span><span class="role-names"><span class="role-org">{p.name}</span><span class="hd-sub">{p.kind}</span></span></span>
+              <span class="row-line hd-sub"><span class="row-line-t">{p.line}</span><span aria-hidden="true" class="arrow arrow--y">↓</span></span>
+            </a>
+          </li>
+        ))}
+      </ol>
+    </div>
+
+    {projects.map(p => (
+      <section id={p.slug} class="sec sec--white">
+        <div class="proj">
+          <div data-rv class="proj-aside">
+            <span data-tx={`pjm-${p.slug}`} data-tx-box class="mono mono--lg">{p.mono}</span>
+            <span class="proj-n">Project {p.n}</span>
+          </div>
+          <div class="proj-main">
+            <div data-rv class="proj-title">
+              <p class="meta">{p.kind}</p>
+              <h2 data-tx={`pjn-${p.slug}`} data-tx-to={p.wikiTo || undefined} class="proj-h2">{p.name}</h2>
+            </div>
+            <p data-rv class="say say--proj">{p.lede}</p>
+            <div data-rv class="proj-detail">
+              <div class="proj-body">
+                <p class="proj-text">{p.body}</p>
+                <div class="proj-inside">
+                  <p class="small">{p.insideLabel}</p>
+                  <ul class="chips">
+                    {p.inside.map(t => <li>{t}</li>)}
+                  </ul>
+                </div>
+              </div>
+              <dl class="facts facts--proj">
+                {p.facts.map(f => <div><dt>{f.k}</dt><dd>{f.v}</dd></div>)}
+              </dl>
+            </div>
+            <p data-rv class="note-card"><span class="b">{p.noteHead}</span> {p.note}</p>
+            <div data-rv class="actions">
+              <a href={p.app} class="btn">Launch app ↗</a>
+              {p.wiki ? <a href={p.wiki} class="btn btn--ghost">Read the write-up →</a> : <span class="muted-s">Write-up in progress</span>}
+            </div>
+          </div>
+        </div>
+      </section>
+    ))}
+
+    <a href="/#work" class="band">
+      <div class="band-in">
+        <div class="band-col"><span class="band-k">Back on the main page</span><span class="band-t">Work history</span><span class="band-sub">Four roles, 2017 to now.</span></div>
+        <span class="big-arrow">→</span>
+      </div>
+    </a>
+  </article>
+</Base>

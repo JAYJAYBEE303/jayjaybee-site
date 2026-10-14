@@ -1,0 +1,5 @@
+---
+// Renders inl() output (see src/lib/site.js). Kept on one line: whitespace between spans would show.
+const { spans } = Astro.props;
+---
+{spans.map(s => s.k === 't' ? <span>{s.t}</span> : s.k === 'b' ? <strong class="strong">{s.t}</strong> : s.k === 'c' ? <code class="code">{s.t}</code> : s.k === 'l' ? (s.ext ? <a href={s.href} target="_blank" rel="noopener">{s.t}</a> : <a href={s.href} title={s.title || undefined}>{s.t}</a>) : <sup class="fn"><button type="button" data-fn={s.n} aria-label={`Note ${s.n}`}>{s.n}</button></sup>)}

@@ -1,12 +1,17 @@
-# resources/
+# jayjaybee.com
 
-Static assets live here; Empty for now.
+Josh Bailey's portfolio. Astro, static output, deployed on Vercel.
 
-Suggested structure when you start adding things:
+```sh
+npm install
+npm run dev       # http://localhost:4321
+npm run build     # -> dist/
+npm run preview
+```
 
-- `resources/images/` - project screenshots, photography
-- `resources/icons/` - wordmark or favicon SVGs (no icon system; one or two only)
-- `resources/fonts/` - only if self-hosting; the live site currently pulls Newsreader / Hanken Grotesk / IBM Plex Mono from Google Fonts
-
-Reference assets from HTML/CSS with relative paths, e.g.
-`<img src="resources/images/fc26.png" alt="FC26 Feel Calculator" />`.
+- `src/data/*.json` - all copy: roles and about (`content.json`), project write-ups (`wiki.json`), the AI thesis (`thesis.json`).
+- `src/lib/site.js` - turns that copy into what each page renders.
+- `src/pages/` - home, `/work/<role>/`, `/projects/`, `/projects/wiki/<app>/[<section>/]`, `/ai-thesis/`.
+- `src/styles/site.css` - the one stylesheet; design tokens on `:root`.
+- `src/scripts/engine.js` - page transitions, shared-element flights, scroll reveals.
+- `projects/apps/` - standalone apps, each its own Vercel project (see `CLAUDE.md`).

@@ -4,13 +4,12 @@
 # Impeccable plugin working files (config + hook cache), same class as .claude/
 .impeccable/
 
-# Jekyll build output (Vercel builds on push; local builds stay local)
-_site/
-.jekyll-cache/
-.jekyll-metadata
-Gemfile.lock
-vendor/
-# test
+# Astro build output and caches (Vercel builds on push; local builds stay local)
+node_modules/
+dist/
+.astro/
+.vercel/
+
 # OS junk
 Thumbs.db
 .DS_Store
@@ -32,10 +31,9 @@ Portrait 3.png
 
 # All PDFs blocked except the one public file
 *.pdf
-!files/CV.pdf
+!public/files/CV.pdf
 
-# Bundler / editor
-.bundle/
+# Editor
 .vscode/
 
 # Large binaries - GitHub rejects files over 100 MB

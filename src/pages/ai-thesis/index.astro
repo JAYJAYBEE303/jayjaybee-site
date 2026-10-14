@@ -1,0 +1,135 @@
+---
+import Base from '../../layouts/Base.astro';
+import Spans from '../../components/Spans.astro';
+import { buildThesis } from '../../lib/site.js';
+
+const th = buildThesis();
+---
+<Base title="The AI Thesis - Josh Bailey" description="A long-form essay: AI as the next uncharted frontier and the risks nobody's pricing in, why this site exists, and how the skill set stays relevant while the ground keeps moving." page="thesis">
+  <div slot="sub" data-sub class="sub">
+    <span class="sub-crumb"><span>The AI thesis</span><span aria-hidden="true" class="sep">/</span><span data-chlabel class="sub-cur">Introduction</span></span>
+    <div role="group" aria-label="Jump to chapter" class="chsegs">
+      {th.segs.map(g => <button type="button" data-jump={g.id} data-cur={g.cur} aria-label={g.label} title={g.label} class="chseg" style={`--g:${g.grow}`}><span data-chfill class="chfill"></span></button>)}
+    </div>
+  </div>
+
+  <article data-page="thesis">
+    <section class="phead phead--thesis">
+      <a href="/#top" class="back">← Home</a>
+      <p data-ci class="kicker">Essay · Three chapters · revised {th.revised}</p>
+      <h1 class="h1">
+        <span class="ln"><span data-cl data-tx="th1" class="ln-in">New frontiers,</span></span>
+        <span class="ln"><span data-cl data-tx="th2" class="ln-in thin">old risks.</span></span>
+      </h1>
+      <div class="intro">
+        <p data-ci class="lede lede--intro">{th.dek}</p>
+        <dl data-ci class="facts facts--side facts--loose">
+          <div><dt>Chapters</dt><dd>Three</dd></div>
+          <div><dt>Read time</dt><dd>{th.read}</dd></div>
+          <div><dt>Subject</dt><dd>{th.subject}</dd></div>
+          <div><dt>Revised</dt><dd>{th.revised}</dd></div>
+        </dl>
+      </div>
+      <nav aria-label="Chapters" class="index">
+        <p data-ci class="index-label">Each chapter in one line, in my own words. Pick one, or read straight through.</p>
+        <ol data-hvg="th" class="rows">
+          {th.map.map((m, i) => (
+            <li data-ci data-hv={i}>
+              <a href={`#${m.id}`} data-jump={m.id} class="mrow-a hd-a">
+                <span class="mrow-num hd-sub">{m.num}</span>
+                <span class="mrow-t">{m.title}</span>
+                <span class="row-line hd-sub"><span class="row-line-t">“{m.key}”</span><span class="mrow-read">{m.read}</span><span aria-hidden="true" class="arrow arrow--y">↓</span></span>
+              </a>
+            </li>
+          ))}
+        </ol>
+      </nav>
+    </section>
+
+    {th.chapters.map(c => (
+      <section id={c.id} data-chap={c.i} class:list={['sec', { 'sec--white': c.white }]}>
+        <div class="chap">
+          <header class="chap-head">
+            <p data-rv class="chap-l"><span class="chap-num">Chapter {c.num}</span><span class="small-875">{c.read}</span></p>
+            <div class="chap-tbox">
+              <h2 class="chap-h2"><span class="ln ln--chap"><span data-ctl class="ln-in">{c.title}</span></span></h2>
+              <ul data-rv class="chips">
+                {c.tags.map(t => <li>{t}</li>)}
+              </ul>
+            </div>
+          </header>
+
+          {c.parts.map(p => p.k === 'chunk' ? (
+            <div data-rv class="row2">
+              <div class="col-l">{p.label && <h3 class="chunk-h">{p.label}</h3>}</div>
+              <div class="prose">
+                {p.paras.map(q => <p class="para"><Spans spans={q} /></p>)}
+              </div>
+            </div>
+          ) : p.k === 'strings' ? (
+            <div class="row2">
+              <div class="col-l"></div>
+              <ol class="items">
+                {p.items.map(it => (
+                  <li data-rv class="item">
+                    <span class="item-h"><span class="item-n">{it.n}</span><span class="item-t">{it.t}</span></span>
+                    <span class="item-x">{it.x}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          ) : p.k === 'pull' ? (
+            <figure data-pq class="pull">
+              <div aria-hidden="true" class="pull-mark"><span></span></div>
+              <blockquote class="pull-q">{p.words.map(w => <span data-pw>{w}</span>)}</blockquote>
+            </figure>
+          ) : p.k === 'scen' ? (
+            <div data-rv class="row2">
+              <div class="scen-aside"><h3 class="scen-h">Eight scenarios</h3><p class="small-875 pretty">Each one, step by step, to where it ends.</p></div>
+              <div class="scen">
+                <div role="tablist" aria-label="Scenario groups" class="scen-tabs">
+                  {th.cats.map(k => <button type="button" role="tab" aria-selected={k.a === 0 ? 'true' : 'false'} data-sc={String(k.a)} class:list={['tab', { 'is-sel': k.a === 0 }]}>{k.name}<span class="tab-n">{k.count}</span></button>)}
+                </div>
+                <div class="scen-body">
+                  {th.cats.map(k => (
+                    <ol data-list={String(k.a)} class="scen-list" hidden={k.a !== 0}>
+                      {k.items.map(x => <li><button type="button" data-sc={x.key} aria-current={x.key === '0-0' ? 'true' : 'false'} class:list={['scen-item', { 'is-cur': x.key === '0-0' }]}><span class="scen-item-n">{x.n}</span>{x.t}</button></li>)}
+                    </ol>
+                  ))}
+                  {th.cats.flatMap(k => k.items.map(x => (
+                    <div data-detail={x.key} class="scen-detail" hidden={x.key !== '0-0'}>
+                      <div class="scen-tbox"><p class="small">{k.name} · {Number(x.n)} of {k.count}</p><h4 data-step class="scen-title">{x.t}</h4></div>
+                      <ol aria-label="How it unfolds" class="steps">
+                        {x.steps.map(st => <li data-step class="step"><span aria-hidden="true" class="step-dot"></span>{st}</li>)}
+                      </ol>
+                      <div data-out class="out"><span class="out-l">Where it ends</span><span class="out-t">{x.outcome}</span></div>
+                      <div class="scen-nav">
+                        <button type="button" data-sc="prev" class="pill">← Previous</button>
+                        <span class="small tnum">{x.pos}</span>
+                        <button type="button" data-sc="next" class="pill pill--fill">Next scenario →</button>
+                      </div>
+                    </div>
+                  )))}
+                </div>
+              </div>
+            </div>
+          ) : null)}
+
+          <div class="row2 chap-end">
+            <div class="chap-end-l">End of chapter {c.num}</div>
+            {c.next && (
+              <a href={`#${c.next.id}`} data-jump={c.next.id} class="card chap-next"><span class="chap-next-l"><span class="small">Next · Chapter {c.next.num}</span><span class="chap-next-t">{c.next.title}</span></span><span aria-hidden="true" class="chap-next-ar">↓</span></a>
+            )}
+          </div>
+        </div>
+      </section>
+    ))}
+
+    <a href="/projects/" class="band">
+      <div class="band-in">
+        <div class="band-col band-col--w"><span class="band-k">The practice behind the essay</span><span class="band-t">See the projects</span><span class="band-sub pretty">Three things I’ve built, each with its own write-up.</span></div>
+        <span class="big-arrow">→</span>
+      </div>
+    </a>
+  </article>
+</Base>
