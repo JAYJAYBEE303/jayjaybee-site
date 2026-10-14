@@ -93,7 +93,7 @@ const ranges = hl.map(h => { const i = narr.indexOf(h); return [i, i + h.length]
 let wpos = 0;
 export const words = narr.split(' ').map(w => { const s = wpos; wpos += w.length + 1; return { t: w + ' ', hl: ranges.some(([a, b]) => s >= a && s < b) }; });
 
-export const keeps = content.about.like.keeps.map(k => ({ head: k.head.replace(/\.$/, ''), body: fix(k.body) }));
+export const keeps = content.keeps.map(k => ({ head: k.head.replace(/\.$/, ''), body: fix(k.body) }));
 
 // ---- Wiki ----
 const wIdx = {};
