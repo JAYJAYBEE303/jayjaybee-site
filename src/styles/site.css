@@ -149,9 +149,9 @@ a.sub-crumb:hover { color: var(--ink) }
 .index { margin-top: clamp(3rem, 6vw, 4.5rem); display: flex; flex-direction: column; gap: .9rem }
 .index-label { font-size: .875rem; color: var(--muted) }
 
-.card { background: var(--white); border: 1px solid var(--card-border); border-radius: 12px; text-decoration: none; color: var(--ink); transition: border-color .25s ease, transform .25s ease }
-.card:hover { border-color: var(--ink); transform: translateY(-2px); color: var(--ink) }
-.card:active { transform: scale(.99) }
+.card { background: var(--white); border: 1px solid var(--card-border); border-radius: 12px; text-decoration: none; color: var(--ink); transition: border-color .25s ease, translate .25s ease, scale .25s ease }
+.card:hover { border-color: var(--ink); translate: 0 -2px; color: var(--ink) }
+.card:active { scale: .99 }
 .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: .75rem }
 .cards--proj { grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr)) }
 .icard { display: flex; flex-direction: column; gap: .35rem; padding: 1.15rem 1.25rem 1.3rem }
