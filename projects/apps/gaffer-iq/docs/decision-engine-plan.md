@@ -133,7 +133,7 @@ This is the pattern `transfers.js:216` already uses for its far window.
 | `p_60` | **Not produced** | `calcPlaytimeSecurity` has `completion` = minutes / (starts x 90). | `p60_t = pStart_t x completion`, with `p60Approx: true`. |
 | `xpts_if_plays` | **Not produced** | Can be backed out of `xpts`. | `xptsIfPlays_t = xpts_t / max(eps, 1 - pZero_t)`; 0 on a blank. This keeps `xpts = (1 - pZero) x xptsIfPlays` true by construction. |
 | `p_p90` | **Not produced** | Ceiling lane's haul rate (`transfers.js:639-642`) is a backward-looking proxy only. | `null` until Phase 7. |
-| Point-in-time snapshots | **Not produced** | `js/calibration.js` stores per-GW *fixture* composite snapshots in the browser's `localStorage`. No player data, no flags, nothing server-side. | Phase 1 snapshot job. |
+| Point-in-time snapshots | **Not produced** | `js/calibration.js` stores per-GW *fixture* composite snapshots in the browser's `localStorage`. No player data, no flags, nothing server-side. | Phase 1 snapshot capture (in the browser, per Q1). |
 
 ---
 
@@ -330,8 +330,8 @@ export const DECISION_ENGINE = {
 
 ## 6. Risks, and what in the brief does not fit the repo
 
-1. **No server-side store.** The repo forbids a database or KV and keeps the proxy stateless (`ARCHITECTURE.md` §5, §12). The brief wants a daily snapshot job and a ledger "table". Proposal: the ledger is a pure function over the public transfers endpoint, cached in `localStorage`; snapshots are written by a scheduled job to files in git, not to a database (Q1).
-2. **Folder restriction vs the scheduler.** A scheduled GitHub Action needs `.github/workflows/` at the repo root, outside `projects/apps/gaffer-iq/`. Committing snapshots into this folder would also trigger a `gaffer-iq` Vercel build every day (Q1).
+1. **No server-side store.** The repo forbids a database or KV and keeps the proxy stateless (`ARCHITECTURE.md` §5, §12). The brief wants a daily snapshot job and a ledger "table". Resolved: the ledger is a pure function over the public transfers endpoint, cached in `localStorage`; snapshots are captured in the browser on each visit and kept in IndexedDB (Q1, decided).
+2. **Snapshots live on one device and have gaps.** Browser capture (Q1) records only on days the app is opened, only in that browser. Consequences: Phase 4 and Phase 7 read snapshots through an "Export snapshots" JSON download, not directly; a missed day is a missing row, never an interpolated one; clearing site data loses history (the export is the backup). Nothing runs outside `projects/apps/gaffer-iq/`.
 3. **This cloud session cannot reach `fantasy.premierleague.com`** (network policy refused it). That blocks the live checks: confirming the 2026/27 price-predictor fields, the Phase 3 "real squad in under 5 s" timing, and ledger checks against a real import. Either allow that host in the environment's network settings, or drop a captured `bootstrap-static` / `fixtures` / picks / transfers payload into `tests/fixtures/`.
 4. **Price-predictor fields are unverified.** Not confirmed in the live payload (risk 3). Phase 5 isolates them in one adapter file; if they are absent, the adapter falls back to the existing transfer-flow heuristic, flagged as an estimate.
 5. **The MILP referee is Python.** open-fpl-solver needs Python + HiGHS; the repo says "zero Python anywhere in the stack". Phase 8 would run it as an offline tool outside the served app, or port the formulation to Node with a WASM HiGHS build (licence check first). Decide at Phase 8.
@@ -341,14 +341,14 @@ export const DECISION_ENGINE = {
 9. **Free transfer derivation.** 2026/27 FT rules (what Wildcard / Free Hit do to banked FTs, any mid-season top-up) are not in the API. Derived count is a pre-fill; the control stays editable.
 10. **Free Hit and the ledger.** Free Hit transfers revert; whether `transfers/` lists them needs checking against a real account (risk 3). The purchase price stays editable per player in the drawer.
 11. **Backtest leakage and effort.** Reconstructing the engine's context for past GWs from vaastav needs care: team strengths in that dataset may be end-of-season values, status flags are not available historically (structure mode cannot be backtested until our own snapshots accumulate), and the old engine needs the same reconstructed context. Phase 7 is the largest phase.
-12. **Terms and access flags (§11)** found in the repo: the proxy sends a spoofed desktop Chrome user agent (`api/fpl.js:120`); `Access-Control-Allow-Origin: *` (`:143`) lets any site use this proxy against FPL; the Understat `match/{id}` route forwards a scraped HTML page. Also check the vaastav dataset's licence before using it, and whether public snapshot files in a public repo count as redistribution under the FPL Game Terms.
+12. **Terms and access flags (§11)** found in the repo: the proxy sends a spoofed desktop Chrome user agent (`api/fpl.js:120`); `Access-Control-Allow-Origin: *` (`:143`) lets any site use this proxy against FPL; the Understat `match/{id}` route forwards a scraped HTML page. Also check the vaastav dataset's licence before using it. Snapshots stay on your device, so no FPL data is redistributed.
 13. **Pre-existing failures.** The 6 failing tests stay out of scope, except `composite.test.js:98`, which the Phase 2 blank-GW fix turns green. The baseline must not otherwise move.
 14. **Skills.** `smart-explore` could not parse files under `projects/apps/` (the repo's `.claudeignore` excludes that path), so discovery used targeted reads. `pathfinder` was applied inline rather than writing a `PATHFINDER-*/` folder at the repo root, which would break the folder restriction. Phases 1 onward use a branch rather than a separate worktree; the cloud container is already isolated.
 
 ## 7. Open questions (for the grill-me pass)
 
-- **Q1 Snapshots.** Where does the daily job run and where do files live? Recommended: a scheduled GitHub Action (repo root, outside this folder) running `tools/snapshot.mjs`, committing to an orphan `gaffer-iq-snapshots` branch so no production build triggers. Alternatives: a local cron on your machine; or browser-side capture on each visit (gaps on days you do not open the app).
-- **Q2 Ledger.** OK to allowlist `entry/{id}/transfers/` and `entry/{id}/history/` in the proxy?
+- **Q1 Snapshots. Decided:** browser capture on each visit, stored in IndexedDB, exportable as JSON.
+- **Q2 Ledger. Decided:** allowlist both `entry/{id}/transfers/` and `entry/{id}/history/` (public, read-only) in the proxy.
 - **Q3 Network.** Will you allow `fantasy.premierleague.com` (and `raw.githubusercontent.com` for vaastav) in this environment, or provide captured payloads?
 - **Q4 The run.** §8 has no counterpart for "the run" (six staged weeks of moves and chips, saved on the device). The plan deletes it, per "remove the old transfer UI entirely". Keep it instead?
 - **Q5** Confirm the readings in risk 7.
@@ -370,14 +370,14 @@ one passes. Phases 1, 2, 3 and 5 are strictly sequential.
 1. `calcSellPrice(purchase, current)` in `js/engine/prices.js`, computed in integer tenths: `current <= purchase ? current : purchase + floor((current - purchase) / 0.2) x 0.1` (in tenths: `p + floor((c - p) / 2)`).
 2. `js/engine/ledger.js`: `buildPurchaseLedger`, `deriveFreeTransfers`. `api.js`: `fetchEntryTransfers`, `fetchEntryHistory`; two anchored patterns in `api/fpl.js`'s `ALLOWED_PATTERNS`, same shape as `entryPicks`. `squadImport.js` returns ledger, `entry_history.bank` and derived FTs; ledger persisted in `localStorage` per team id, editable.
 3. `js/engine/feasibility.js` `checkSwap`: positions, 3 per club after removing p, `price(q) <= bank + sell(p)`, legal formation still possible.
-4. `tools/snapshot.mjs` (Node, global `fetch` and clock injectable): bootstrap elements (status, news, `chance_of_playing_*`, `now_cost`, `cost_change_*`, transfers in/out, ownership), plus `event/{gw}/live/` once per finished GW, written as timestamped JSON. Scheduler per Q1.
+4. `js/snapshots.js` (module layer, the same side-effect tier as `js/calibration.js`): on `data:ready`, capture one record per call, holding the bootstrap fields per player (status, news, `chance_of_playing_*`, `now_cost`, `cost_change_*`, transfers in/out, ownership) with the capture timestamp and the `bootstrap` fetch time. Also capture `event/{gw}/live/` once for each finished GW not yet stored (one request, every player's minutes). Stored in IndexedDB (a trimmed day is ~100 KB, which would fill `localStorage` within weeks). The record builder is pure and the storage is passed in, so Node tests use an in-memory store. A minimum interval between captures lives in config. "Export snapshots" downloads everything as one JSON file for the offline tools.
 
 **References** `api/fpl.js:25-36` (allowlist pattern shape), `js/squadImport.js:95` (import flow), `js/modules/planner-run.js:79-90` (club count logic to move into the engine).
 
 **Acceptance (tests first)**
 - Sell price: purchase 5.0 -> current 5.1 sells 5.0; 5.2 -> 5.1; 5.3 -> 5.1; 4.8 -> 4.8; 5.0 -> 5.0.
 - Feasibility rejects a 4th player from one club, and a swap affordable at current price but not at sell price.
-- Snapshot job run twice (stub fetch, advancing clock) writes two distinct timestamped records.
+- Snapshot capture run twice (in-memory store, advancing clock past the minimum interval) stores two distinct timestamped records; a second call inside the interval stores nothing.
 
 **Guards** Never forward cookies or tokens through the proxy. No relaxed allowlist patterns. Prices in tenths internally; no float accumulation.
 
@@ -421,7 +421,7 @@ one passes. Phases 1, 2, 3 and 5 are strictly sequential.
 
 > **How this serves the primary goal:** autosub value and the structure and "wait for news" calls are only as good as the per-GW chance a player plays.
 
-**Implement** Fit offline in Node (`tools/minutes/`) on vaastav history plus our snapshots and `event/{gw}/live/` records; ship coefficients into `DECISION_ENGINE` (no training at runtime). Features per §7 Phase 4. Output replaces the derived `pStart`, `pZero`, `p60` (`availabilitySource: 'model'`, `p60Approx: false`).
+**Implement** Fit offline in Node (`tools/minutes/`) on vaastav history plus our exported snapshots and `event/{gw}/live/` records; ship coefficients into `DECISION_ENGINE` (no training at runtime). Features per §7 Phase 4. Output replaces the derived `pStart`, `pZero`, `p60` (`availabilitySource: 'model'`, `p60Approx: false`).
 
 **Acceptance** Brier on P(60+) beats the last-5-starts baseline on a held-out period; calibration table by bucket, reported by return category.
 
