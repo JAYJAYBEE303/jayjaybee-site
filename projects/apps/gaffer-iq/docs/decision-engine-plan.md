@@ -418,7 +418,11 @@ export const DECISION_ENGINE = {
 };
 ```
 
-Mode weights, normalisation and thresholds follow Q6 and Q7.
+Mode weights are the brief's §6 presets exactly as written (Q6): `now` [1,0,0,0,0];
+`longterm` [1,1,1,0,0] / 3 (the brief's alternative, decay 0.85, is tried in
+Phase 7); `future` [0.5,0.75,1,1,1] normalised to sum 1; `funds` 0.85^(t-1) over
+5, not normalised; `structure` [1,0.85,0.72,0.61,0.52]; `ceiling` most weight on
+t\*, small elsewhere. Thresholds follow Q7.
 
 ---
 
@@ -431,7 +435,7 @@ Mode weights, normalisation and thresholds follow Q6 and Q7.
 5. **The MILP referee is Python.** open-fpl-solver needs Python + HiGHS; the repo says "zero Python anywhere in the stack". Phase 8 would run it as an offline tool outside the served app, or port the formulation to Node with a WASM HiGHS build (licence check first). Decide at Phase 8.
 6. **Performance (measured on synthetic data).** The real `scorePlayer` took 430 ms for 255 players x 6 single-GW calls and 570 ms for 615 x 6, so projecting every feasible candidate fits the 5 s budget; **no candidate cap**, as the brief decided brute force. `pickStartingXI` costs ~3 us, so single-swap enumeration (~5-15k `V` calls) is cheap. The two things that would not fit, unbounded mode 4 chaining (~1M `V` calls) and synchronous robustness, are bounded in §5.2. If Phase 3 measurement still blows the budget, a capped pre-filter comes back to you as a question, with its criterion.
 7. **Brief inconsistencies to confirm** (Q10): `horizon_gws: 6` vs five weights per mode (plan: the 6th GW is used only by the mode 3 deferral test); mode 3 is titled "GW+3..+5" but its weights cover GW+1..+5 (plan: use the weights as written); Ceiling's upper tail does not exist before Phase 7 (plan: Phase 3 ships Ceiling on the mean at t\*, labelled as such). Mode 4's lambda "derived (see below)" is read from the same row: the funds credit is the chained second move's net gain, else `lambdaDefault`.
-8. **Units of DeltaEV** (Q6). Modes 2 and 3 normalise their weights (sum 1, a per-GW average) while mode 6 does not (sum 3.70, a horizon total), yet all are compared against the same one-off FT value and hit cost. The same move can roll in mode 2 and go ahead in mode 6.
+8. **Units of DeltaEV** (kept as written, Q6). Modes 2 and 3 normalise their weights (sum 1, a per-GW average) while modes 4 and 6 do not (a horizon total), yet all are compared against the same one-off FT value and hit cost, so the same move can roll in mode 2 and go ahead in mode 6. Phase 7 reports whether this costs points; any change to the presets comes back to you.
 9. **Dashboard divergence.** The Dashboard keeps its own XI and captain from `expectedPoints`. The P1-P4 root fixes reach it, so it uses the same corrected rule; it still reads one projection per window rather than the per-GW projections. Moving the Dashboard onto the new projections is a follow-up.
 10. **Free transfer derivation.** 2026/27 FT rules (what Wildcard / Free Hit do to banked FTs, any mid-season top-up) are not in the API. Derived count is a pre-fill; the control stays editable.
 11. **Free Hit and the import.** During a Free Hit week the import returns the temporary squad and bank; Phase 1 re-reads picks and bank from GW-1 when `active_chip` is `freehit`. Whether `transfers/` lists Free Hit moves needs a real account (risk 3); purchase prices stay editable.
@@ -448,7 +452,7 @@ Mode weights, normalisation and thresholds follow Q6 and Q7.
 - **Q3 Network. Decided:** you will allow `fantasy.premierleague.com` (and `raw.githubusercontent.com`, already reachable) in this environment.
 - **Q4 The run and chip hints. Decided:** delete the run; keep chip-week hints as pre-fills for the chip plan, re-pointed so Bench Boost and Triple Captain come from the engine's projections and real bench (Wildcard and Free Hit stay in `chips.js`).
 - **Q5 Root fix for the minutes double count (P1). Decided:** fix `calcExpectedPoints` at the root; the Dashboard's captain and XI order will move.
-- **Q6 Units of DeltaEV** (risk 8). Use weights as per-GW discount factors without normalising, so DeltaEV is a horizon total in the same unit as the FT value and hit cost?
+- **Q6 Units of DeltaEV. Decided:** keep the brief's presets exactly as written; Phase 7 reports the effect (risk 8).
 - **Q7 Threshold.** Recommend a move whenever OutScore > 0 in every mode (OutScore already nets the FT value or the hit)?
 - **Q8 Blank next GW in mode 1.** What should Now do with a fit premium whose team blanks next GW?
 - **Q9 Leftovers.** Rewrite the landing card copy, delete `index-FXL00-CK7M8F4.html`, drop the `me/` allowlist entry?
@@ -575,7 +579,7 @@ before the previous one passes. Phases 1, 2, 3 and 5 are strictly sequential.
 
 **Implement** `tools/backtest/` (Node): point-in-time context from vaastav + Understat (dates sliced), many starting squads, metrics and baselines per §7 Phase 7, old engine from the tag (§4.4), paired per-GW bootstrap CIs; tune config; ceiling Monte Carlo and `pP90`. Report `docs/decision-engine-backtest.md`.
 
-**Acceptance** States plainly, with confidence intervals, whether the new engine beats the old engine and the roll baseline.
+**Acceptance** States plainly, with confidence intervals, whether the new engine beats the old engine and the roll baseline, and whether the mixed weight units (risk 8) cost points.
 
 **Guards** Suspect leakage first when numbers look good.
 
