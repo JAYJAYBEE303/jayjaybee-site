@@ -103,3 +103,13 @@ export function groupBy(arr, keyFn) {
 export function toTenths(millions) {
   return Math.round(millions * 10);
 }
+
+/**
+ * Integer tenths of a million back to millions (55 -> 5.5), for funds terms
+ * and display.
+ * @param {number} tenths
+ * @returns {number} millions
+ */
+export function fromTenths(tenths) {
+  return tenths / 10;
+}

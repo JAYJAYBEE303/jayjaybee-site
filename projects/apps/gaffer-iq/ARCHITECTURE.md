@@ -115,7 +115,8 @@ jayjaybee-site/                   ← repo root (not Gaffer IQ's concern)
             │   ├── ledger.js
             │   ├── feasibility.js
             │   ├── projections.js
-            │   └── squad-value.js
+            │   ├── squad-value.js
+            │   └── decision.js
             └── modules/
                 ├── landing.js
                 ├── matchup.js
@@ -188,6 +189,8 @@ gaffer-iq/                          (= projects/gaffer-iq/ in the repo)
     │   ├── projections.js      # Per player, per GW of the horizon: xpts, pZero, xptsIfPlays,
     │   │                       #   pStart, p60 - the decision engine's data contract.
     │   ├── squad-value.js      # V_t(S): best XI + captain + expected autosubs (+ Bench Boost).
+    │   ├── decision.js         # Every legal transfer scored as a change in V over six mode
+    │   │                       #   presets: one move or roll per mode, KeepValue/OutScore per player.
     │   └── season.js           # Whole-season model for the Full Season strip: per-GW matchups,
     │                           #   postponement inference, chip windows (FEATURE_ENGINE §15).
     │

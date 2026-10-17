@@ -10,7 +10,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { squadValue, autosubRecovery } from '../../js/engine/squad-value.js';
+import { squadValue, autosubRecovery, uncoveredLoss } from '../../js/engine/squad-value.js';
 
 // ─── Test utilities ──────────────────────────────────────────────────────────
 
@@ -178,6 +178,19 @@ test('linear mode weights the bench slots 0.30 / 0.10 / 0.03 and the reserve kee
     (0.30 * 2.5) + (0.10 * 2.2) + (0.03 * 2) + (0.03 * 2));
 });
 
+// ─── Uncovered loss (brief §6, mode 6) ───────────────────────────────────────
+
+test('uncoveredLoss is a starter\'s chance of missing out times what the bench cannot cover', () => {
+  // MID 9 plays half the time (7 when he does, 3.5 xpts - still in the XI).
+  // When he misses out MID 12, first on the bench, brings 2.5:
+  // 0.5 x (7 - 2.5) = 2.25. Starters who always play lose nothing.
+  const { ids, projections } = squadOf(withRows([9, 'MID', 7, 0.5]));
+  const loss = uncoveredLoss(ids, GW, projections);
+  close(loss.get(9), 2.25);
+  assert.equal(loss.get(13), 0);
+  assert.equal(loss.has(12), false, 'bench players are not starters');
+});
+
 // ─── Captain ─────────────────────────────────────────────────────────────────
 
 test('selling the only strong captain option costs more than his raw xpts difference', () => {
@@ -199,6 +212,20 @@ test('the captain maximises his xpts plus his absence times the vice\'s xpts', (
   assert.equal(v.captainId, 9);
   assert.equal(v.viceId, 13);
   close(v.components.captain, 11.9);
+});
+
+test('squadValue names the next captain option and the gap to it', () => {
+  // FWD 13 (9) captains; MID 8 (8) is the next option: a gap of 1.
+  const { ids, projections } = squadOf(BASE);
+  const v = squadValue(ids, GW, projections);
+  assert.equal(v.captainId, 13);
+  assert.equal(v.nextCaptainId, 8);
+  close(v.captainGap, 1);
+});
+
+test('under Triple Captain the captain gap is exactly double', () => {
+  const { ids, projections } = squadOf(BASE);
+  close(squadValue(ids, GW, projections, { chip: 'triplecaptain' }).captainGap, 2);
 });
 
 test('Triple Captain doubles the captain\'s bonus', () => {

@@ -1498,9 +1498,32 @@ export const TRIPLE_CAPTAIN_MULTIPLIER = 3;
 // and STATUS_PLAY_CHANCE above); the decision engine works in 0-1.
 export const PERCENT = 100;
 
+// Per-gameweek decay of the Funds & flexibility mode's weights (brief §6).
+const DECAY_BASE = 0.85;
+
 export const DECISION_ENGINE = {
   // FPL: free transfers bank up to this many; a sixth would be wasted.
   maxBankedFt: 5,
+
+  // ── Transfer economics (engine/decision.js, plan §5.2) ──
+  // What a free transfer is worth, so a move must beat rolling it (brief §6):
+  // 'flat', or 'decreasing' - the value of the FT that rolling would bank, by
+  // how many would then be held (the 2nd is worth 1.5, ... the 5th 0.3). At
+  // maxBankedFt a rolled FT is wasted, so using one costs nothing.
+  ftValueMode: 'decreasing',
+  ftValueFlat: 1.75,
+  ftValueSchedule: { 2: 1.5, 3: 1.0, 4: 0.6, 5: 0.3 },
+  // A move with no free transfer left costs FPL's hit, and must clear it by
+  // this margin as well.
+  hitCost: HIT_PENALTY,
+  hitMargin: 2,
+  // Points per £1.0m freed (brief §5's lambda) where a mode values funds.
+  lambdaDefault: 0.10,
+  decayBase: DECAY_BASE,
+  // A mode card shows up to two alternatives within this many points of its move.
+  alternativesWindow: 2,
+  // The minutes-risk badge on a move's two players, from pZero in the planning GW.
+  minutesRiskPZero: { medium: 0.1, high: 0.3 },
 
   // ── Projections (engine/projections.js, plan §2.2) ──
   // Gameweeks projected from the planning gameweek on (brief §3).
@@ -1531,6 +1554,74 @@ export const DECISION_ENGINE = {
   benchOrder: 'xptsIfPlays',
   // Linear mode: the share of each bench slot's xpts credited to the squad.
   benchWeightsLinear: { s1: 0.30, s2: 0.10, s3: 0.03, gk: 0.03 },
+
+  // ── The six modes (brief §6; plan §5.4, Q6/Q7) ──
+  // Weights are w_1..w_5 for the planning GW and the four after it, exactly as
+  // the brief writes them (Q6): Long term and Future prep are normalised to a
+  // per-GW average, Funds and Structure are horizon totals. A move is made only
+  // when its OutScore - its gain over rolling, after the FT value or hit - is
+  // above `threshold` (Q7). Starting defaults, NOT tuned: Phase 7 tunes them.
+  modes: {
+    now: {
+      label: 'Now',
+      weights: [1, 0, 0, 0, 0],
+      lambda: 0,
+      // An incoming player more likely than this to get no minutes in the
+      // planning GW (or flagged out) is never Now's buy.
+      pZeroGate: 0.25,
+      threshold: 0,
+    },
+    longterm: {
+      label: 'Long term',
+      weights: [1, 1, 1, 0, 0].map(w => w / 3),
+      lambda: 0.10,
+      threshold: 0,
+    },
+    future: {
+      label: 'Future prep',
+      weights: [0.5, 0.75, 1, 1, 1].map(w => w / 4.25),
+      // The brief gives 0.10-0.20; the midpoint until Phase 7 tunes it.
+      lambda: 0.15,
+      threshold: 0,
+    },
+    funds: {
+      label: 'Funds & flexibility',
+      weights: [0, 1, 2, 3, 4].map(k => DECAY_BASE ** k),
+      // No lambda of its own: the brief's "derived" rate is the chained second
+      // move's net gain, else lambdaDefault (Q10).
+      // A downgrade may give up at most this many points over the horizon ...
+      tau: 1.0,
+      // ... and is ranked by money freed per point lost, the loss floored here.
+      eps: 0.1,
+      // The most efficient downgrades searched for a second move they fund.
+      chainTopK: 5,
+      threshold: 0,
+    },
+    ceiling: {
+      label: 'Ceiling',
+      // On the target GW t* and on the other four.
+      targetWeight: 1,
+      otherWeight: 0.1,
+      lambda: 0,
+      // Points lost at t* by selling him for his best affordable replacement,
+      // at or above which he is protected from sale in the four modes above.
+      lockThreshold: 3,
+      threshold: 0,
+    },
+    structure: {
+      label: 'Structure fix',
+      weights: [1, 0.85, 0.72, 0.61, 0.52],
+      lambda: 0.10,
+      // Expected GWs unavailable over the horizon that make him a dead slot ...
+      deadSlotMinGws: 2,
+      // ... and the points a dead slot costs the squad beyond his projections
+      // (no bench cover, nothing in a Bench Boost week).
+      deadSlotPenalty: 1,
+      // He is held, not sold, if his availability reaches this inside the horizon.
+      recoveredAvailability: 0.9,
+      threshold: 0,
+    },
+  },
 };
 
 // Minimum gap between two point-in-time snapshots (js/snapshots.js). The brief

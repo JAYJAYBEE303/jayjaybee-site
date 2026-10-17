@@ -35,9 +35,11 @@ const OUTFIELD = ['DEF', 'MID', 'FWD'];
  * @param {'linear'|'probability'} [opts.autosubMode]  DECISION_ENGINE.autosubMode by default
  * @param {{s1: number, s2: number, s3: number, gk: number}} [opts.benchWeightsLinear]
  * @returns {{ value: number, xi: number[], bench: number[], captainId: number|null,
- *   viceId: number|null, components: { xi: number, captain: number, autosub: number,
- *   benchBoost: number } }}
+ *   viceId: number|null, nextCaptainId: number|null, captainGap: number,
+ *   components: { xi: number, captain: number, autosub: number, benchBoost: number } }}
  *   bench: outfield in DECISION_ENGINE.benchOrder, reserve keeper last.
+ *   nextCaptainId / captainGap: the second-best captain and how much less his
+ *   armband is worth (doubled under Triple Captain, like the bonus itself).
  *   components sum to value; benchBoost is the bench's xpts less the autosub
  *   recovery already credited, so a boosted week never counts a sub twice.
  */
@@ -46,13 +48,7 @@ export function squadValue(squad, t, projections, {
   autosubMode = DECISION_ENGINE.autosubMode,
   benchWeightsLinear = DECISION_ENGINE.benchWeightsLinear,
 } = {}) {
-  const entries = squad.map(id => {
-    const gw = gameweekOf(projections, id, t);
-    return { player: { id, position: gw.position }, gw };
-  });
-  const { xi, bench } = pickStartingXI(entries, e => e.gw.xpts);
-  const xiGws    = xi.map(e => e.gw);
-  const benchGws = orderBench(bench.map(e => e.gw));
+  const { xiGws, benchGws } = lineupOf(squad, t, projections);
 
   const captain = pickCaptain(xiGws);
   const multiplier = chip === 'triplecaptain' ? TRIPLE_CAPTAIN_MULTIPLIER : CAPTAIN_MULTIPLIER;
@@ -67,6 +63,8 @@ export function squadValue(squad, t, projections, {
     bench: benchGws.map(g => g.playerId),
     captainId: captain.captainId,
     viceId:    captain.viceId,
+    nextCaptainId: captain.nextCaptainId,
+    captainGap: (multiplier - 1) * (captain.bonus - captain.nextBonus),
     components: { xi: xiValue, captain: captainValue, autosub, benchBoost },
   };
 }
@@ -96,6 +94,43 @@ export function autosubRecovery(xi, benchOrder, t, projections, mode,
     xi.map(id => gameweekOf(projections, id, t)),
     benchOrder.map(id => gameweekOf(projections, id, t)),
     mode, weights);
+}
+
+/**
+ * What each starter's possible absence costs the squad once autosubs have
+ * done what they can (brief §6, mode 6's uncovered loss): pZero x
+ * xptsIfPlays, less the recovery his absence brings in. Starters only; the XI
+ * and bench are picked as squadValue picks them.
+ *
+ * @param {number[]} squad
+ * @param {number} t
+ * @param {Map} projections
+ * @param {object} [opts]  { autosubMode, benchWeightsLinear } as squadValue's
+ * @returns {Map<number, number>}  starter id -> points
+ */
+export function uncoveredLoss(squad, t, projections, {
+  autosubMode = DECISION_ENGINE.autosubMode,
+  benchWeightsLinear = DECISION_ENGINE.benchWeightsLinear,
+} = {}) {
+  const { xiGws, benchGws } = lineupOf(squad, t, projections);
+  const total = recovery(xiGws, benchGws, autosubMode, benchWeightsLinear);
+  return new Map(xiGws.map(g => {
+    // The recovery his absence accounts for: all of it, less what is left
+    // when he is certain to play.
+    const certain = xiGws.map(x => (x === g ? { ...x, pZero: 0 } : x));
+    const covered = total - recovery(certain, benchGws, autosubMode, benchWeightsLinear);
+    return [g.playerId, (g.pZero * g.xptsIfPlays) - covered];
+  }));
+}
+
+/** The XI by xpts and the bench in DECISION_ENGINE.benchOrder, as gameweek projections. */
+function lineupOf(squad, t, projections) {
+  const entries = squad.map(id => {
+    const gw = gameweekOf(projections, id, t);
+    return { player: { id, position: gw.position }, gw };
+  });
+  const { xi, bench } = pickStartingXI(entries, e => e.gw.xpts);
+  return { xiGws: xi.map(e => e.gw), benchGws: orderBench(bench.map(e => e.gw)) };
 }
 
 function recovery(xiGws, benchGws, mode, weights) {
@@ -228,21 +263,22 @@ function absenceDistribution(pZeros, cap) {
 /**
  * The captain and vice maximising the captain's extra points: his own xpts,
  * plus the vice's xpts when he does not play (brief §4.2). xpts_v is the
- * vice's unconditional figure, his own absence included.
+ * vice's unconditional figure, his own absence included. The runner-up
+ * captain and his bonus come along for the EV gap the UI shows.
  */
 function pickCaptain(xiGws) {
-  let best = { captainId: null, viceId: null, bonus: 0 };
-  for (const c of xiGws) {
+  const options = xiGws.map(c => {
     let vice = null;
     for (const v of xiGws) {
       if (v !== c && (!vice || v.xpts > vice.xpts)) vice = v;
     }
-    const bonus = c.xpts + (vice ? c.pZero * vice.xpts : 0);
-    if (best.captainId === null || bonus > best.bonus) {
-      best = { captainId: c.playerId, viceId: vice?.playerId ?? null, bonus };
-    }
-  }
-  return best;
+    return { captainId: c.playerId, viceId: vice?.playerId ?? null,
+      bonus: c.xpts + (vice ? c.pZero * vice.xpts : 0) };
+  });
+  // Stable: on a tie the earlier player in the XI keeps the armband.
+  options.sort((a, b) => b.bonus - a.bonus);
+  const [best = { captainId: null, viceId: null, bonus: 0 }, next] = options;
+  return { ...best, nextCaptainId: next?.captainId ?? null, nextBonus: next?.bonus ?? best.bonus };
 }
 
 /** Outfield subs by DECISION_ENGINE.benchOrder, descending; the reserve keeper last. */

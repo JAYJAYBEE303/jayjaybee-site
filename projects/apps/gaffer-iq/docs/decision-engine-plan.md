@@ -4,8 +4,9 @@ Date: 2026-10-16, revision 2 on 2026-10-17 (after an adversarial review of
 revision 1 against the code and the brief: 58 findings, 44 confirmed and folded
 in below).
 Status: **approved**; grill-me questions Q1-Q10 answered (§7). Phase 1 done
-(`f4ef63f`); Phase 2 done, awaiting your check before Phase 3. Where the build
-departed from this plan, the text below was updated to match it.
+(`f4ef63f`); Phase 2 done (`cfad609`); Phase 3 done, awaiting your check before
+the UI phase. Where the build departed from this plan, the text below was
+updated to match it.
 Brief: `fpl-decision-engine-brief.md` (16 Oct 2026). Section numbers below
 (§3, §5 ...) refer to the brief unless prefixed with a file name.
 Scope: `projects/apps/gaffer-iq/` only. Branch:
@@ -328,16 +329,21 @@ Rules the signatures do not show:
 - **Performance bounds.** `V_t(S - p + q)` is computed once per `(p, q, t)` and reused by all six modes, which differ only in weights, lambda and gates; lock and ban only re-filter. Mode 4 chaining takes the top-K downgrades only, draws the second buy from the newly affordable price band, and scores the pair jointly as `V(S - p + q - r + s)` with the club check across both moves. Robustness runs after first paint and never on the lock / ban path.
 
 ```js
+// runDecisionEngine(input, config = DECISION_ENGINE, cache = createDecisionCache())
 input = {
   planningGw,
-  squad: [{ playerId, position, teamId, price, purchasePrice, sellPrice, sellPriceEstimated }],  // 15
-  bank, freeTransfers,
+  squad: [{ playerId, name, position, teamId, priceTenths, purchaseTenths }],  // 15; purchaseTenths null = no ledger entry
+  bankTenths, freeTransfers,
   chipPlan: { [gw]: 'benchboost' | 'triplecaptain' | 'freehit' | 'wildcard' },
+  chipsUsed: [{ chip, gw }],          // from history/ (with the UI's override): the chip hints' halves
   locks: Set<playerId>, bans: Set<playerId>,
-  projections,        // from buildProjections
-  candidates,         // Player[]: every feasible replacement, per position (no cap)
+  projections,        // from buildProjections, for the squad and every candidate
+  candidates,         // Player[]: every possible replacement (no cap); the engine applies checkSwap
   priceSignals,       // Phase 5 adapter output, or null
 }
+// The engine prices each sale itself (calcSellPrice). The cache holds V per
+// (gw, swap) between runs and empties itself when the projections, the squad,
+// the planned Bench Boost / Triple Captain GWs or the autosub settings change.
 
 DecisionResult = {
   modes: { [modeId]: {
@@ -346,14 +352,16 @@ DecisionResult = {
     root: Move | null,
     rollValue,                       // display only: the value of the FT kept by rolling
     alternatives: Move[],            // within `alternativesWindow` points, max 2
-    waitForNews: boolean, deferral: { laterScore, epsilon } | null,
+    waitForNews: boolean, deferral: { laterScore, epsilon } | null,   // Phase 5
     robustness: number | null,       // Phase 6
+    targetGw,                        // Ceiling only: t*
   } },
   players: [{ playerId,
-    keepValue: { [modeId]: number }, outScore: { [modeId]: number },
-    best: { [modeId]: Move | null }, // full components for every owned player, every mode
+    keepValue: { [modeId]: number }, outScore: { [modeId]: number | null },
+    best: { [modeId]: Move | null }, // full components for every owned player, every mode; null with no legal move
     flags: Array<'sell' | 'hold' | 'protected' | 'locked' | 'pendingNews' | 'sellPriceEstimated'>,
-    lockValue: number | null }],
+    lockValue: number | null,        // null: no affordable replacement, so no sale to protect against
+    uncoveredLoss: number }],        // mode 6's structural exposure, Structure-weighted
   lineup: { xi, bench, captainId, viceId, captainGap, nextCaptainId },
   chipHints: {                       // pre-fill only; never applied unless you accept them (Q4)
     benchboost:    { gw, gain, reasoning } | null,   // GW with the largest Bench Boost increment from squadValue
@@ -362,14 +370,17 @@ DecisionResult = {
 }
 
 Move = {
-  outId, inId,
+  mode, outId, inId,
   deltaEv, perGw: number[],          // w_t x (V_t(S - p + q) - V_t(S)) per GW
   fundsTerm, priceTerm, transferCost,
-  outScore,                          // = deltaEv + fundsTerm - priceTerm - transferCost: the gain over rolling
-  tentativeFromGw,                   // later-GW parts shown greyed
-  minutesRisk: { out: 'low' | 'medium' | 'high', in: 'low' | 'medium' | 'high' },
+  deadSlotTerm,                      // Structure only, else 0
+  outScore,                          // = deltaEv + fundsTerm + deadSlotTerm - priceTerm - transferCost: the gain over rolling
+  efficiency,                        // Funds only: money freed per point given up
+  tentativeFromGw,                   // later-GW parts shown greyed: every GW after the planning GW
+  minutesRisk: { out: 'low' | 'medium' | 'high', in: 'low' | 'medium' | 'high' },   // pZero in the planning GW
   chained: Move | null,              // mode 4 only
-  why: { squad, funds, price, cost }, // plain-English sentences, built in the engine
+  tags: Array<'blankGwOneWeek' | 'sellPriceEstimated' | 'pendingNews'>,
+  why: { squad, funds, price, cost }, // plain-English sentences, built in the engine; price null until Phase 5
 }
 ```
 
@@ -410,13 +421,14 @@ export const DECISION_ENGINE = {
   absenceCarryOver: { doubtful: 0.3, injured: 0.6, suspended: 0, unavailable: 1 },
   absenceMinRunGws: 2, absenceLookbackGws: 5, minContentionGws: 3,
   seasonMaxAgeMinutes: 60, snapshotMinIntervalMinutes: 360,
-  modes: {
-    now:       { weights, lambda, pZeroGate, threshold },
-    longterm:  { weights, lambda, threshold },
-    future:    { weights, lambda, threshold, deferralEpsilon },
-    funds:     { weights, tau, eps, chainTopK, threshold },
-    ceiling:   { targetWeight, otherWeight, lockThreshold, threshold },
-    structure: { weights, lambda, deadSlotMinGws, deadSlotPenalty, threshold },
+  minutesRiskPZero: { medium: 0.1, high: 0.3 },
+  modes: {   // each also has a label
+    now:       { weights, lambda: 0, pZeroGate: 0.25, threshold: 0 },
+    longterm:  { weights, lambda: 0.10, threshold: 0 },
+    future:    { weights, lambda: 0.15, threshold: 0 },          // deferralEpsilon arrives in Phase 5
+    funds:     { weights, tau: 1.0, eps: 0.1, chainTopK: 5, threshold: 0 },   // lambda: lambdaDefault
+    ceiling:   { targetWeight: 1, otherWeight: 0.1, lambda: 0, lockThreshold: 3, threshold: 0 },
+    structure: { weights, lambda: 0.10, deadSlotMinGws: 2, deadSlotPenalty: 1, recoveredAvailability: 0.9, threshold: 0 },
   },
 };
 ```
@@ -544,6 +556,16 @@ before the previous one passes. Phases 1, 2, 3 and 5 are strictly sequential.
 
 **Guards** Sell price, never current price, in budget and funds logic. Ranking by raw points or form is a bug.
 
+**As built** (`js/engine/decision.js`; tests `tests/engine/decision.test.js`). Readings and starting values the plan left open, all in `config.js` for Phase 7 to tune:
+- **Defaults chosen:** Now's `pZeroGate` 0.25 (FPL's 75% flag); Future prep's lambda 0.15 (the midpoint of the brief's 0.10-0.20); Funds' `eps` 0.1 and `chainTopK` 5; Ceiling's `otherWeight` 0.1 and `lockThreshold` 3 points; Structure's `deadSlotMinGws` 2, `deadSlotPenalty` 1 point and `recoveredAvailability` 0.9.
+- **t\*** sums the 15 highest xpts across every projected player, squad and candidates alike: the GW with the most to gain for any squad, which also keeps t\* from moving with the moves being scored.
+- **Lock value** is null when nothing affordable can replace him: there is then no sale to protect against.
+- **Mode 6's uncovered loss** is reported per player but not added to DeltaEV: V already prices it through the autosub term, so every mode credits a move that removes it. The dead-slot penalty is added, in Structure only, as `deadSlotTerm` (expected GWs unavailable = the sum of `1 - availability`, which projections now carry apart from rotation). The hold rule needs a flag now, availability reaching `recoveredAvailability` inside the five GWs, and no `fallLikely` price signal (none until Phase 5).
+- **Mode 4's chain** is a second transfer this GW, costed at `transferCost(freeTransfers - 1)`; the funds credit is the better of its net gain and lambda per £1.0m freed.
+- **Gates** act on admissible moves: Now's availability gate removes the buy from all of Now's moves; Long term's DeltaEV gate and every threshold filter the root and the alternatives, so an alternative also beats rolling.
+- **FT cost** (§5.2) is built here because OutScore needs it; Phase 5 keeps the rest of its list.
+- **Measured:** the real 2025-26 league rebuilt as of GW20 from vaastav (790 players, live table GW1-19, the 15 most-selected players): projections 1.6 s, all six modes 0.7 s cold, a lock re-run 45 ms; the synthetic 600-candidate test asserts < 5 s and < 200 ms.
+
 ### UI (brief §8) - after Phase 3, may run alongside Phase 4
 
 > **How this serves the primary goal:** this is where the one recommended move per mode, and the evidence for it, reaches you.
@@ -568,7 +590,7 @@ before the previous one passes. Phases 1, 2, 3 and 5 are strictly sequential.
 
 > **How this serves the primary goal:** decides when a move is worth a transfer at all, and stops a 0.1m wobble from driving advice.
 
-**Implement** FT cost per §5.2, hit threshold, mode 3 deferral test (with the exception for a price move that changes affordability), mode 1 "wait for team news" flag; `js/engine/price-adapter.js` as the only reader of the undocumented predictor fields, falling back to `calcPriceChangeRisk` (flagged); `PriceTerm` from the actual change in `sell(p)`.
+**Implement** FT cost per §5.2 (built in Phase 3, with its table tests), hit threshold, mode 3 deferral test (with the exception for a price move that changes affordability), mode 1 "wait for team news" flag; `js/engine/price-adapter.js` as the only reader of the undocumented predictor fields, falling back to `calcPriceChangeRisk` (flagged); `PriceTerm` from the actual change in `sell(p)`.
 
 **Acceptance (tests first)** FT cost table: banked 0 -> hit cost + margin, 1 -> 1.5, 2 -> 1.0, 4 -> 0.3, 5 -> 0 (flat mode at 5 also 0); deferral test and its affordability exception; price term is zero when a fall does not change the sell price (odd-tenths profit case); the fallback path is tested.
 

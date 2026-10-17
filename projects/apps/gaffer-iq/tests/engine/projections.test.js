@@ -179,6 +179,24 @@ test('a 25% flag this gameweek is not carried flat to GW+4', () => {
   for (let k = 1; k < gws.length; k++) assert.ok(available[k] >= available[k - 1]);
 });
 
+test('each projection carries the availability it was built from, apart from rotation', () => {
+  // The decision engine's dead-slot and hold rules need it: a player who is
+  // often left out is not an injured one.
+  const alternate = [[90, 6], [0, 0], [90, 6], [0, 0], [90, 6], [0, 0], [90, 6], [0, 0]];
+  const { season, ctx } = league([
+    rawPlayer(1, 1, 'MID', { status: 'd', chance_of_playing_next_round: 25, total_points: 24, minutes: 360, starts: 4 }),
+    rawPlayer(2, 1, 'MID', { total_points: 24, minutes: 360, starts: 4 }),
+  ]);
+  const projections = project(season, ctx, { gwTable: liveTable({ 1: alternate, 2: alternate }) });
+  const doubt = projections.get(1).gws;
+  assert.equal(doubt[0].availability, 0.25);
+  const carry = DECISION_ENGINE.absenceCarryOver.doubtful;
+  assert.ok(Math.abs(doubt[3].availability - (1 - 0.75 * carry ** 3)) < 1e-12);
+  const rotation = projections.get(2).gws[0];
+  assert.equal(rotation.availability, 1);
+  assert.equal(rotation.pZero, 0.5);
+});
+
 test('a flagged team-mate\'s chance recovers in his club\'s channel read as well', () => {
   // channel.js scales a club's attacking share by each attacker's chance of
   // playing, read from ctx.playersByTeamId - inside every fixture score.

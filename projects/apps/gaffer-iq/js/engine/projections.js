@@ -37,6 +37,8 @@ import { calcPlaytimeSecurity } from './form.js';
  * @property {number}  xptsIfPlays   expected points given he plays (brief: xpts_if_plays)
  * @property {number|null} pP90      upper-tail points, null until Phase 7
  * @property {boolean} estimated     his rates came from season totals or the price prior
+ * @property {number}  availability  chance he is fit and permitted to play, 0-1 - apart
+ *   from rotation, which pZero also carries (a fit squad player is available but may not play)
  * @property {'fpl'|'status'|'recovery'|'model'} availabilitySource
  */
 
@@ -87,8 +89,8 @@ export function buildProjections(players, ctx, {
 function projectGw(player, gw, k, rates, fixtures, ctxForGw, scorePlayerFn) {
   const available = availability(player, k);
   const base = {
-    gw, fixtures, pP90: null, p60Approx: true,
-    estimated: rates.estimated, availabilitySource: available.source,
+    gw, fixtures, pP90: null, p60Approx: true, estimated: rates.estimated,
+    availability: available.value, availabilitySource: available.source,
   };
   if (fixtures === 0) {
     return { ...base, xpts: 0, pStart: 0, pZero: 1, p60: 0, xptsIfPlays: 0 };
