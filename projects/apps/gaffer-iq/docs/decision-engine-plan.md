@@ -422,7 +422,10 @@ Mode weights are the brief's §6 presets exactly as written (Q6): `now` [1,0,0,0
 `longterm` [1,1,1,0,0] / 3 (the brief's alternative, decay 0.85, is tried in
 Phase 7); `future` [0.5,0.75,1,1,1] normalised to sum 1; `funds` 0.85^(t-1) over
 5, not normalised; `structure` [1,0.85,0.72,0.61,0.52]; `ceiling` most weight on
-t\*, small elsewhere. Thresholds follow Q7.
+t\*, small elsewhere. Every mode's `threshold` is 0: a move is recommended only
+when OutScore > 0, i.e. it beats rolling after the FT value or hit is paid
+(Q7). Long term additionally keeps the brief's own gate, DeltaEV > FT value
+(free) or > `hitCost + hitMargin` (hit).
 
 ---
 
@@ -453,7 +456,7 @@ t\*, small elsewhere. Thresholds follow Q7.
 - **Q4 The run and chip hints. Decided:** delete the run; keep chip-week hints as pre-fills for the chip plan, re-pointed so Bench Boost and Triple Captain come from the engine's projections and real bench (Wildcard and Free Hit stay in `chips.js`).
 - **Q5 Root fix for the minutes double count (P1). Decided:** fix `calcExpectedPoints` at the root; the Dashboard's captain and XI order will move.
 - **Q6 Units of DeltaEV. Decided:** keep the brief's presets exactly as written; Phase 7 reports the effect (risk 8).
-- **Q7 Threshold.** Recommend a move whenever OutScore > 0 in every mode (OutScore already nets the FT value or the hit)?
+- **Q7 Threshold. Decided:** OutScore > 0 in every mode (a config key per mode for Phase 7 tuning); Long term also keeps its DeltaEV gate.
 - **Q8 Blank next GW in mode 1.** What should Now do with a fit premium whose team blanks next GW?
 - **Q9 Leftovers.** Rewrite the landing card copy, delete `index-FXL00-CK7M8F4.html`, drop the `me/` allowlist entry?
 - **Q10** Confirm the readings in risk 7.
@@ -523,7 +526,7 @@ before the previous one passes. Phases 1, 2, 3 and 5 are strictly sequential.
 
 **Acceptance (tests first)**
 - One test per extra-logic rule above.
-- `deltaEv` equal to the FT value gives `outScore` 0 and the call "roll".
+- `deltaEv` equal to the FT value gives `outScore` 0 and the call "roll"; in Long term, a move with OutScore > 0 but DeltaEV below the FT value also rolls.
 - Every owned player carries all components for all six modes.
 - A starter who blanks only in a planned Free Hit GW is not a top sell in any mode; the Triple Captain captain gap is exactly double the normal one.
 - Bench filler (brief §7): the squad holds a genuine sell, bank 0, and no `q` affordable for the filler beats the weakest starter; the filler is not mode 1's top sell. No cheap-sell penalty is added to pass it.
