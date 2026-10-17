@@ -457,7 +457,7 @@ when OutScore > 0, i.e. it beats rolling after the FT value or hit is paid
 - **Q5 Root fix for the minutes double count (P1). Decided:** fix `calcExpectedPoints` at the root; the Dashboard's captain and XI order will move.
 - **Q6 Units of DeltaEV. Decided:** keep the brief's presets exactly as written; Phase 7 reports the effect (risk 8).
 - **Q7 Threshold. Decided:** OutScore > 0 in every mode (a config key per mode for Phase 7 tuning); Long term also keeps its DeltaEV gate.
-- **Q8 Blank next GW in mode 1.** What should Now do with a fit premium whose team blanks next GW?
+- **Q8 Blank next GW in mode 1. Decided:** Now stays a pure one-week preset - it may offer the sale, labelled "blank GW - one-week view"; a planned Free Hit that GW means he is never sold.
 - **Q9 Leftovers.** Rewrite the landing card copy, delete `index-FXL00-CK7M8F4.html`, drop the `me/` allowlist entry?
 - **Q10** Confirm the readings in risk 7.
 
@@ -530,7 +530,7 @@ before the previous one passes. Phases 1, 2, 3 and 5 are strictly sequential.
 - Every owned player carries all components for all six modes.
 - A starter who blanks only in a planned Free Hit GW is not a top sell in any mode; the Triple Captain captain gap is exactly double the normal one.
 - Bench filler (brief §7): the squad holds a genuine sell, bank 0, and no `q` affordable for the filler beats the weakest starter; the filler is not mode 1's top sell. No cheap-sell penalty is added to pass it.
-- The blank-next-GW case behaves as Q8 decides.
+- Blank next GW (Q8): with a Free Hit planned that GW, a fit premium who blanks is never sold in any mode; without one, Now may offer the sale, tagged "blank GW - one-week view", while modes 2-6 keep him whenever his later GWs outweigh the blank.
 - Chip hints: the Bench Boost hint is the GW with the largest Bench Boost increment on a hand-built squad; the Triple Captain hint picks a captain's double over his single; a chip already used in that half is never hinted.
 - Identical output for identical input. Under ~5 s per mode on a real squad (risk 3) and on a synthetic 15-man squad now; a lock / ban re-run under 200 ms.
 
