@@ -144,7 +144,7 @@
                 <a class="mod" href="#matchup"><span class="mod__read" aria-hidden="true">72·41</span><span class="mod__name">Matchup Analyser</span><span class="mod__hint">One fixture, both sides, all six metrics.</span></a>
                 <a class="mod" href="#ranker"><span class="mod__read" aria-hidden="true">#1</span><span class="mod__name">Player Ranker</span><span class="mod__hint">Players ranked by projected value.</span></a>
                 <a class="mod" href="#dashboard"><span class="mod__read" aria-hidden="true">(C)</span><span class="mod__name">GW Dashboard</span><span class="mod__hint">Captain, bench and transfer calls.</span></a>
-                <a class="mod" href="#planner"><span class="mod__read" aria-hidden="true">+6</span><span class="mod__name">Transfer Planner</span><span class="mod__hint">Your moves across the next six gameweeks.</span></a>
+                <a class="mod" href="#planner"><span class="mod__name">Transfer Planner</span><span class="mod__hint">One best move per mode, scored on your whole squad.</span></a>
               </nav>
             </div>
           </div>
@@ -434,61 +434,81 @@
         </div>
       </section>
 
-      <!-- TRANSFER PLANNER - design export FINAL - Planner.dc.html (css/planner.css).
-           The run settings, tray header and squad drawer frame are static;
-           js/modules/planner.js fills the verdict hero (#pl-hero), the six
-           weeks of the run (#pl-weeks), the move tray (#pl-tray) and the
-           squad drawer's lists. The run's rules live in planner-run.js. -->
+      <!-- TRANSFER PLANNER (css/planner.css). The settings bar, section heads
+           and squad drawer frame are static; js/modules/planner.js fills the
+           hero (#pl-hero), the chip plan, the mode cards, the captain and XI,
+           the sell / hold table and the drawer's lists from the decision
+           engine's result (engine/decision.js). -->
       <section class="module-view" data-module="planner" aria-label="Transfer Planner">
         <div class="pl">
-          <section class="hero" aria-label="This week’s call">
+          <section class="hero" aria-label="Plan">
             <div class="hero__in wrap" id="pl-hero"></div>
           </section>
 
-          <div id="pl-run-wrap" hidden>
-            <div class="cmd" id="pl-cmd" role="region" aria-label="Run settings">
+          <div id="pl-body" hidden>
+            <div class="cmd" id="pl-cmd" role="region" aria-label="Plan settings">
               <div class="cmd__in wrap">
-                <span class="run-t">The run <span class="muted" id="pl-run-range"></span></span>
+                <span class="cmd__t" id="pl-cmd-t"></span>
                 <div class="bank" role="group" aria-label="Bank">
                   <label class="lbl" for="pl-bank">Bank £m</label>
                   <button type="button" data-bank="-1" aria-label="Bank down £0.1m">−</button>
                   <input id="pl-bank" type="number" inputmode="decimal" min="0" max="100" step="0.1" value="0.0">
                   <button type="button" data-bank="1" aria-label="Bank up £0.1m">+</button>
                 </div>
-                <div class="ftg" role="radiogroup" aria-label="Free transfers going into the first week" id="pl-ft-grp">
-                  <span class="lbl">FT now</span>
+                <div class="ftg" role="radiogroup" aria-label="Free transfers banked" id="pl-ft-grp">
+                  <span class="lbl" aria-hidden="true">Free transfers</span>
                   <div class="seg">
+                    <button type="button" role="radio" data-ft="0" aria-checked="false">0</button>
                     <button type="button" role="radio" data-ft="1" aria-checked="true">1</button>
                     <button type="button" role="radio" data-ft="2" aria-checked="false">2</button>
+                    <button type="button" role="radio" data-ft="3" aria-checked="false">3</button>
+                    <button type="button" role="radio" data-ft="4" aria-checked="false">4</button>
+                    <button type="button" role="radio" data-ft="5" aria-checked="false">5</button>
                   </div>
                 </div>
-                <button type="button" class="tog" id="pl-hit" aria-pressed="false">Hits off</button>
                 <button type="button" class="tog tog--plain" id="pl-squad-btn" aria-haspopup="dialog">Squad 0/15</button>
                 <span class="grow"></span>
-                <span class="save-st" id="pl-save-st" role="status">Saved</span>
-                <button type="button" class="btn btn--go" id="pl-save" disabled>Save run</button>
+                <button type="button" class="btn" id="pl-export">Export snapshots</button>
               </div>
             </div>
 
-            <section class="run wrap" aria-label="Gameweek run">
-              <div class="run__hd">
-                <span class="muted">Pick a week, then add moves to it. Shift moves and chips between weeks with ‹ ›.</span>
-                <span class="totals" id="pl-totals"></span>
-              </div>
-              <div class="weeks" role="list" id="pl-weeks"></div>
-              <div class="issues" id="pl-issues" role="alert" hidden></div>
-              <div class="unplaced" id="pl-unplaced" hidden></div>
-              <div class="run__ft"><button type="button" class="clr" id="pl-clear" hidden>Clear the run</button></div>
+            <div class="wrap"><p class="live" id="pl-live" role="status" hidden></p></div>
+
+            <section class="sec wrap" aria-labelledby="pl-chips-t">
+              <header class="sec__hd">
+                <span class="lbl">Plan</span>
+                <h2 id="pl-chips-t">Chips</h2>
+                <span class="sec__meta">Hints are suggestions - nothing is planned until you pick a week.</span>
+              </header>
+              <div class="cps" id="pl-chips"></div>
             </section>
 
-            <section class="tray wrap" aria-labelledby="pl-tray-t">
-              <header>
+            <section class="sec wrap" aria-labelledby="pl-modes-t">
+              <header class="sec__hd">
                 <span class="lbl">Moves</span>
-                <h2 id="pl-tray-t">Add to GW</h2>
-                <div class="lens" role="radiogroup" aria-label="Lens" id="pl-lens"></div>
-                <span class="tray__unit" id="pl-unit"></span>
+                <h2 id="pl-modes-t" tabindex="-1">One per mode</h2>
+                <span class="choices" id="pl-choices" hidden></span>
               </header>
-              <div id="pl-tray"></div>
+              <p class="sec__note" id="pl-modes-note" role="status"></p>
+              <div id="pl-modes" aria-busy="true"></div>
+            </section>
+
+            <section class="sec wrap" aria-labelledby="pl-xi-t">
+              <header class="sec__hd">
+                <span class="lbl">Lineup</span>
+                <h2 id="pl-xi-t">Captain and XI</h2>
+              </header>
+              <div id="pl-xi" aria-busy="true"></div>
+            </section>
+
+            <section class="sec wrap" aria-labelledby="pl-sh-t">
+              <header class="sec__hd">
+                <span class="lbl">Squad</span>
+                <h2 id="pl-sh-t">Sell or hold</h2>
+                <div class="lens" role="radiogroup" aria-label="Mode" id="pl-sh-mode"></div>
+              </header>
+              <p class="sec__note">Keep: what selling him would cost the squad, in points, over the mode’s weeks. Out: what his best sale gains over rolling, after the transfer’s cost. Est.: no purchase price on record, so his current price stands in. Flags: Sell - a mode’s move sells him; Hold - doubtful now, back soon; Protected - worth too much in the peak week to sell; News - flagged doubtful.</p>
+              <div id="pl-sh" aria-busy="true"></div>
             </section>
           </div>
 

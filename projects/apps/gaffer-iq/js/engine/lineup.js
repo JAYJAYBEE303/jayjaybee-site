@@ -1,17 +1,14 @@
 /**
  * js/engine/lineup.js
  * Layer: engine (pure). No DOM, no network, no store mutation.
- * Picks a legal starting XI and bench from a scored 15-man squad, and totals
- * the XI's expected points.
+ * Picks a legal starting XI and bench from a scored 15-man squad.
  *
- * Shared by modules/dashboard.js and engine/transfers.js so that both agree on
- * what "your starting XI" means - the transfer lanes are measured as the change
- * in this total, so a disagreement here would silently corrupt every lane.
- *
- * See docs/superpowers/specs/2026-08-30-planner-multi-lens-transfers-design.md §6.
+ * Shared by modules/dashboard.js (its XI) and engine/squad-value.js (the
+ * decision engine's V, ranked by a gameweek's xpts through the value
+ * accessor), so both pick the XI by the same rules.
  */
 
-import { XI_FORMATION_MIN, XI_SIZE, BENCH_CONTRIBUTION_WEIGHT } from '../config.js';
+import { XI_FORMATION_MIN, XI_SIZE } from '../config.js';
 
 /**
  * A player's projected points for the window their score was built over.
@@ -83,33 +80,4 @@ export function pickStartingXI(scoredSquad, valueOf = expectedPointsOf) {
   const bench = benchGkp ? [...benchOutfield, benchGkp] : benchOutfield;
 
   return { xi, bench };
-}
-
-/**
- * Total expected points for a squad: the XI in full, plus the bench at
- * BENCH_CONTRIBUTION_WEIGHT.
- *
- * This is the quantity every transfer lane differences. A swap that changes
- * only bench personnel moves it by a fraction of a point; a swap that promotes
- * a player into the XI is credited for the promotion AND for the demotion of
- * whoever they displace, because both fall out of re-picking the XI.
- *
- * @param {Array<{player: Player, score: object}>} scoredSquad
- * @returns {{ value: number, estimated: boolean }}  points scale, higher = better
- */
-export function calcXiExpectedPoints(scoredSquad) {
-  const { xi, bench } = pickStartingXI(scoredSquad);
-  let value = 0;
-  let estimated = false;
-
-  for (const entry of xi) {
-    value += expectedPointsOf(entry);
-    if (entry?.score?.expectedPoints?.estimated) estimated = true;
-  }
-  for (const entry of bench) {
-    value += BENCH_CONTRIBUTION_WEIGHT * expectedPointsOf(entry);
-    if (entry?.score?.expectedPoints?.estimated) estimated = true;
-  }
-
-  return { value, estimated };
 }

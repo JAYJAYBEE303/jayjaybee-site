@@ -82,12 +82,11 @@ With the pipeline and scoring proven, go wide. Build the remaining three modules
 **Exit criterion:** enter your squad, get a captaincy pick, XI/bench order, and risk flags for the current GW; live points appear during an active GW.
 
 ### 2D. Transfer Planner
-- `modules/planner.js` + `modules/planner-boards.js`: takes current squad + budget + free transfers, enumerates every legal out→in swap (`engine/transfers.js`), models the −4 point hit, respects budget.
-- Ranks by the change in projected **starting-XI** expected points (`engine/lineup.js`'s shared `pickStartingXI`/`calcXiExpectedPoints`), not by within-position composite - the axis that made a bench-to-bench swap able to outrank a genuine upgrade to a starter. See `FEATURE_ENGINE.md` §14.1.
-- Scores every swap on five independent lanes - Now, Future Prep, Funds & Flexibility, Ceiling, Structure Fix - and normalises them (`engine/strategy.js`) into one weekly verdict: act on the strongest lane, or roll the transfer when nothing clears the acting threshold. Four hard triggers (an unavailable XI starter, a near chip window, a cash crunch, an imminent high-confidence price rise) can promote a lane past the raw arithmetic, always naming what it jumped ahead of.
-- Surfaces top N single transfers per lane, plus the best 2-transfer combination over the active horizon.
+- Rebuilt on the squad-aware decision engine (`docs/decision-engine-plan.md`, branch `Refactor/gaffer-IQ-transfer-suggestion-engine-redesign`): `engine/projections.js` projects every player per gameweek; `engine/decision.js` scores every legal single transfer - affordable at the seller's sell price, club limit kept - by its change to the whole squad's value V_t(S) (`engine/squad-value.js`) over five gameweeks.
+- Six mode presets of that one calculation - Now, Long term, Future prep, Funds & flexibility, Ceiling, Structure fix - each name one move or "roll", with the components (squad effect, funds, price, transfer cost) in plain English; a move is made only when it beats rolling the free transfer (or clears a hit and its margin).
+- `modules/planner.js` renders the result and nothing else: settings bar (bank, free transfers, squad, snapshot export), chip plan with hints, one card per mode, captain and XI, and a sortable sell / hold table with KeepValue and OutScore per mode and lock / ban re-runs.
 
-**Exit criterion:** for a given squad and budget, the planner ranks transfers by projected starting-XI expected-points gain across five lanes and issues a weekly verdict - including "no transfer this week" - that is hit-aware and states its own confidence.
+**Exit criterion:** for a given squad, bank and free transfers, the planner names one move or a roll per mode, each explained and hit-aware, and re-runs a lock or ban in well under a second. Later phases of the plan add the minutes model, the price layer, robustness and a backtest.
 
 ---
 

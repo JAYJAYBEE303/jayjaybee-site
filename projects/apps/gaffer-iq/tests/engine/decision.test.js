@@ -254,6 +254,7 @@ test('budget uses the sell price, never the current price', () => {
   }));
   assert.equal(playerOf(result, 11).best.now.inId, 118);
   assert.ok(allBest(result).every(m => m.inId !== 117));
+  assert.equal(playerOf(result, 11).sellPriceTenths, 53, 'the table shows the sell price');
 });
 
 test('with no ledger entry a player sells at his current price, flagged estimated', () => {

@@ -5,7 +5,7 @@ revision 1 against the code and the brief: 58 findings, 44 confirmed and folded
 in below).
 Status: **approved**; grill-me questions Q1-Q10 answered (§7). Phase 1 done
 (`f4ef63f`); Phase 2 done (`cfad609`); Phase 3 done (`3870fc1`, review fixes
-in the commit after it); the UI phase in progress. Where the build departed from this plan, the text below was
+`94d309a`); UI phase done, awaiting your check. Where the build departed from this plan, the text below was
 updated to match it.
 Brief: `fpl-decision-engine-brief.md` (16 Oct 2026). Section numbers below
 (§3, §5 ...) refer to the brief unless prefixed with a file name.
@@ -356,7 +356,7 @@ DecisionResult = {
     robustness: number | null,       // Phase 6
     targetGw,                        // Ceiling only: t*, null when a planned chip covers every GW
   } },
-  players: [{ playerId,
+  players: [{ playerId, sellPriceTenths,   // what he sells for (flagged sellPriceEstimated without a ledger entry)
     keepValue: { [modeId]: number }, outScore: { [modeId]: number | null },
     best: { [modeId]: Move | null }, // full components for every owned player, every mode; null with no legal move
     flags: Array<'sell' | 'hold' | 'protected' | 'locked' | 'pendingNews' | 'sellPriceEstimated'>,
@@ -575,9 +575,30 @@ before the previous one passes. Phases 1, 2, 3 and 5 are strictly sequential.
 
 **Implement** The layout in §4.3, built from `DecisionResult` only. Mode card: root move or Roll, EV gain vs rolling (`outScore`), robustness (hidden until Phase 6), minutes-risk badges, two collapsed alternatives, plain-English why, later-GW parts greyed, pending-news note. Sell/hold table: sortable, KeepValue and OutScore per mode, flags, estimated sell prices marked. Lock / ban buttons re-run the engine. Captain and XI panel with the EV gap. Chip plan pre-filled from the hints. An "Export snapshots" button in the settings bar. Drawer markers from `DecisionResult.lineup`. Then delete everything in §4.1, docs included, in the same commit.
 
+**Pattern checklist** (ui-consistency pass over the app's module views - the bound is `index.html` + `js/main.js`; 5 chrome views counted, `.mx` `.fc` `.rk` `.db` `.pl`, of 6 candidates, landing left out as chrome-less; theme `css/base.css :root` + `assets/fonts.css`, no `DESIGN.md`):
+- Holder: `section.module-view[data-module=planner] > .pl`; every rule nested under `.pl` (5 of 5).
+- Section head: `<header>` with a `.lbl` kicker and an `h2` in `600 22px/1 var(--font-head)`, .05em, uppercase (ranker, dashboard, planner); a card's title one level down at 20px (dashboard `.card h2`).
+- `.lbl`: 700 11px/1.2 sans, .1em, uppercase, muted (5 of 5). Bands through `[data-band]` -> `--b/--bb/--bt` (6 of 6); a colour that is not a rating (minutes risk) reads a primitive (CONVENTIONS §5.2).
+- Tabular data is a real `<table>` (CONVENTIONS §6; fixtures 4 of 4): scrolling `region` wrapper with `tabindex=0`, `<caption class="sr">`, `th scope=col` in the `.lbl` bundle, numbers right-aligned in tabular figures, row hover `--color-surface-raised`. Sort control: the ranker's `.sb` header button ("Sort by X, high to low", arrow glyph, `.is-on`); on a real table the header also carries `aria-sort`.
+- Toggles are `aria-pressed` buttons (5 of 5); a single choice is `role=radio` / `aria-checked` (planner `.lens`, `.seg`).
+- Unsettled values: `.sk` / `.chip.is-pending`, `aria-hidden`, `aria-busy` on the region; a ranked view is skeletoned whole (CONVENTIONS §5.4) - mode cards, the XI and the table all wait for settled counter-matchup data.
+- Entrances only under `[data-anim]`, set on reader-caused renders; reduced motion turns every animation off (6 of 6).
+- Values: colours only through tokens; spacing and type are px literals in module CSS (5 of 6) on a 2 px step, reused from planner.css's own; no inline styles except `--d` delays.
+- Reuse in place: planner's drawer, toast, dialog, bank stepper, `.seg`, `.tog`, `.lens`, `.btn`, `.chip`, `.card` grid.
+
 **Acceptance** Manual check in `vercel dev` (keyboard, reduced motion, 360 px width, skeletons while unsettled, live-round note); `grep -rE 'enumerateSwaps|buildVerdict|LANE_SCALE|planner-run|planner-boards' js tests css index.html` finds nothing; every class in `css/planner.css` has a consumer; `ui-ux-pro-max` review of cards, table and lock/ban flow; `requesting-code-review`.
 
 **Guards** Tokens only, no raw hex outside `base.css` / the `.pl` token block; every rule under `.pl`; no analysis in the module; no parallel old screen.
+
+**As built** (`js/modules/planner.js`, `css/planner.css`, the planner section of `index.html`; tests `tests/modules/planner.test.js`):
+- **Layout** as §4.3, with the chip plan as its own section under the settings bar rather than inside it (four chips do not fit a sticky bar). The bar holds the bank stepper, free transfers 0-5 (a radio group; arrow keys move it), the squad drawer and "Export snapshots".
+- **Chip plan:** per chip, a week picker over the projection horizon (the planning GW and the five after it), chips used per half (derived from `history/` chips, your marks saved), and the hint with a "Plan GWn" button: a hint is never applied until you press it. A week already holding another chip, or in a half where the chip is used, cannot be picked.
+- **Settings** (`gafferiq_planner` in localStorage): your bank and free transfers stand for the import and planning GW you set them for, your chips-used marks for that import, your chip plan always (the engine ignores weeks already gone). No history at all gives one free transfer; history with no deadline before the planning GW gives 5 (transfers are unlimited, so a move costs nothing).
+- **Projections** are built once per data load, after the skeletons paint, from the archived minutes tables when they hold every finished GW (a partial table would make most players look out of contention), else from season totals, flagged estimated. That build blocks the main thread once: 1.9-2.4 s on the 2025-26 GW20 pool in headless Chromium. Lock, ban, bank and FT re-runs take 27-209 ms there (the slowest is a lock that changes which downgrades Funds chains).
+- **Lock and ban:** "Don't sell" / "Don't buy" on each card, "Keep" on each table row, and a "Not selling / Not buying" line to undo them; each change toasts with Undo and puts keyboard focus back where the reader was. They last for the visit, not saved.
+- **Sell / hold table:** the mode pills pick which mode's KeepValue and OutScore show; four columns sort both ways (`aria-sort`, no figure last); the player column stays put while the table scrolls sideways on a phone. `DecisionResult.players` gained `sellPriceTenths` for its sell-price column.
+- **Dropped with no consumer left:** the `--pl-cmd-h` ResizeObserver (§4.2 listed it as kept; nothing read the value), the drawer's band chips (they needed the deleted `scoreSquad`), and the landing card's badge (Q9; one `landing.css` rule keeps a badge-less card's text full width).
+- **Verified** in headless Chromium against intercepted payloads rebuilt from vaastav's 2025-26 data as of GW20 (FPL and the proxy are not reachable from this environment): 1280 px and 360 px with no page scroll sideways, reduced motion, skeletons while counter-matchup data is unsettled, the live-round note with a GW in play, the empty and short-squad states, the drawer's focus trap and Escape, keyboard focus after a lock or ban, and no page errors.
 
 ### Phase 4: Minutes and availability model
 

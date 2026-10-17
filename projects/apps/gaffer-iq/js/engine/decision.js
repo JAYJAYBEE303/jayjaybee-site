@@ -116,6 +116,7 @@ export function runDecisionEngine(input, config = DECISION_ENGINE, cache = creat
     }
     return {
       playerId: p.playerId,
+      sellPriceTenths: p.sellPriceTenths,
       keepValue, outScore, best,
       flags: flagsFor(run, p, { rootSells, ceiling, structure }),
       lockValue: ceiling.lockValues.get(p.playerId),
@@ -572,7 +573,7 @@ function explain(run, weights, record, freeTransfers, tags) {
   const name = id => run.names.get(id) ?? String(id);
   const counted = run.modeGws.filter((_, k) => weights[k] > 0);
   const span = counted.at(-1) - counted[0] === counted.length - 1
-    ? (counted.length === 1 ? `GW${counted[0]}` : `GW${counted[0]}-${counted.at(-1)}`)
+    ? (counted.length === 1 ? `GW${counted[0]}` : `GW${counted[0]}–${counted.at(-1)}`)
     : `${counted.slice(0, -1).map(gw => `GW${gw}`).join(', ')} and GW${counted.at(-1)}`;
 
   let squad = `${name(p.playerId)} out, ${name(q.id)} in: ${points(record.deltaEv)} points for the squad over ${span}.`;

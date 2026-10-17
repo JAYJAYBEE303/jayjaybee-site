@@ -178,10 +178,8 @@ gaffer-iq/                          (= projects/gaffer-iq/ in the repo)
     │   ├── style.js            # Team xG profiles (styleClash itself is unwired - FEATURE_ENGINE §8.1).
     │   ├── counter.js          # Position-based counter-matchup scoring.
     │   ├── composite.js        # Combines all metrics → composite matchup score.
-    │   ├── lineup.js           # Starting XI/bench selection + XI expected points.
-    │   │                       #   Shared by dashboard.js and transfers.js - see note below.
-    │   ├── transfers.js        # Enumerates squad swaps; scores each on 5 lanes (FEATURE_ENGINE §14).
-    │   ├── strategy.js         # Normalises the 5 lanes into one weekly verdict (FEATURE_ENGINE §14).
+    │   ├── lineup.js           # Starting XI/bench selection. Shared by dashboard.js and
+    │   │                       #   squad-value.js - see note below.
     │   ├── prices.js           # Price-move signal, season price change, sell price (calcSellPrice).
     │   ├── ledger.js           # Purchase prices and banked free transfers, from a manager's
     │   │                       #   transfer list and history (decision engine).
@@ -208,12 +206,11 @@ gaffer-iq/                          (= projects/gaffer-iq/ in the repo)
         │                       #   paged ranked list, filters drawer.
         ├── dashboard.js        # GW Decision Dashboard: squad board / team sheet, captain,
         │                       #   breakdown and risk panels.
-        ├── planner.js          # Transfer Planner: verdict tape, the run, move tray, squad drawer, import.
-        ├── planner-boards.js   # Transfer Planner: lens boards + verdict copy (no state).
-        └── planner-run.js      # Transfer Planner: the run's week-by-week transfer rules (pure).
+        └── planner.js          # Transfer Planner: settings bar, chip plan, one card per mode,
+                                #   captain and XI, sell/hold table, squad drawer, import.
 ```
 
-**`pickStartingXI` (`engine/lineup.js`) is shared between the Dashboard and the Planner** - it used to be defined only inside `modules/dashboard.js` and was lifted out so both modules agree on what "your starting XI" means. The Planner's five transfer lanes are measured as the *change* in this selection's total expected points, so a disagreement between the two on XI selection would silently corrupt every lane. See `FEATURE_ENGINE.md` §14.1. The decision engine's squad value (`engine/squad-value.js`) uses it too, passing a gameweek's `xpts` as the optional value accessor in place of `expectedPoints`.
+**`pickStartingXI` (`engine/lineup.js`) is shared between the Dashboard and the decision engine** - it used to be defined only inside `modules/dashboard.js` and was lifted out so the app has one rule for "your starting XI". The decision engine's squad value (`engine/squad-value.js`) passes a gameweek's `xpts` as the optional value accessor in place of `expectedPoints`, and the Planner's captain and XI panel and drawer markers show that engine's pick (`DecisionResult.lineup`), so one screen never shows two XIs. See `FEATURE_ENGINE.md` §14.1.
 
 ### Hard rules about this structure
 1. **Only `api.js` is allowed to call `fetch()`.** Modules and engine never fetch directly. This keeps the network surface in one place and makes caching and the proxy boundary trivial to reason about.
@@ -365,7 +362,7 @@ Anything a predicate reports unsettled renders as a **skeleton** (`CONVENTIONS.m
 - **Dispatch before you announce.** `prefetchAllTeamXg()` must run *before* `store.markDataReady()`. "Outstanding" is only distinguishable from "never asked for" once the prefetch has registered what it is waiting on; announce first and every module renders against a store reporting nothing pending. Worse, when there is genuinely nothing to fetch, no later emit arrives to correct it and the skeletons never clear.
 - **Settle on failure too.** A rejected fetch is as final an answer to "is more coming?" as a fulfilled one. `TEAM_XG_SETTLE_TIMEOUT_MS` (`config.js`) is the backstop for the third case - `fetch` has no timeout, so a request the proxy never answers would otherwise hold skeletons on screen for the whole session.
 
-There is a payoff beyond honesty. The Ranker, Dashboard and Planner now skip their expensive work entirely while unsettled - a full-pool rank or swap enumeration whose result was going to be superseded is pure waste - so the gate removes rescoring passes rather than adding them.
+There is a payoff beyond honesty. The Ranker, Dashboard and Planner now skip their expensive work entirely while unsettled - a full-pool rank or projection build whose result was going to be superseded is pure waste - so the gate removes rescoring passes rather than adding them.
 
 ### Processing
 - All transformation from raw JSON to the internal model happens in `engine/normalise.js` and **nowhere else**. Modules and other engine files only ever see the clean model, never raw FPL field names like `element_type` or `team_h_difficulty`. This insulates the whole codebase from the FPL API's quirky naming and from upstream schema changes - if the API renames a field, you fix it in one function.
@@ -522,7 +519,7 @@ HORIZONS = {
 
 ### How they work
 - A single global "active horizon" lives in `store`, fixed at `GW5`. It was previously driven by a switcher in the app shell; that control was removed and nothing writes the value any more. `setActiveHorizon()` and the `horizon:changed` event are deliberately kept, so restoring a control means re-adding markup and one listener in `main.js` rather than re-plumbing the modules that read it.
-- **`GW10` is not one of the switchable options.** Nothing selects it as the active horizon. It exists for the Matchup Analyser's Outlook strip (`MATCHUP_OUTLOOK_HORIZON` in `js/modules/matchup.js`), which deliberately reads a longer window than the app scores on: that strip only *shows* a team's run of fixtures, whereas the active horizon prices players in the Ranker and Planner, where lengthening the window would move every ranking. Matchup therefore does not read `getActiveHorizon()` at all, and no longer subscribes to `horizon:changed`.
+- **`GW10` is not one of the switchable options.** Nothing selects it as the active horizon. It exists for the Matchup Analyser's Outlook strip (`MATCHUP_OUTLOOK_HORIZON` in `js/modules/matchup.js`), which deliberately reads a longer window than the app scores on: that strip only *shows* a team's run of fixtures, whereas the active horizon prices players in the Ranker, where lengthening the window would move every ranking (the Planner's decision engine keeps its own five-gameweek view, `DECISION_ENGINE.modes`). Matchup therefore does not read `getActiveHorizon()` at all, and no longer subscribes to `horizon:changed`.
 - For multi-GW horizons, a team/player's score is the **aggregate of its per-fixture composite scores across the horizon's GWs**, with a configurable aggregation method (default: mean, with an option for "worst-case" / minimum to surface fixture traps). The aggregation method and any GW-distance decay live in `config.js` and are detailed in `FEATURE_ENGINE.md`.
 - **Blank and double gameweeks** must be handled explicitly: a team with no fixture in a GW contributes a defined "blank" value (not zero, not skipped silently); a team with two fixtures has them collapsed to a per-GW mean and then lifted by `DGW_UPLIFT`, so a double adds *return* rather than doubling that gameweek's weight. `composite.js`'s `fixturesForTeamInWindow` resolves each team's fixture list per horizon, including these cases; `engine/fixtures.js` provides the display-side fold (`groupPerGwSlots`) and the irregularity summary. **Do not assume one-fixture-per-GW anywhere** - in particular, `perGw`'s length is not the horizon's length.
 - **Postponed fixtures** (`event: null`) are retained in `season.pendingFixtures` / `pendingFixturesByTeam` and are **display-only**. They have no gameweek, so nothing that aggregates over a gameweek window may read them - `fixturesForTeamInWindow`'s `f.gw === null` guard is what makes retaining them safe, and it must stay.
@@ -547,13 +544,13 @@ All four modules consume the **same** engine output (composite scores + breakdow
 │ Matchup       │  │ Player Ranker │ │ GW Dashboard │ │ Transfer       │
 │ Analyser      │  │               │ │              │ │ Planner        │
 ├───────────────┤  ├───────────────┤ ├──────────────┤ ├────────────────┤
-│ Deep-dive on  │  │ Ranks players │ │ Decision view│ │ Scores swaps on│
-│ ONE fixture:  │  │ by projected  │ │ for the      │ │ five lanes by  │
-│ shows full    │  │ value over the│ │ active GW:   │ │ projected-XI   │
-│ breakdown,    │  │ horizon, using│ │ captaincy,   │ │ points change; │
-│ both sides,   │  │ player form × │ │ start/bench, │ │ issues a weekly│
-│ style clash,  │  │ fixture       │ │ flags risky  │ │ verdict, or    │
-│ counter-      │  │ composite.    │ │ picks.       │ │ rolls.         │
+│ Deep-dive on  │  │ Ranks players │ │ Decision view│ │ Scores every   │
+│ ONE fixture:  │  │ by projected  │ │ for the      │ │ legal transfer │
+│ shows full    │  │ value over the│ │ active GW:   │ │ by its effect  │
+│ breakdown,    │  │ horizon, using│ │ captaincy,   │ │ on the whole   │
+│ both sides,   │  │ player form × │ │ start/bench, │ │ squad; one move│
+│ style clash,  │  │ fixture       │ │ flags risky  │ │ or roll per    │
+│ counter-      │  │ composite.    │ │ picks.       │ │ mode, six modes│
 │ matchups.     │  │               │ │              │ │                │
 └───────────────┘  └───────────────┘ └──────────────┘ └────────────────┘
         │                  │               │                  │
@@ -567,7 +564,7 @@ Relationships, concretely:
 - **Fixtures** is the schedule-level companion to the Matchup Analyser: the Matchday clock (kickoff times, results, and a match report drawer per fixture with its events and lineups), the league table with its European/relegation zones, one team's season as a results/to-come ribbon, and the full H2H history for a pairing. It carries no scoring of its own - the Gaffer IQ chips on its tiles and ribbon are `composite.scoreFixture` read as-is - it is the "what and when" view that the Matchup Analyser then explains. All four views run on live data, and they cross-link: a club name in the Table opens By team on that club, and a ribbon fixture in By team - or the head-to-head block inside any match report, played or upcoming - opens Head-to-head on that pairing.
 - **Player Ranker** = player form × that player's fixture composite over the horizon → a ranked projected-value list. It is the bridge between team-level fixture scores and player-level decisions.
 - **GW Dashboard** is horizon-locked to `GW1` by design (it's about *this* week's decisions: captaincy, starting XI, bench order, risk flags). It consumes the ranker's projections and the live endpoint.
-- **Transfer Planner** is the most horizon-aware module: it takes your current squad (entered manually or imported via the FPL picks endpoint), the ranker's projections over the chosen horizon, and budget/free-transfer constraints, and enumerates every legal swap (`engine/transfers.js`). Each swap is scored not by the ranker's within-position composite but by the change it makes to `pickStartingXI`'s total expected points (`engine/lineup.js`) - the same axis fix `expectedPoints` already gave captaincy (§10.2 above) - on five independent lanes (Now, Future Prep, Funds & Flexibility, Ceiling, Structure Fix). `engine/strategy.js` normalises the five and issues one weekly verdict: act on the strongest lane, or roll the transfer. See `FEATURE_ENGINE.md` §14 for the full model.
+- **Transfer Planner** runs the decision engine on your squad (entered by hand or imported via the FPL picks endpoint, with purchase prices, bank, free transfers and chips played from the manager's transfer list and history). `engine/projections.js` projects every player per gameweek for the planning GW and the five after it; `engine/decision.js` scores every legal single transfer - affordable at the seller's sell price - by the change it makes to the squad's value V_t(S) (`engine/squad-value.js`: best XI, captain, expected autosubs, Bench Boost) over five gameweeks, and six mode presets (Now, Long term, Future prep, Funds & flexibility, Ceiling, Structure fix) each name one move or "roll", with every component kept for the plain-English why. Lock and ban re-run it on cached values. The module renders that result and nothing else. See `FEATURE_ENGINE.md` §14 and `docs/decision-engine-plan.md`.
 
 Dependency direction is strictly: `modules → engine → normalise → store → api → proxy → FPL`. Nothing points back up the chain.
 

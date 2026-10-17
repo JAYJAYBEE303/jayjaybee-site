@@ -214,6 +214,7 @@ body:has(.landing.is-active) {
   .mod:hover .mod__read, .mod:focus-visible .mod__read { background: var(--color-accent); color: var(--color-bg); }
   .mod__name { font: 600 clamp(16px, 2.2dvh, 22px)/1 var(--font-head); text-transform: uppercase; letter-spacing: .05em; }
   .mod__hint { font-size: 12.5px; line-height: 1.35; color: var(--color-muted); }
+  .mod:not(:has(.mod__read)) > * { grid-column: 1 / -1; }   /* a card with no readout */
 
   .foot { display: flex; justify-content: space-between; gap: 16px; padding: clamp(8px, 1.4dvh, 16px) max(var(--pad), calc((100vw - 1240px) / 2)); font-size: 11.5px; color: var(--color-muted); }
 

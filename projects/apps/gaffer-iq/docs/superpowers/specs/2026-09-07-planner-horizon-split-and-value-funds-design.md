@@ -1,5 +1,7 @@
 # Planner: horizon split and a value-ranked Funds board
 
+> **Superseded (2026-10-17).** The lanes, verdict and run this describes were replaced by the squad-aware decision engine (`docs/decision-engine-plan.md`; `FEATURE_ENGINE.md` §14) and their code deleted. Kept as history only.
+
 Date: 2026-09-07
 Status: implemented 2026-09-07; §11.2 open for a decision
 Supersedes parts of `2026-08-30-planner-multi-lens-transfers-design.md` (§7.1

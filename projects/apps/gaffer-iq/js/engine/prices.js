@@ -81,30 +81,6 @@ export function calcPriceChangeRisk(player) {
 }
 
 /**
- * Return players most likely to rise, sorted by confidence descending.
- * @param {Player[]} players
- * @returns {Array<{ player: Player, priceRisk: ReturnType<calcPriceChangeRisk> }>}
- */
-export function rankByPriceRise(players) {
-  return players
-    .map(player => ({ player, priceRisk: calcPriceChangeRisk(player) }))
-    .filter(({ priceRisk }) => priceRisk.direction === 'rise')
-    .sort((a, b) => b.priceRisk.confidence - a.priceRisk.confidence);
-}
-
-/**
- * Return players most likely to fall, sorted by confidence descending.
- * @param {Player[]} players
- * @returns {Array<{ player: Player, priceRisk: ReturnType<calcPriceChangeRisk> }>}
- */
-export function rankByPriceFall(players) {
-  return players
-    .map(player => ({ player, priceRisk: calcPriceChangeRisk(player) }))
-    .filter(({ priceRisk }) => priceRisk.direction === 'fall')
-    .sort((a, b) => b.priceRisk.confidence - a.priceRisk.confidence);
-}
-
-/**
  * Actual price movement since the season opened - a FACT, not a prediction.
  * The sibling of calcPriceChangeRisk above, and deliberately separate from it:
  * that one forecasts the next move from transfer flow, this one reports the

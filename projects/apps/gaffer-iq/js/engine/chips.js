@@ -1,8 +1,11 @@
 /**
  * js/engine/chips.js
  * Layer: engine (pure). No DOM, no network, no store mutation.
- * Scores Wildcard / Free Hit / Bench Boost / Triple Captain timing across the
- * coming gameweek window. All four exports are pure: same inputs → same outputs.
+ * Scores Wildcard and Free Hit timing across the coming gameweek window - the
+ * Transfer Planner's hints for those two chips. Both exports are pure: same
+ * inputs → same outputs. Bench Boost and Triple Captain hints come from the
+ * decision engine instead (engine/decision.js chipHints), which prices them on
+ * the real bench and armband.
  * See ROADMAP.md Phase 4-3 and FEATURE_ENGINE.md §9 (horizon aggregation -
  * blank/double GW handling is the analytical backbone here).
  *
@@ -14,14 +17,10 @@
 import {
   CHIP_PLAN_HORIZON, WC_WINDOW, WC_TOP_TEAMS,
   FH_TOP_TEAMS, FH_BLANK_WEIGHT, FH_BLANK_THRESHOLD,
-  BB_MIN_DOUBLES,
   HORIZON_DECAY, W_MEAN, W_MIN, BLANK_GW_VALUE,
-  PROJ_FORM, PROJ_FIXTURE, PROJ_COUNTER, PROJ_MINUTES,
 } from '../config.js';
 import { clamp } from '../util.js';
 import { scoreFixture } from './composite.js';
-import { calcPlayerForm, calcPlayingLikelihood } from './form.js';
-import { calcCounterMatchup, defensiveCounterEdge } from './counter.js';
 
 // ─── Internal helpers ────────────────────────────────────────────────────────
 
@@ -96,15 +95,6 @@ function aggregateWindow(team, startGw, windowGws, ctx, cached) {
   // 'blend' aggregation matches composite.scoreOverHorizon's default.
   const value = clamp(0, 100, (W_MEAN * mean) + (W_MIN * minVal));
   return { value, numBlanks, numDoubles };
-}
-
-/** Look up a player by id across ctx.playersByTeamId. Returns null if missing. */
-function findPlayer(playerId, ctx) {
-  for (const arr of Object.values(ctx.playersByTeamId || {})) {
-    const p = arr.find(pl => pl.id === playerId);
-    if (p) return p;
-  }
-  return null;
 }
 
 // ─── Wildcard timing ─────────────────────────────────────────────────────────
@@ -233,152 +223,4 @@ export function scoreFreeHitTiming(horizon, ctx) {
     reasoning,
     candidates,
   };
-}
-
-// ─── Bench Boost timing ──────────────────────────────────────────────────────
-
-/**
- * Pick the single best Bench Boost GW.
- * MODEL: BB pays out when as many bench players as possible have DGWs in the
- * activation GW. Bench must be supplied via `ctx.benchPlayerIds` (the planner
- * derives this from the current squad - engine stays pure and squad-agnostic).
- * Tiebreaker on DGW count: the GW where bench fixtures project highest.
- *
- * @returns {null | { gw, dgwCount, totalProjected, reasoning, candidates }}
- *   Returns null when bench is empty (chip cannot be meaningfully scored).
- */
-export function scoreBenchBoostTiming(horizon, ctx) {
-  if (!ctx || !ctx.teamsById) {
-    throw new TypeError('scoreBenchBoostTiming: ctx (from buildScoreContext) is required');
-  }
-  const benchIds = Array.isArray(ctx.benchPlayerIds) ? ctx.benchPlayerIds : [];
-  if (benchIds.length === 0) return null;
-
-  const cached = makeFxCache();
-  const startGw = ctx.currentGw;
-  const benchPlayers = benchIds.map(id => findPlayer(id, ctx)).filter(Boolean);
-  const candidates = [];
-
-  for (let off = 0; off < CHIP_PLAN_HORIZON; off++) {
-    const gw = startGw + off;
-    let dgwCount = 0;
-    let totalProjected = 0;
-
-    for (const p of benchPlayers) {
-      const team = ctx.teamsById[p.teamId];
-      if (!team) continue;
-      const fxs = teamFixturesInGw(team, gw, ctx);
-      if (fxs.length >= 2) dgwCount++;
-      for (const f of fxs) totalProjected += cached(team, f, ctx).value;
-    }
-
-    candidates.push({ gw, dgwCount, totalProjected });
-  }
-
-  // Best = most bench DGWs; tiebreak by total projected fixture quality.
-  candidates.sort((a, b) =>
-    (b.dgwCount - a.dgwCount) || (b.totalProjected - a.totalProjected)
-  );
-  const best = candidates[0];
-
-  let reasoning;
-  if (best.dgwCount >= BB_MIN_DOUBLES) {
-    reasoning = `${best.dgwCount} of your ${benchPlayers.length} bench players have double GWs in GW${best.gw}`;
-  } else if (best.dgwCount === 1) {
-    reasoning = `Only 1 bench DGW available (GW${best.gw}) - Bench Boost is better held for a bigger DGW`;
-  } else {
-    reasoning = `No bench DGWs in the next ${CHIP_PLAN_HORIZON} GWs - hold Bench Boost`;
-  }
-
-  return {
-    gw:             best.gw,
-    dgwCount:       best.dgwCount,
-    totalProjected: best.totalProjected,
-    reasoning,
-    candidates,
-  };
-}
-
-// ─── Triple Captain timing ───────────────────────────────────────────────────
-
-/**
- * For a specific player, pick the GW whose projected single-GW score is
- * highest. MODEL: a TC pays out on the player's biggest single-week haul, so
- * for SGW we use the player's projected score for that GW; for a DGW we sum
- * across both fixtures (TC scores both fixtures).
- *
- * Cheap shortcut: calcPlayerForm doesn't vary by GW (already a rolling window),
- * so we evaluate it once and only re-score the fixture component per candidate
- * GW - keeps this function fast enough to run inline on every squad change.
- *
- * @param {Player} player
- * @param {{label: string, gws: number}} horizon  passed for API symmetry; unused.
- * @param {object} ctx
- * @returns {null | { gw, score, dgw, reasoning }}
- *   score: 0–200ish - a DGW sums two fixtures so it can exceed 100 on purpose
- *   (that's the whole point of TC into a DGW).
- */
-export function scoreTripleCaptainTiming(player, horizon, ctx) {
-  if (!player || !ctx || !ctx.teamsById) {
-    throw new TypeError('scoreTripleCaptainTiming: player and ctx are required');
-  }
-  const team = ctx.teamsById[player.teamId];
-  if (!team) return null;
-
-  const cached    = makeFxCache();
-  const startGw   = ctx.currentGw;
-  const playerForm = calcPlayerForm(player, ctx);
-  // Must mirror scorePlayer's blend exactly - this function inlines the same
-  // four-term projection for a SINGLE fixture rather than a horizon, so any
-  // change to the PROJ_* set has to land here too or chip advice silently
-  // diverges from the Ranker/Dashboard/Planner. See FEATURE_ENGINE.md §10.
-  const playing = calcPlayingLikelihood(player, playerForm);
-
-  let best = null;
-  for (let off = 0; off < CHIP_PLAN_HORIZON; off++) {
-    const gw = startGw + off;
-    const fxs = teamFixturesInGw(team, gw, ctx);
-    if (fxs.length === 0) continue;
-
-    // Per-fixture player-projection contribution = scorePlayer's blend, but
-    // applied to a single fixture rather than a horizon. DGWs sum across both.
-    let projected = 0;
-    for (const f of fxs) {
-      const fxScore = cached(team, f, ctx);
-      const opponent = ctx.teamsById[
-        f.homeTeamId === team.id ? f.awayTeamId : f.homeTeamId
-      ];
-      // Player counter-edge for this single fixture, matching scorePlayer's
-      // position routing (FWD→fwdVsCb, MID→mean(wm,cam), DEF/GKP→100-oppCm).
-      let counterValue = 50;
-      if (opponent) {
-        if (player.position === 'FWD') {
-          counterValue = calcCounterMatchup(team, opponent, ctx).pairings.fwdVsCb?.value ?? 50;
-        } else if (player.position === 'MID') {
-          const cm = calcCounterMatchup(team, opponent, ctx).pairings;
-          counterValue = ((cm.wideMidVsFb?.value ?? 50) + (cm.camVsCbMid?.value ?? 50)) / 2;
-        } else {
-          counterValue = defensiveCounterEdge(calcCounterMatchup(opponent, team, ctx));
-        }
-      }
-      const single =
-          (PROJ_FORM    * playerForm.value)
-        + (PROJ_FIXTURE * fxScore.value)
-        + (PROJ_COUNTER * counterValue)
-        + (PROJ_MINUTES * playing.value);
-      projected += clamp(0, 100, single);
-    }
-
-    if (!best || projected > best.score) {
-      best = { gw, score: projected, dgw: fxs.length > 1, fixtureCount: fxs.length };
-    }
-  }
-
-  if (!best) return null;
-
-  const reasoning = best.dgw
-    ? `${player.name} has a double GW in GW${best.gw} - combined projected score ${Math.round(best.score)}`
-    : `${player.name}'s strongest single fixture is GW${best.gw} (projected ${Math.round(best.score)})`;
-
-  return { gw: best.gw, score: best.score, dgw: best.dgw, reasoning };
 }

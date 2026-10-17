@@ -1,5 +1,7 @@
 # Transfer Planner - Multi-Lens Transfers Implementation Plan
 
+> **Superseded (2026-10-17).** The lanes, verdict and run this describes were replaced by the squad-aware decision engine (`docs/decision-engine-plan.md`; `FEATURE_ENGINE.md` §14) and their code deleted. Kept as history only.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Rank FPL transfers by their effect on the projected starting XI's expected points, present five parallel lens boards, and lead with a verdict that states its own confidence.

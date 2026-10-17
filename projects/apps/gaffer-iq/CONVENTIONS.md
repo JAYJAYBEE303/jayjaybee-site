@@ -142,7 +142,7 @@ The structural class keeps the settled value's exact footprint, so the number dr
 Three further rules:
 
 - **Skeleton the value, not the affordance.** A per-gameweek strip cell links to that fixture's card whether or not its score has settled; keep it clickable. The exception is an element whose affordance is a *promise about the value* - a Ranker row opens "that player" in the Matchup Analyser, and while the table is skeletoned there is no player behind it.
-- **Withhold orderings, not just numbers.** Where a view *ranks* by a settling score - the Ranker's table, the Planner's boards, the Dashboard's captain and XI - skeletoning the score cells alone is not enough: the order still reshuffles under the reader. Skeleton the whole list.
+- **Withhold orderings, not just numbers.** Where a view *ranks* by a settling score - the Ranker's table, the Planner's mode cards, XI and sell / hold table, the Dashboard's captain and XI - skeletoning the score cells alone is not enough: the order still reshuffles under the reader. Skeleton the whole list.
 - **Say what is pending, where you can.** The Matchup card skeletons only the `counterMatchup` breakdown row, because every other metric there really is final. Naming the one input the score is waiting on beats going blank as a whole.
 
 Skeletons carry no information: mark them `aria-hidden="true"` and put `aria-busy="true"` on the region that owns them. Where the skeleton *is* the whole message (a loading pane), use `role="status"` with an `aria-label` instead - a shimmer says nothing to a screen reader.

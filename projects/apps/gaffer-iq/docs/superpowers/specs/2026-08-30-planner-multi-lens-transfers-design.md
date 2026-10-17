@@ -1,5 +1,7 @@
 # Transfer Planner - multi-lens recommendations, XI awareness, and a weekly verdict
 
+> **Superseded (2026-10-17).** The lanes, verdict and run this describes were replaced by the squad-aware decision engine (`docs/decision-engine-plan.md`; `FEATURE_ENGINE.md` §14) and their code deleted. Kept as history only.
+
 **Date:** 2026-08-30
 **Status:** design approved, implementation plan pending
 **Scope:** `modules/planner.js`, `modules/dashboard.js` (extraction only), `squadImport.js`, `store.js`, three new engine modules, `config.js`, `index.html`, `components.css`

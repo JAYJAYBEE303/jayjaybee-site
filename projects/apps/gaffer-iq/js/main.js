@@ -27,9 +27,9 @@ import { calcBaseDifficulty, calcHomeAwaySplit, calcVenueEffect, calcFixtureHist
 import { calcTeamForm, calcPlayerForm, calcPlayingLikelihood } from './engine/form.js';
 import { calcStyleProfile, calcStyleClash } from './engine/style.js';
 import { buildUnderstatSlugsByTeamId } from './engine/channel.js';
-import { pickStartingXI, calcXiExpectedPoints } from './engine/lineup.js';
-import { enumerateSwaps, calcSquadFlexibility } from './engine/transfers.js';
-import { buildVerdict } from './engine/strategy.js';
+import { pickStartingXI } from './engine/lineup.js';
+import { buildProjections } from './engine/projections.js';
+import { runDecisionEngine } from './engine/decision.js';
 import {
   calcCounterMatchup, calcIndividualDuels, duelsForPairing,
 } from './engine/counter.js';
@@ -44,7 +44,7 @@ import { initPlanner }      from './modules/planner.js';
 import { initScheduleBar }  from './modules/scheduleBar.js';
 import { initCalibration }  from './calibration.js';
 import {
-  openSnapshotDb, captureSnapshot, captureGwTables, downloadSnapshots,
+  openSnapshotDb, captureSnapshot, captureGwTables,
 } from './snapshots.js';
 
 // ─── Data loading ─────────────────────────────────────────────────────────────
@@ -491,7 +491,7 @@ initFullSeason();
 initFixtures();
 initRanker();
 initDashboard();
-initPlanner();
+initPlanner({ snapshotDb: _snapshotDb });
 // Outside .app-main: one bar shared by every view, hidden on ordinary weeks.
 initScheduleBar();
 initCalibration();
@@ -556,13 +556,8 @@ window.__engine = {
   calcCounterMatchup,
   calcIndividualDuels, duelsForPairing,
   pickStartingXI,
-  calcXiExpectedPoints,
-  enumerateSwaps,
-  calcSquadFlexibility,
-  buildVerdict,
-  // Downloads the point-in-time archive as one JSON file for the offline tools.
-  // A button replaces this in the Planner's settings bar (decision engine UI phase).
-  exportSnapshots: () => _snapshotDb.then(downloadSnapshots),
+  buildProjections,
+  runDecisionEngine,
 };
 
 /**

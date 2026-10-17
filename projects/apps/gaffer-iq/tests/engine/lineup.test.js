@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { pickStartingXI, calcXiExpectedPoints } from '../../js/engine/lineup.js';
+import { pickStartingXI } from '../../js/engine/lineup.js';
 
 /** Build a scored squad entry with a given position and expected points. */
 function entry(id, position, expectedPoints, estimated = false) {
@@ -55,26 +55,6 @@ test('pickStartingXI orders by expected points, not by composite value', () => {
 test('pickStartingXI always puts the reserve keeper last on the bench', () => {
   const { bench } = pickStartingXI(squadOf15());
   assert.equal(bench.at(-1).player.position, 'GKP');
-});
-
-test('calcXiExpectedPoints weights the bench below the XI', () => {
-  const total = calcXiExpectedPoints(squadOf15());
-  const { xi } = pickStartingXI(squadOf15());
-  const xiOnly = xi.reduce((s, e) => s + e.score.expectedPoints.value, 0);
-  assert.ok(total.value > xiOnly, 'bench contributes something');
-  assert.ok(total.value < xiOnly + 5, 'but far less than a starter would');
-});
-
-test('calcXiExpectedPoints reports estimated when any input score is estimated', () => {
-  const squad = squadOf15();
-  squad[7].score.expectedPoints.estimated = true;   // the 9.0 MID, a certain starter
-  assert.equal(calcXiExpectedPoints(squad).estimated, true);
-});
-
-test('calcXiExpectedPoints is zero for an empty squad rather than NaN', () => {
-  const result = calcXiExpectedPoints([]);
-  assert.equal(result.value, 0);
-  assert.equal(Number.isNaN(result.value), false);
 });
 
 // ─── Value accessor (decision engine plan Phase 2) ───────────────────────────

@@ -4,7 +4,8 @@
  * Side effects: DOM writes, sessionStorage reads/writes, network (live poll).
  * Reads from store; delegates all scoring to engine/composite.js exclusively.
  * No analytical logic lives here - scorePlayer(player, getHorizon(), ctx)
- * is the sole engine call, over the SAME global horizon the Planner reads.
+ * is the sole engine call, over the global horizon (the Planner's decision
+ * engine keeps its own five-gameweek view, engine/decision.js).
  * Layout: design export FINAL - Dashboard.dc.html (styles css/dashboard.css) -
  * a command bar (gameweek, squad tally, search, import), the squad board /
  * team sheet, and Captain, Breakdown and Risks panels.
@@ -53,7 +54,7 @@ import { fetchAndMapSquad, loadSavedTeamId, saveTeamId, resolveImportGw } from '
  * a given score actually covers.
  *
  * A function, not a const: it re-reads the store each call, so restoring the
- * horizon switcher needs no change here. Same shape as planner.js's getHorizon.
+ * horizon switcher needs no change here.
  */
 function getHorizon() {
   return HORIZONS[store.getActiveHorizon()] ?? HORIZONS.GW5;
