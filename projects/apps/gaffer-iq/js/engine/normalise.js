@@ -11,6 +11,11 @@
  * The same rule now covers one non-FPL payload: normaliseMatchLineups() at
  * the foot of this file reads Understat's match rosters, which are the only
  * source of a real teamsheet anywhere in the stack.
+ *
+ * One builder here deliberately KEEPS FPL's names: buildBootstrapSnapshot()
+ * archives a point-in-time copy of the bootstrap payload for backtests, and an
+ * archive has to stay in the upstream's own vocabulary. Nothing analyses it
+ * directly; the offline tools read it back through this file.
  */
 
 import {
@@ -325,6 +330,9 @@ export function normaliseGwStat(raw) {
     bonus:         raw.bonus || 0,
     yellowCards:   raw.yellow_cards || 0,
     redCards:      raw.red_cards || 0,
+    // The player's price that gameweek, in TENTHS of a million - what a squad
+    // that started in this gameweek paid for him (engine/ledger.js).
+    priceTenths:   typeof raw.value === 'number' ? raw.value : null,
   };
 }
 
@@ -348,6 +356,175 @@ export function normalisePlayerSummary(raw) {
       isHome: Boolean(f.is_home),
       opponentTeamId: f.is_home ? f.team_a : f.team_h,
       fplDifficulty: f.difficulty,
+    })),
+  };
+}
+
+// ─── Manager entry payloads (decision engine) ────────────────────────────────
+// A manager's own picks, transfers, gameweek history and chips - the inputs to
+// the purchase-price ledger and the free-transfer count. Money stays in FPL's
+// TENTHS of a million: every sum built on these is integer arithmetic.
+
+// FPL chip names → the app's chip ids (config.js CHIP_IDS). A Map, not an
+// object literal, so an unexpected name can never resolve to a prototype
+// property. A chip the app does not model (2024/25's assistant manager) maps to
+// nothing and is dropped.
+const CHIP_BY_FPL_NAME = new Map([
+  ['wildcard', 'wildcard'],
+  ['freehit',  'freehit'],
+  ['bboost',   'benchboost'],
+  ['3xc',      'triplecaptain'],
+]);
+
+/**
+ * @param {object} raw  entry/{id}/event/{gw}/picks/ response
+ * @returns {{ picks: Array<{playerId: number, slot: number|null, isCaptain: boolean,
+ *             isViceCaptain: boolean}>, activeChip: string|null, bankTenths: number|null }}
+ *   slot 1-11 is the XI, 12-15 the bench in order; activeChip is a CHIP_IDS id.
+ */
+export function normaliseEntryPicks(raw) {
+  return {
+    picks: (raw?.picks ?? []).map(p => ({
+      playerId:      p.element,
+      slot:          p.position ?? null,
+      isCaptain:     Boolean(p.is_captain),
+      isViceCaptain: Boolean(p.is_vice_captain),
+    })),
+    activeChip: CHIP_BY_FPL_NAME.get(raw?.active_chip) ?? null,
+    bankTenths: typeof raw?.entry_history?.bank === 'number' ? raw.entry_history.bank : null,
+  };
+}
+
+/**
+ * @param {object[]} raw  entry/{id}/transfers/ response (one row per transfer)
+ * @returns {Array<{ inId: number, inCostTenths: number, outId: number,
+ *                   outCostTenths: number, gw: number, time: string }>}
+ */
+export function normaliseEntryTransfers(raw) {
+  return (Array.isArray(raw) ? raw : []).map(t => ({
+    inId:          t.element_in,
+    inCostTenths:  t.element_in_cost,
+    outId:         t.element_out,
+    outCostTenths: t.element_out_cost,
+    gw:            t.event,
+    time:          t.time,
+  }));
+}
+
+/**
+ * @param {object} raw  entry/{id}/history/ response
+ * @returns {{ gws: Array<{ gw: number, transfers: number, transfersCost: number,
+ *                          bankTenths: number|null }>,
+ *             chips: Array<{ chip: string, gw: number }> }}
+ *   transfersCost is the points hit taken that gameweek; chip is a CHIP_IDS id.
+ */
+export function normaliseEntryHistory(raw) {
+  return {
+    gws: (raw?.current ?? []).map(g => ({
+      gw:            g.event,
+      transfers:     g.event_transfers ?? 0,
+      transfersCost: g.event_transfers_cost ?? 0,
+      bankTenths:    typeof g.bank === 'number' ? g.bank : null,
+    })),
+    chips: (raw?.chips ?? [])
+      .map(c => ({ chip: CHIP_BY_FPL_NAME.get(c.name) ?? null, gw: c.event }))
+      .filter(c => c.chip !== null),
+  };
+}
+
+/**
+ * One gameweek's live payload reduced to what the projection adapter needs:
+ * who played, for how long, and what they scored.
+ * @param {object} raw  event/{gw}/live/ response
+ * @returns {Array<{ playerId: number, minutes: number, points: number,
+ *                   starts: number|null }>}  starts is null when FPL omits it
+ */
+export function normaliseLiveGw(raw) {
+  return (raw?.elements ?? []).map(e => ({
+    playerId: e.id,
+    minutes:  e.stats?.minutes ?? 0,
+    points:   e.stats?.total_points ?? 0,
+    starts:   typeof e.stats?.starts === 'number' ? e.stats.starts : null,
+  }));
+}
+
+// ─── Point-in-time bootstrap snapshot ────────────────────────────────────────
+// Kept in FPL's own field names on purpose - see the file header.
+
+// Element fields every snapshot archives: the ones that move over a season and
+// cannot be rebuilt afterwards (availability, news, price, transfer flow,
+// ownership, FPL's own projection, set-piece duty, club and position).
+const SNAPSHOT_ELEMENT_FIELDS = [
+  'id', 'team', 'element_type', 'status', 'news', 'news_added',
+  'chance_of_playing_next_round', 'chance_of_playing_this_round', 'can_select', 'removed',
+  'now_cost', 'cost_change_event', 'cost_change_event_fall', 'cost_change_start',
+  'selected_by_percent', 'transfers_in', 'transfers_out', 'transfers_in_event',
+  'transfers_out_event', 'form', 'ep_next', 'ep_this', 'event_points', 'total_points',
+  'minutes', 'starts', 'penalties_order', 'corners_and_indirect_freekicks_order',
+  'direct_freekicks_order',
+];
+const SNAPSHOT_FIELD_SET = new Set(SNAPSHOT_ELEMENT_FIELDS);
+
+// Element fields known before 2026/27 that are NOT archived: identity and
+// presentation, season totals the per-gameweek live tables rebuild, and ranks
+// or per-90s derived from those. Any key on neither list is new and IS archived
+// - that is how the undocumented 2026/27 price-predictor fields get logged
+// before anything reads them. A key missing from this list only costs space.
+const UNARCHIVED_ELEMENT_KEYS = new Set([
+  'web_name', 'first_name', 'second_name', 'known_name', 'photo', 'code', 'team_code',
+  'opta_code', 'region', 'birth_date', 'team_join_date', 'has_temporary_code', 'special',
+  'squad_number', 'can_transact', 'in_dreamteam', 'dreamteam_count', 'points_per_game',
+  'value_form', 'value_season', 'cost_change_start_fall', 'goals_scored', 'assists',
+  'clean_sheets', 'goals_conceded', 'own_goals', 'penalties_saved', 'penalties_missed',
+  'yellow_cards', 'red_cards', 'saves', 'bonus', 'bps', 'influence', 'creativity', 'threat',
+  'ict_index', 'clearances_blocks_interceptions', 'recoveries', 'tackles',
+  'defensive_contribution', 'expected_goals', 'expected_assists',
+  'expected_goal_involvements', 'expected_goals_conceded', 'influence_rank',
+  'influence_rank_type', 'creativity_rank', 'creativity_rank_type', 'threat_rank',
+  'threat_rank_type', 'ict_index_rank', 'ict_index_rank_type',
+  'corners_and_indirect_freekicks_text', 'direct_freekicks_text', 'penalties_text',
+  'expected_goals_per_90', 'saves_per_90', 'expected_assists_per_90',
+  'expected_goal_involvements_per_90', 'expected_goals_conceded_per_90',
+  'goals_conceded_per_90', 'now_cost_rank', 'now_cost_rank_type', 'form_rank',
+  'form_rank_type', 'points_per_game_rank', 'points_per_game_rank_type', 'selected_rank',
+  'selected_rank_type', 'starts_per_90', 'clean_sheets_per_90',
+  'defensive_contribution_per_90',
+]);
+
+/**
+ * A point-in-time archive record of one bootstrap payload, columnar to keep it
+ * small: `fields` names each column, and every row holds one player's values
+ * in that order (missing values as null). Unknown element keys are appended
+ * after the archived fields, sorted, so a new upstream field is never lost.
+ *
+ * @param {object} raw  bootstrap-static/ response
+ * @param {{ capturedAt: number, fetchedAt: number }} times  epoch ms: when this
+ *   record was made, and when the payload it copies was fetched
+ * @returns {{ capturedAt: number, fetchedAt: number, fields: string[],
+ *             rows: Array<Array<*>>, events: object[] }}
+ */
+export function buildBootstrapSnapshot(raw, { capturedAt, fetchedAt }) {
+  const elements = raw?.elements ?? [];
+  const unknown = new Set();
+  for (const element of elements) {
+    for (const key of Object.keys(element)) {
+      if (!SNAPSHOT_FIELD_SET.has(key) && !UNARCHIVED_ELEMENT_KEYS.has(key)) unknown.add(key);
+    }
+  }
+  const fields = [...SNAPSHOT_ELEMENT_FIELDS, ...[...unknown].sort()];
+
+  return {
+    capturedAt,
+    fetchedAt,
+    fields,
+    rows: elements.map(element => fields.map(f => element[f] ?? null)),
+    events: (raw?.events ?? []).map(e => ({
+      id:            e.id,
+      deadline_time: e.deadline_time,
+      finished:      Boolean(e.finished),
+      data_checked:  Boolean(e.data_checked),
+      is_current:    Boolean(e.is_current),
+      is_next:       Boolean(e.is_next),
     })),
   };
 }

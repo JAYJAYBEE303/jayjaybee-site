@@ -1100,6 +1100,12 @@ export const TEAM_XG_COALESCE_MS = 400;
 // racing the normal path.
 export const TEAM_XG_SETTLE_TIMEOUT_MS = 20000;
 
+// How old a season restored from sessionStorage may be before a reload fetches
+// bootstrap and fixtures again (store.isSeasonExpired). Without a limit, one tab kept
+// open for days kept serving the prices, injury flags and transfer counts it
+// first loaded - stale inputs to every recommendation the Planner makes.
+export const SEASON_MAX_AGE_MS = 60 * 60 * 1000;
+
 // ─── §11.1  Player Ranker performance ────────────────────────────────────────
 
 // Number of players scored per setTimeout(fn, 0) chunk in the async ranker.
@@ -1466,3 +1472,27 @@ export const CHIP_WINDOW_GWS = 3;
 // ── Board rendering ──────────────────────────────────────────────────────────
 export const BOARD_TOP_N      = 3;
 export const BOARD_EXPANDED_N = 8;
+
+// ─── Decision engine (squad-aware transfer recommendations) ──────────────────
+//
+// Replaces the §14 lanes in stages - see docs/decision-engine-plan.md. FPL game
+// rules come first (fixed by the game, not tuned), then DECISION_ENGINE: the
+// single home of the new engine's tunables (brief §9), grown phase by phase.
+
+// FPL: at most this many players from any one club.
+export const MAX_PER_CLUB = 3;
+
+// FPL: a seller keeps this share of any rise since purchase, rounded down to
+// £0.1m; a fall is passed on in full. See engine/prices.js → calcSellPrice.
+export const SELL_PROFIT_SHARE = 0.5;
+
+export const DECISION_ENGINE = {
+  // FPL: free transfers bank up to this many; a sixth would be wasted.
+  maxBankedFt: 5,
+};
+
+// Minimum gap between two point-in-time snapshots (js/snapshots.js). The brief
+// asks for one a day; a few hours lets the day's price changes and the evening
+// press conferences land in separate records without filling storage with
+// near-identical copies from every reload.
+export const SNAPSHOT_MIN_INTERVAL_MS = 6 * 60 * 60 * 1000;

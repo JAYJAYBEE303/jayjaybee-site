@@ -15,6 +15,7 @@
 // would drift apart, so the question is answered here, once, against the same
 // function the scoring path uses.
 import { buildUnderstatSlugsByTeamId } from './engine/channel.js';
+import { SEASON_MAX_AGE_MS } from './config.js';
 
 // Bump the version suffix when the normalised model shape changes - old
 // cached payloads will then be ignored rather than feeding stale data through.
@@ -184,6 +185,21 @@ function getSavedXi() {
 function getError()                   { return state.lastError; }
 function getLastRefreshAt()           { return state.lastRefreshAt; }
 function isFresh()                    { return state.season !== null; }
+
+/**
+ * Whether the season in memory is too old to stand in for a fetch on load.
+ * A season restored from sessionStorage carries its fetch time; past
+ * SEASON_MAX_AGE_MS, main.js fetches again rather than serving stale prices
+ * and injury flags. Asked only when deciding whether to fetch - never by the
+ * modules, for which isFresh() means "there is a season to render from", which
+ * stays true however long a tab is left open.
+ * @param {number} [now]  epoch ms, injectable for tests
+ * @returns {boolean}  true when there is no fetch time or it is too old
+ */
+function isSeasonExpired(now = Date.now()) {
+  return typeof state.lastRefreshAt !== 'number'
+    || now - state.lastRefreshAt > SEASON_MAX_AGE_MS;
+}
 
 // ─── Setters (mutations + persistence) ───────────────────────────────────────
 
@@ -531,7 +547,7 @@ export const store = {
   isTeamScoreSettled, isTeamXgSettled,
   getLive, getMatchDetail,
   getActiveHorizon, getActiveModule, getSquad, getSquadPicks, getSavedXi,
-  getError, getLastRefreshAt, isFresh,
+  getError, getLastRefreshAt, isFresh, isSeasonExpired,
   setSeason, setPlayerSummary, setLeagueXg, setLeagueXgPrev, setLeagueXgHistory, setTeamXg,
   markTeamXgRequested, settleTeamXg, settleAllTeamXg,
   setLive, setMatchDetail,

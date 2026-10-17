@@ -18,7 +18,7 @@ import {
   TEAM_XG_SETTLE_TIMEOUT_MS,
 } from './config.js';
 import {
-  fetchBootstrap, fetchFixtures, fetchPlayerSummary,
+  fetchBootstrap, fetchFixtures, fetchPlayerSummary, fetchLivePoints,
   fetchLeagueXg, fetchTeamXg, ApiError,
 } from './api.js';
 import { normaliseSeason, normalisePlayerSummary } from './engine/normalise.js';
@@ -43,8 +43,38 @@ import { initDashboard }    from './modules/dashboard.js';
 import { initPlanner }      from './modules/planner.js';
 import { initScheduleBar }  from './modules/scheduleBar.js';
 import { initCalibration }  from './calibration.js';
+import {
+  openSnapshotDb, captureSnapshot, captureGwTables, downloadSnapshots,
+} from './snapshots.js';
 
 // ─── Data loading ─────────────────────────────────────────────────────────────
+
+// The point-in-time archive (js/snapshots.js). Opened once; resolves to a store
+// that quietly keeps nothing when IndexedDB is unavailable.
+const _snapshotDb = openSnapshotDb();
+
+// The played-gameweek tables are topped up once per page load, not per emit.
+let _gwTablesArchived = false;
+
+/**
+ * Archive a freshly fetched bootstrap payload. Fire-and-forget: point-in-time
+ * data is worth keeping, but never worth delaying or failing the load for.
+ */
+function archiveBootstrap(rawBootstrap) {
+  const fetchedAt = store.getLastRefreshAt();
+  _snapshotDb
+    .then(db => captureSnapshot(db, rawBootstrap, { fetchedAt, now: Date.now() }))
+    .catch(err => console.warn('[Gaffer IQ] snapshot not captured:', err?.message ?? err));
+}
+
+/** Store a minutes/points table for every played gameweek not yet held. Fire-and-forget. */
+function archiveGwTables() {
+  if (_gwTablesArchived) return;
+  _gwTablesArchived = true;
+  _snapshotDb
+    .then(db => captureGwTables(db, store.getEvents(), fetchLivePoints, Date.now()))
+    .catch(err => console.warn('[Gaffer IQ] gameweek tables not captured:', err?.message ?? err));
+}
 
 // Slugs whose team-xG fetch has already been started this session, so a
 // re-render mid-flight can't fire a duplicate request.
@@ -96,9 +126,9 @@ function resetTeamXgPrefetch() {
  * model, and pushes into the store. Emits data:ready on success or
  * data:error on failure.
  *
- * If the store already holds a season (hydrated from sessionStorage) and
- * `force` is false, we just signal ready without re-hitting the API -
- * ARCHITECTURE.md §6 treats bootstrap/fixtures as fresh for the session.
+ * If the store already holds a season (hydrated from sessionStorage) younger
+ * than SEASON_MAX_AGE_MS and `force` is false, we just signal ready without
+ * re-hitting the API - see ARCHITECTURE.md §6.
  */
 async function loadInitialData({ force = false } = {}) {
   // Two INDEPENDENT freshness gates. store.isFresh() reflects sessionStorage-
@@ -112,7 +142,9 @@ async function loadInitialData({ force = false } = {}) {
   // stranding H2H History / Style Clash / venue split on their neutral
   // fallback for the rest of that session even though the proxy was healthy.
   // See git history for the bug report this fixes.
-  const seasonFresh = !force && store.isFresh();
+  // A season restored from sessionStorage is refetched once it is older than
+  // SEASON_MAX_AGE_MS, so a reload never serves stale prices and flags.
+  const seasonFresh = !force && store.isFresh() && !store.isSeasonExpired();
   const xgFresh      = !force && store.getLeagueXg() !== null;
 
   if (seasonFresh && xgFresh) {
@@ -130,6 +162,7 @@ async function loadInitialData({ force = false } = {}) {
     // each team's statistics land. Not gated on any tab being open.
     prefetchAllTeamXg();
     store.markDataReady();
+    archiveGwTables();
     return;
   }
 
@@ -167,6 +200,7 @@ async function loadInitialData({ force = false } = {}) {
 
       const season = normaliseSeason(bootstrapRes.value, fixturesRes.value);
       store.setSeason(season);
+      archiveBootstrap(bootstrapRes.value);
     }
 
     if (xgFresh) {
@@ -213,6 +247,7 @@ async function loadInitialData({ force = false } = {}) {
     // above. Same reason, same ordering requirement.
     prefetchAllTeamXg();
     store.markDataReady();
+    archiveGwTables();
   } catch (err) {
     // store.setError() clears season state before emitting - the store is left
     // cleanly empty, not partially populated (CONVENTIONS.md §9, store.js §setError).
@@ -525,6 +560,9 @@ window.__engine = {
   enumerateSwaps,
   calcSquadFlexibility,
   buildVerdict,
+  // Downloads the point-in-time archive as one JSON file for the offline tools.
+  // A button replaces this in the Planner's settings bar (decision engine UI phase).
+  exportSnapshots: () => _snapshotDb.then(downloadSnapshots),
 };
 
 /**

@@ -92,3 +92,14 @@ export function groupBy(arr, keyFn) {
   }
   return out;
 }
+
+/**
+ * A price in millions (the normalised Player.price, e.g. 5.5) as integer tenths
+ * of a million (55) - the unit FPL itself uses and the one money arithmetic in
+ * the decision engine runs in, so rounding never drifts.
+ * @param {number} millions
+ * @returns {number} integer tenths
+ */
+export function toTenths(millions) {
+  return Math.round(millions * 10);
+}

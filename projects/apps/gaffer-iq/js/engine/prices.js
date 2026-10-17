@@ -11,6 +11,7 @@
 import {
   PRICE_MIN_ACTIVITY,
   PRICE_ACTIVITY_SCALE,
+  SELL_PROFIT_SHARE,
 } from '../config.js';
 
 // ─── Public API ───────────────────────────────────────────────────────────────
@@ -129,6 +130,31 @@ export function calcSeasonPriceChange(player) {
   const label = `${sign}£${(Math.abs(tenths) / 10).toFixed(1)}m`;
 
   return { value: tenths / 10, direction, label };
+}
+
+/**
+ * What FPL pays you for a player you sell - not his current price.
+ *
+ * A seller keeps SELL_PROFIT_SHARE of any rise since purchase, rounded down to
+ * £0.1m, and absorbs any fall in full. So a £0.1m rise is worth nothing to the
+ * seller and £0.3m is worth £0.1m. Every budget and funds calculation in the
+ * decision engine must use this, never the current price (brief §10).
+ *
+ * Integer TENTHS of a million in and out (50 = £5.0m), so the rounding is
+ * exact; a float price is a caller bug and throws rather than rounding wrong.
+ *
+ * @param {number} purchaseTenths  price paid, in tenths of a million
+ * @param {number} currentTenths   price now, in tenths of a million
+ * @returns {number}  sell price in tenths of a million, <= max(purchase, current)
+ * @throws {TypeError} when either price is not an integer number of tenths
+ */
+export function calcSellPrice(purchaseTenths, currentTenths) {
+  if (!Number.isInteger(purchaseTenths) || !Number.isInteger(currentTenths)) {
+    throw new TypeError(
+      `calcSellPrice: prices must be integer tenths, got ${purchaseTenths} and ${currentTenths}`);
+  }
+  if (currentTenths <= purchaseTenths) return currentTenths;
+  return purchaseTenths + Math.floor((currentTenths - purchaseTenths) * SELL_PROFIT_SHARE);
 }
 
 // ─── Private helpers ──────────────────────────────────────────────────────────

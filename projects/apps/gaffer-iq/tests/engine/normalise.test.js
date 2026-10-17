@@ -8,6 +8,8 @@ import assert from 'node:assert/strict';
 
 import {
   normaliseFixture, deriveUpcomingGw, deriveEventCompletion,
+  normaliseGwStat, normaliseEntryPicks, normaliseEntryTransfers, normaliseEntryHistory,
+  normaliseLiveGw, buildBootstrapSnapshot,
 } from '../../js/engine/normalise.js';
 
 test('normaliseFixture flags a provisional kickoff time', () => {
@@ -142,4 +144,174 @@ test('deriveUpcomingGw moves past a current gameweek whose matches are all playe
     [{ id: 1, gw: 3, played: true }, { id: 2, gw: 4, played: false }],
   );
   assert.equal(deriveUpcomingGw(events), 4);
+});
+
+// ─── Entry payloads for the decision engine (Phase 1) ────────────────────────
+
+const RAW_PICKS = {
+  active_chip: null,
+  automatic_subs: [],
+  entry_history: {
+    event: 7, points: 58, total_points: 412, rank: 1234, rank_sort: 1240,
+    overall_rank: 99999, percentile_rank: 10, bank: 15, value: 1012,
+    event_transfers: 1, event_transfers_cost: 0, points_on_bench: 6,
+  },
+  picks: [
+    { element: 11, position: 1,  multiplier: 1, is_captain: false, is_vice_captain: false, element_type: 1 },
+    { element: 22, position: 7,  multiplier: 2, is_captain: true,  is_vice_captain: false, element_type: 3 },
+    { element: 33, position: 12, multiplier: 0, is_captain: false, is_vice_captain: true,  element_type: 2 },
+  ],
+};
+
+test('normaliseEntryPicks maps picks, armbands and the bank', () => {
+  const result = normaliseEntryPicks(RAW_PICKS);
+  assert.equal(result.bankTenths, 15);
+  assert.equal(result.activeChip, null);
+  assert.deepEqual(result.picks, [
+    { playerId: 11, slot: 1,  isCaptain: false, isViceCaptain: false },
+    { playerId: 22, slot: 7,  isCaptain: true,  isViceCaptain: false },
+    { playerId: 33, slot: 12, isCaptain: false, isViceCaptain: true },
+  ]);
+});
+
+test('normaliseEntryPicks names the active chip in the app\'s own chip ids', () => {
+  const chipOf = name => normaliseEntryPicks({ ...RAW_PICKS, active_chip: name }).activeChip;
+  assert.equal(chipOf('freehit'), 'freehit');
+  assert.equal(chipOf('wildcard'), 'wildcard');
+  assert.equal(chipOf('bboost'), 'benchboost');
+  assert.equal(chipOf('3xc'), 'triplecaptain');
+  // A chip this app does not model (the 2024/25 assistant manager) is no chip.
+  assert.equal(chipOf('manager'), null);
+});
+
+test('normaliseEntryTransfers maps each transfer with prices in tenths', () => {
+  const result = normaliseEntryTransfers([
+    { element_in: 5, element_in_cost: 62, element_out: 9, element_out_cost: 58,
+      entry: 123, event: 4, time: '2026-09-12T10:00:00.000000Z' },
+  ]);
+  assert.deepEqual(result, [
+    { inId: 5, inCostTenths: 62, outId: 9, outCostTenths: 58, gw: 4,
+      time: '2026-09-12T10:00:00.000000Z' },
+  ]);
+});
+
+test('normaliseEntryTransfers treats a missing payload as no transfers', () => {
+  assert.deepEqual(normaliseEntryTransfers(null), []);
+});
+
+test('normaliseEntryHistory maps gameweeks and the chips played', () => {
+  const result = normaliseEntryHistory({
+    current: [
+      { event: 1, points: 60, total_points: 60, rank: 1, rank_sort: 1, overall_rank: 1,
+        percentile_rank: 1, bank: 5, value: 1000, event_transfers: 0,
+        event_transfers_cost: 0, points_on_bench: 4 },
+      { event: 2, points: 50, total_points: 110, rank: 1, rank_sort: 1, overall_rank: 1,
+        percentile_rank: 1, bank: 0, value: 1003, event_transfers: 3,
+        event_transfers_cost: 8, points_on_bench: 2 },
+    ],
+    past: [],
+    chips: [
+      { name: 'wildcard', time: '2026-08-29T09:00:00Z', event: 3 },
+      { name: '3xc', time: '2026-09-20T09:00:00Z', event: 5 },
+      { name: 'manager', time: '2026-09-27T09:00:00Z', event: 6 },
+    ],
+  });
+  assert.deepEqual(result.gws, [
+    { gw: 1, transfers: 0, transfersCost: 0, bankTenths: 5 },
+    { gw: 2, transfers: 3, transfersCost: 8, bankTenths: 0 },
+  ]);
+  assert.deepEqual(result.chips, [
+    { chip: 'wildcard', gw: 3 },
+    { chip: 'triplecaptain', gw: 5 },
+  ]);
+});
+
+test('normaliseLiveGw keeps minutes, points and starts for every player', () => {
+  const result = normaliseLiveGw({
+    elements: [
+      { id: 7, stats: { minutes: 90, goals_scored: 1, total_points: 9, starts: 1, bonus: 2 }, explain: [] },
+      { id: 8, stats: { minutes: 0, goals_scored: 0, total_points: 0, starts: 0, bonus: 0 }, explain: [] },
+    ],
+  });
+  assert.deepEqual(result, [
+    { playerId: 7, minutes: 90, points: 9, starts: 1 },
+    { playerId: 8, minutes: 0, points: 0, starts: 0 },
+  ]);
+});
+
+test('normaliseLiveGw marks starts unknown when the payload does not carry them', () => {
+  const [row] = normaliseLiveGw({ elements: [{ id: 7, stats: { minutes: 30, total_points: 2 } }] });
+  assert.equal(row.starts, null);
+});
+
+test('normaliseGwStat keeps the player\'s price for that gameweek in tenths', () => {
+  const stat = normaliseGwStat({ round: 3, fixture: 21, opponent_team: 4, was_home: true,
+    minutes: 90, total_points: 6, value: 57 });
+  assert.equal(stat.priceTenths, 57);
+});
+
+// ─── Point-in-time bootstrap snapshot ────────────────────────────────────────
+
+const RAW_ELEMENT = {
+  id: 7, web_name: 'Saka', first_name: 'Bukayo', second_name: 'Saka', photo: '223340.jpg',
+  code: 223340, team: 1, team_code: 3, element_type: 3,
+  status: 'd', news: 'Hamstring - 75% chance of playing', news_added: '2026-10-15T18:00:00Z',
+  chance_of_playing_next_round: 75, chance_of_playing_this_round: 75,
+  now_cost: 102, cost_change_event: 1, cost_change_event_fall: -1, cost_change_start: 2,
+  selected_by_percent: '41.2', transfers_in: 900000, transfers_out: 400000,
+  transfers_in_event: 52000, transfers_out_event: 61000, form: '6.1', ep_next: '5.4',
+  ep_this: '5.0', event_points: 7, total_points: 61, minutes: 610, starts: 7,
+};
+
+/** Test utility: read one archived value back out of the columnar record. */
+function archived(record, playerId, field) {
+  const row = record.rows.find(r => r[record.fields.indexOf('id')] === playerId);
+  return row?.[record.fields.indexOf(field)];
+}
+
+const RAW_EVENTS = [
+  { id: 8, name: 'Gameweek 8', deadline_time: '2026-10-17T17:30:00Z', finished: false,
+    data_checked: false, is_current: false, is_next: true, is_previous: false,
+    average_entry_score: 0 },
+];
+
+test('buildBootstrapSnapshot keeps the availability, price and transfer fields of every player', () => {
+  const record = buildBootstrapSnapshot({ elements: [RAW_ELEMENT], events: RAW_EVENTS },
+    { capturedAt: 1000, fetchedAt: 900 });
+  assert.equal(archived(record, 7, 'status'), 'd');
+  assert.equal(archived(record, 7, 'news'), 'Hamstring - 75% chance of playing');
+  assert.equal(archived(record, 7, 'chance_of_playing_next_round'), 75);
+  assert.equal(archived(record, 7, 'now_cost'), 102);
+  assert.equal(archived(record, 7, 'cost_change_event'), 1);
+  assert.equal(archived(record, 7, 'transfers_in_event'), 52000);
+  assert.equal(archived(record, 7, 'selected_by_percent'), '41.2');
+  assert.equal(archived(record, 7, 'ep_next'), '5.4');
+});
+
+test('buildBootstrapSnapshot archives an element field it has never seen', () => {
+  // The 2026/27 price-change predictor fields are undocumented: whatever FPL
+  // calls them, they must be in the record from the first capture on, because
+  // point-in-time data cannot be backfilled.
+  const record = buildBootstrapSnapshot(
+    { elements: [{ ...RAW_ELEMENT, price_change_progress: 87 }], events: RAW_EVENTS },
+    { capturedAt: 1000, fetchedAt: 900 });
+  assert.equal(archived(record, 7, 'price_change_progress'), 87);
+});
+
+test('buildBootstrapSnapshot leaves out static fields such as names and photos', () => {
+  const record = buildBootstrapSnapshot({ elements: [RAW_ELEMENT], events: RAW_EVENTS },
+    { capturedAt: 1000, fetchedAt: 900 });
+  assert.equal(record.fields.includes('photo'), false);
+  assert.equal(record.fields.includes('web_name'), false);
+});
+
+test('buildBootstrapSnapshot stamps both times and keeps the gameweek calendar', () => {
+  const record = buildBootstrapSnapshot({ elements: [RAW_ELEMENT], events: RAW_EVENTS },
+    { capturedAt: 1000, fetchedAt: 900 });
+  assert.equal(record.capturedAt, 1000);
+  assert.equal(record.fetchedAt, 900);
+  assert.deepEqual(record.events, [
+    { id: 8, deadline_time: '2026-10-17T17:30:00Z', finished: false, data_checked: false,
+      is_current: false, is_next: true },
+  ]);
 });

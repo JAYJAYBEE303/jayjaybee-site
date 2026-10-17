@@ -100,6 +100,8 @@ jayjaybee-site/                   ← repo root (not Gaffer IQ's concern)
             ├── api.js
             ├── store.js
             ├── util.js
+            ├── squadImport.js
+            ├── snapshots.js
             ├── engine/
             │   ├── normalise.js
             │   ├── fixtures.js
@@ -108,7 +110,10 @@ jayjaybee-site/                   ← repo root (not Gaffer IQ's concern)
             │   ├── form.js
             │   ├── style.js
             │   ├── counter.js
-            │   └── composite.js
+            │   ├── composite.js
+            │   ├── prices.js
+            │   ├── ledger.js
+            │   └── feasibility.js
             └── modules/
                 ├── landing.js
                 ├── matchup.js
@@ -156,6 +161,10 @@ gaffer-iq/                          (= projects/gaffer-iq/ in the repo)
     ├── api.js                  # Data-access layer. The ONLY file that calls fetch().
     ├── store.js                # In-memory + sessionStorage cache. App state. Pub/sub.
     ├── util.js                 # Pure helpers: math, formatting, array ops. No DOM, no fetch.
+    ├── squadImport.js          # Squad import shared by Dashboard and Planner: picks (the week
+    │                           #   before, in a Free Hit week), bank, purchase-price ledger.
+    ├── snapshots.js            # Point-in-time archive in IndexedDB: a bootstrap record per
+    │                           #   fresh fetch + a minutes/points table per played GW.
     │
     ├── engine/                 # The analytical brain. Pure functions. No DOM.
     │   ├── normalise.js        # Builds clean internal models from raw FPL payloads.
@@ -170,6 +179,10 @@ gaffer-iq/                          (= projects/gaffer-iq/ in the repo)
     │   │                       #   Shared by dashboard.js and transfers.js - see note below.
     │   ├── transfers.js        # Enumerates squad swaps; scores each on 5 lanes (FEATURE_ENGINE §14).
     │   ├── strategy.js         # Normalises the 5 lanes into one weekly verdict (FEATURE_ENGINE §14).
+    │   ├── prices.js           # Price-move signal, season price change, sell price (calcSellPrice).
+    │   ├── ledger.js           # Purchase prices and banked free transfers, from a manager's
+    │   │                       #   transfer list and history (decision engine).
+    │   ├── feasibility.js      # Whether FPL would accept one transfer (decision engine).
     │   └── season.js           # Whole-season model for the Full Season strip: per-GW matchups,
     │                           #   postponement inference, chip windows (FEATURE_ENGINE §15).
     │
@@ -246,7 +259,7 @@ The proxy permits only these path patterns:
 | Player summary | `^element-summary/\d{1,4}/$` | **parameterised** - id is 1–4 digits |
 | GW live points | `^event/\d{1,2}/live/$` | **parameterised** - GW is 1–2 digits; dashboard use, Phase 2 |
 
-> The table above is the **Phase 1** set. Later phases added more, each still an anchored pattern in the same file: `entry/…` and `me/` for squad import (Phase 4-1), and a separate `ALLOWED_UNDERSTAT_PATTERNS` array reached via `?source=understat` - `league/EPL/{season}`, `team/{slug}/{season}`, plus `match/{id}` and `matchdata/{id}` for the Fixtures tab's match feed (§7). `api/fpl.js` is the source of truth; read it before assuming an endpoint is reachable.
+> The table above is the **Phase 1** set. Later phases added more, each still an anchored pattern in the same file: `entry/…` and `me/` for squad import (Phase 4-1), `entry/{id}/transfers/` and `entry/{id}/history/` for the decision engine's purchase-price ledger and free-transfer count, and a separate `ALLOWED_UNDERSTAT_PATTERNS` array reached via `?source=understat` - `league/EPL/{season}`, `team/{slug}/{season}`, plus `match/{id}` and `matchdata/{id}` for the Fixtures tab's match feed (§7). `api/fpl.js` is the source of truth; read it before assuming an endpoint is reachable.
 >
 > `match/{id}` is the one route that forwards a **page** rather than a JSON endpoint, because Understat server-renders the match timeline and publishes those minutes nowhere in JSON. The proxy still answers JSON - it wraps the markup as `{ html }` - so the client contract is unchanged and rule 2 below still applies unmodified. Parsing happens client-side in `js/api.js`, never in the proxy.
 
@@ -297,7 +310,7 @@ modules/*  ──▶  read scores, render DOM for the active horizon
 ### Fetch strategy
 - On app load, `api.js` fetches `bootstrap-static/` and `fixtures/` **once** and hands them to `store`. These two payloads power almost everything.
 - `element-summary/<id>/` is fetched **lazily and on demand** (e.g. when the user opens a player in the ranker or expands a matchup), then cached in `store`. Never bulk-fetch all ~700 players' summaries on load - that's ~700 requests; it's slow and abusive to the API. **Sanctioned exception:** the Ranker's "Last Season" Avg Pts/GW toggle (FEATURE_ENGINE.md §10.1) does load every summary, but only on an explicit button click, staggered into small chunks with a yield between each - never automatically on load.
-- `event/<gw>/live/` is fetched only by the dashboard, only when viewing the current/in-progress GW.
+- `event/<gw>/live/` is fetched by the dashboard only when viewing the current/in-progress GW, and by `snapshots.js` once per played GW for the point-in-time archive (refetched until that GW's bonus is confirmed, then never again on that device). One request at a time, after `data:ready`; never on the render path.
 - `team/{slug}/{season}` is fetched eagerly for every team at startup, once
   `leagueXg` and fixtures have loaded, and cached in `store.teamXg` for the
   session. Consumed as `ctx.teamXgBySlug`. Fetched up front - not lazily per
@@ -310,7 +323,8 @@ modules/*  ──▶  read scores, render DOM for the active horizon
 
 ### Caching (the `store`)
 - `store.js` keeps an in-memory object for the session and mirrors the big static payloads (`bootstrap`, `fixtures`) into `sessionStorage` keyed by a fetch timestamp.
-- TTL policy: bootstrap/fixtures are treated as fresh for the session unless the user hits a manual "refresh data" control. Player summaries cached for the session. Live data is never cached (always re-fetched).
+- TTL policy: bootstrap/fixtures restored from `sessionStorage` are treated as fresh for `SEASON_MAX_AGE_MS` (`config.js`, 60 minutes); an older copy is refetched on load (`store.isSeasonExpired`, read only by `main.js`; `store.isFresh` still just means "a season is loaded"), so a tab left open for days cannot keep serving stale prices and injury flags. Player summaries cached for the session. Live data is never cached in the store (always re-fetched); the archive's copies live in IndexedDB, not the store.
+- Point-in-time archive: `snapshots.js` writes one record per freshly fetched bootstrap (at most one per `SNAPSHOT_MIN_INTERVAL_MS`) into IndexedDB, fire-and-forget. It is the browser's own storage, not a server store - the proxy still stores nothing - and it degrades to keeping nothing when IndexedDB is unavailable.
 - `store` exposes a tiny pub/sub (`subscribe(event, cb)` / `emit(event)`) so modules can react to `data:ready`, `horizon:changed`, etc., without tight coupling.
 - The store also holds `activeModule` - which tab is on screen - written only by `main.js`'s router and published as `route:changed`. Modules read it to skip work while hidden; see `CONVENTIONS.md` §8 for the contract they must follow.
 

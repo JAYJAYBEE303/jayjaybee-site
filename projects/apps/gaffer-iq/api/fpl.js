@@ -33,6 +33,12 @@ const ALLOWED_PATTERNS = [
   // entryInfo: longer cache (5 min) - name/rank seldom change mid-session.
   { name: 'entryPicks',    pattern: /^entry\/\d{1,8}\/event\/\d{1,2}\/picks\/$/,      cache: 'public, s-maxage=60, stale-while-revalidate=120'    },
   { name: 'entryInfo',     pattern: /^entry\/\d{1,8}\/$/,                             cache: 'public, s-maxage=300, stale-while-revalidate=600'   },
+  // Decision engine ledger: the manager's transfer list (what each player cost)
+  // and gameweek history (transfers made, chips played -> free transfers banked).
+  // Both public and read-only, like the two above; short cache because both
+  // change the moment the manager makes a transfer.
+  { name: 'entryTransfers', pattern: /^entry\/\d{1,8}\/transfers\/$/,                 cache: 'public, s-maxage=60, stale-while-revalidate=120'    },
+  { name: 'entryHistory',   pattern: /^entry\/\d{1,8}\/history\/$/,                   cache: 'public, s-maxage=60, stale-while-revalidate=120'    },
   { name: 'me',            pattern: /^me\/$/,                                         cache: 'no-store, max-age=0'                                },
 ];
 

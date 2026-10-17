@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { calcSeasonPriceChange } from '../../js/engine/prices.js';
+import { calcSeasonPriceChange, calcSellPrice } from '../../js/engine/prices.js';
 
 test('calcSeasonPriceChange reports a rise for a positive cost change', () => {
   // cost_change_start is in TENTHS of a million: 3 → +£0.3m.
@@ -60,4 +60,34 @@ test('calcSeasonPriceChange keeps one decimal place for a whole-million fall', (
   assert.equal(result.value, -1);
   assert.equal(result.direction, 'fall');
   assert.equal(result.label, '-£1.0m');
+});
+
+// ─── calcSellPrice (decision engine Phase 1) ─────────────────────────────────
+// All prices in TENTHS of a million: 50 = £5.0m. FPL keeps half of any rise,
+// rounded down to £0.1m, and passes every fall on in full.
+
+test('calcSellPrice keeps nothing of a single £0.1m rise', () => {
+  assert.equal(calcSellPrice(50, 51), 50);
+});
+
+test('calcSellPrice keeps £0.1m of a £0.2m rise', () => {
+  assert.equal(calcSellPrice(50, 52), 51);
+});
+
+test('calcSellPrice rounds half of a £0.3m rise down to £0.1m', () => {
+  assert.equal(calcSellPrice(50, 53), 51);
+});
+
+test('calcSellPrice passes a fall on in full', () => {
+  assert.equal(calcSellPrice(50, 48), 48);
+});
+
+test('calcSellPrice sells at the purchase price when the price has not moved', () => {
+  assert.equal(calcSellPrice(50, 50), 50);
+});
+
+test('calcSellPrice rejects prices in millions instead of tenths', () => {
+  // A caller passing 5.0 / 5.3 would otherwise get a silently wrong sell price
+  // on the one path where money is at stake.
+  assert.throws(() => calcSellPrice(5.0, 5.3), TypeError);
 });

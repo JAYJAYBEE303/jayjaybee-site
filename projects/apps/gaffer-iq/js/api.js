@@ -203,6 +203,48 @@ export async function fetchEntryInfo(teamId) {
   }
 }
 
+/**
+ * Fetches every transfer an FPL manager has made this season - what each
+ * incoming player cost, which sets his sell price (engine/ledger.js).
+ * @param {number} teamId  FPL manager ID (positive integer up to 8 digits)
+ * @returns {Promise<object[]>}  raw entry/transfers JSON: [{ element_in, element_in_cost, … }]
+ * @throws {ApiError}  with message "Failed to load transfers for team <id>: …"
+ */
+export async function fetchEntryTransfers(teamId) {
+  if (!Number.isInteger(teamId) || teamId <= 0 || teamId > 99_999_999) {
+    throw new ApiError(`Invalid teamId: ${teamId}`, { path: 'entry-transfers' });
+  }
+  try {
+    return await callProxy(`entry/${teamId}/transfers/`);
+  } catch (err) {
+    throw new ApiError(
+      `Failed to load transfers for team ${teamId}: ${err.message}`,
+      { upstreamStatus: err.upstreamStatus ?? null, path: `entry/${teamId}/transfers/` },
+    );
+  }
+}
+
+/**
+ * Fetches an FPL manager's gameweek-by-gameweek history: transfers made, hits
+ * taken, bank, and chips played - what the free-transfer count is replayed from.
+ * @param {number} teamId  FPL manager ID (positive integer up to 8 digits)
+ * @returns {Promise<object>}  raw entry/history JSON: { current, past, chips }
+ * @throws {ApiError}  with message "Failed to load history for team <id>: …"
+ */
+export async function fetchEntryHistory(teamId) {
+  if (!Number.isInteger(teamId) || teamId <= 0 || teamId > 99_999_999) {
+    throw new ApiError(`Invalid teamId: ${teamId}`, { path: 'entry-history' });
+  }
+  try {
+    return await callProxy(`entry/${teamId}/history/`);
+  } catch (err) {
+    throw new ApiError(
+      `Failed to load history for team ${teamId}: ${err.message}`,
+      { upstreamStatus: err.upstreamStatus ?? null, path: `entry/${teamId}/history/` },
+    );
+  }
+}
+
 // ─── Phase 3A - Understat (external xG) ──────────────────────────────────────
 // Failures here are NON-FATAL - callers use Promise.allSettled and continue
 // with FPL-only data when these fail. See main.js loadInitialData() and
