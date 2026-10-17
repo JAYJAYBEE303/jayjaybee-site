@@ -137,11 +137,10 @@ expectedPoints = avgPointsPerGw x fixtureMultiplier x (min(startShare, availabil
 | P7 | **Team-level availability is carried flat.** `channelPersonnelFactor` reads every team-mate's `chanceOfPlayingNext` from `ctx.playersByTeamId`, inside every fixture score. | `channel.js:376`; `composite.js:160-163, 419-420` | A striker flagged 25% this week still scales his club's attacking share at GW+4. |
 | P8 | **Injury spells drag the rates forever.** `avgPointsPerGw` and every appearance measure average over the whole season (or the last 5 GWs), injured zeros included, so a recovering premium stays suppressed at every GW+k even when fit. | `composite.js:982-983`; `form.js:400, 413, 588-590` | Modes 2, 3 and 6 lean towards selling a returning premium, against §6 mode 6 "hold if the recovery ends inside the horizon". |
 
-P2, P3 and P4 break rules the repo already documents, so Phase 2 fixes them at
-the root. P1 is fixed in the projection adapter regardless; whether
-`calcExpectedPoints` (and so the Dashboard's captain) is also fixed at the root
-is question Q5. P6, P7 and P8 are handled in the adapter. P5 is a separate
-follow-up.
+P1-P4 are fixed at the root in Phase 2 (P2-P4 break rules the repo already
+documents; P1 by your decision, Q5), so the Dashboard's captain and XI use the
+same corrected rule. The projection adapter does not depend on those fixes. P6,
+P7 and P8 are handled in the adapter. P5 is a separate follow-up.
 
 ### 2.2 The v1 derivation (projection adapter)
 
@@ -220,7 +219,7 @@ against him.
 
 ### 4.2 Kept
 
-- The whole prediction layer: `composite.js`, `form.js`, `counter.js`, `fixtures.js`, `channel.js`, `normalise.js`, `season.js`, `h2h.js`, `style.js`, `standings.js`. Changed only by the root fixes in §2.1 (P2-P4, and P1 if Q5 says so) and extended by the projection adapter.
+- The whole prediction layer: `composite.js`, `form.js`, `counter.js`, `fixtures.js`, `channel.js`, `normalise.js`, `season.js`, `h2h.js`, `style.js`, `standings.js`. Changed only by the root fixes in §2.1 (P1-P4) and extended by the projection adapter.
 - `pickStartingXI` (`lineup.js:44`), given an optional value accessor so the squad value function can rank by a GW's `xpts` while the Dashboard keeps calling it as today. Greedy minimum-then-fill is optimal for the brief's "maximise sum of xpts" objective; Phase 2 tests it against brute-force formation enumeration.
 - Data ingestion: `api.js`, `api/fpl.js`, `store.js`, `squadImport.js` (all extended, not replaced).
 - `chips.js` Wildcard and Free Hit timing, and `computeChipRecs`, which now merges them with the engine's Bench Boost and Triple Captain hints (Q4).
@@ -433,7 +432,7 @@ Mode weights, normalisation and thresholds follow Q6 and Q7.
 6. **Performance (measured on synthetic data).** The real `scorePlayer` took 430 ms for 255 players x 6 single-GW calls and 570 ms for 615 x 6, so projecting every feasible candidate fits the 5 s budget; **no candidate cap**, as the brief decided brute force. `pickStartingXI` costs ~3 us, so single-swap enumeration (~5-15k `V` calls) is cheap. The two things that would not fit, unbounded mode 4 chaining (~1M `V` calls) and synchronous robustness, are bounded in §5.2. If Phase 3 measurement still blows the budget, a capped pre-filter comes back to you as a question, with its criterion.
 7. **Brief inconsistencies to confirm** (Q10): `horizon_gws: 6` vs five weights per mode (plan: the 6th GW is used only by the mode 3 deferral test); mode 3 is titled "GW+3..+5" but its weights cover GW+1..+5 (plan: use the weights as written); Ceiling's upper tail does not exist before Phase 7 (plan: Phase 3 ships Ceiling on the mean at t\*, labelled as such). Mode 4's lambda "derived (see below)" is read from the same row: the funds credit is the chained second move's net gain, else `lambdaDefault`.
 8. **Units of DeltaEV** (Q6). Modes 2 and 3 normalise their weights (sum 1, a per-GW average) while mode 6 does not (sum 3.70, a horizon total), yet all are compared against the same one-off FT value and hit cost. The same move can roll in mode 2 and go ahead in mode 6.
-9. **Dashboard divergence.** The Dashboard keeps its own XI and captain from `expectedPoints`. The P2-P4 root fixes reach it; P1 reaches it only if Q5 says so. Moving the Dashboard onto the new projections is a follow-up.
+9. **Dashboard divergence.** The Dashboard keeps its own XI and captain from `expectedPoints`. The P1-P4 root fixes reach it, so it uses the same corrected rule; it still reads one projection per window rather than the per-GW projections. Moving the Dashboard onto the new projections is a follow-up.
 10. **Free transfer derivation.** 2026/27 FT rules (what Wildcard / Free Hit do to banked FTs, any mid-season top-up) are not in the API. Derived count is a pre-fill; the control stays editable.
 11. **Free Hit and the import.** During a Free Hit week the import returns the temporary squad and bank; Phase 1 re-reads picks and bank from GW-1 when `active_chip` is `freehit`. Whether `transfers/` lists Free Hit moves needs a real account (risk 3); purchase prices stay editable.
 12. **The live table costs requests.** One `event/{gw}/live/` request per finished GW, once (re-fetched until that GW's bonus is confirmed), cached in IndexedDB. Up to 38 small requests over a season; light, and nothing else in the app bulk-fetches.
@@ -448,7 +447,7 @@ Mode weights, normalisation and thresholds follow Q6 and Q7.
 - **Q2 Ledger. Decided:** allowlist both `entry/{id}/transfers/` and `entry/{id}/history/` (public, read-only) in the proxy.
 - **Q3 Network. Decided:** you will allow `fantasy.premierleague.com` (and `raw.githubusercontent.com`, already reachable) in this environment.
 - **Q4 The run and chip hints. Decided:** delete the run; keep chip-week hints as pre-fills for the chip plan, re-pointed so Bench Boost and Triple Captain come from the engine's projections and real bench (Wildcard and Free Hit stay in `chips.js`).
-- **Q5 Root fix for the minutes double count (P1).** Fix `calcExpectedPoints` too, so the Dashboard captain uses the same corrected rule, or fix it only inside the new adapter?
+- **Q5 Root fix for the minutes double count (P1). Decided:** fix `calcExpectedPoints` at the root; the Dashboard's captain and XI order will move.
 - **Q6 Units of DeltaEV** (risk 8). Use weights as per-GW discount factors without normalising, so DeltaEV is a horizon total in the same unit as the FT value and hit cost?
 - **Q7 Threshold.** Recommend a move whenever OutScore > 0 in every mode (OutScore already nets the FT value or the hit)?
 - **Q8 Blank next GW in mode 1.** What should Now do with a fit premium whose team blanks next GW?
@@ -492,7 +491,7 @@ before the previous one passes. Phases 1, 2, 3 and 5 are strictly sequential.
 > **How this serves the primary goal:** this is the "what does it do to the whole squad" measure; every recommendation is a difference of it, so its inputs must be right first.
 
 **Implement**
-1. Root fixes in the prediction layer: P3 (count 0 -> 0), P2 (`nextFixtureScore` from the pre-uplift GW mean; the uplift stays in `value` only), P4 (`edgeValue = oppCm.value == null ? 50 : 100 - oppCm.value`), and P1 in `calcExpectedPoints` if Q5 says so. The commit message records the before/after on the Dashboard captain and Ranker numbers.
+1. Root fixes in the prediction layer: P3 (count 0 -> 0), P2 (`nextFixtureScore` from the pre-uplift GW mean; the uplift stays in `value` only), P4 (`edgeValue = oppCm.value == null ? 50 : 100 - oppCm.value`), and P1 (the minutes factor in `calcExpectedPoints` becomes availability alone, Q5). The commit message records the before/after on the Dashboard captain, XI order and Ranker numbers for one squad.
 2. `js/engine/projections.js` `buildProjections` per §2.2 and §5.1.
 3. `pickStartingXI` gains an optional value accessor (Dashboard call unchanged).
 4. `js/engine/squad-value.js`: `squadValue` (optimal XI by `xpts`; captain and vice per §5.2; Triple Captain; Bench Boost counts only the increment over autosub value; blanks via `xpts = 0`, `pZero = 1`) and `autosubRecovery` (linear mode first, then probability mode per §5.2). Then switch the default to `probability`.
