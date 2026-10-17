@@ -3,7 +3,7 @@
 Date: 2026-10-16, revision 2 on 2026-10-17 (after an adversarial review of
 revision 1 against the code and the brief: 58 findings, 44 confirmed and folded
 in below).
-Status: **draft, awaiting approval** - no code has been changed.
+Status: **awaiting approval** - grill-me questions Q1-Q10 answered (§7); no code has been changed.
 Brief: `fpl-decision-engine-brief.md` (16 Oct 2026). Section numbers below
 (§3, §5 ...) refer to the brief unless prefixed with a file name.
 Scope: `projects/apps/gaffer-iq/` only. Branch:
@@ -437,7 +437,7 @@ when OutScore > 0, i.e. it beats rolling after the FT value or hit is paid
 4. **Price-predictor fields are unverified** (risk 3). Phase 5 isolates them in one adapter file; if they are absent, the adapter falls back to `calcPriceChangeRisk`, flagged as an estimate. Snapshots keep unknown element fields from Phase 1 on, so the fields are logged even before the adapter reads them.
 5. **The MILP referee is Python.** open-fpl-solver needs Python + HiGHS; the repo says "zero Python anywhere in the stack". Phase 8 would run it as an offline tool outside the served app, or port the formulation to Node with a WASM HiGHS build (licence check first). Decide at Phase 8.
 6. **Performance (measured on synthetic data).** The real `scorePlayer` took 430 ms for 255 players x 6 single-GW calls and 570 ms for 615 x 6, so projecting every feasible candidate fits the 5 s budget; **no candidate cap**, as the brief decided brute force. `pickStartingXI` costs ~3 us, so single-swap enumeration (~5-15k `V` calls) is cheap. The two things that would not fit, unbounded mode 4 chaining (~1M `V` calls) and synchronous robustness, are bounded in §5.2. If Phase 3 measurement still blows the budget, a capped pre-filter comes back to you as a question, with its criterion.
-7. **Brief inconsistencies to confirm** (Q10): `horizon_gws: 6` vs five weights per mode (plan: the 6th GW is used only by the mode 3 deferral test); mode 3 is titled "GW+3..+5" but its weights cover GW+1..+5 (plan: use the weights as written); Ceiling's upper tail does not exist before Phase 7 (plan: Phase 3 ships Ceiling on the mean at t\*, labelled as such). Mode 4's lambda "derived (see below)" is read from the same row: the funds credit is the chained second move's net gain, else `lambdaDefault`.
+7. **Brief inconsistencies, read as follows** (confirmed, Q10): `horizon_gws: 6` vs five weights per mode (plan: the 6th GW is used only by the mode 3 deferral test); mode 3 is titled "GW+3..+5" but its weights cover GW+1..+5 (plan: use the weights as written); Ceiling's upper tail does not exist before Phase 7 (plan: Phase 3 ships Ceiling on the mean at t\*, labelled as such). Mode 4's lambda "derived (see below)" is read from the same row: the funds credit is the chained second move's net gain, else `lambdaDefault`.
 8. **Units of DeltaEV** (kept as written, Q6). Modes 2 and 3 normalise their weights (sum 1, a per-GW average) while modes 4 and 6 do not (a horizon total), yet all are compared against the same one-off FT value and hit cost, so the same move can roll in mode 2 and go ahead in mode 6. Phase 7 reports whether this costs points; any change to the presets comes back to you.
 9. **Dashboard divergence.** The Dashboard keeps its own XI and captain from `expectedPoints`. The P1-P4 root fixes reach it, so it uses the same corrected rule; it still reads one projection per window rather than the per-GW projections. Moving the Dashboard onto the new projections is a follow-up.
 10. **Free transfer derivation.** 2026/27 FT rules (what Wildcard / Free Hit do to banked FTs, any mid-season top-up) are not in the API. Derived count is a pre-fill; the control stays editable.
@@ -449,7 +449,7 @@ when OutScore > 0, i.e. it beats rolling after the FT value or hit is paid
 16. **Pre-existing failures.** The 5 failing `channel.test.js` tests stay out of scope. `composite.test.js:98` turns green with the P3 fix. The baseline must not otherwise move.
 17. **Skills.** `smart-explore` could not parse files under `projects/apps/` (the repo's `.claudeignore` excludes that path), so discovery used targeted reads. `pathfinder` was applied inline rather than writing a `PATHFINDER-*/` folder at the repo root, which would break the folder restriction. Phases 1 onward use a branch rather than a separate worktree; the cloud container is already isolated.
 
-## 7. Open questions (grill-me pass)
+## 7. Decisions from the grill-me pass
 
 - **Q1 Snapshots. Decided:** browser capture on each visit, stored in IndexedDB, exportable as JSON.
 - **Q2 Ledger. Decided:** allowlist both `entry/{id}/transfers/` and `entry/{id}/history/` (public, read-only) in the proxy.
@@ -460,7 +460,7 @@ when OutScore > 0, i.e. it beats rolling after the FT value or hit is paid
 - **Q7 Threshold. Decided:** OutScore > 0 in every mode (a config key per mode for Phase 7 tuning); Long term also keeps its DeltaEV gate.
 - **Q8 Blank next GW in mode 1. Decided:** Now stays a pure one-week preset - it may offer the sale, labelled "blank GW - one-week view"; a planned Free Hit that GW means he is never sold.
 - **Q9 Leftovers. Decided:** rewrite the landing card copy; keep `index-FXL00-CK7M8F4.html` and the `me/` route (risk 15).
-- **Q10** Confirm the readings in risk 7.
+- **Q10 Brief readings. Decided:** the four readings in risk 7 stand.
 
 ---
 
