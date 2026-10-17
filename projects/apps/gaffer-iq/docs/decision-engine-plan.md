@@ -35,7 +35,7 @@ captain is never sold without the loss of the armband being counted.
 | `js/engine/lineup.js:44` | `pickStartingXI` | Greedy XI + bench order by `expectedPoints`. **Shared with the Dashboard** (`js/modules/dashboard.js:515`). |
 | `js/engine/lineup.js:91` | `calcXiExpectedPoints` | XI sum + `BENCH_CONTRIBUTION_WEIGHT` (0.15) x bench. The quantity every lane differences. |
 | `js/engine/prices.js:36` | `calcPriceChangeRisk` | Price-move guess from in-GW transfer flow. Used by the Funds lane and the planner's "Buy now" note. |
-| `js/engine/chips.js:125-321` | `score*Timing` | Chip week recommendations; feed the `chipWindow` trigger and the run's chip pills. Imported only by the planner. |
+| `js/engine/chips.js:125-321` | `score*Timing` | Chip week recommendations; feed the `chipWindow` trigger and the run's chip pills. Imported only by the planner. Wildcard and Free Hit timing are league-wide fixture reads; Bench Boost uses a proxy bench (the 4 lowest composite scores, `planner.js:563-570`) and Triple Captain inlines the `PROJ_*` blend with this week's availability carried flat (`chips.js:321-371`). |
 
 ### 1.2 Module / UI
 
@@ -208,21 +208,22 @@ against him.
 
 - `js/engine/transfers.js` and `js/engine/strategy.js` (whole files).
 - `js/modules/planner-boards.js` and `js/modules/planner-run.js` (whole files; Q4), after moving `timingNote` into `planner.js`.
-- In `js/modules/planner.js`: the verdict tape, the run, the move tray and lens boards and their state (`_moves`, `_chipsAt`, `_swaps`, `_verdict`, `RUN_KEY`, `runSnapshot`, `isDirty`, `onBeforeUnload`, FLIP code); `scoreSquad`, `_scores`, `ensureRankTiers`, `_rankTierByPlayerId` and the `rankPlayers` / `attachRankTiers` imports (the ~920 ms full-pool rank fed only the Structure lane); `priceChangeNote`; `pickBenchPlayerIds`, `pickTcCandidate` and `computeChipRecs` if Q4 drops chip-week suggestions.
+- In `js/modules/planner.js`: the verdict tape, the run, the move tray and lens boards and their state (`_moves`, `_chipsAt`, `_swaps`, `_verdict`, `RUN_KEY`, `runSnapshot`, `isDirty`, `onBeforeUnload`, FLIP code); `scoreSquad`, `_scores`, `ensureRankTiers`, `_rankTierByPlayerId` and the `rankPlayers` / `attachRankTiers` imports (the ~920 ms full-pool rank fed only the Structure lane); `priceChangeNote`; `pickBenchPlayerIds` and `pickTcCandidate` (the Bench Boost and Triple Captain hints come from the engine instead, Q4).
 - In `index.html`: the run, the tray, and the ids with no counterpart in the new screen: `#pl-hit`, `#pl-save`, `#pl-save-st`, `#pl-run-range`, `#pl-clear`, `#pl-issues`, `#pl-unplaced`, `#pl-totals`, the FT 1/2 radio. In `css/planner.css`: **delete by consumer, not by name** - the rules are flat siblings under `.pl`, so every class no template or `index.html` still uses goes (UI-phase acceptance checks this).
 - `calcXiExpectedPoints` from `js/engine/lineup.js`; `rankByPriceRise` / `rankByPriceFall` from `js/engine/prices.js` (already unused). **`calcPriceChangeRisk` stays** with `PRICE_MIN_ACTIVITY` / `PRICE_ACTIVITY_SCALE`, as the price adapter's flagged fallback (risk 4).
-- `js/engine/chips.js` if Q4 drops chip-week suggestions (it is imported only by the planner).
+- In `js/engine/chips.js`: `scoreBenchBoostTiming` and `scoreTripleCaptainTiming`, with the inlined `PROJ_*` blend and the imports only they used (Q4: replaced by engine hints that use the same projections and the real bench). `scoreWildcardTiming` and `scoreFreeHitTiming` stay.
 - Config constants left without an importer: `BENCH_CONTRIBUTION_WEIGHT`, `NOW_WINDOW_GWS`, `FUTURE_*`, `CANDIDATE_POOL_PER_POS`, `FUNDS_MIN_CASH_FREED`, `FLEX_*`, `CEILING_*`, `HAUL_POINTS_THRESHOLD`, `STRUCTURE_PLAYTIME_FLOOR`, `LANE_SCALE_*`, `VERDICT_*`, `HIT_PENALTY` (replaced by `DECISION_ENGINE.hitCost`), and any other constant whose last importer goes.
 - Tests: `tests/engine/transfers.test.js`, `tests/engine/strategy.test.js`, `tests/modules/planner-run.test.js`, the `calcXiExpectedPoints` cases in `lineup.test.js`.
 - `window.__engine` transfer hooks in `js/main.js` (replaced by hooks for the new engine).
 - `index-FXL00-CK7M8F4.html` and the `me/` allowlist entry (Q9).
-- Docs, in the same commit as the code deletion: `FEATURE_ENGINE.md` §14 becomes a pointer to `docs/decision-engine.md`, keeping §14.1's description of the kept `pickStartingXI`; `ARCHITECTURE.md` file tree and §10; `ROADMAP.md` §2D; `GAFFER_IQ_TESTING_ROADMAP.md` planner checklist; stale code comments (`index.html:441`, `css/planner.css:4`, `lineup.js:7-11`, `dashboard.js:7`). The two superseded specs and the old plan stay in `docs/superpowers/` as history, marked superseded.
+- Docs, in the same commit as the code deletion: `FEATURE_ENGINE.md` §14 becomes a pointer to `docs/decision-engine.md`, keeping §14.1's description of the kept `pickStartingXI`; `ARCHITECTURE.md` file tree and §10; `ROADMAP.md` §2D; `GAFFER_IQ_TESTING_ROADMAP.md` planner checklist; the `chips.js` lockstep notes in `FEATURE_ENGINE.md` §10-§11; stale code comments (`index.html:441`, `css/planner.css:4`, `lineup.js:7-11`, `dashboard.js:7`). The two superseded specs and the old plan stay in `docs/superpowers/` as history, marked superseded.
 
 ### 4.2 Kept
 
 - The whole prediction layer: `composite.js`, `form.js`, `counter.js`, `fixtures.js`, `channel.js`, `normalise.js`, `season.js`, `h2h.js`, `style.js`, `standings.js`. Changed only by the root fixes in §2.1 (P2-P4, and P1 if Q5 says so) and extended by the projection adapter.
 - `pickStartingXI` (`lineup.js:44`), given an optional value accessor so the squad value function can rank by a GW's `xpts` while the Dashboard keeps calling it as today. Greedy minimum-then-fill is optimal for the brief's "maximise sum of xpts" objective; Phase 2 tests it against brute-force formation enumeration.
 - Data ingestion: `api.js`, `api/fpl.js`, `store.js`, `squadImport.js` (all extended, not replaced).
+- `chips.js` Wildcard and Free Hit timing, and `computeChipRecs`, which now merges them with the engine's Bench Boost and Triple Captain hints (Q4).
 - Planner shell: data-ready / settle gating, `route:changed` deferral, `getPlanningTiming` and `buildCtx` (planning GW, not a live GW), squad drawer (its bench / start / C markers driven by `DecisionResult.lineup`, so one screen never shows two XIs), import form, toast, confirm dialog, bank input, `#pl-cmd` and its resize observer.
 
 ### 4.3 How the new UI sits in the site
@@ -234,7 +235,7 @@ It keeps the app's design system: tokens from `css/base.css` (`--color-*`,
 values (`CONVENTIONS.md` §5.4), and entrance motion gated on `[data-anim]` and
 `prefers-reduced-motion`. Layout, in reading order:
 
-1. Settings bar: bank (from import, editable), FTs 0-5 (derived for the planning GW, editable), chips used per half (derived from `history/` `chips[]`, split at `CHIP_RESET_AFTER_GW`, with a manual override), chip plan (chip -> GW; the engine's only chip input). Bank, FT and chip overrides are saved in `localStorage` next to the ledger.
+1. Settings bar: bank (from import, editable), FTs 0-5 (derived for the planning GW, editable), chips used per half (derived from `history/` `chips[]`, split at `CHIP_RESET_AFTER_GW`, with a manual override), chip plan (chip -> GW; the engine's only chip input), pre-filled with the chip hints - Wildcard and Free Hit from `chips.js`, Bench Boost and Triple Captain from the engine, each with its reasoning - and your choice always overrides a hint. Bank, FT and chip overrides are saved in `localStorage` next to the ledger.
 2. Live-round note (`timingNote`) when planning while a GW is in play.
 3. Six mode cards (§8 items 1-7).
 4. Captain and XI panel.
@@ -351,6 +352,10 @@ DecisionResult = {
     flags: Array<'sell' | 'hold' | 'protected' | 'locked' | 'pendingNews' | 'sellPriceEstimated'>,
     lockValue: number | null }],
   lineup: { xi, bench, captainId, viceId, captainGap, nextCaptainId },
+  chipHints: {                       // pre-fill only; never applied unless you accept them (Q4)
+    benchboost:    { gw, gain, reasoning } | null,   // GW with the largest Bench Boost increment from squadValue
+    triplecaptain: { gw, gain, reasoning } | null,   // GW with the largest captain bonus
+  },
 }
 
 Move = {
@@ -442,7 +447,7 @@ Mode weights, normalisation and thresholds follow Q6 and Q7.
 - **Q1 Snapshots. Decided:** browser capture on each visit, stored in IndexedDB, exportable as JSON.
 - **Q2 Ledger. Decided:** allowlist both `entry/{id}/transfers/` and `entry/{id}/history/` (public, read-only) in the proxy.
 - **Q3 Network. Decided:** you will allow `fantasy.premierleague.com` (and `raw.githubusercontent.com`, already reachable) in this environment.
-- **Q4 The run and chip-week suggestions.** §8 has no counterpart for "the run" or for the chip-week recommendations it shows. Delete both (the chip plan becomes your input), or keep them?
+- **Q4 The run and chip hints. Decided:** delete the run; keep chip-week hints as pre-fills for the chip plan, re-pointed so Bench Boost and Triple Captain come from the engine's projections and real bench (Wildcard and Free Hit stay in `chips.js`).
 - **Q5 Root fix for the minutes double count (P1).** Fix `calcExpectedPoints` too, so the Dashboard captain uses the same corrected rule, or fix it only inside the new adapter?
 - **Q6 Units of DeltaEV** (risk 8). Use weights as per-GW discount factors without normalising, so DeltaEV is a horizon total in the same unit as the FT value and hit cost?
 - **Q7 Threshold.** Recommend a move whenever OutScore > 0 in every mode (OutScore already nets the FT value or the hit)?
@@ -507,7 +512,7 @@ before the previous one passes. Phases 1, 2, 3 and 5 are strictly sequential.
 
 > **How this serves the primary goal:** turns the squad value into one scored move (or Roll) per mode, with every component kept for the explanation.
 
-**Implement** `js/engine/decision.js` `runDecisionEngine`: every feasible `(p, q)`, `V` cached per `(p, q, t)`; §5 formulas per mode; `KeepValue` with the ghost; Free Hit / Wildcard weights; full `best` move for every owned player and mode; lock list; locks and bans; missing-ledger fallback. Then each mode's extra logic from §6, as named steps:
+**Implement** `js/engine/decision.js` `runDecisionEngine`: every feasible `(p, q)`, `V` cached per `(p, q, t)`; §5 formulas per mode; `KeepValue` with the ghost; Free Hit / Wildcard weights; full `best` move for every owned player and mode; lock list; locks and bans; missing-ledger fallback; Bench Boost and Triple Captain chip hints from `squadValue` (only for chips still available in the half that contains the hinted GW). Then each mode's extra logic from §6, as named steps:
 - **Mode 1:** hard availability gate - an incoming player flagged out, or with `pZero_1 > pZeroGate`, is never the root buy.
 - **Mode 4:** tau gate (points lost over the horizon <= `tau`); efficiency = money freed (`sell(p) - price(q)`) / max(`eps`, points lost); chained second move per §5.2, credited net of its FT / hit cost and decay.
 - **Mode 5:** t\* = the GW in the next 5 with the highest sum of top-15 `xpts` (ties: most double-GW fixtures); mean at t\* until Phase 7; chip-aware (BB bench weight 1, TC captain x3, Free Hit blankers not sold); lock value `V_t*(S) - V_t*(S - p + best affordable q)`; players above `lockThreshold` are protected in modes 1-4.
@@ -520,6 +525,7 @@ before the previous one passes. Phases 1, 2, 3 and 5 are strictly sequential.
 - A starter who blanks only in a planned Free Hit GW is not a top sell in any mode; the Triple Captain captain gap is exactly double the normal one.
 - Bench filler (brief §7): the squad holds a genuine sell, bank 0, and no `q` affordable for the filler beats the weakest starter; the filler is not mode 1's top sell. No cheap-sell penalty is added to pass it.
 - The blank-next-GW case behaves as Q8 decides.
+- Chip hints: the Bench Boost hint is the GW with the largest Bench Boost increment on a hand-built squad; the Triple Captain hint picks a captain's double over his single; a chip already used in that half is never hinted.
 - Identical output for identical input. Under ~5 s per mode on a real squad (risk 3) and on a synthetic 15-man squad now; a lock / ban re-run under 200 ms.
 
 **Review** `requesting-code-review` on the scorer before moving on.
@@ -530,7 +536,7 @@ before the previous one passes. Phases 1, 2, 3 and 5 are strictly sequential.
 
 > **How this serves the primary goal:** this is where the one recommended move per mode, and the evidence for it, reaches you.
 
-**Implement** The layout in §4.3, built from `DecisionResult` only. Mode card: root move or Roll, EV gain vs rolling (`outScore`), robustness (hidden until Phase 6), minutes-risk badges, two collapsed alternatives, plain-English why, later-GW parts greyed, pending-news note. Sell/hold table: sortable, KeepValue and OutScore per mode, flags, estimated sell prices marked. Lock / ban buttons re-run the engine. Captain and XI panel with the EV gap. Drawer markers from `DecisionResult.lineup`. Then delete everything in §4.1, docs included, in the same commit.
+**Implement** The layout in §4.3, built from `DecisionResult` only. Mode card: root move or Roll, EV gain vs rolling (`outScore`), robustness (hidden until Phase 6), minutes-risk badges, two collapsed alternatives, plain-English why, later-GW parts greyed, pending-news note. Sell/hold table: sortable, KeepValue and OutScore per mode, flags, estimated sell prices marked. Lock / ban buttons re-run the engine. Captain and XI panel with the EV gap. Chip plan pre-filled from the hints. Drawer markers from `DecisionResult.lineup`. Then delete everything in §4.1, docs included, in the same commit.
 
 **Acceptance** Manual check in `vercel dev` (keyboard, reduced motion, 360 px width, skeletons while unsettled, live-round note); `grep -rE 'enumerateSwaps|buildVerdict|LANE_SCALE|planner-run|planner-boards' js tests css index.html` finds nothing; every class in `css/planner.css` has a consumer; `ui-ux-pro-max` review of cards, table and lock/ban flow; `requesting-code-review`.
 
