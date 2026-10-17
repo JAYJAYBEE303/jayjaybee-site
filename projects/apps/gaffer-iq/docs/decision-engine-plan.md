@@ -214,7 +214,7 @@ against him.
 - Config constants left without an importer: `BENCH_CONTRIBUTION_WEIGHT`, `NOW_WINDOW_GWS`, `FUTURE_*`, `CANDIDATE_POOL_PER_POS`, `FUNDS_MIN_CASH_FREED`, `FLEX_*`, `CEILING_*`, `HAUL_POINTS_THRESHOLD`, `STRUCTURE_PLAYTIME_FLOOR`, `LANE_SCALE_*`, `VERDICT_*`, `HIT_PENALTY` (replaced by `DECISION_ENGINE.hitCost`), and any other constant whose last importer goes.
 - Tests: `tests/engine/transfers.test.js`, `tests/engine/strategy.test.js`, `tests/modules/planner-run.test.js`, the `calcXiExpectedPoints` cases in `lineup.test.js`.
 - `window.__engine` transfer hooks in `js/main.js` (replaced by hooks for the new engine).
-- `index-FXL00-CK7M8F4.html` and the `me/` allowlist entry (Q9).
+- The landing card's run copy (`index.html:147`): the "+6" badge goes and the hint becomes "One best move per mode, scored on your whole squad." (Q9).
 - Docs, in the same commit as the code deletion: `FEATURE_ENGINE.md` §14 becomes a pointer to `docs/decision-engine.md`, keeping §14.1's description of the kept `pickStartingXI`; `ARCHITECTURE.md` file tree and §10; `ROADMAP.md` §2D; `GAFFER_IQ_TESTING_ROADMAP.md` planner checklist; the `chips.js` lockstep notes in `FEATURE_ENGINE.md` §10-§11; stale code comments (`index.html:441`, `css/planner.css:4`, `lineup.js:7-11`, `dashboard.js:7`). The two superseded specs and the old plan stay in `docs/superpowers/` as history, marked superseded.
 
 ### 4.2 Kept
@@ -445,8 +445,9 @@ when OutScore > 0, i.e. it beats rolling after the FT value or hit is paid
 12. **The live table costs requests.** One `event/{gw}/live/` request per finished GW, once (re-fetched until that GW's bonus is confirmed), cached in IndexedDB. Up to 38 small requests over a season; light, and nothing else in the app bulk-fetches.
 13. **Backtest leakage and effort.** Reconstructing the engine's context for past GWs from vaastav needs care: team strengths in that dataset may be end-of-season values, status flags are not available historically (structure mode cannot be backtested until our own snapshots accumulate), and the old engine needs the same reconstructed context. Phase 7 is the largest phase.
 14. **Terms and access flags (§11)** found in the repo: the proxy sends a spoofed desktop Chrome user agent (`api/fpl.js:120`); `Access-Control-Allow-Origin: *` (`:143`) lets any site use this proxy against FPL; the Understat `match/{id}` route forwards a scraped HTML page. Check the vaastav dataset's licence before using it. Snapshots stay on your device, so no FPL data is redistributed.
-15. **Pre-existing failures.** The 5 failing `channel.test.js` tests stay out of scope. `composite.test.js:98` turns green with the P3 fix. The baseline must not otherwise move.
-16. **Skills.** `smart-explore` could not parse files under `projects/apps/` (the repo's `.claudeignore` excludes that path), so discovery used targeted reads. `pathfinder` was applied inline rather than writing a `PATHFINDER-*/` folder at the repo root, which would break the folder restriction. Phases 1 onward use a branch rather than a separate worktree; the cloud container is already isolated.
+15. **Leftovers kept by decision (Q9).** `index-FXL00-CK7M8F4.html` stays: nothing links to it, but it is served and boots `js/main.js`, so after the gut it will run the new code against its old markup. The useless `me/` proxy route also stays.
+16. **Pre-existing failures.** The 5 failing `channel.test.js` tests stay out of scope. `composite.test.js:98` turns green with the P3 fix. The baseline must not otherwise move.
+17. **Skills.** `smart-explore` could not parse files under `projects/apps/` (the repo's `.claudeignore` excludes that path), so discovery used targeted reads. `pathfinder` was applied inline rather than writing a `PATHFINDER-*/` folder at the repo root, which would break the folder restriction. Phases 1 onward use a branch rather than a separate worktree; the cloud container is already isolated.
 
 ## 7. Open questions (grill-me pass)
 
@@ -458,7 +459,7 @@ when OutScore > 0, i.e. it beats rolling after the FT value or hit is paid
 - **Q6 Units of DeltaEV. Decided:** keep the brief's presets exactly as written; Phase 7 reports the effect (risk 8).
 - **Q7 Threshold. Decided:** OutScore > 0 in every mode (a config key per mode for Phase 7 tuning); Long term also keeps its DeltaEV gate.
 - **Q8 Blank next GW in mode 1. Decided:** Now stays a pure one-week preset - it may offer the sale, labelled "blank GW - one-week view"; a planned Free Hit that GW means he is never sold.
-- **Q9 Leftovers.** Rewrite the landing card copy, delete `index-FXL00-CK7M8F4.html`, drop the `me/` allowlist entry?
+- **Q9 Leftovers. Decided:** rewrite the landing card copy; keep `index-FXL00-CK7M8F4.html` and the `me/` route (risk 15).
 - **Q10** Confirm the readings in risk 7.
 
 ---
