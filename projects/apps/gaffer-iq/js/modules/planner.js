@@ -20,7 +20,7 @@
 import { store } from '../store.js';
 import {
   HORIZONS, SQUAD_LIMITS, SQUAD_TOTAL, SEASON_GWS, CHIP_IDS, CHIP_LABELS, CHIP_RESET_AFTER_GW,
-  DECISION_ENGINE,
+  DECISION_ENGINE, GW_TABLES_WAIT_MS,
 } from '../config.js';
 import { buildScoreContext } from '../engine/composite.js';
 import { scoreWildcardTiming, scoreFreeHitTiming } from '../engine/chips.js';
@@ -30,7 +30,7 @@ import { deriveFreeTransfers } from '../engine/ledger.js';
 import {
   fetchAndMapSquad, loadSavedTeamId, saveTeamId, resolveImportGw, loadLedger,
 } from '../squadImport.js';
-import { downloadSnapshots } from '../snapshots.js';
+import { exportSnapshots, downloadSnapshots } from '../snapshots.js';
 import { toTenths, fromTenths } from '../util.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -38,6 +38,12 @@ import { toTenths, fromTenths } from '../util.js';
 /** localStorage key for your bank, free-transfer and chip overrides, kept next
  *  to the ledger (squadImport.js) they override. */
 const SETTINGS_KEY = 'gafferiq_planner';
+
+/** What the old planner kept; removed on sight. */
+const RETIRED_KEYS = ['gafferiq_planner_run', 'gafferiq_chips_used'];
+
+/** The bank box's ceiling, £m (its max attribute in index.html). */
+const BANK_MAX = 100;
 
 /** One line under each mode card's title: what the mode is for. */
 const MODE_BLURB = {
@@ -89,8 +95,12 @@ let _pendingRender = false;
 /** Promise of the snapshot archive's adapter (main.js), for the export
  *  button and the per-gameweek minutes table. */
 let _snapshotDb = null;
+/** Settles once this visit's minutes tables are archived (main.js). */
+let _gwTablesArchived = null;
 /** Promise of the archived minutes tables, read once per data:ready. */
 let _gwTables = null;
+/** What the projections stand on: 'table' (per-GW minutes) or 'totals'. */
+let _basis = null;
 
 /** buildProjections output for every player, and the GW it was built for. */
 let _projections = null;
@@ -118,6 +128,7 @@ let _locks = new Set();
 let _bans = new Set();
 
 let _tableMode = 'longterm';
+let _openAlts = new Set();   // modes whose alternatives are expanded
 let _sort = { key: 'out', desc: true };
 let _animate = false;        // the next ready render plays the entrance
 let _heroHtml = '';          // what the hero shows now
@@ -165,7 +176,14 @@ let _importInfo    = null;
  */
 export function resolveSettings(ledger, saved, planningGw) {
   const importedAt = ledger?.importedAt ?? null;
-  const history = ledger?.history ?? null;
+  // The ledger is this app's own record, but a malformed one (an old version,
+  // a hand edit) must read as no import rather than stop the page.
+  const h = ledger?.history;
+  const history = Array.isArray(h?.gws) && Array.isArray(h.chips)
+    && h.gws.every(g => Number.isInteger(g?.gw) && Number.isInteger(g?.transfers))
+    && h.chips.every(c => typeof c?.chip === 'string' && Number.isInteger(c?.gw))
+    ? h : null;
+  const bankTenths = Number.isInteger(ledger?.bankTenths) && ledger.bankTenths >= 0 ? ledger.bankTenths : 0;
   const derivedFt = history
     ? (deriveFreeTransfers(history, planningGw) ?? DECISION_ENGINE.maxBankedFt)
     : 1;
@@ -176,11 +194,17 @@ export function resolveSettings(ledger, saved, planningGw) {
 
   const sameImport = Boolean(saved) && saved.importedAt === importedAt;
   const sameGw = sameImport && saved.planningGw === planningGw;
+  const used = sameImport && saved.used ? saved.used : derivedUsed;
+  // A plan made later in the season than the planning GW belongs to the last
+  // season; a week in a half where its chip is used can no longer be played.
+  const lastSeason = Number.isInteger(saved?.planningGw) && saved.planningGw > planningGw;
+  const chipPlan = lastSeason ? {} : Object.fromEntries(Object.entries(saved?.chipPlan ?? {})
+    .filter(([gw, chip]) => !used[chip]?.[halfOf(Number(gw))]));
   return {
-    bankTenths: sameGw && Number.isInteger(saved.bankTenths) ? saved.bankTenths : (ledger?.bankTenths ?? 0),
+    bankTenths: sameGw && Number.isInteger(saved.bankTenths) ? saved.bankTenths : bankTenths,
     freeTransfers: sameGw && Number.isInteger(saved.freeTransfers) ? saved.freeTransfers : derivedFt,
-    chipPlan: saved?.chipPlan ?? {},
-    used: sameImport && saved.used ? saved.used : derivedUsed,
+    chipPlan,
+    used,
   };
 }
 
@@ -196,10 +220,11 @@ export function chipsUsedList(used) {
  * @param {Player[]} players
  * @param {Object<number, number>} [purchasesTenths]
  */
-export function decisionSquad(players, purchasesTenths = {}) {
+export function decisionSquad(players, purchasesTenths) {
+  const paid = id => (Number.isInteger(purchasesTenths?.[id]) ? purchasesTenths[id] : null);
   return players.map(p => ({
     playerId: p.id, name: p.name, position: p.position, teamId: p.teamId,
-    priceTenths: toTenths(p.price), purchaseTenths: purchasesTenths[p.id] ?? null,
+    priceTenths: toTenths(p.price), purchaseTenths: paid(p.id),
   }));
 }
 
@@ -253,9 +278,10 @@ function pts(v) {
   return `${r >= 0 ? '+' : '−'}${Math.abs(r).toFixed(1)}`;
 }
 
-/** Points to one decimal, unsigned. */
+/** Points to one decimal, unsigned unless negative. */
 function pt(v) {
-  return (Math.round(v * 10) / 10 || 0).toFixed(1);
+  const r = Math.round(v * 10) / 10 || 0;
+  return r < 0 ? `−${Math.abs(r).toFixed(1)}` : r.toFixed(1);
 }
 
 function nameOf(id) {
@@ -516,10 +542,10 @@ async function buildAndRun(token, planningGw) {
   const ctx = buildCtx();
   try {
     if (!ctx) throw new Error('no scoring context');
-    _projections = buildProjections(store.getPlayers(), ctx, {
-      planningGw, gwTable: gwTableFor(tables, store.getEvents(), planningGw),
-    });
+    const gwTable = gwTableFor(tables, store.getEvents(), planningGw);
+    _projections = buildProjections(store.getPlayers(), ctx, { planningGw, gwTable });
     _projectionsGw = planningGw;
+    _basis = gwTable ? 'table' : 'totals';
     _hints = wildcardAndFreeHitHints(ctx);
   } catch (err) {
     console.warn('[planner] projections failed:', err?.message ?? err);
@@ -532,9 +558,17 @@ async function buildAndRun(token, planningGw) {
   render();
 }
 
-/** The archived minutes tables, read once per data:ready; [] when there are none. */
+/**
+ * The archived minutes tables, read once per data:ready; [] when there are
+ * none. Waits for this visit's archive top-up first, up to GW_TABLES_WAIT_MS,
+ * so a first visit projects on this visit's tables, not a partial set.
+ */
 function readGwTables() {
-  _gwTables ??= (_snapshotDb ?? Promise.resolve(null))
+  _gwTables ??= Promise.race([
+    _gwTablesArchived ?? Promise.resolve(),
+    new Promise(resolve => setTimeout(resolve, GW_TABLES_WAIT_MS)),
+  ])
+    .then(() => _snapshotDb ?? null)
     .then(db => db?.getAll('gwTables') ?? [])
     .catch(err => {
       console.warn('[planner] minutes tables unreadable - projections use season totals:', err?.message ?? err);
@@ -590,6 +624,9 @@ function runEngine() {
 /** A setting, lock or ban changed: re-run on what is cached, or just repaint
  *  the controls while the plan is still being built. */
 function rerun() {
+  // A deadline that passed with the page open moves the planning GW past the
+  // projections: start again rather than run on the wrong weeks.
+  if (_projections && _projectionsGw !== getPlanningTiming().planningGw) return recompute();
   if (_state === 'ready' || _state === 'failed') {
     if (_projections) runEngine();
     render();
@@ -683,7 +720,7 @@ function renderCmd() {
   const live = _root.querySelector('#pl-live');
   const note = timingNote(getPlanningTiming());
   live.hidden = !note;
-  live.textContent = note;
+  setText(live, note);
 }
 
 // ─── Render: chip plan ───────────────────────────────────────────────────────
@@ -711,7 +748,7 @@ function chipRowHTML(chip, settings, gws) {
     const usable = gws.includes(hint.gw) && !used[halfOf(hint.gw)] && !takenBy(hint.gw);
     hintText = `<span><b>Hint GW${hint.gw}.</b> ${esc(hint.reasoning ?? '')}</span>`
       + (hint.gw === plannedGw ? ' <span class="muted">Planned.</span>'
-        : usable ? ` <button type="button" class="link" data-chip-use="${chip}" data-gw="${hint.gw}">Plan GW${hint.gw}</button>`
+        : usable ? ` <button type="button" class="link" data-chip-use="${chip}" data-gw="${hint.gw}" aria-label="Plan ${esc(label)} for GW${hint.gw}">Plan GW${hint.gw}</button>`
           : ' <span class="muted">Not plannable here.</span>');
   }
 
@@ -778,7 +815,7 @@ function modeCardHTML(mode, i, settings, planningGw) {
 
   const seller = _result.players.find(p => p.playerId === root.outId);
   const perGw = counted.length > 1
-    ? `<ol class="pgw" aria-label="Gain by gameweek">${root.perGw.map((v, k) => {
+    ? `<ol class="pgw" aria-label="Weighted gain by gameweek" title="Each week's gain times the mode's weight for it">${root.perGw.map((v, k) => {
       const gw = planningGw + k;
       if (!counted.includes(gw)) return '';
       const tentative = gw >= root.tentativeFromGw;
@@ -793,7 +830,7 @@ function modeCardHTML(mode, i, settings, planningGw) {
       ? '<p class="mc__note">Team news pending: a flagged player is in this move, so the press conferences may change it.</p>'
       : '');
   const alts = mode.alternatives.length
-    ? `<details class="mc__alts"><summary>${mode.alternatives.length} alternative${mode.alternatives.length === 1 ? '' : 's'}</summary><ol>`
+    ? `<details class="mc__alts" data-alts="${mode.modeId}"${_openAlts.has(mode.modeId) ? ' open' : ''}><summary>${mode.alternatives.length} alternative${mode.alternatives.length === 1 ? '' : 's'}</summary><ol>`
       + mode.alternatives.map(a => `<li><span>Sell <b>${esc(nameOf(a.outId))}</b> → buy <b>${esc(nameOf(a.inId))}</b></span>`
         + `<b class="num">${pts(a.outScore)}</b></li>`).join('')
       + '</ol></details>'
@@ -809,9 +846,18 @@ function modeCardHTML(mode, i, settings, planningGw) {
 
 function modesNote(settings, planningGw) {
   const chip = settings.chipPlan[planningGw];
-  if (chip === 'wildcard') return `Wildcard planned for GW${planningGw}: rebuild the squad there - single moves don’t apply.`;
-  if (chip === 'freehit') return `Free Hit planned for GW${planningGw}: these are permanent moves for GW${planningGw + 1} on - make them after it.`;
-  return '';
+  const notes = [];
+  if (chip === 'wildcard') notes.push(`Wildcard planned for GW${planningGw}: rebuild the squad there - single moves don’t apply.`);
+  if (chip === 'freehit') notes.push(`Free Hit planned for GW${planningGw}: these are permanent moves for GW${planningGw + 1} on - make them after it.`);
+  if (_basis === 'totals') {
+    notes.push('Minutes come from season totals: this device has not archived every finished gameweek yet, so the projections are estimates.');
+  }
+  return notes.join(' ');
+}
+
+/** Write a live region's text only when it changes, so it is not re-announced. */
+function setText(el, text) {
+  if (el.textContent !== text) el.textContent = text;
 }
 
 function renderModes() {
@@ -830,18 +876,18 @@ function renderModes() {
 
   if (_state !== 'ready') {
     box.setAttribute('aria-busy', String(_state !== 'failed'));
-    note.textContent = _state === 'failed'
-      ? 'Couldn’t build a plan - some of your squad could not be projected. The console says which player failed; reload once data has finished loading.'
+    setText(note, _state === 'failed'
+      ? 'Couldn’t build a plan - the console has the error. Reload once the data has finished loading.'
       : _state === 'settling'
         ? 'Counter-matchup data is still landing - moves are held back until it settles.'
-        : 'Scoring every legal transfer against your whole squad…';
+        : 'Gathering each finished gameweek’s minutes, then scoring every legal transfer against your whole squad…');
     box.innerHTML = _state === 'failed' ? ''
       : `<ol class="mcs" aria-hidden="true">${Object.keys(DECISION_ENGINE.modes)
         .map(() => '<li class="mc mc--sk"><span class="sk"></span></li>').join('')}</ol>`;
     return;
   }
   box.setAttribute('aria-busy', 'false');
-  note.textContent = modesNote(settings, planningGw);
+  setText(note, modesNote(settings, planningGw));
   box.innerHTML = `<ol class="mcs">${Object.values(_result.modes)
     .map((mode, i) => modeCardHTML(mode, i, settings, planningGw)).join('')}</ol>`;
 }
@@ -871,7 +917,12 @@ function renderXi() {
   const gap = captainId && nextCaptainId && Number.isFinite(captainGap)
     ? ` <b class="num">${pts(captainGap)}</b> clear of ${esc(nameOf(nextCaptainId))}, the next-best captain.`
     : '';
-  box.innerHTML = `<p class="xi__cap"><b>${esc(nameOf(captainId))}</b> captains${viceId ? `, <b>${esc(nameOf(viceId))}</b> vice` : ''}.${gap}</p>`
+  const { planningGw } = getPlanningTiming();
+  const chip = currentSettings().chipPlan[planningGw];
+  const other = chip === 'freehit' || chip === 'wildcard'
+    ? `<p class="sec__note">${esc(CHIP_LABELS[chip])} planned for GW${planningGw}: this is your current squad’s XI, not the ${esc(CHIP_LABELS[chip])} squad’s.</p>`
+    : '';
+  box.innerHTML = other + `<p class="xi__cap"><b>${esc(nameOf(captainId))}</b> captains${viceId ? `, <b>${esc(nameOf(viceId))}</b> vice` : ''}.${gap}</p>`
     + `<div class="xi__grid"><div><span class="lbl">XI · ${shape}</span><ul class="xi__lns">${lines}</ul></div>`
     + `<div><span class="lbl">Bench, in order</span><ol class="xi__bench">${bench.map(id => `<li>${person(id)}</li>`).join('')}</ol></div></div>`;
 }
@@ -934,7 +985,7 @@ function renderTable() {
       + `<td class="${r.out !== null && r.out > 0 ? 'is-pos' : ''}">${out}</td>`
       + `<td class="l">${r.best ? `→ ${esc(nameOf(r.best.inId))}` : '<span aria-hidden="true">–</span>'}</td>`
       + `<td class="l"><span class="flags">${flags}</span></td>`
-      + `<td class="c"><button type="button" class="tog tog--sm" data-lock="${r.id}" aria-pressed="${_locks.has(r.id)}" aria-label="Keep ${esc(r.name)}" title="Don’t sell him in any mode">Keep</button></td></tr>`;
+      + `<td class="c"><button type="button" class="tog tog--sm" data-lock="${r.id}" aria-pressed="${_locks.has(r.id)}" aria-label="Lock ${esc(r.name)}" title="Don’t sell him in any mode">Lock</button></td></tr>`;
   }).join('');
 
   box.innerHTML = '<div class="tw" role="region" aria-labelledby="pl-sh-t" tabindex="0"><table>'
@@ -1113,6 +1164,10 @@ function afterSquadChange() {
   _q = '';
   const search = _root?.querySelector('#pl-search');
   if (search) search.value = '';
+  // A lock only means something on a player you own, a ban on one you don't.
+  const owned = new Set(store.getSquad());
+  _locks = new Set([..._locks].filter(id => owned.has(id)));
+  _bans = new Set([..._bans].filter(id => !owned.has(id)));
   // Invalidate always, recompute lazily (CONVENTIONS.md §8).
   if (store.getActiveModule() !== 'planner') {
     _pendingRender = true;
@@ -1125,7 +1180,7 @@ function afterSquadChange() {
 // ─── Event handlers ───────────────────────────────────────────────────────────
 
 function onBankChange(millions) {
-  const value = Number.isFinite(millions) && millions > 0 ? millions : 0;
+  const value = Number.isFinite(millions) && millions > 0 ? Math.min(BANK_MAX, millions) : 0;
   changeSettings({ bankTenths: toTenths(value) });
 }
 
@@ -1176,8 +1231,9 @@ function onClick(e) {
   if (hit('[data-undo]')) {
     const u = _undo;
     _undo = null;
-    _root.querySelector('#pl-toast').innerHTML = '';
     u?.();
+    _root.querySelector('#pl-toast').innerHTML = '';
+    _root.querySelector('#pl-modes-t')?.focus();
     return;
   }
   if (hit('[data-dlg-cancel]') || t.id === 'pl-dlg-scrim') return closeDialog(false);
@@ -1190,8 +1246,12 @@ function onClick(e) {
   if ((el = hit('[data-ft]'))) return changeSettings({ freeTransfers: Number(el.dataset.ft) });
   if (hit('#pl-export')) {
     return void (_snapshotDb ?? Promise.resolve(null))
-      .then(db => { if (!db) throw new Error('no archive'); return downloadSnapshots(db); })
-      .then(() => toast('Snapshots exported'))
+      .then(async db => {
+        const held = db ? await exportSnapshots(db) : { snapshots: [], gwTables: [] };
+        if (!held.snapshots.length && !held.gwTables.length) return toast('Nothing archived on this device yet');
+        await downloadSnapshots(db);
+        return toast('Snapshots exported');
+      })
       .catch(err => { console.warn('[planner] snapshot export failed:', err?.message ?? err); toast('Couldn’t export snapshots'); });
   }
   if ((el = hit('[data-chip-used]'))) {
@@ -1412,6 +1472,14 @@ function wireDom() {
 
   _root.addEventListener('click', onClick);
   _root.addEventListener('change', onChange);
+  // An expanded "alternatives" list stays expanded across re-runs. 'toggle'
+  // does not bubble, hence the capture.
+  _root.addEventListener('toggle', e => {
+    const mode = e.target.dataset?.alts;
+    if (!mode) return;
+    if (e.target.open) _openAlts.add(mode);
+    else _openAlts.delete(mode);
+  }, true);
   _root.addEventListener('submit', onSubmit);
   _root.addEventListener('input', onInput);
   document.addEventListener('keydown', onKeydown);
@@ -1421,6 +1489,11 @@ function wireDom() {
   if (saved) _root.querySelector('#pl-imp-id').value = String(saved);
 
   _saved = loadSaved();
+  try {
+    for (const key of RETIRED_KEYS) localStorage.removeItem(key);
+  } catch (err) {
+    console.warn('[planner] old planner storage not cleared:', err?.message ?? err);
+  }
 
   render();
   _domWired = true;
@@ -1430,7 +1503,9 @@ function wireDom() {
 
 function onDataReady() {
   wireDom();          // no-op after first call
-  // New data: new projections, minutes tables, hints and V values.
+  // New data: new projections, minutes tables, hints and V values - and any
+  // projection build still in flight is now out of date.
+  ++_token;
   _projections = null;
   _gwTables = null;
   _hints = { wildcard: null, freehit: null };
@@ -1481,9 +1556,12 @@ function onSquadPicksChanged() {
  * @param {object} [opts]
  * @param {Promise<object>} [opts.snapshotDb]  the snapshot archive (js/snapshots.js):
  *   its minutes tables feed the projections, and the settings bar exports it
+ * @param {Promise<void>} [opts.gwTablesArchived]  settles when this visit's
+ *   minutes tables are archived; the projections wait for it (bounded)
  */
-export function initPlanner({ snapshotDb = null } = {}) {
+export function initPlanner({ snapshotDb = null, gwTablesArchived = null } = {}) {
   _snapshotDb = snapshotDb;
+  _gwTablesArchived = gwTablesArchived;
   store.subscribe('data:ready',         onDataReady);
   store.subscribe('route:changed',      onRouteChanged);
   store.subscribe('squad:updated',      afterSquadChange);

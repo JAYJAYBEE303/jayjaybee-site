@@ -291,7 +291,8 @@ s.setSquad([].concat(pick('GKP', 2), pick('DEF', 5), pick('MID', 5), pick('FWD',
       transfer cost, each part named in its why lines.
 - [ ] "Don't sell" on a card re-runs in well under a second, the player is no
       card's sell, and Undo restores him. "Don't buy" likewise for the buy; the
-      "Not buying" list unbans.
+      "Not selling / Not buying" line undoes either, and drops a lock or ban
+      that no longer applies once the squad changes.
 - [ ] Free transfers 0: a move must clear the 4-point hit and its 2-point
       margin. 5: a move costs nothing.
 - [ ] A Wildcard planned for the planning GW makes all six cards roll; a Free

@@ -21,7 +21,7 @@
  * and Now's "wait for team news" call arrive with it.
  */
 
-import { DECISION_ENGINE, SQUAD_TOTAL, CHIP_RESET_AFTER_GW, CHIP_LABELS } from '../config.js';
+import { DECISION_ENGINE, SQUAD_TOTAL, SEASON_GWS, CHIP_RESET_AFTER_GW, CHIP_LABELS } from '../config.js';
 import { fromTenths, toTenths } from '../util.js';
 import { calcSellPrice } from './prices.js';
 import { checkSwap } from './feasibility.js';
@@ -37,9 +37,10 @@ const LOCK_PROTECTED_MODES = new Set(['now', 'longterm', 'future', 'funds']);
 
 /**
  * A cache of V values to pass back into runDecisionEngine between runs. It
- * empties itself when the projections Map, the squad, the planned Bench Boost
- * / Triple Captain weeks or the autosub settings change. A projections Map is
- * read as immutable: build a new one rather than editing it in place.
+ * empties itself when the projections Map, the squad or the autosub settings
+ * change; each value is keyed by its GW's planned Bench Boost / Triple
+ * Captain, so moving one recomputes only the weeks it touches. A projections
+ * Map is read as immutable: build a new one rather than editing it in place.
  */
 export function createDecisionCache() {
   return { projections: null, key: null, values: new Map() };
@@ -185,11 +186,13 @@ function prepare(input, config, cache) {
   const chipAt = gw => (VALUE_CHIPS.has(chipPlan[gw]) ? chipPlan[gw] : null);
   const wildcardGws = Object.entries(chipPlan).filter(([, chip]) => chip === 'wildcard').map(([gw]) => Number(gw));
   // Free Hit and Wildcard (plan §5.2): a Free Hit GW, and every GW from a
-  // Wildcard on, is played by a different squad - this one's moves count nothing there.
-  const zeroed = gw => chipPlan[gw] === 'freehit' || wildcardGws.some(w => w <= gw);
+  // Wildcard on, is played by a different squad - this one's moves count
+  // nothing there. Nor does a GW after the season's last: nobody plays it.
+  const zeroed = gw => gw > SEASON_GWS || chipPlan[gw] === 'freehit' || wildcardGws.some(w => w <= gw);
 
-  const key = [ids.join(','), modeGws.filter(chipAt).map(gw => `${gw}:${chipAt(gw)}`).join(','),
-    config.autosubMode, JSON.stringify(config.benchWeightsLinear)].join('|');
+  // The squad and the autosub settings key the whole cache; a GW's planned
+  // Bench Boost / Triple Captain keys each value, so moving one keeps the rest.
+  const key = [ids.join(','), config.autosubMode, JSON.stringify(config.benchWeightsLinear)].join('|');
   if (cache.projections !== projections || cache.key !== key) {
     cache.projections = projections;
     cache.key = key;
@@ -198,7 +201,7 @@ function prepare(input, config, cache) {
   const valueOpts = gw => ({ chip: chipAt(gw), autosubMode: config.autosubMode,
     benchWeightsLinear: config.benchWeightsLinear });
   const value = (gw, squadIds, swapKey) => {
-    const cacheKey = `${gw}|${swapKey}`;
+    const cacheKey = `${gw}|${chipAt(gw) ?? ''}|${swapKey}`;
     let v = cache.values.get(cacheKey);
     if (v === undefined) {
       v = squadValue(squadIds, gw, overlay, valueOpts(gw)).value;
@@ -576,7 +579,7 @@ function explain(run, weights, record, freeTransfers, tags) {
     ? (counted.length === 1 ? `GW${counted[0]}` : `GW${counted[0]}–${counted.at(-1)}`)
     : `${counted.slice(0, -1).map(gw => `GW${gw}`).join(', ')} and GW${counted.at(-1)}`;
 
-  let squad = `${name(p.playerId)} out, ${name(q.id)} in: ${points(record.deltaEv)} points for the squad over ${span}.`;
+  let squad = `${name(p.playerId)} out, ${name(q.id)} in: ${points(record.deltaEv)} weighted points for the squad over ${span}.`;
   if (tags.includes('blankGwOneWeek')) {
     squad += ` ${name(p.playerId)} has no fixture in GW${run.modeGws[0]}: a one-week view.`;
   }
@@ -636,7 +639,8 @@ function chipHints(run) {
   const { input, config, ids, overlay } = run;
   const used = input.chipsUsed ?? [];
   const firstHalf = gw => gw <= CHIP_RESET_AFTER_GW;
-  const gws = Array.from({ length: config.horizonGws }, (_, k) => input.planningGw + k);
+  const gws = Array.from({ length: config.horizonGws }, (_, k) => input.planningGw + k)
+    .filter(gw => gw <= SEASON_GWS);
   const opts = { autosubMode: config.autosubMode, benchWeightsLinear: config.benchWeightsLinear };
 
   const hint = (chip, gainAt, describe) => {

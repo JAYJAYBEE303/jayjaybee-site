@@ -1440,3 +1440,9 @@ export const DECISION_ENGINE = {
 // press conferences land in separate records without filling storage with
 // near-identical copies from every reload.
 export const SNAPSHOT_MIN_INTERVAL_MS = 6 * 60 * 60 * 1000;
+
+// How long the Planner waits for this visit's minutes tables to be archived
+// (one request per gameweek still missing, js/snapshots.js) before projecting
+// on what is stored. A first visit mid-season fetches most of a season; a
+// return visit has nothing left to fetch and waits no time at all.
+export const GW_TABLES_WAIT_MS = 20000;

@@ -68,6 +68,25 @@ test('your bank and free transfers stand for the import and planning GW you set 
   assert.deepEqual(reimported.chipPlan, { 6: 'benchboost' });
 });
 
+test('a malformed import record is treated as no import, never thrown on', () => {
+  const broken = { importedAt: 5, bankTenths: '15', purchasesTenths: null,
+    history: { gws: 'x', chips: { chip: 'wildcard' } } };
+  assert.deepEqual(resolveSettings(broken, null, 4),
+    { bankTenths: 0, freeTransfers: 1, chipPlan: {}, used: NONE_USED });
+  assert.equal(decisionSquad([{ id: 10, name: 'Saka', position: 'MID', teamId: 1, price: 10.1 }], null)[0].purchaseTenths, null);
+  const nulls = { ...LEDGER, history: { gws: [null], chips: [null] } };
+  assert.equal(resolveSettings(nulls, null, 4).freeTransfers, 1);
+});
+
+test('a chip plan lapses with its season, and in a half where the chip is used', () => {
+  const saved = { importedAt: 1000, planningGw: 30, chipPlan: { 33: 'freehit', 34: 'benchboost' },
+    used: { ...NONE_USED, benchboost: [false, true] } };
+  // GW34's Bench Boost sits in a half where it is used; the Free Hit stands.
+  assert.deepEqual(resolveSettings(LEDGER, saved, 31).chipPlan, { 33: 'freehit' });
+  // Back to GW2: a new season, so last season's plan is gone.
+  assert.deepEqual(resolveSettings(LEDGER, saved, 2).chipPlan, {});
+});
+
 test('a chip used in a half reaches the engine as one entry for that half', () => {
   const used = { ...NONE_USED, wildcard: [true, false], benchboost: [true, true] };
   assert.deepEqual(chipsUsedList(used), [

@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 
 import { runDecisionEngine, transferCost, createDecisionCache } from '../../js/engine/decision.js';
 import { squadValue } from '../../js/engine/squad-value.js';
-import { DECISION_ENGINE } from '../../js/config.js';
+import { DECISION_ENGINE, SEASON_GWS } from '../../js/config.js';
 
 // ─── Test utilities ──────────────────────────────────────────────────────────
 
@@ -342,6 +342,19 @@ test('a Wildcard in the planning GW leaves every mode nothing to weigh: all six 
   assert.equal(result.modes.ceiling.targetGw, null);
 });
 
+test('gameweeks past the end of the season count for nothing and are never hinted', () => {
+  // Planning GW36: the projections run to GW41; the bench doubles in GW39-40.
+  const result = runDecisionEngine(scenario({
+    planningGw: 36,
+    candidates: [{ id: 101, position: 'GKP', xip: 6.5 }],
+    changes: [{ id: 12, xip: [2.5, 2.5, 2.5, 9, 9, 2.5], fx: [1, 1, 1, 2, 2, 1] }],
+  }));
+  assert.deepEqual(result.modes.future.weights.slice(SEASON_GWS - 36 + 1), [0, 0]);
+  assert.ok(result.modes.future.weights[0] > 0);
+  assert.ok(result.modes.ceiling.targetGw <= SEASON_GWS);
+  assert.ok(result.chipHints.benchboost.gw <= SEASON_GWS, `hinted GW${result.chipHints.benchboost.gw}`);
+});
+
 test('a chip planned for a GW already gone is ignored', () => {
   const base = { candidates: [{ id: 101, position: 'GKP', xip: 6.5 }] };
   assert.deepEqual(runDecisionEngine(scenario({ ...base, chipPlan: { [GW - 2]: 'wildcard' } })),
@@ -632,6 +645,15 @@ test('a warm cache matches a cold one when the planning GW and a planned chip mo
   const cache = createDecisionCache();
   run(GW, cache);
   assert.deepEqual(run(GW + 1, cache), run(GW + 1, createDecisionCache()));
+});
+
+test('moving a planned Bench Boost keeps the V values of every other week', () => {
+  const input = scenario({ candidates: [{ id: 101, position: 'GKP', xip: 6.5 }] });
+  const cache = createDecisionCache();
+  runDecisionEngine({ ...input, chipPlan: { [GW + 2]: 'benchboost' } }, DECISION_ENGINE, cache);
+  const before = cache.values.size;
+  runDecisionEngine({ ...input, chipPlan: { [GW + 3]: 'benchboost' } }, DECISION_ENGINE, cache);
+  assert.ok(cache.values.size > before, `${cache.values.size} values after, ${before} before`);
 });
 
 test('every mode preset must weigh the same number of GWs', () => {

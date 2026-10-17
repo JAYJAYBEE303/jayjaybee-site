@@ -54,7 +54,11 @@ import {
 const _snapshotDb = openSnapshotDb();
 
 // The played-gameweek tables are topped up once per page load, not per emit.
-let _gwTablesArchived = false;
+// The promise settles when this visit's top-up is done (or has given up), so
+// the Planner can project on this visit's tables rather than the last one's.
+let _gwTablesStarted = false;
+let _gwTablesDone;
+const _gwTablesArchived = new Promise(resolve => { _gwTablesDone = resolve; });
 
 /**
  * Archive a freshly fetched bootstrap payload. Fire-and-forget: point-in-time
@@ -69,11 +73,12 @@ function archiveBootstrap(rawBootstrap) {
 
 /** Store a minutes/points table for every played gameweek not yet held. Fire-and-forget. */
 function archiveGwTables() {
-  if (_gwTablesArchived) return;
-  _gwTablesArchived = true;
+  if (_gwTablesStarted) return;
+  _gwTablesStarted = true;
   _snapshotDb
     .then(db => captureGwTables(db, store.getEvents(), fetchLivePoints, Date.now()))
-    .catch(err => console.warn('[Gaffer IQ] gameweek tables not captured:', err?.message ?? err));
+    .catch(err => console.warn('[Gaffer IQ] gameweek tables not captured:', err?.message ?? err))
+    .finally(_gwTablesDone);
 }
 
 // Slugs whose team-xG fetch has already been started this session, so a
@@ -491,7 +496,7 @@ initFullSeason();
 initFixtures();
 initRanker();
 initDashboard();
-initPlanner({ snapshotDb: _snapshotDb });
+initPlanner({ snapshotDb: _snapshotDb, gwTablesArchived: _gwTablesArchived });
 // Outside .app-main: one bar shared by every view, hidden on ordinary weeks.
 initScheduleBar();
 initCalibration();

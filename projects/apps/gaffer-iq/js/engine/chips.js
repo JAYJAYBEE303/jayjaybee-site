@@ -17,7 +17,7 @@
 import {
   CHIP_PLAN_HORIZON, WC_WINDOW, WC_TOP_TEAMS,
   FH_TOP_TEAMS, FH_BLANK_WEIGHT, FH_BLANK_THRESHOLD,
-  HORIZON_DECAY, W_MEAN, W_MIN, BLANK_GW_VALUE,
+  HORIZON_DECAY, W_MEAN, W_MIN, BLANK_GW_VALUE, SEASON_GWS,
 } from '../config.js';
 import { clamp } from '../util.js';
 import { scoreFixture } from './composite.js';
@@ -121,7 +121,8 @@ export function scoreWildcardTiming(horizon, ctx) {
   const teams = Object.values(ctx.teamsById);
   const candidates = [];
 
-  for (let off = 0; off < CHIP_PLAN_HORIZON; off++) {
+  // A chip can only be played in a gameweek the season has.
+  for (let off = 0; off < CHIP_PLAN_HORIZON && startGw + off <= SEASON_GWS; off++) {
     const activateGw = startGw + off;
     const runStartGw = activateGw + 1;
 
@@ -174,7 +175,7 @@ export function scoreFreeHitTiming(horizon, ctx) {
   const teams = Object.values(ctx.teamsById);
   const candidates = [];
 
-  for (let off = 0; off < CHIP_PLAN_HORIZON; off++) {
+  for (let off = 0; off < CHIP_PLAN_HORIZON && startGw + off <= SEASON_GWS; off++) {
     const gw = startGw + off;
     let blankCount = 0;
     const teamScores = [];
