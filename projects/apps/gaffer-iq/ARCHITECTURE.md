@@ -113,7 +113,9 @@ jayjaybee-site/                   ← repo root (not Gaffer IQ's concern)
             │   ├── composite.js
             │   ├── prices.js
             │   ├── ledger.js
-            │   └── feasibility.js
+            │   ├── feasibility.js
+            │   ├── projections.js
+            │   └── squad-value.js
             └── modules/
                 ├── landing.js
                 ├── matchup.js
@@ -183,6 +185,9 @@ gaffer-iq/                          (= projects/gaffer-iq/ in the repo)
     │   ├── ledger.js           # Purchase prices and banked free transfers, from a manager's
     │   │                       #   transfer list and history (decision engine).
     │   ├── feasibility.js      # Whether FPL would accept one transfer (decision engine).
+    │   ├── projections.js      # Per player, per GW of the horizon: xpts, pZero, xptsIfPlays,
+    │   │                       #   pStart, p60 - the decision engine's data contract.
+    │   ├── squad-value.js      # V_t(S): best XI + captain + expected autosubs (+ Bench Boost).
     │   └── season.js           # Whole-season model for the Full Season strip: per-GW matchups,
     │                           #   postponement inference, chip windows (FEATURE_ENGINE §15).
     │
@@ -205,7 +210,7 @@ gaffer-iq/                          (= projects/gaffer-iq/ in the repo)
         └── planner-run.js      # Transfer Planner: the run's week-by-week transfer rules (pure).
 ```
 
-**`pickStartingXI` (`engine/lineup.js`) is shared between the Dashboard and the Planner** - it used to be defined only inside `modules/dashboard.js` and was lifted out so both modules agree on what "your starting XI" means. The Planner's five transfer lanes are measured as the *change* in this selection's total expected points, so a disagreement between the two on XI selection would silently corrupt every lane. See `FEATURE_ENGINE.md` §14.1.
+**`pickStartingXI` (`engine/lineup.js`) is shared between the Dashboard and the Planner** - it used to be defined only inside `modules/dashboard.js` and was lifted out so both modules agree on what "your starting XI" means. The Planner's five transfer lanes are measured as the *change* in this selection's total expected points, so a disagreement between the two on XI selection would silently corrupt every lane. See `FEATURE_ENGINE.md` §14.1. The decision engine's squad value (`engine/squad-value.js`) uses it too, passing a gameweek's `xpts` as the optional value accessor in place of `expectedPoints`.
 
 ### Hard rules about this structure
 1. **Only `api.js` is allowed to call `fetch()`.** Modules and engine never fetch directly. This keeps the network surface in one place and makes caching and the proxy boundary trivial to reason about.

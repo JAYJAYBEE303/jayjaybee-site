@@ -21,7 +21,7 @@ import {
 import { clamp } from '../util.js';
 import { scoreFixture } from './composite.js';
 import { calcPlayerForm, calcPlayingLikelihood } from './form.js';
-import { calcCounterMatchup } from './counter.js';
+import { calcCounterMatchup, defensiveCounterEdge } from './counter.js';
 
 // ─── Internal helpers ────────────────────────────────────────────────────────
 
@@ -358,7 +358,7 @@ export function scoreTripleCaptainTiming(player, horizon, ctx) {
           const cm = calcCounterMatchup(team, opponent, ctx).pairings;
           counterValue = ((cm.wideMidVsFb?.value ?? 50) + (cm.camVsCbMid?.value ?? 50)) / 2;
         } else {
-          counterValue = 100 - calcCounterMatchup(opponent, team, ctx).value;
+          counterValue = defensiveCounterEdge(calcCounterMatchup(opponent, team, ctx));
         }
       }
       const single =

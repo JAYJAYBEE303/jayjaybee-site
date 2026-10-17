@@ -33,22 +33,31 @@ function expectedPointsOf(entry) {
  * Select the optimal legal starting XI from a scored squad.
  *
  * Formation rules (FPL): exactly 1 GKP, at least 3 DEF, at least 2 MID, at
- * least 1 FWD, 11 players total. Fill the minimums by expected points
- * descending, then fill remaining outfield slots from the leftover pool.
- * Bench is ordered outfield-by-expected-points descending, reserve GKP last -
- * a keeper can only replace a keeper, so he is never the first substitute.
+ * least 1 FWD, 11 players total. Fill the minimums by value (expected points
+ * unless `valueOf` says otherwise) descending, then fill remaining outfield
+ * slots from the leftover pool. Bench is ordered outfield by the same value
+ * descending, reserve GKP last - a keeper can only replace a keeper, so he is
+ * never the first substitute.
  *
- * @param {Array<{player: Player, score: object}>} scoredSquad
- * @returns {{ xi: Array<{player, score}>, bench: Array<{player, score}> }}
+ * Filling the minimums first and then the best of the rest is optimal: the
+ * best XI under any formation holds each position's top players, and the
+ * squad's own limits (5 DEF, 5 MID, 3 FWD) are the formation maximums. A test
+ * checks it against enumerating every formation.
+ *
+ * @param {Array<{player: Player}>} scoredSquad
+ * @param {(entry: object) => number} [valueOf]  what to maximise; defaults to
+ *   the entry's score.expectedPoints. The decision engine passes a
+ *   gameweek's xpts (engine/squad-value.js).
+ * @returns {{ xi: object[], bench: object[] }}  the entries passed in
  */
-export function pickStartingXI(scoredSquad) {
+export function pickStartingXI(scoredSquad, valueOf = expectedPointsOf) {
   const byPos = { GKP: [], DEF: [], MID: [], FWD: [] };
   for (const entry of scoredSquad ?? []) {
     const pos = entry?.player?.position;
     if (byPos[pos]) byPos[pos].push(entry);
   }
   for (const pos of Object.keys(byPos)) {
-    byPos[pos].sort((a, b) => expectedPointsOf(b) - expectedPointsOf(a));
+    byPos[pos].sort((a, b) => valueOf(b) - valueOf(a));
   }
 
   const xi = [];
@@ -65,7 +74,7 @@ export function pickStartingXI(scoredSquad) {
     ...byPos.DEF.slice(XI_FORMATION_MIN.DEF),
     ...byPos.MID.slice(XI_FORMATION_MIN.MID),
     ...byPos.FWD.slice(XI_FORMATION_MIN.FWD),
-  ].sort((a, b) => expectedPointsOf(b) - expectedPointsOf(a));
+  ].sort((a, b) => valueOf(b) - valueOf(a));
 
   const remainingSlots = Math.max(0, XI_SIZE - xi.length);
   xi.push(...pool.slice(0, remainingSlots));

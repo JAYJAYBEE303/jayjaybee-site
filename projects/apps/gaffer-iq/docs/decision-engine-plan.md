@@ -3,7 +3,9 @@
 Date: 2026-10-16, revision 2 on 2026-10-17 (after an adversarial review of
 revision 1 against the code and the brief: 58 findings, 44 confirmed and folded
 in below).
-Status: **awaiting approval** - grill-me questions Q1-Q10 answered (§7); no code has been changed.
+Status: **approved**; grill-me questions Q1-Q10 answered (§7). Phase 1 done
+(`f4ef63f`); Phase 2 done, awaiting your check before Phase 3. Where the build
+departed from this plan, the text below was updated to match it.
 Brief: `fpl-decision-engine-brief.md` (16 Oct 2026). Section numbers below
 (§3, §5 ...) refer to the brief unless prefixed with a file name.
 Scope: `projects/apps/gaffer-iq/` only. Branch:
@@ -150,16 +152,16 @@ from one basis for every player, so the identities hold by algebra:
 For each player and each GW `t` of the horizon (`k = t - planningGw`, `k = 0..5`):
 
 - **Context.** `ctx_k` = the engine ctx with `currentGw = planningGw + k`, `playerSummariesById = {}` (P6) and `playersByTeamId` rebuilt from clones whose `chanceOfPlayingNext` is the recovered value for that GW (P7). `{ gws: 1 }` single-GW scoring; nothing else in ctx is keyed to `currentGw`, so this is a valid window with no future leak.
-- **`a_t` availability.** `k = 0`: FPL's `chance_of_playing_next_round`, else `STATUS_PLAY_CHANCE[status]`. `k >= 1`: the recovery curve in config, by status. Never carried flat.
-- **Contention GWs `C`.** Elapsed GWs, minus the player's latest run of zero-minute GWs when that run is still going and he is flagged now, or ended within `absenceLookbackGws` and he has played since (P8). Per-GW minutes come from the Phase 1 `event/{gw}/live/` table (one request per finished GW, every player). Without the table, `C` = all elapsed GWs, flagged estimated.
-- **Rates, unshrunk.** `appearRate` = GWs in `C` with minutes > 0 / |C| (fallback: starts / elapsed GWs); `ppa` (points per appearance) = points in `C` / appearances in `C` (fallback: points / starts); `startRate` = season starts / |C| (starts only happen in contention GWs). If |C| < `minContentionGws`, fall back to `calcPlaytimeSecurity`'s price prior, flagged estimated. Never the price-shrunk `startRate` for `pZero` (an ever-present cheap starter would get a false 29% pZero).
+- **`a_t` availability.** `k = 0`: FPL's `chance_of_playing_next_round`, else `STATUS_PLAY_CHANCE[status]`. `k >= 1`: `1 - (1 - a_0) x absenceCarryOver[status]^k` - the share of this week's absence chance still there `k` gameweeks on (config; doubtful 0.3, injured 0.6, suspended 0, unavailable 1). Never carried flat. The same recovered figure is what `ctx_k` gives his club's channel read, also at `k = 0` (an injured player with no FPL chance used to read as 100% available there).
+- **Contention GWs `C`.** Elapsed GWs in which his club had a fixture (a club blank is not a missed appearance), minus the player's latest run of zero-minute GWs when that run is still going and he is flagged now, or lasted at least `absenceMinRunGws` (2; one missed week is as likely a benching), ended within `absenceLookbackGws` and he has played since (P8). Per-GW minutes come from the Phase 1 `event/{gw}/live/` table (one request per finished GW, every player). Without the table, `C` = his club's played matches, flagged estimated.
+- **Rates, unshrunk.** `appearRate` = GWs in `C` with minutes > 0 / |C| (fallback: starts / his club's played matches); `ppa` (points per appearance) = points in `C` / appearances in `C`, a past double's points scaled back to one fixture by `count(n)` (fallback: points / starts); `startRate` = season starts / |C| (starts only happen in contention GWs). If |C| < `minContentionGws`, fall back to `calcPlaytimeSecurity`'s price prior, flagged estimated. Never the price-shrunk `startRate` for `pZero` (an ever-present cheap starter would get a false 29% pZero).
 - **`fm_t` fixture multiplier** from the pre-uplift GW mean (P2), with the P4 guard. `n_t` = fixtures in GW `t`; `count(n) = n == 0 ? 0 : 1 + DGW_EXPECTED_PTS_FACTOR x (n - 1)`.
 
 ```
 xpts_t        = a_t x appearRate x ppa x fm_t x count(n_t)
 pZero_t       = n_t == 0 ? 1 : (1 - a_t) + a_t x (1 - appearRate)^n_t     // availability shared across a double, selection per fixture
 xptsIfPlays_t = n_t == 0 ? 0 : xpts_t / (1 - pZero_t)                     // when 1 - pZero_t <= eps: the a_t = 1 value
-pStart_t      = a_t x startRate                                            // approximate until Phase 4
+pStart_t      = min(1 - pZero_t, a_t x (1 - (1 - startRate)^n_t))          // starts at least once; approximate until Phase 4
 p60_t         = pStart_t x completion,  p60Approx: true                    // completion = minutes / (starts x 90)
 pP90          = null                                                       // Phase 7
 ```
@@ -318,7 +320,7 @@ export function runDecisionEngine(input, config)                   // -> Decisio
 Rules the signatures do not show:
 
 - **Captain.** Chosen to maximise `xpts_c + pZero_c x xpts_v` (vice covers only when the captain does not play; `xpts_v` is the vice's unconditional figure). Triple Captain doubles that bonus.
-- **Autosubs, probability mode.** Each bench player comes on at most once. Expected recovery is computed exactly over the absence patterns of outfield starters (up to `autosubMaxAbsences`), applying FPL's bench order and formation rules to each pattern; the GK slot is separate (`pZero_gk1 x xpts_gk2`). Probability mass beyond the cap is reported in `components`, not credited. Bench order: outfield by `xptsIfPlays` descending, GK last (configurable).
+- **Autosubs, probability mode.** Each bench player comes on at most once. Expected recovery is computed exactly, with no cap: the outcome depends only on how many starters are absent at each position and on which subs play, and with `c` subs playing, absences past `c` at one position change nothing (each finds no sub left or fails as the one before did). So each position's absence count is capped at `c` with its tail probability folded in - at most `(c + 1)^3` states per play/miss outcome of the three subs, none when no sub plays - and FPL's bench order and formation rules are applied to each state; the GK slot is separate (`pZero_gk1 x xpts_gk2`). A test checks it against brute force over all 2^10 x 2^3 patterns. Bench order: outfield by `xptsIfPlays` descending, GK last (configurable).
 - **Free Hit and Wildcard** are handled in `decision.js` by weights, not in `squadValue`: `w_t = 0` for a planned Free Hit GW, and for every GW from a planned Wildcard onward, in DeltaEV, KeepValue and lock value.
 - **Ghost** (KeepValue): `{ xpts: 0, xptsIfPlays: 0, pZero: 1 }`, built directly, never passed through `checkSwap` or the funds term.
 - **No ledger entry** for a player (drawer edit, Dashboard import): purchase = current price, so sell = current price, flagged `estimated` on the move and in the table.
@@ -400,14 +402,13 @@ export const DECISION_ENGINE = {
   decayBase: 0.85,
   lambdaDefault: 0.10,
   autosubMode: 'probability',            // 'linear' | 'probability'
-  autosubMaxAbsences: 3,
   benchOrder: 'xptsIfPlays',
   benchWeightsLinear: { s1: 0.30, s2: 0.10, s3: 0.03, gk: 0.03 },
   fundsModeTau: 1.0,
   robustnessRuns: 30,
   alternativesWindow: 2,
-  availabilityRecovery: { /* per status, per GW ahead */ },
-  absenceLookbackGws: 5, minContentionGws: 3,
+  absenceCarryOver: { doubtful: 0.3, injured: 0.6, suspended: 0, unavailable: 1 },
+  absenceMinRunGws: 2, absenceLookbackGws: 5, minContentionGws: 3,
   seasonMaxAgeMinutes: 60, snapshotMinIntervalMinutes: 360,
   modes: {
     now:       { weights, lambda, pZeroGate, threshold },
@@ -438,7 +439,7 @@ when OutScore > 0, i.e. it beats rolling after the FT value or hit is paid
 3. **Network.** You will allow `fantasy.premierleague.com` in this environment (Q3). When re-checked on 17 Oct it was still refused; `raw.githubusercontent.com` (vaastav) is reachable. Until the FPL host is allowed, Phases 1-3 run on synthetic squads, and the live checks (price-predictor fields, real-squad timing, ledger and Free Hit import against a real account) wait. Separately, the client calls the **production** proxy by absolute URL (`js/api.js` `PROXY_BASE_URL`), so the two new ledger routes only answer once this branch is merged and the `gaffer-iq` project deploys; until then the import carries on without purchase prices (each falls back to the current price, flagged).
 4. **Price-predictor fields are unverified** (risk 3). Phase 5 isolates them in one adapter file; if they are absent, the adapter falls back to `calcPriceChangeRisk`, flagged as an estimate. Snapshots keep unknown element fields from Phase 1 on, so the fields are logged even before the adapter reads them.
 5. **The MILP referee is Python.** open-fpl-solver needs Python + HiGHS; the repo says "zero Python anywhere in the stack". Phase 8 would run it as an offline tool outside the served app, or port the formulation to Node with a WASM HiGHS build (licence check first). Decide at Phase 8.
-6. **Performance (measured on synthetic data).** The real `scorePlayer` took 430 ms for 255 players x 6 single-GW calls and 570 ms for 615 x 6, so projecting every feasible candidate fits the 5 s budget; **no candidate cap**, as the brief decided brute force. `pickStartingXI` costs ~3 us, so single-swap enumeration (~5-15k `V` calls) is cheap. The two things that would not fit, unbounded mode 4 chaining (~1M `V` calls) and synchronous robustness, are bounded in §5.2. If Phase 3 measurement still blows the budget, a capped pre-filter comes back to you as a question, with its criterion.
+6. **Performance (measured on synthetic data).** The real `scorePlayer` took 430 ms for 255 players x 6 single-GW calls and 570 ms for 615 x 6, so projecting every feasible candidate fits the 5 s budget; **no candidate cap**, as the brief decided brute force. `pickStartingXI` costs ~3 us, so single-swap enumeration (~5-15k `V` calls) is cheap. The two things that would not fit, unbounded mode 4 chaining (~1M `V` calls) and synchronous robustness, are bounded in §5.2. If Phase 3 measurement still blows the budget, a capped pre-filter comes back to you as a question, with its criterion. Measured in Phase 2: `buildProjections` takes 0.3 s for the real 616-player pool (vaastav 2026-27) and 0.8 s for a synthetic 620-player one, 6 GWs, real scorer; `squadValue` takes 43 us a call in probability mode and 7 us in linear mode, so a 15.7k-call cache fill (every same-position swap x 6 GWs on that pool) is ~0.7 s.
 7. **Brief inconsistencies, read as follows** (confirmed, Q10): `horizon_gws: 6` vs five weights per mode (plan: the 6th GW is used only by the mode 3 deferral test); mode 3 is titled "GW+3..+5" but its weights cover GW+1..+5 (plan: use the weights as written); Ceiling's upper tail does not exist before Phase 7 (plan: Phase 3 ships Ceiling on the mean at t\*, labelled as such). Mode 4's lambda "derived (see below)" is read from the same row: the funds credit is the chained second move's net gain, else `lambdaDefault`.
 8. **Units of DeltaEV** (kept as written, Q6). Modes 2 and 3 normalise their weights (sum 1, a per-GW average) while modes 4 and 6 do not (a horizon total), yet all are compared against the same one-off FT value and hit cost, so the same move can roll in mode 2 and go ahead in mode 6. Phase 7 reports whether this costs points; any change to the presets comes back to you.
 9. **Dashboard divergence.** The Dashboard keeps its own XI and captain from `expectedPoints`. The P1-P4 root fixes reach it, so it uses the same corrected rule; it still reads one projection per window rather than the per-GW projections. Moving the Dashboard onto the new projections is a follow-up.
@@ -448,7 +449,7 @@ when OutScore > 0, i.e. it beats rolling after the FT value or hit is paid
 13. **Backtest leakage and effort.** Reconstructing the engine's context for past GWs from vaastav needs care: team strengths in that dataset may be end-of-season values, status flags are not available historically (structure mode cannot be backtested until our own snapshots accumulate), and the old engine needs the same reconstructed context. Phase 7 is the largest phase.
 14. **Terms and access flags (§11)** found in the repo: the proxy sends a spoofed desktop Chrome user agent (`api/fpl.js:120`); `Access-Control-Allow-Origin: *` (`:143`) lets any site use this proxy against FPL; the Understat `match/{id}` route forwards a scraped HTML page. Check the vaastav dataset's licence before using it. Snapshots stay on your device, so no FPL data is redistributed.
 15. **Leftovers kept by decision (Q9).** `index-FXL00-CK7M8F4.html` stays: nothing links to it, but it is served and boots `js/main.js`, so after the gut it will run the new code against its old markup. The useless `me/` proxy route also stays.
-16. **Pre-existing failures.** The 5 failing `channel.test.js` tests stay out of scope. `composite.test.js:98` turns green with the P3 fix. The baseline must not otherwise move.
+16. **Pre-existing failures.** The 5 failing `channel.test.js` tests stay out of scope. `composite.test.js:98` turned green with the P3 fix (Phase 2). The baseline must not otherwise move.
 17. **Skills.** `smart-explore` could not parse files under `projects/apps/` (the repo's `.claudeignore` excludes that path), so discovery used targeted reads. `pathfinder` was applied inline rather than writing a `PATHFINDER-*/` folder at the repo root, which would break the folder restriction. Phases 1 onward use a branch rather than a separate worktree; the cloud container is already isolated.
 
 ## 7. Decisions from the grill-me pass
@@ -501,10 +502,12 @@ before the previous one passes. Phases 1, 2, 3 and 5 are strictly sequential.
 > **How this serves the primary goal:** this is the "what does it do to the whole squad" measure; every recommendation is a difference of it, so its inputs must be right first.
 
 **Implement**
-1. Root fixes in the prediction layer: P3 (count 0 -> 0), P2 (`nextFixtureScore` from the pre-uplift GW mean; the uplift stays in `value` only), P4 (`edgeValue = oppCm.value == null ? 50 : 100 - oppCm.value`), and P1 (the minutes factor in `calcExpectedPoints` becomes availability alone, Q5). The commit message records the before/after on the Dashboard captain, XI order and Ranker numbers for one squad.
+1. Root fixes in the prediction layer: P3 (count 0 -> 0, `fixtureCountFactor`, shared with the adapter), P2 (`nextFixtureScore` from the pre-uplift GW mean, `scoreOverHorizon`'s new `preUpliftValue`; the uplift stays in `value` only), P4 (`defensiveCounterEdge` in `engine/counter.js`: `oppCm.value == null ? 50 : 100 - oppCm.value`, also used by `engine/chips.js`'s Triple Captain timing, which carried the same inversion), and P1 (the minutes factor in `calcExpectedPoints` becomes availability alone, Q5). The commit message records the before/after on the Dashboard captain, XI order and Ranker numbers for one squad (the real 2026-27 league from vaastav after GW1; the FPL host is still refused).
 2. `js/engine/projections.js` `buildProjections` per §2.2 and §5.1.
 3. `pickStartingXI` gains an optional value accessor (Dashboard call unchanged).
-4. `js/engine/squad-value.js`: `squadValue` (optimal XI by `xpts`; captain and vice per §5.2; Triple Captain; Bench Boost counts only the increment over autosub value; blanks via `xpts = 0`, `pZero = 1`) and `autosubRecovery` (linear mode first, then probability mode per §5.2). Then switch the default to `probability`.
+4. `js/engine/squad-value.js`: `squadValue` (optimal XI by `xpts`; captain and vice per §5.2; Triple Captain; Bench Boost counts only the increment over autosub value; blanks via `xpts = 0`, `pZero = 1`) and `autosubRecovery` (linear mode first, then probability mode per §5.2). Then switch the default to `probability`. FPL facts the new files need (`MATCH_MINUTES`, `PERCENT`, `CAPTAIN_MULTIPLIER`, `TRIPLE_CAPTAIN_MULTIPLIER`) are config constants, so the engine files hold no numeric literals but 0 and 1.
+
+**Known v1 limit seen on real data.** Until a player has `minContentionGws` contention gameweeks, his appearance rate is the price prior: after GW1 a nailed but mid-priced starter reads `pZero` ~0.6, and `ppa` rests on one appearance. Both are flagged `estimated`; Phase 4's model replaces them.
 
 **Acceptance (tests first)**
 - Brief §7 Phase 2 cases, with their conditions pinned: the 3rd-sub defender's ~3% / ~100% case in `linear` mode, plus a hand-computed probability-mode case; the injured-starter and exactly-3-DEF cases run through `autosubRecovery` against a fixed XI (re-picking the XI would bench the injured starter and skip the autosub code); selling the only strong captain costs more than the raw xpts difference.

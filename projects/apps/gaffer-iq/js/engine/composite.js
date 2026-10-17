@@ -32,7 +32,7 @@ import {
 import { buildXgProfilesByTeamId } from './style.js';
 import { buildUnderstatSlugsByTeamId, buildChannelProfilesByTeamId } from './channel.js';
 import {
-  calcCounterMatchup, calcCounterMatchupMirrored, calcCombinedCounterMatchup,
+  calcCounterMatchup, calcCounterMatchupMirrored, calcCombinedCounterMatchup, defensiveCounterEdge,
 } from './counter.js';
 
 /**
@@ -743,7 +743,7 @@ function calcPlayerCounterEdge(player, gwWindow, teamFixturesByGw, ctx) {
         // DEF/GKP: invert opponent's attack score - higher = their attack is weak vs this defence.
         // MODEL: a defender's counter edge is determined by how poorly the opponent attacks.
         const oppCm = calcCounterMatchup(opponent, team, ctx);
-        edgeValue   = 100 - oppCm.value;
+        edgeValue   = defensiveCounterEdge(oppCm);
         estimated   = oppCm.estimated;
       }
 
@@ -760,6 +760,53 @@ function calcPlayerCounterEdge(player, gwWindow, teamFixturesByGw, ctx) {
 }
 
 /**
+ * Internal: fold one value per gameweek into a horizon figure - a weighted
+ * mean with GW-distance decay (nearer GWs weigh more), combined with the worst
+ * gameweek per AGG_METHOD.
+ *
+ * `entries` is ONE PER GAMEWEEK, so each gameweek contributes exactly one
+ * weight regardless of how many fixtures it holds - a double's extra return is
+ * already priced into its value by applyDgwUplift. The minimum therefore tracks
+ * the worst ADJUSTED GAMEWEEK, not the worst individual fixture, which is the
+ * point: leaving it on raw fixtures would let W_MIN keep punishing a double
+ * that contains one hard game, re-introducing the very defect the uplift fixes
+ * through the 25% blend weight.
+ *
+ * @param {Array<{gwOffset: number}>} entries
+ * @param {(entry: object) => number} valueOf  the gameweek's 0–100 value
+ * @returns {{aggregateMean: number, aggregateMin: number, value: number}}
+ */
+function aggregateGws(entries, valueOf) {
+  let wSum   = 0;
+  let wTotal = 0;
+  let minVal = 100;
+
+  for (const e of entries) {
+    const w = Math.pow(HORIZON_DECAY, e.gwOffset);
+    const v = valueOf(e);
+    wSum   += v * w;
+    wTotal += w;
+    if (v < minVal) minVal = v;
+  }
+
+  const aggregateMean = wTotal === 0 ? 50 : wSum / wTotal;
+  const aggregateMin  = minVal;
+
+  let rawValue;
+  if (AGG_METHOD === 'mean') {
+    rawValue = aggregateMean;
+  } else if (AGG_METHOD === 'min') {
+    rawValue = aggregateMin;
+  } else {
+    // 'blend' (default): rewards a good run but punishes a single brutal fixture.
+    // W_MIN * aggregateMin surfaces fixture traps hiding in a green sequence.
+    rawValue = (W_MEAN * aggregateMean) + (W_MIN * aggregateMin);
+  }
+
+  return { aggregateMean, aggregateMin, value: clamp(0, 100, rawValue) };
+}
+
+/**
  * Aggregate a team's composite scores across a horizon window.
  * Handles blank GWs (no fixture → BLANK_GW_VALUE, never silently skipped) and
  * double GWs (both fixtures scored and included, naturally boosting the score).
@@ -772,6 +819,9 @@ function calcPlayerCounterEdge(player, gwWindow, teamFixturesByGw, ctx) {
  * @param {object} ctx   output of buildScoreContext
  * @returns {object}  CompositeScore shape + perGw strip
  *   value: 0–100, higher = better fixture run for `team`. Direction: higher = better.
+ *   preUpliftValue: the same fold with every double at its plain fixture mean
+ *     (no applyDgwUplift) - what a points projection reads, since it prices a
+ *     double by its fixture count instead.
  *   perGw: [{gw, value, band, opponent, venue, isBlank, provisional,
  *     provisionalKickoff}] one entry per FIXTURE; DGWs produce two entries for
  *     the same gw, blanks one with isBlank: true. Fold it into one slot per
@@ -821,7 +871,7 @@ export function scoreOverHorizon(team, horizon, ctx) {
   // two entries doubled that GW's WEIGHT in the mean below without adding any
   // return - and a double against two hard opponents therefore scored LOWER
   // than a single hard fixture. See FEATURE_ENGINE.md §9.
-  const entries = [];  // { gwOffset, value, fixtureScores: [] }
+  const entries = [];  // { gwOffset, value, rawValue, fixtureScores: [] }
   const perGw   = [];  // public per-GW strip array - still one entry per FIXTURE
 
   for (let i = 0; i < gwWindow.length; i++) {
@@ -832,7 +882,7 @@ export function scoreOverHorizon(team, horizon, ctx) {
     if (fixtures.length === 0) {
       // MODEL: blank GW - BLANK_GW_VALUE (40) reflects zero return for assets;
       // mildly bad rather than neutral, never silently skipped. FEATURE_ENGINE.md §9.
-      entries.push({ gwOffset, value: BLANK_GW_VALUE, fixtureScores: [] });
+      entries.push({ gwOffset, value: BLANK_GW_VALUE, rawValue: BLANK_GW_VALUE, fixtureScores: [] });
       perGw.push({
         gw, value: BLANK_GW_VALUE, band: bandFromValue(BLANK_GW_VALUE),
         opponent: null, venue: null, isBlank: true,
@@ -846,7 +896,7 @@ export function scoreOverHorizon(team, horizon, ctx) {
     const rawGwValue = scores.reduce((s, x) => s + x.value, 0) / scores.length;
     const gwValue    = applyDgwUplift(rawGwValue, fixtures.length);
 
-    entries.push({ gwOffset, value: gwValue, fixtureScores: scores });
+    entries.push({ gwOffset, value: gwValue, rawValue: rawGwValue, fixtureScores: scores });
 
     // perGw stays ONE ENTRY PER FIXTURE - its shape is unchanged and every
     // renderer depends on it. groupPerGwSlots (engine/fixtures.js) is what
@@ -874,7 +924,8 @@ export function scoreOverHorizon(team, horizon, ctx) {
 
   if (entries.length === 0) {
     return {
-      value: 50, band: bandFromValue(50), confidence: 1, provisional: false, perGw: [],
+      value: 50, preUpliftValue: 50, band: bandFromValue(50), confidence: 1, provisional: false,
+      perGw: [],
       breakdown: {
         aggregateMean: 50, aggregateMin: 50, aggMethod: AGG_METHOD,
         numGws, numBlanks: 0, numDoubles: 0,
@@ -882,41 +933,12 @@ export function scoreOverHorizon(team, horizon, ctx) {
     };
   }
 
-  // Weighted mean with GW-distance decay; nearer GWs have more weight.
-  //
-  // `entries` is now ONE PER GAMEWEEK, so each gameweek contributes exactly one
-  // weight regardless of how many fixtures it holds - a double's extra return
-  // is already priced into e.value by applyDgwUplift above. minVal therefore
-  // tracks the worst ADJUSTED GAMEWEEK, not the worst individual fixture, which
-  // is the point: leaving it on raw fixtures would let W_MIN keep punishing a
-  // double that contains one hard game, re-introducing the very defect the
-  // uplift fixes through the 25% blend weight.
-  let wSum   = 0;
-  let wTotal = 0;
-  let minVal = 100;
-
-  for (const e of entries) {
-    const w = Math.pow(HORIZON_DECAY, e.gwOffset);
-    wSum   += e.value * w;
-    wTotal += w;
-    if (e.value < minVal) minVal = e.value;
-  }
-
-  const aggregateMean = wTotal === 0 ? 50 : wSum / wTotal;
-  const aggregateMin  = minVal;
-
-  let rawValue;
-  if (AGG_METHOD === 'mean') {
-    rawValue = aggregateMean;
-  } else if (AGG_METHOD === 'min') {
-    rawValue = aggregateMin;
-  } else {
-    // 'blend' (default): rewards a good run but punishes a single brutal fixture.
-    // W_MIN * aggregateMin surfaces fixture traps hiding in a green sequence.
-    rawValue = (W_MEAN * aggregateMean) + (W_MIN * aggregateMin);
-  }
-
-  const value = clamp(0, 100, rawValue);
+  const { aggregateMean, aggregateMin, value } = aggregateGws(entries, e => e.value);
+  // The same fold without DGW_UPLIFT, for expectedPoints (via scorePlayer's
+  // nextFixtureScore): a points projection prices a double by its fixture
+  // count, so the uplift reaching it as well counted the double twice
+  // (docs/decision-engine-plan.md §2.1, P2).
+  const preUpliftValue = aggregateGws(entries, e => e.rawValue).value;
 
   // Confidence averages over every FIXTURE, not every gameweek - a double's two
   // fixtures each carry their own confidence and both inform how much to trust
@@ -928,6 +950,7 @@ export function scoreOverHorizon(team, horizon, ctx) {
 
   return {
     value,
+    preUpliftValue,
     band:        bandFromValue(value),
     confidence:  avgConfidence,
     provisional: avgConfidence < CONFIDENCE_FLOOR,
@@ -1040,7 +1063,7 @@ export function calcLastSeasonAvgPointsPerGw(player, ctx) {
 /**
  * Real points-scale projection used for captaincy / Triple Captain decisions:
  * how many FPL points is this player actually expected to score next,
- * scaled by how good his next fixture is and how likely he is to start?
+ * scaled by how good his next fixture is and whether he is available?
  *
  * This is deliberately NOT `scorePlayer`'s 0–100 `value` - that composite is a
  * normalised quality score (FEATURE_ENGINE.md §10) meant for comparing players
@@ -1054,22 +1077,40 @@ export function calcLastSeasonAvgPointsPerGw(player, ctx) {
  *
  * @param {{value: number, estimated: boolean}} avgPointsPerGw
  * @param {{value: number}} nextFixtureScore  0–100, fixture+counter blend
- * @param {{value: number, estimated: boolean}} playing  0–100 playing likelihood
+ * @param {{value: number, availability?: number, estimated: boolean}} playing
+ *   a calcPlayingLikelihood result; only its availability (0–100) is read. A
+ *   bare { value } is read as the availability.
  * @returns {{value: number, estimated: boolean}}
  *   value: expected FPL points for the upcoming game (real points scale, not 0–100).
  */
 export function calcExpectedPoints(avgPointsPerGw, nextFixtureScore, playing, fixtureCount = 1) {
   const fixtureMultiplier = 1 + EXPECTED_PTS_FIXTURE_SWING * ((nextFixtureScore.value - 50) / 50);
-  const minutesMultiplier = playing.value / 100;
-  // How many games he actually plays that week. A blank yields 0 - the team does
-  // not play, so no projection is possible; a double yields ~1.9x. Clamped at 0
-  // so a nonsense negative count can never invert the projection into negative
-  // points. Defaults to 1 for callers with no fixture context.
-  const countMultiplier   = Math.max(0, 1 + DGW_EXPECTED_PTS_FACTOR * (fixtureCount - 1));
+  // MODEL: availability alone, never the start share. avgPointsPerGw already
+  // averages over every elapsed gameweek, benched ones included, so scaling it
+  // by how often he starts counted his minutes twice - a player who appears in
+  // half the gameweeks projected a quarter of his points per appearance.
+  // See docs/decision-engine-plan.md §2.1 (P1).
+  const availabilityMultiplier = (playing.availability ?? playing.value) / 100;
+  // fixtureCount defaults to 1 for callers with no fixture context.
+  const countMultiplier = fixtureCountFactor(fixtureCount);
   return {
-    value:     avgPointsPerGw.value * fixtureMultiplier * minutesMultiplier * countMultiplier,
+    value:     avgPointsPerGw.value * fixtureMultiplier * availabilityMultiplier * countMultiplier,
     estimated: avgPointsPerGw.estimated || playing.estimated,
   };
+}
+
+/**
+ * How much a gameweek is worth to a points projection for the number of games
+ * the team plays in it, relative to a single fixture. A blank yields 0 - the
+ * team does not play, so no projection is possible; a double yields ~1.9x
+ * (DGW_EXPECTED_PTS_FACTOR). A negative count yields 0 too, never negative
+ * points. Shared with engine/projections.js so both price a double alike.
+ *
+ * @param {number} fixtureCount
+ * @returns {number}
+ */
+export function fixtureCountFactor(fixtureCount) {
+  return fixtureCount > 0 ? 1 + (DGW_EXPECTED_PTS_FACTOR * (fixtureCount - 1)) : 0;
 }
 
 /**
@@ -1155,9 +1196,13 @@ export function scorePlayer(player, horizon, ctx) {
   // "is he in form". Re-normalised over just these two weights since PROJ_FORM
   // is dropped from the blend. Reused below by expectedPoints so both metrics
   // agree on what "a good fixture" means.
+  // MODEL: built from the PRE-UPLIFT horizon value - how good the fixtures
+  // are, not how many. expectedPoints prices a double by its fixture count, so
+  // DGW_UPLIFT here as well counted the double twice (~2.1x a single instead
+  // of 1.9x); `value` above keeps the uplift. docs/decision-engine-plan.md §2.1 (P2).
   const nextFixtureScore = {
     value: clamp(0, 100,
-      ((PROJ_FIXTURE * horizonResult.value) + (PROJ_COUNTER * counterEdge.value))
+      ((PROJ_FIXTURE * horizonResult.preUpliftValue) + (PROJ_COUNTER * counterEdge.value))
       / (PROJ_FIXTURE + PROJ_COUNTER)),
     estimated: counterEdge.estimated,
   };

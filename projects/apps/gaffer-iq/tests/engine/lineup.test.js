@@ -76,3 +76,53 @@ test('calcXiExpectedPoints is zero for an empty squad rather than NaN', () => {
   assert.equal(result.value, 0);
   assert.equal(Number.isNaN(result.value), false);
 });
+
+// ─── Value accessor (decision engine plan Phase 2) ───────────────────────────
+
+test('pickStartingXI orders by a value accessor when given one', () => {
+  // The decision engine picks by a gameweek's xpts, not by expectedPoints.
+  // Inverting the values flips who starts in midfield.
+  const squad = squadOf15().map(e => ({ ...e, xpts: 10 - e.score.expectedPoints.value }));
+  const startingIds = pickStartingXI(squad, e => e.xpts).xi.map(e => e.player.id);
+  assert.ok(startingIds.includes(12), 'the 8.5 MID starts');
+  assert.ok(!startingIds.includes(8),  'the 1.0 MID does not');
+});
+
+/** Deterministic PRNG (mulberry32), so a failure reproduces. */
+function seeded(seed) {
+  return () => {
+    seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** The best XI total over every legal formation - the brief's "enumerate formations". */
+function bruteForceBest(squad, valueOf) {
+  const top = (pos, n) => squad.filter(e => e.player.position === pos)
+    .map(valueOf).sort((a, b) => b - a).slice(0, n).reduce((s, v) => s + v, 0);
+  let best = -Infinity;
+  for (let d = 3; d <= 5; d++) {
+    for (let m = 2; m <= 5; m++) {
+      const f = 10 - d - m;
+      if (f >= 1 && f <= 3) best = Math.max(best, top('GKP', 1) + top('DEF', d) + top('MID', m) + top('FWD', f));
+    }
+  }
+  return best;
+}
+
+test('pickStartingXI\'s greedy XI matches brute-force formation enumeration', () => {
+  const random = seeded(2026);
+  const positions = ['GKP', 'GKP', 'DEF', 'DEF', 'DEF', 'DEF', 'DEF',
+    'MID', 'MID', 'MID', 'MID', 'MID', 'FWD', 'FWD', 'FWD'];
+  for (let run = 0; run < 500; run++) {
+    // Rounded to halves so ties are common, as they are with real projections.
+    const squad = positions.map((position, i) => ({
+      player: { id: i + 1, position }, xpts: Math.round(random() * 24) / 2,
+    }));
+    const { xi } = pickStartingXI(squad, e => e.xpts);
+    const total = xi.reduce((s, e) => s + e.xpts, 0);
+    assert.equal(total, bruteForceBest(squad, e => e.xpts), `run ${run}`);
+  }
+});

@@ -602,6 +602,23 @@ export function calcCounterMatchupMirrored(attackingResult) {
 }
 
 /**
+ * A defender's counter edge against one opponent: that opponent's attacking
+ * counter read from the defending side. Shared by the player projection
+ * (composite.js) and the Triple Captain timing (chips.js) so they cannot drift.
+ *
+ * MODEL: a blank channel (no Understat profile yet, value null) is neutral -
+ * the same rule as the mirror above. `100 - null` is 100 in JS, which handed
+ * every defender and keeper at such a club a perfect edge.
+ *
+ * @param {{value: number|null}} attackingCounter  calcCounterMatchup(opponent, team, ctx)
+ * @returns {number}  0–100, higher = the opponent's attack suits this defence less
+ */
+export function defensiveCounterEdge(attackingCounter) {
+  const value = attackingCounter?.value;
+  return value === null || value === undefined ? 50 : 100 - value;
+}
+
+/**
  * Blend a team's Attacking Counters (its attack vs the opponent's defence,
  * `calcCounterMatchup(team, opponent, ctx)`) with its Defending Counters (its
  * defence vs the opponent's attack, `calcCounterMatchupMirrored(calcCounterMatchup

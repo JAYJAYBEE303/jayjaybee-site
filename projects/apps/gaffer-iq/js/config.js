@@ -1486,9 +1486,51 @@ export const MAX_PER_CLUB = 3;
 // £0.1m; a fall is passed on in full. See engine/prices.js → calcSellPrice.
 export const SELL_PROFIT_SHARE = 0.5;
 
+// FPL: a full match, in minutes.
+export const MATCH_MINUTES = 90;
+
+// FPL: the captain's points count this many times (the vice's, if the captain
+// does not play); under the Triple Captain chip, the second figure.
+export const CAPTAIN_MULTIPLIER = 2;
+export const TRIPLE_CAPTAIN_MULTIPLIER = 3;
+
+// FPL publishes playing chances as percentages (chance_of_playing_next_round,
+// and STATUS_PLAY_CHANCE above); the decision engine works in 0-1.
+export const PERCENT = 100;
+
 export const DECISION_ENGINE = {
   // FPL: free transfers bank up to this many; a sixth would be wasted.
   maxBankedFt: 5,
+
+  // ── Projections (engine/projections.js, plan §2.2) ──
+  // Gameweeks projected from the planning gameweek on (brief §3).
+  horizonGws: 6,
+  // The share of a flagged player's absence chance still there one gameweek
+  // later, by status: availability k gameweeks ahead = 1 - (1 - a0) x carry^k.
+  // A doubt usually clears within the week; an injury FPL lists at 0% runs
+  // longer; most suspensions are served in one match; 'unavailable' (left the
+  // club, on loan) does not come back. REASONED, NOT FITTED - Phase 4 replaces
+  // this with a fitted model.
+  absenceCarryOver: { doubtful: 0.3, injured: 0.6, suspended: 0, unavailable: 1 },
+  // A zero-minute run he has since played through is excused from his rates
+  // only if it lasted this many gameweeks (one missed week is as likely a
+  // benching as a knock) ...
+  absenceMinRunGws: 2,
+  // ... and ended within this many gameweeks of the latest one.
+  absenceLookbackGws: 5,
+  // With fewer contention gameweeks than this, his price prior stands in for
+  // his appearance and start rates.
+  minContentionGws: 3,
+
+  // ── Squad value (engine/squad-value.js, brief §4) ──
+  // 'probability': expected autosub recovery from every starter's pZero and
+  // FPL's bench rules. 'linear': fixed weights per bench slot (below).
+  autosubMode: 'probability',
+  // The GwProjection field the outfield bench is ordered by, descending. The
+  // reserve keeper always sits last: he can only replace the keeper.
+  benchOrder: 'xptsIfPlays',
+  // Linear mode: the share of each bench slot's xpts credited to the squad.
+  benchWeightsLinear: { s1: 0.30, s2: 0.10, s3: 0.03, gk: 0.03 },
 };
 
 // Minimum gap between two point-in-time snapshots (js/snapshots.js). The brief

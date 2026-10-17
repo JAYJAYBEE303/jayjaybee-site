@@ -7,7 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildRoleSignature } from '../../js/engine/counter.js';
+import { buildRoleSignature, defensiveCounterEdge } from '../../js/engine/counter.js';
 
 // Real 2025 Understat records, used so the fixtures can't drift from the
 // schema the proxy actually returns.
@@ -338,4 +338,16 @@ test('calcCombinedCounterMatchup takes the lower maturity of the two sides', () 
   const attacking = { value: 60, estimated: false, maturity: 0.9, mode: 'channel', pairings: {} };
   const defending = { value: 40, estimated: false, maturity: 0.2, pairings: {} };
   assert.equal(calcCombinedCounterMatchup(attacking, defending).maturity, 0.2);
+});
+
+// ─── defensiveCounterEdge ────────────────────────────────────────────────────
+
+test('defensiveCounterEdge inverts the opponent\'s attacking counter', () => {
+  assert.equal(defensiveCounterEdge({ value: 30 }), 70);
+});
+
+test('defensiveCounterEdge reads a blank channel as neutral, not as a perfect edge', () => {
+  // `100 - null` is 100 in JS: a blank channel used to hand defenders 100.
+  assert.equal(defensiveCounterEdge({ value: null }), 50);
+  assert.equal(defensiveCounterEdge(undefined), 50);
 });

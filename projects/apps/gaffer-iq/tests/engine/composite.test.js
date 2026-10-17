@@ -6,7 +6,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { metricMaturity, applyDgwUplift, calcExpectedPoints } from '../../js/engine/composite.js';
+import {
+  metricMaturity, applyDgwUplift, calcExpectedPoints, buildScoreContext, scorePlayer,
+} from '../../js/engine/composite.js';
+import { HORIZONS } from '../../js/config.js';
+import { syntheticSeason, rawPlayer } from './synthetic-season.js';
 
 test('metricMaturity is 1 for a normal, non-estimated metric', () => {
   // The five metrics that don't opt into the ramp report no maturity at all
@@ -113,4 +117,57 @@ test('calcExpectedPoints defaults to a single fixture when the count is omitted'
 test('calcExpectedPoints never returns negative points for a nonsense count', () => {
   const r = calcExpectedPoints({ value: 5, estimated: false }, EP_NEUTRAL_FIXTURE, EP_FULL_PLAYING, -3);
   assert.equal(r.value, 0);
+});
+
+test('calcExpectedPoints scales by availability alone, not by start share', () => {
+  // P1: avgPointsPerGw already averages over every elapsed gameweek, benched
+  // ones included, so applying a start share on top counted minutes twice.
+  const playing = { value: 40, startShare: 40, availability: 100, estimated: false };
+  const r = calcExpectedPoints({ value: 5, estimated: false }, EP_NEUTRAL_FIXTURE, playing, 1);
+  assert.equal(r.value, 5);
+});
+
+test('calcExpectedPoints still scales by availability', () => {
+  const playing = { value: 25, startShare: 100, availability: 25, estimated: false };
+  const r = calcExpectedPoints({ value: 8, estimated: false }, EP_NEUTRAL_FIXTURE, playing, 1);
+  assert.equal(r.value, 2);
+});
+
+// ─── scorePlayer on a real context (decision engine plan §2.1, P1/P2/P4) ─────
+
+test('expected points do not fall with minutes share once the per-gameweek average carries it', () => {
+  // P1. Both scored 50 points over the same 10 gameweeks; the second played
+  // half the minutes. Points per gameweek already says what that is worth.
+  const season = syntheticSeason({ playedGws: 10, fixtures: [[11, 1, 2]], players: [
+    rawPlayer(1, 1, 'MID', { total_points: 50, minutes: 900, starts: 10 }),
+    rawPlayer(2, 1, 'MID', { total_points: 50, minutes: 450, starts: 5 }),
+  ] });
+  const ctx = { ...buildScoreContext(season), currentGw: 11 };
+  const full = scorePlayer(season.playersById[1], HORIZONS.GW1, ctx);
+  const half = scorePlayer(season.playersById[2], HORIZONS.GW1, ctx);
+  assert.equal(half.breakdown.minutes.startShare, 50);
+  assert.equal(half.expectedPoints.value, full.expectedPoints.value);
+});
+
+test('a double gameweek against identical opponents projects exactly 1.9x a single', () => {
+  // P2. The double is priced once, by the fixture count; DGW_UPLIFT lifting
+  // the fixture score as well made it ~2.1x.
+  const season = syntheticSeason({ playedGws: 10, fixtures: [[11, 1, 4], [12, 1, 2], [12, 1, 3]],
+    players: [rawPlayer(1, 1, 'MID', { total_points: 50, minutes: 900, starts: 10 })] });
+  const ctx = buildScoreContext(season);
+  const player = season.playersById[1];
+  const single = scorePlayer(player, HORIZONS.GW1, { ...ctx, currentGw: 11 }).expectedPoints.value;
+  const double = scorePlayer(player, HORIZONS.GW1, { ...ctx, currentGw: 12 }).expectedPoints.value;
+  assert.ok(single > 0);
+  assert.ok(Math.abs(double / single - 1.9) < 1e-9, `double/single = ${double / single}`);
+});
+
+test('a defender at a club with no channel profile gets a neutral counter edge, not 100', () => {
+  // P4. No Understat data, so every channel is blank (value null);
+  // `100 - null` is 100 in JS.
+  const season = syntheticSeason({ playedGws: 10, fixtures: [[11, 1, 2]],
+    players: [rawPlayer(1, 1, 'DEF', { total_points: 40, minutes: 900, starts: 10 })] });
+  const ctx = { ...buildScoreContext(season), currentGw: 11 };
+  const score = scorePlayer(season.playersById[1], HORIZONS.GW1, ctx);
+  assert.equal(score.breakdown.counter.value, 50);
 });
