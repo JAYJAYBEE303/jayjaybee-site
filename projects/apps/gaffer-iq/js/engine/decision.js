@@ -14,10 +14,11 @@
  *
  * Money is integer tenths of a million, and a sold player is always valued at
  * his SELL price (engine/prices.js, engine/feasibility.js). V is cached per
- * (gameweek, swap): pass the same cache back and a lock, ban, bank or FT
- * change re-runs without recomputing it. PriceTerm is 0 until Phase 5's price
- * layer; the Future prep deferral test and Now's "wait for team news" call
- * arrive with it.
+ * (gameweek, swap): pass the same cache back and a lock, ban or FT change
+ * re-runs on cached values; a bank change, or a lock that changes which
+ * downgrades Funds chains, computes only the swaps it newly makes legal.
+ * PriceTerm is 0 until Phase 5's price layer; the Future prep deferral test
+ * and Now's "wait for team news" call arrive with it.
  */
 
 import { DECISION_ENGINE, SQUAD_TOTAL, CHIP_RESET_AFTER_GW, CHIP_LABELS } from '../config.js';
@@ -36,8 +37,9 @@ const LOCK_PROTECTED_MODES = new Set(['now', 'longterm', 'future', 'funds']);
 
 /**
  * A cache of V values to pass back into runDecisionEngine between runs. It
- * empties itself when the projections, the squad, the planned Bench Boost /
- * Triple Captain weeks or the autosub settings change.
+ * empties itself when the projections Map, the squad, the planned Bench Boost
+ * / Triple Captain weeks or the autosub settings change. A projections Map is
+ * read as immutable: build a new one rather than editing it in place.
  */
 export function createDecisionCache() {
   return { projections: null, key: null, values: new Map() };
@@ -76,7 +78,8 @@ export function transferCost(freeTransfers, config = DECISION_ENGINE) {
  * @param {Player[]} input.candidates  every possible replacement (price in millions)
  * @param {object|null} input.priceSignals  Phase 5; per player { fallLikely }
  * @param {object} [config]  DECISION_ENGINE by default
- * @param {object} [cache]   createDecisionCache(), kept between runs
+ * @param {object} [cache]   createDecisionCache(), kept between runs; the
+ *   one argument written to (by design: it holds the V values)
  * @returns {DecisionResult}  see docs/decision-engine-plan.md §5.2
  */
 export function runDecisionEngine(input, config = DECISION_ENGINE, cache = createDecisionCache()) {
@@ -89,8 +92,14 @@ export function runDecisionEngine(input, config = DECISION_ENGINE, cache = creat
   const modes = {};
   const bestByMode = {};
   for (const [modeId, mode] of Object.entries(config.modes)) {
-    const weights = modeId === 'ceiling' ? ceiling.weights : masked(run, mode.weights);
-    const result = scoreMode(run, { modeId, mode, weights, pairs, ceiling, structure });
+    const raw = modeId === 'ceiling' ? ceiling.weights : weightsOf(run, mode);
+    const weights = masked(run, raw);
+    const total = sum(raw);
+    // MODEL: money freed and a dead slot matter only while this squad plays;
+    // a Free Hit or Wildcard budget is the squad's value either way. So both
+    // count for the share of the mode's weight that no planned chip covers.
+    const share = total > 0 ? sum(weights) / total : 0;
+    const result = scoreMode(run, { modeId, mode, weights, share, pairs, ceiling, structure });
     modes[modeId] = result.summary;
     bestByMode[modeId] = result.bestByOwner;
   }
@@ -141,7 +150,9 @@ function prepare(input, config, cache) {
   for (const id of ids) {
     if (!projections.has(id)) throw new TypeError(`runDecisionEngine: squad player ${id} has no projection`);
   }
-  const chipPlan = input.chipPlan ?? {};
+  // A chip planned for a GW already gone is history, not a plan.
+  const chipPlan = Object.fromEntries(Object.entries(input.chipPlan ?? {})
+    .filter(([gw]) => Number(gw) >= planningGw));
 
   // Ghosts for KeepValue (plan §5.2): a zero-points placeholder per position,
   // never bought, never priced.
@@ -165,14 +176,19 @@ function prepare(input, config, cache) {
   }
 
   const modeGws = config.modes.now.weights.map((_, k) => planningGw + k);
+  for (const [modeId, mode] of Object.entries(config.modes)) {
+    if (Array.isArray(mode.weights) && mode.weights.length !== modeGws.length) {
+      throw new TypeError(`runDecisionEngine: mode ${modeId} must weigh the same number of GWs as Now`);
+    }
+  }
   const chipAt = gw => (VALUE_CHIPS.has(chipPlan[gw]) ? chipPlan[gw] : null);
   const wildcardGws = Object.entries(chipPlan).filter(([, chip]) => chip === 'wildcard').map(([gw]) => Number(gw));
   // Free Hit and Wildcard (plan §5.2): a Free Hit GW, and every GW from a
   // Wildcard on, is played by a different squad - this one's moves count nothing there.
   const zeroed = gw => chipPlan[gw] === 'freehit' || wildcardGws.some(w => w <= gw);
 
-  const key = [ids.join(','), modeGws.map(chipAt).join(','), config.autosubMode,
-    JSON.stringify(config.benchWeightsLinear)].join('|');
+  const key = [ids.join(','), modeGws.filter(chipAt).map(gw => `${gw}:${chipAt(gw)}`).join(','),
+    config.autosubMode, JSON.stringify(config.benchWeightsLinear)].join('|');
   if (cache.projections !== projections || cache.key !== key) {
     cache.projections = projections;
     cache.key = key;
@@ -207,7 +223,13 @@ function prepare(input, config, cache) {
 
 const ghostId = position => `ghost:${position}`;
 const swapIn = (ids, outId, inId) => ids.map(id => (id === outId ? inId : id));
-const dot = (weights, values) => weights.reduce((sum, w, k) => sum + (w * values[k]), 0);
+const dot = (weights, values) => weights.reduce((s, w, k) => s + (w * values[k]), 0);
+const sum = values => values.reduce((s, x) => s + x, 0);
+
+/** A preset's GW weights: as written, or decayBase^k for 'decay'. */
+function weightsOf(run, mode) {
+  return mode.weights === 'decay' ? run.modeGws.map((_, k) => run.config.decayBase ** k) : mode.weights;
+}
 
 /** A mode's weights with the Free Hit / Wildcard GWs zeroed. */
 function masked(run, weights) {
@@ -251,69 +273,75 @@ function ghostDeltas(run, p) {
 /**
  * t*: the GW in the mode horizon whose 15 highest projected xpts - across
  * every projected player, the squad and the candidates - sum highest; a tie
- * goes to the GW with more clubs playing a double, then to the earlier GW.
- * Read as the GW with the most to gain for any squad, which also keeps t* from
- * moving with the moves being scored.
+ * goes to the GW with more clubs playing a double, then to the earlier GW. A
+ * GW a planned Free Hit or Wildcard covers is played by another squad and is
+ * never t*; with every GW covered there is none.
+ * MODEL: read as the GW with the most to gain for any squad, which also keeps
+ * t* from moving with the moves being scored.
  *
  * Lock value: V_t*(S) - V_t*(S - p + his best affordable replacement); at or
  * above lockThreshold he is protected from sale in modes 1-4. With no
- * affordable replacement there is no sale to protect against: null.
+ * affordable replacement, or no t*, there is no sale to protect against: null.
+ *
+ * @returns {{ targetGw: number|null, weights: number[], lockValues: Map,
+ *   protectedIds: Set }}  weights before Free Hit / Wildcard masking
  */
 function ceilingTarget(run, pairs) {
   const { config, modeGws } = run;
   const mode = config.modes.ceiling;
   const projections = [...run.input.projections.values()];
   let target = null;
-  for (const gw of modeGws) {
-    const gws = projections.map(p => p.gws.find(g => g.gw === gw)).filter(Boolean);
-    const top = gws.map(g => g.xpts).sort((a, b) => b - a).slice(0, SQUAD_TOTAL);
-    const sum = top.reduce((s, x) => s + x, 0);
+  modeGws.forEach((gw, k) => {
+    if (run.zeroed(gw)) return;
+    const gws = projections.map(p => p.gws.find(g => g.gw === gw));
+    const top = gws.map(g => g?.xpts ?? 0).sort((a, b) => b - a).slice(0, SQUAD_TOTAL);
+    const total = sum(top);
     const doubles = new Set(projections.filter((p, i) => (gws[i]?.fixtures ?? 0) > 1).map(p => p.teamId)).size;
-    if (!target || sum > target.sum || (sum === target.sum && doubles > target.doubles)) {
-      target = { gw, sum, doubles };
+    if (!target || total > target.total || (total === target.total && doubles > target.doubles)) {
+      target = { gw, k, total, doubles };
     }
-  }
-  const k = modeGws.indexOf(target.gw);
-  const weights = masked(run, modeGws.map(gw => (gw === target.gw ? mode.targetWeight : mode.otherWeight)));
+  });
+  const weights = modeGws.map(gw => (target === null ? 0
+    : gw === target.gw ? mode.targetWeight : mode.otherWeight));
 
   const lockValues = new Map();
   for (const p of run.owned) {
     let bestDelta = null;
     for (const pair of pairs) {
-      if (pair.p !== p || run.bans.has(pair.q.id)) continue;
-      if (bestDelta === null || pair.dV[k] > bestDelta) bestDelta = pair.dV[k];
+      if (target === null || pair.p !== p || run.bans.has(pair.q.id)) continue;
+      if (bestDelta === null || pair.dV[target.k] > bestDelta) bestDelta = pair.dV[target.k];
     }
-    lockValues.set(p.playerId, bestDelta === null ? null : (run.zeroed(target.gw) ? 0 : -bestDelta));
+    lockValues.set(p.playerId, bestDelta === null ? null : -bestDelta);
   }
   const protectedIds = new Set(run.owned.map(p => p.playerId)
     .filter(id => lockValues.get(id) !== null && lockValues.get(id) >= mode.lockThreshold));
-  return { targetGw: target.gw, weights, lockValues, protectedIds };
+  return { targetGw: target?.gw ?? null, weights, lockValues, protectedIds };
 }
 
 // ─── Mode 6: uncovered loss, dead slots, holds ───────────────────────────────
 
 /**
  * Per owned player: his uncovered loss - pZero x (xptsIfPlays - what the bench
- * recovers in his place) - summed with Structure's weights (brief §6). It is
- * reported, not added: V already counts it, through the autosub term, so
- * every mode's DeltaEV credits a move that removes it.
+ * recovers in his place) - summed with Structure's weights (brief §6).
+ * MODEL: it is reported, not added: V already counts it, through the autosub
+ * term, so every mode's DeltaEV credits a move that removes it.
  *
  * A dead slot: expected GWs unavailable over the horizon reach deadSlotMinGws.
  * A hold: flagged now, his availability reaches recoveredAvailability inside
- * the horizon, and no fall in his sell price is expected (no price signal
- * counts as none until Phase 5).
+ * the horizon, and no fall in his sell price is expected.
+ * MODEL: no price signal counts as no fall expected until Phase 5.
  */
 function structureSignals(run) {
   const { config, modeGws, input } = run;
   const mode = config.modes.structure;
-  const weights = masked(run, mode.weights);
+  const weights = masked(run, weightsOf(run, mode));
   const losses = modeGws.map(gw => uncoveredLoss(run.ids, gw, run.overlay, run.valueOpts(gw)));
   const uncovered = new Map(run.owned.map(p => [p.playerId,
-    weights.reduce((sum, w, k) => sum + (w * (losses[k].get(p.playerId) ?? 0)), 0)]));
+    dot(weights, losses.map(loss => loss.get(p.playerId) ?? 0))]));
 
   const availabilities = id => modeGws.map(gw => run.gwOf(id, gw)?.availability ?? 1);
   const isDeadSlot = id =>
-    availabilities(id).reduce((sum, a) => sum + (1 - a), 0) >= mode.deadSlotMinGws;
+    sum(availabilities(id).map(a => 1 - a)) >= mode.deadSlotMinGws;
   const holds = new Set(run.owned.map(p => p.playerId).filter(id => {
     const a = availabilities(id);
     return a[0] < 1 && a.some(x => x >= mode.recoveredAvailability)
@@ -324,14 +352,17 @@ function structureSignals(run) {
 
 // ─── Scoring one mode ────────────────────────────────────────────────────────
 
-function scoreMode(run, { modeId, mode, weights, pairs, ceiling, structure }) {
+function scoreMode(run, { modeId, mode, weights, share, pairs, ceiling, structure }) {
   const { config, cost } = run;
   const lambda = mode.lambda ?? config.lambdaDefault;
   const gate = mode.pZeroGate;
   const pointsLostOf = deltaEv => Math.max(0, -deltaEv);
 
+  // A mode whose every GW a planned chip covers has nothing to weigh: it
+  // rolls, whatever money a move would free.
+  const scored = weights.some(w => w > 0) ? pairs : [];
   const records = [];
-  for (const pair of pairs) {
+  for (const pair of scored) {
     if (run.bans.has(pair.q.id)) continue;
     if (gate !== undefined) {
       // Now: an incoming player flagged out, or likelier than the gate to get
@@ -340,24 +371,25 @@ function scoreMode(run, { modeId, mode, weights, pairs, ceiling, structure }) {
       if (first.availability === 0 || first.pZero > gate) continue;
     }
     const perGw = weights.map((w, k) => w * pair.dV[k]);
-    const deltaEv = perGw.reduce((s, x) => s + x, 0);
+    const deltaEv = sum(perGw);
     const record = {
       pair, perGw, deltaEv,
-      fundsTerm: lambda * fromTenths(pair.moneyFreed),
+      fundsTerm: lambda * fromTenths(pair.moneyFreed) * share,
       priceTerm: 0,
       deadSlotTerm: 0,
       efficiency: null,
       chained: null,
     };
     if (modeId === 'funds') {
-      // A downgrade that frees money for at most tau points lost, ranked by
-      // money freed per point lost (brief §6, mode 4).
+      // A downgrade that frees money for at most tau points lost (brief §6,
+      // mode 4). Its efficiency, money freed per point lost, picks the
+      // downgrades addChains searches; moves rank by OutScore, as in every mode.
       const pointsLost = pointsLostOf(deltaEv);
       if (pair.moneyFreed <= 0 || pointsLost > mode.tau) continue;
       record.efficiency = fromTenths(pair.moneyFreed) / Math.max(mode.eps, pointsLost);
     }
     if (modeId === 'structure') {
-      const penalty = mode.deadSlotPenalty;
+      const penalty = mode.deadSlotPenalty * share;
       record.deadSlotTerm = (structure.isDeadSlot(pair.p.playerId) ? penalty : 0)
         - (structure.isDeadSlot(pair.q.id) ? penalty : 0);
     }
@@ -391,7 +423,7 @@ function scoreMode(run, { modeId, mode, weights, pairs, ceiling, structure }) {
   const root = rootRecord ? bestOrBuild(run, modeId, weights, rootRecord, bestByOwner) : null;
   const alternatives = rootRecord
     ? rest.filter(r => r.outScore >= rootRecord.outScore - config.alternativesWindow)
-      .slice(0, config.alternativesWindow)
+      .slice(0, config.alternativesMax)
       .map(r => bestOrBuild(run, modeId, weights, r, bestByOwner))
     : [];
 
@@ -426,7 +458,8 @@ function bestOrBuild(run, modeId, weights, record, bestByOwner) {
  * downgrade's money is added, and the club limit kept across both moves. It is
  * scored jointly, V(S - p + q - r + s) - V(S - p + q), with Funds' decaying
  * weights, as a second transfer this GW at the cost of the next free transfer
- * (or a hit). The downgrade's funds credit is the better of that net gain and
+ * (or a hit).
+ * MODEL: the downgrade's funds credit is the better of that net gain and
  * lambda per £1.0m freed (Q10's reading of the brief's "derived" lambda).
  */
 function addChains(run, records, mode, weights, eligibleSeller) {
@@ -441,6 +474,7 @@ function addChains(run, records, mode, weights, eligibleSeller) {
     const { p, q, moneyFreed } = record.pair;
     const firstIds = swapIn(run.ids, p.playerId, q.id);
     const firstKey = `${p.playerId}>${q.id}`;
+    const firstValues = run.modeGws.map((gw, k) => (weights[k] === 0 ? 0 : run.value(gw, firstIds, firstKey)));
     const qPrice = toTenths(q.price);
     const state = {
       bankTenths: run.state.bankTenths + moneyFreed,
@@ -458,10 +492,11 @@ function addChains(run, records, mode, weights, eligibleSeller) {
         if (toTenths(s.price) <= reachBefore) continue;          // affordable anyway
         if (!checkSwap(state, r.playerId, s).ok) continue;
         const ids = swapIn(firstIds, r.playerId, s.id);
+        const chainKey = `${firstKey}+${r.playerId}>${s.id}`;
         const dV = run.modeGws.map((gw, k) => (weights[k] === 0 ? 0
-          : run.value(gw, ids, `${firstKey}+${r.playerId}>${s.id}`) - run.value(gw, firstIds, firstKey)));
+          : run.value(gw, ids, chainKey) - firstValues[k]));
         const perGw = weights.map((w, k) => w * dV[k]);
-        const gain = perGw.reduce((sum, x) => sum + x, 0);
+        const gain = sum(perGw);
         const net = gain - secondCost;
         if (!best || net > best.net) best = { r, s, perGw, gain, net };
       }
@@ -507,20 +542,22 @@ function buildMove(run, modeId, weights, record, freeTransfers = run.input.freeT
     outScore: record.outScore,
     efficiency: record.efficiency,
     tentativeFromGw: first + 1,
-    minutesRisk: { out: minutesRisk(config, pGw.pZero), in: minutesRisk(config, qGw.pZero) },
+    minutesRisk: { out: minutesRisk(config, pGw), in: minutesRisk(config, qGw) },
     chained: record.chained,
     tags,
     why: explain(run, weights, record, freeTransfers, tags),
   };
 }
 
-function minutesRisk(config, pZero) {
+/** 'blank' with no fixture (his pZero of 1 is no minutes risk), else by pZero. */
+function minutesRisk(config, gw) {
   const bands = config.minutesRiskPZero;
-  if (pZero >= bands.high) return 'high';
-  return pZero >= bands.medium ? 'medium' : 'low';
+  if (gw.fixtures === 0) return 'blank';
+  if (gw.pZero >= bands.high) return 'high';
+  return gw.pZero >= bands.medium ? 'medium' : 'low';
 }
 
-/** Flagged doubtful now: press conferences may still change the picture. */
+/** MODEL: flagged doubtful now - press conferences may still change the picture. */
 function pendingNews(gw) {
   return gw.availability > 0 && gw.availability < 1;
 }
@@ -534,8 +571,9 @@ function explain(run, weights, record, freeTransfers, tags) {
   const { p, q, moneyFreed } = record.pair;
   const name = id => run.names.get(id) ?? String(id);
   const counted = run.modeGws.filter((_, k) => weights[k] > 0);
-  const span = counted.length === 0 ? 'no counted GW'
-    : counted.length === 1 ? `GW${counted[0]}` : `GW${counted[0]}-${counted.at(-1)}`;
+  const span = counted.at(-1) - counted[0] === counted.length - 1
+    ? (counted.length === 1 ? `GW${counted[0]}` : `GW${counted[0]}-${counted.at(-1)}`)
+    : `${counted.slice(0, -1).map(gw => `GW${gw}`).join(', ')} and GW${counted.at(-1)}`;
 
   let squad = `${name(p.playerId)} out, ${name(q.id)} in: ${points(record.deltaEv)} points for the squad over ${span}.`;
   if (tags.includes('blankGwOneWeek')) {
@@ -589,8 +627,9 @@ function lineupOf(run) {
  * Bench Boost and Triple Captain pre-fills for the chip plan (Q4): the GW of
  * the projection horizon where the chip adds most to the squad as it stands -
  * Bench Boost's increment over the autosubs already credited, Triple Captain's
- * extra captain bonus. Only GWs in a half whose chip is unused, and with no
- * other chip planned. Never applied unless accepted.
+ * extra captain bonus. Only GWs in a half whose chip is unused, with no other
+ * chip planned, and before any planned Wildcard (after it the squad is
+ * another one). Never applied unless accepted.
  */
 function chipHints(run) {
   const { input, config, ids, overlay } = run;
@@ -604,6 +643,7 @@ function chipHints(run) {
     for (const gw of gws) {
       if (used.some(u => u.chip === chip && firstHalf(u.gw) === firstHalf(gw))) continue;
       if (run.chipPlan[gw] && run.chipPlan[gw] !== chip) continue;
+      if (Object.entries(run.chipPlan).some(([w, c]) => c === 'wildcard' && Number(w) <= gw)) continue;
       const gain = gainAt(gw);
       if (gain > 0 && (!best || gain > best.gain)) best = { gw, gain };
     }

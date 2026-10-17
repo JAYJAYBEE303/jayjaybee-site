@@ -4,8 +4,8 @@ Date: 2026-10-16, revision 2 on 2026-10-17 (after an adversarial review of
 revision 1 against the code and the brief: 58 findings, 44 confirmed and folded
 in below).
 Status: **approved**; grill-me questions Q1-Q10 answered (§7). Phase 1 done
-(`f4ef63f`); Phase 2 done (`cfad609`); Phase 3 done, awaiting your check before
-the UI phase. Where the build departed from this plan, the text below was
+(`f4ef63f`); Phase 2 done (`cfad609`); Phase 3 done (`3870fc1`, review fixes
+in the commit after it); the UI phase in progress. Where the build departed from this plan, the text below was
 updated to match it.
 Brief: `fpl-decision-engine-brief.md` (16 Oct 2026). Section numbers below
 (§3, §5 ...) refer to the brief unless prefixed with a file name.
@@ -351,16 +351,16 @@ DecisionResult = {
     call: 'move' | 'roll' | 'wait',
     root: Move | null,
     rollValue,                       // display only: the value of the FT kept by rolling
-    alternatives: Move[],            // within `alternativesWindow` points, max 2
+    alternatives: Move[],            // within `alternativesWindow` points, at most `alternativesMax`
     waitForNews: boolean, deferral: { laterScore, epsilon } | null,   // Phase 5
     robustness: number | null,       // Phase 6
-    targetGw,                        // Ceiling only: t*
+    targetGw,                        // Ceiling only: t*, null when a planned chip covers every GW
   } },
   players: [{ playerId,
     keepValue: { [modeId]: number }, outScore: { [modeId]: number | null },
     best: { [modeId]: Move | null }, // full components for every owned player, every mode; null with no legal move
     flags: Array<'sell' | 'hold' | 'protected' | 'locked' | 'pendingNews' | 'sellPriceEstimated'>,
-    lockValue: number | null,        // null: no affordable replacement, so no sale to protect against
+    lockValue: number | null,        // null: no affordable replacement (or no t*), so no sale to protect against
     uncoveredLoss: number }],        // mode 6's structural exposure, Structure-weighted
   lineup: { xi, bench, captainId, viceId, captainGap, nextCaptainId },
   chipHints: {                       // pre-fill only; never applied unless you accept them (Q4)
@@ -377,7 +377,7 @@ Move = {
   outScore,                          // = deltaEv + fundsTerm + deadSlotTerm - priceTerm - transferCost: the gain over rolling
   efficiency,                        // Funds only: money freed per point given up
   tentativeFromGw,                   // later-GW parts shown greyed: every GW after the planning GW
-  minutesRisk: { out: 'low' | 'medium' | 'high', in: 'low' | 'medium' | 'high' },   // pZero in the planning GW
+  minutesRisk: { out: Risk, in: Risk },   // Risk 'low' | 'medium' | 'high' by pZero in the planning GW; 'blank' with no fixture
   chained: Move | null,              // mode 4 only
   tags: Array<'blankGwOneWeek' | 'sellPriceEstimated' | 'pendingNews'>,
   why: { squad, funds, price, cost }, // plain-English sentences, built in the engine; price null until Phase 5
@@ -417,7 +417,7 @@ export const DECISION_ENGINE = {
   benchWeightsLinear: { s1: 0.30, s2: 0.10, s3: 0.03, gk: 0.03 },
   fundsModeTau: 1.0,
   robustnessRuns: 30,
-  alternativesWindow: 2,
+  alternativesWindow: 2, alternativesMax: 2,
   absenceCarryOver: { doubtful: 0.3, injured: 0.6, suspended: 0, unavailable: 1 },
   absenceMinRunGws: 2, absenceLookbackGws: 5, minContentionGws: 3,
   seasonMaxAgeMinutes: 60, snapshotMinIntervalMinutes: 360,
@@ -426,7 +426,7 @@ export const DECISION_ENGINE = {
     now:       { weights, lambda: 0, pZeroGate: 0.25, threshold: 0 },
     longterm:  { weights, lambda: 0.10, threshold: 0 },
     future:    { weights, lambda: 0.15, threshold: 0 },          // deferralEpsilon arrives in Phase 5
-    funds:     { weights, tau: 1.0, eps: 0.1, chainTopK: 5, threshold: 0 },   // lambda: lambdaDefault
+    funds:     { weights: 'decay', tau: 1.0, eps: 0.1, chainTopK: 5, threshold: 0 },   // decayBase^k; lambda: lambdaDefault
     ceiling:   { targetWeight: 1, otherWeight: 0.1, lambda: 0, lockThreshold: 3, threshold: 0 },
     structure: { weights, lambda: 0.10, deadSlotMinGws: 2, deadSlotPenalty: 1, recoveredAvailability: 0.9, threshold: 0 },
   },
@@ -564,7 +564,10 @@ before the previous one passes. Phases 1, 2, 3 and 5 are strictly sequential.
 - **Mode 4's chain** is a second transfer this GW, costed at `transferCost(freeTransfers - 1)`; the funds credit is the better of its net gain and lambda per £1.0m freed.
 - **Gates** act on admissible moves: Now's availability gate removes the buy from all of Now's moves; Long term's DeltaEV gate and every threshold filter the root and the alternatives, so an alternative also beats rolling.
 - **FT cost** (§5.2) is built here because OutScore needs it; Phase 5 keeps the rest of its list.
-- **Measured:** the real 2025-26 league rebuilt as of GW20 from vaastav (790 players, live table GW1-19, the 15 most-selected players): projections 1.6 s, all six modes 0.7 s cold, a lock re-run 45 ms; the synthetic 600-candidate test asserts < 5 s and < 200 ms.
+- **Measured:** the real 2025-26 league rebuilt as of GW20 from vaastav (790 players, live table GW1-19, the 15 most-selected players): projections 1.6 s, all six modes 0.7 s cold, a lock re-run 45 ms; the synthetic 600-candidate test asserts < 5 s and < 200 ms (with real squad prices and an FPL-like price spread, so the lock re-run searches new Funds chains: about 100 ms here).
+- **Review fixes** (the commit after `3870fc1`): a Free Hit / Wildcard GW counts for nothing, so a mode whose every GW a planned chip covers now rolls instead of moving on money alone, and money freed and the dead-slot penalty count only for the share of a mode's weight no chip covers (a Wildcard budget is the squad's value either way); chip plans for GWs already gone are ignored; t\* is never a covered GW (none when all are); `alternativesMax` is its own key, apart from the points window; Funds' weights are `decayBase^k` at run time; the V cache keys planned chips by GW; every preset must weigh as many GWs as Now; a player with no fixture reads `minutesRisk` 'blank', not 'high'; a move's text names only the GWs it counts; no Bench Boost / Triple Captain week is hinted at or after a planned Wildcard.
+- **Funds ranks by OutScore**, as every mode does (brief §5's max over q, which is where the chained second move's credit counts); efficiency, money freed per point lost, picks the `chainTopK` downgrades searched for a chain and is shown on the move.
+- **Open for Phase 5 (Q7's threshold):** at 5 banked FTs the cost is 0, so Future prep, Funds and Structure (no DeltaEV gate) can recommend a swap whose only gain is a little money freed (OutScore +0.01). It follows Q7 as decided; the hit threshold and FT economics in Phase 5 are where to revisit it.
 
 ### UI (brief §8) - after Phase 3, may run alongside Phase 4
 
@@ -592,7 +595,7 @@ before the previous one passes. Phases 1, 2, 3 and 5 are strictly sequential.
 
 **Implement** FT cost per §5.2 (built in Phase 3, with its table tests), hit threshold, mode 3 deferral test (with the exception for a price move that changes affordability), mode 1 "wait for team news" flag; `js/engine/price-adapter.js` as the only reader of the undocumented predictor fields, falling back to `calcPriceChangeRisk` (flagged); `PriceTerm` from the actual change in `sell(p)`.
 
-**Acceptance (tests first)** FT cost table: banked 0 -> hit cost + margin, 1 -> 1.5, 2 -> 1.0, 4 -> 0.3, 5 -> 0 (flat mode at 5 also 0); deferral test and its affordability exception; price term is zero when a fall does not change the sell price (odd-tenths profit case); the fallback path is tested.
+**Acceptance (tests first)** FT cost table: banked 0 -> hit cost + margin, 1 -> 1.5, 2 -> 1.0, 4 -> 0.3, 5 -> 0 (flat mode at 5 also 0); deferral test and its affordability exception; price term is zero when a fall does not change the sell price (odd-tenths profit case); the fallback path is tested; a decision on money-only moves at 5 banked FTs (Phase 3 notes).
 
 **Review** `requesting-code-review`.
 

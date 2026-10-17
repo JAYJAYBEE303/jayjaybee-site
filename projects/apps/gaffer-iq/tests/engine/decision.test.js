@@ -123,6 +123,21 @@ test('a move whose squad gain equals the free transfer\'s value scores 0, and th
   assert.equal(result.modes.now.rollValue, 1.5);
 });
 
+test('with no free transfer a move must clear the hit and its margin; with five banked it is free', () => {
+  // Keeper 101 projects 6.5 to keeper 1's 4: +2.5 in the planning GW.
+  const input = scenario({ candidates: [{ id: 101, position: 'GKP', xip: 6.5 }] });
+  const none = runDecisionEngine({ ...input, freeTransfers: 0 });
+  assert.equal(none.modes.now.rollValue, 4 + 2);
+  assert.equal(none.modes.now.call, 'roll');
+  close(playerOf(none, 1).best.now.outScore, 2.5 - 6);
+  assert.match(playerOf(none, 1).best.now.why.cost, /hit/);
+
+  const five = runDecisionEngine({ ...input, freeTransfers: 5 });
+  assert.equal(five.modes.now.rollValue, 0);
+  close(five.modes.now.root.outScore, 2.5);
+  assert.match(five.modes.now.root.why.cost, /waste/);
+});
+
 test('Long term rolls a move that beats rolling only thanks to the money it frees', () => {
   // Keeper 101 projects 5.4 (+1.4 a GW) and costs £2.0m less: OutScore
   // 1.4 + 0.10 x 2.0 - 1.5 = 0.1, but the squad gain is under the FT's 1.5.
@@ -195,12 +210,30 @@ test('a move beyond the alternatives window is not offered as an alternative', (
   assert.deepEqual(alternatives.map(m => m.inId), [126]);
 });
 
+test('how many alternatives are shown and how close they must be are separate settings', () => {
+  // OutScores 2.0, 1.5, 1.25 and 1.0, all beating rolling.
+  const input = scenario({
+    changes: [{ id: 11, price: 60 }],
+    candidates: [[125, 8.5], [126, 8], [129, 7.75], [127, 7.5]].map(([id, xip]) => ({ id, position: 'MID', xip, price: 55 })),
+  });
+  const alternatives = config => runDecisionEngine(input, config).modes.now.alternatives.map(m => m.inId);
+  assert.deepEqual(alternatives({ ...DECISION_ENGINE, alternativesWindow: 3 }), [126, 129]);
+  assert.deepEqual(alternatives({ ...DECISION_ENGINE, alternativesWindow: 0.5 }), [126]);
+});
+
 test('a move explains itself in plain English', () => {
   const result = runDecisionEngine(scenario({ candidates: [{ id: 101, position: 'GKP', xip: 6.5 }] }));
   const { why } = result.modes.now.root;
   assert.match(why.squad, /P1 out, P101 in/);
   assert.match(why.cost, /free transfer/);
   assert.equal(why.price, null);
+});
+
+test('a move\'s explanation names only the GWs it counts', () => {
+  // Free Hit in GW11: Long term counts GW10 and GW12 (+4 each, a third weight).
+  const result = runDecisionEngine(scenario({
+    candidates: [{ id: 101, position: 'GKP', xip: 8 }], chipPlan: { [GW + 1]: 'freehit' } }));
+  assert.match(result.modes.longterm.root.why.squad, /over GW10 and GW12\./);
 });
 
 test('identical input gives identical output', () => {
@@ -285,11 +318,52 @@ test('a fit player who blanks next GW: Now may sell him, labelled one-week; the 
   assert.equal(now.outId, 13);
   assert.ok(now.tags.includes('blankGwOneWeek'));
   assert.match(now.why.squad, /one-week/);
+  assert.equal(now.minutesRisk.out, 'blank', 'no fixture is a blank, not a minutes risk');
   for (const mode of MODES.slice(1)) assert.notEqual(result.modes[mode].root?.outId, 13, mode);
 
   // A Free Hit that GW means he is never sold.
   const freeHit = runDecisionEngine(scenario({ ...base, chipPlan: { [GW]: 'freehit' } }));
   for (const mode of MODES) assert.notEqual(freeHit.modes[mode].root?.outId, 13, mode);
+});
+
+test('a Wildcard in the planning GW leaves every mode nothing to weigh: all six roll', () => {
+  // Selling the £15.0m captain (9 a GW) for a £4.5m forward (2 a GW) frees
+  // £10.5m; with every GW played by the Wildcard squad, money alone must not
+  // make the move.
+  const result = runDecisionEngine(scenario({
+    changes: [{ id: 13, price: 150 }],
+    candidates: [{ id: 120, position: 'FWD', xip: 2, price: 45 }],
+    freeTransfers: 4,
+    chipPlan: { [GW]: 'wildcard' },
+  }));
+  for (const mode of MODES) assert.equal(result.modes[mode].call, 'roll', mode);
+  assert.deepEqual(allBest(result), []);
+  assert.equal(result.modes.ceiling.targetGw, null);
+});
+
+test('a chip planned for a GW already gone is ignored', () => {
+  const base = { candidates: [{ id: 101, position: 'GKP', xip: 6.5 }] };
+  assert.deepEqual(runDecisionEngine(scenario({ ...base, chipPlan: { [GW - 2]: 'wildcard' } })),
+    runDecisionEngine(scenario(base)));
+});
+
+test('money freed counts only for the share of a mode\'s weight a planned chip leaves', () => {
+  // A Wildcard in GW11 leaves Long term GW10's third of its weight, so keeper
+  // 101's £2.0m saving is worth 0.10 x 2.0 x 1/3 there.
+  const result = runDecisionEngine(scenario({
+    candidates: [{ id: 101, position: 'GKP', xip: 5, price: 30 }], chipPlan: { [GW + 1]: 'wildcard' } }));
+  close(playerOf(result, 1).best.longterm.fundsTerm, 0.10 * 2.0 / 3);
+});
+
+test('the dead-slot penalty shrinks with the share of Structure\'s weight a planned chip leaves', () => {
+  // DEF 4 is out all horizon; a Wildcard in GW11 leaves GW10's 1 of 3.7.
+  const result = runDecisionEngine(scenario({
+    changes: [{ id: 4, pz: 1, av: 0 }],
+    candidates: [{ id: 115, position: 'DEF', xip: 4 }],
+    chipPlan: { [GW + 1]: 'wildcard' },
+  }));
+  close(playerOf(result, 4).best.structure.deadSlotTerm,
+    DECISION_ENGINE.modes.structure.deadSlotPenalty / 3.7);
 });
 
 test('the captain and XI panel names the next captain and the gap, doubled under Triple Captain', () => {
@@ -339,6 +413,18 @@ test('a chip already used in a half is never hinted for a GW in that half', () =
   assert.equal(runDecisionEngine(input).chipHints.benchboost.gw, 21);
 });
 
+test('no Bench Boost week is hinted at or after a planned Wildcard', () => {
+  // The bench's double is GW12, but a Wildcard in GW11 replaces this squad.
+  const input = scenario({
+    changes: [
+      { id: 12, xip: [2.5, 2.5, 5, 2.5, 2.5, 2.5], fx: [1, 1, 2, 1, 1, 1] },
+      { id: 15, xip: [2.2, 2.2, 4.4, 2.2, 2.2, 2.2], fx: [1, 1, 2, 1, 1, 1] },
+    ],
+    chipPlan: { [GW + 1]: 'wildcard' },
+  });
+  assert.equal(runDecisionEngine(input).chipHints.benchboost.gw, GW);
+});
+
 // ─── Mode 1: Now ─────────────────────────────────────────────────────────────
 
 test('Now never buys a player more likely than its gate to get no minutes', () => {
@@ -367,7 +453,12 @@ test('Funds does not count a downgrade that gives up more than tau points', () =
   assert.equal(playerOf(result, 10).best.funds, null);
 });
 
-test('Funds ranks a downgrade by the money it frees per point it gives up', () => {
+test('Funds weighs the GWs by the configured decay', () => {
+  const config = { ...DECISION_ENGINE, decayBase: 0.5 };
+  assert.deepEqual(runDecisionEngine(scenario(), config).modes.funds.weights, [1, 0.5, 0.25, 0.125, 0.0625]);
+});
+
+test('Funds rates a downgrade\'s efficiency as the money it frees per point it gives up', () => {
   // MID 109 instead (0.1 a GW less): £3.0m for 0.1 x 3.71 = 0.37 points.
   const result = runDecisionEngine(scenario({
     changes: [{ id: 10, price: 80 }],
@@ -423,6 +514,18 @@ test('Ceiling breaks a tie for the target GW by the most double-GW fixtures', ()
     { id: 8, xip: [8, 11, 8, 8, 8, 8] },
     { id: 9, xip: [7, 7, 7, 10, 7, 7], fx: [1, 1, 1, 2, 1, 1] }] }));
   assert.equal(result.modes.ceiling.targetGw, 13);
+});
+
+test('Ceiling never targets a GW a planned chip covers', () => {
+  // GW12 is the strongest week, but a Free Hit plays it: the target is the
+  // next best, GW13 (+3 from a double).
+  const result = runDecisionEngine(scenario({
+    changes: [{ id: 9, xip: [7, 7, 7, 10, 7, 7], fx: [1, 1, 1, 2, 1, 1] }],
+    candidates: [{ id: 112, position: 'FWD', xip: [6, 6, 20, 6, 6, 6], fx: [1, 1, 2, 1, 1, 1] }],
+    chipPlan: { 12: 'freehit' },
+  }));
+  assert.equal(result.modes.ceiling.targetGw, 13);
+  assert.deepEqual(result.modes.ceiling.weights, [0.1, 0.1, 0, 1, 0.1]);
 });
 
 test('a player with a high lock value at the target GW is protected from sale in modes 1-4', () => {
@@ -503,6 +606,39 @@ test('Structure holds a doubtful player who recovers inside the horizon', () => 
   assert.equal(runDecisionEngine(scenario(base), neverRecovered).modes.structure.root?.outId, 5);
 });
 
+// ─── The V cache and the presets ─────────────────────────────────────────────
+
+test('a warm cache gives exactly the cold result after a lock, a ban, a bank, an FT or a chip change', () => {
+  const input = fillerScenario({ bankTenths: 5 });
+  const cache = createDecisionCache();
+  runDecisionEngine(input, DECISION_ENGINE, cache);
+  const changes = [{ locks: new Set([4]) }, { bans: new Set([103]) }, { bankTenths: 20 },
+    { freeTransfers: 0 }, { freeTransfers: 5 }, { chipPlan: { [GW + 1]: 'benchboost' } }];
+  for (const change of changes) {
+    const next = { ...input, ...change };
+    assert.deepEqual(runDecisionEngine(next, DECISION_ENGINE, cache), runDecisionEngine(next),
+      Object.keys(change).join());
+  }
+});
+
+test('a warm cache matches a cold one when the planning GW and a planned chip move on together', () => {
+  // Projections for GW10-16, so both planning GWs have their six.
+  const input = scenario({ candidates: [{ id: 101, position: 'GKP', xip: 6.5 }] });
+  const projections = new Map([...input.projections].map(([id, p]) =>
+    [id, { ...p, gws: [...p.gws, { ...p.gws.at(-1), gw: p.gws.at(-1).gw + 1 }] }]));
+  const run = (planningGw, cache) => runDecisionEngine(
+    { ...input, projections, planningGw, chipPlan: { [planningGw + 2]: 'benchboost' } }, DECISION_ENGINE, cache);
+  const cache = createDecisionCache();
+  run(GW, cache);
+  assert.deepEqual(run(GW + 1, cache), run(GW + 1, createDecisionCache()));
+});
+
+test('every mode preset must weigh the same number of GWs', () => {
+  const short = { ...DECISION_ENGINE, modes: { ...DECISION_ENGINE.modes,
+    now: { ...DECISION_ENGINE.modes.now, weights: [1, 0, 0] } } };
+  assert.throws(() => runDecisionEngine(scenario(), short), /same number of GWs/);
+});
+
 // ─── Performance (plan risk 6) ───────────────────────────────────────────────
 
 /** Deterministic PRNG (mulberry32), so a failure reproduces. */
@@ -518,17 +654,23 @@ function seeded(seed) {
 test('a full run takes well under 5 s on a 600-player pool, and a lock or ban re-run under 200 ms', () => {
   const random = seeded(3);
   const positions = ['GKP', 'DEF', 'DEF', 'MID', 'MID', 'MID', 'FWD'];
+  // Prices skewed cheap like FPL's (median about £5.4m, up to £15.0m).
   const candidates = Array.from({ length: 600 }, (_, i) => ({
     id: 1000 + i, position: positions[i % positions.length], team: 1 + (i % 20),
-    price: 40 + Math.round(random() * 90), xip: 1 + Math.round(random() * 18) / 2,
+    price: 40 + Math.round((random() ** 3) * 110), xip: 1 + Math.round(random() * 18) / 2,
     pz: [0, 0, 0.05, 0.2, 0.5][Math.floor(random() * 5)],
   }));
-  const input = scenario({ candidates, bankTenths: 20 });
+  // Real squad prices, so Funds has downgrades to chain and the lock re-run
+  // searches new second moves.
+  const prices = [50, 40, 62, 55, 45, 50, 40, 125, 95, 80, 70, 50, 140, 75, 45];
+  const changes = BASE.map((s, i) => ({ id: s.id, price: prices[i] }));
+  const input = scenario({ changes, candidates, bankTenths: 20, freeTransfers: 2 });
   const cache = createDecisionCache();
 
   let start = performance.now();
-  runDecisionEngine(input, DECISION_ENGINE, cache);
+  const first = runDecisionEngine(input, DECISION_ENGINE, cache);
   const cold = performance.now() - start;
+  assert.ok(first.players.some(p => p.best.funds?.chained), 'the pool exercises the chain search');
   start = performance.now();
   runDecisionEngine({ ...input, locks: new Set([13]), bans: new Set([1003, 1004]) }, DECISION_ENGINE, cache);
   const warm = performance.now() - start;

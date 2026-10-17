@@ -1498,9 +1498,6 @@ export const TRIPLE_CAPTAIN_MULTIPLIER = 3;
 // and STATUS_PLAY_CHANCE above); the decision engine works in 0-1.
 export const PERCENT = 100;
 
-// Per-gameweek decay of the Funds & flexibility mode's weights (brief §6).
-const DECAY_BASE = 0.85;
-
 export const DECISION_ENGINE = {
   // FPL: free transfers bank up to this many; a sixth would be wasted.
   maxBankedFt: 5,
@@ -1519,9 +1516,12 @@ export const DECISION_ENGINE = {
   hitMargin: 2,
   // Points per £1.0m freed (brief §5's lambda) where a mode values funds.
   lambdaDefault: 0.10,
-  decayBase: DECAY_BASE,
-  // A mode card shows up to two alternatives within this many points of its move.
+  // Per-GW decay for a mode whose weights are 'decay' (brief §6, §9).
+  decayBase: 0.85,
+  // A mode card shows up to alternativesMax alternatives, each within
+  // alternativesWindow points of its move.
   alternativesWindow: 2,
+  alternativesMax: 2,
   // The minutes-risk badge on a move's two players, from pZero in the planning GW.
   minutesRiskPZero: { medium: 0.1, high: 0.3 },
 
@@ -1586,14 +1586,17 @@ export const DECISION_ENGINE = {
     },
     funds: {
       label: 'Funds & flexibility',
-      weights: [0, 1, 2, 3, 4].map(k => DECAY_BASE ** k),
+      // decayBase^k for the k-th GW (brief §6: "decay 0.85 over 5").
+      weights: 'decay',
       // No lambda of its own: the brief's "derived" rate is the chained second
       // move's net gain, else lambdaDefault (Q10).
       // A downgrade may give up at most this many points over the horizon ...
       tau: 1.0,
-      // ... and is ranked by money freed per point lost, the loss floored here.
+      // ... and its efficiency is the money it frees per point it loses, the
+      // loss floored here. Moves are ranked by OutScore, as in every mode;
+      // efficiency picks the chainTopK downgrades searched for a second move
+      // they fund.
       eps: 0.1,
-      // The most efficient downgrades searched for a second move they fund.
       chainTopK: 5,
       threshold: 0,
     },
