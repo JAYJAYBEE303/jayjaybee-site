@@ -1448,10 +1448,13 @@ export const DECISION_ENGINE = {
       // The brief gives 0.10-0.20; the midpoint until Phase 7 tunes it.
       lambda: 0.15,
       threshold: 0,
-      // The deferral test (brief §6): when the same move made next week, on
-      // the free transfer then banked, scores within this many points of
-      // making it now, the mode waits. Not tuned: Phase 7.
-      deferralEpsilon: 0.25,
+      // The deferral test (brief §6): when the same move made next week -
+      // scored over the same five GWs, the planning GW given up - comes within
+      // this much of making it now, the mode waits. In this mode's units (a
+      // weighted average where the planning GW weighs 0.5 / 4.25), 0.1 lets it
+      // wait when the move gains under about 0.85 points this week. Not tuned:
+      // Phase 7.
+      deferralEpsilon: 0.1,
     },
     funds: {
       label: 'Funds & flexibility',

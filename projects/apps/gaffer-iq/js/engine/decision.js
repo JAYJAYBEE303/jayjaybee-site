@@ -480,7 +480,7 @@ function scoreMode(run, { modeId, mode, raw, weights, share, pairs, ceiling, str
       .map(r => bestOrBuild(run, modeId, weights, r, bestByOwner))
     : [];
 
-  const deferral = modeId === 'future' && rootRecord ? deferralOf(run, mode, raw, rootRecord) : null;
+  const deferral = modeId === 'future' && rootRecord ? deferralOf(run, mode, weights, raw, rootRecord) : null;
   const summary = {
     modeId,
     label: mode.label,
@@ -499,32 +499,30 @@ function scoreMode(run, { modeId, mode, raw, weights, share, pairs, ceiling, str
 
 /**
  * Future prep's deferral test (brief §6, mode 3): the same move made a week
- * later, scored as the mode would score it then - its weights one GW on (the
- * sixth projected GW is used here only, risk 7), against q's price then. Its
- * free transfer costs what it costs now: either way the two weeks make one
- * transfer and bank the same free transfers - except with none banked, where
- * waiting turns this week's hit into next week's free transfer. Within
- * deferralEpsilon of making it now, the mode waits. It never waits when no
- * later GW counts (the season's end, a Wildcard), when a likely price move
- * would put the buy out of reach by then, or with free transfers at the cap,
- * where waiting would roll one away (brief §10).
+ * later, scored over the same five GWs with the planning GW given up (your
+ * reading, after Phase 5's review), against q's price then. Its free transfer
+ * costs what it costs now: either way the two weeks make one transfer and bank
+ * the same free transfers - except with none banked, where waiting turns this
+ * week's hit into next week's free transfer. Within deferralEpsilon of making
+ * it now, the mode waits. It never waits when no later GW counts (the season's
+ * end, a Wildcard), when a likely price move would put the buy out of reach by
+ * then, or with free transfers at the cap, where waiting would roll one away
+ * (brief §10).
  *
+ * @param {number[]} weights  the mode's weights, planned chips masked
+ * @param {number[]} raw      the same, unmasked
  * @returns {{gw: number, laterScore: number, epsilon: number}|null}  gw: the
  *   first GW the later move counts for; null: make it now
  */
-function deferralOf(run, mode, raw, record) {
+function deferralOf(run, mode, weights, raw, record) {
   const { config, input } = run;
   if (input.freeTransfers >= config.maxBankedFt) return null;
-  const gws = run.modeGws.map(gw => gw + 1);
-  const weights = raw.map((w, k) => (run.zeroed(gws[k]) ? 0 : w));
-  if (weights.every(w => w === 0)) return null;
-  const { p, q } = record.pair;
+  const later = weights.map((w, k) => (k === 0 ? 0 : w));
+  if (later.every(w => w === 0)) return null;
+  const { p, q, dV } = record.pair;
   const total = sum(raw);
-  const share = total > 0 ? sum(weights) / total : 0;
-  const ids = swapIn(run.ids, p.playerId, q.id);
-  const key = `${p.playerId}>${q.id}`;
-  const deltaEv = sum(gws.map((gw, k) => (weights[k] === 0 ? 0
-    : weights[k] * (run.value(gw, ids, key) - run.value(gw, run.ids, 'S')))));
+  const share = total > 0 ? sum(later) / total : 0;
+  const deltaEv = dot(later, dV);
 
   // p sells at today's price: the fall that waiting risks is already in
   // today's PriceTerm, so it is not counted twice.
@@ -539,7 +537,7 @@ function deferralOf(run, mode, raw, record) {
   const reach = run.state.bankTenths + p.sellPriceTenths + (outlook.fallLikely ? outlook.down : 0);
   const outOfReach = qPrice + (run.riseLikely(q.id) ? 1 : 0) > reach;
   if (outOfReach || laterScore < record.outScore - mode.deferralEpsilon) return null;
-  return { gw: gws[weights.findIndex(w => w > 0)], laterScore, epsilon: mode.deferralEpsilon };
+  return { gw: run.modeGws[later.findIndex(w => w > 0)], laterScore, epsilon: mode.deferralEpsilon };
 }
 
 /**

@@ -438,7 +438,7 @@ export const DECISION_ENGINE = {
   modes: {   // each also has a label
     now:       { weights, lambda: 0, pZeroGate: 0.25, threshold: 0 },
     longterm:  { weights, lambda: 0.10, threshold: 0 },
-    future:    { weights, lambda: 0.15, threshold: 0, deferralEpsilon: 0.25 },
+    future:    { weights, lambda: 0.15, threshold: 0, deferralEpsilon: 0.1 },
     funds:     { weights: 'decay', tau: 1.0, eps: 0.1, chainTopK: 5, threshold: 0, minFreedTenths: 5 },   // decayBase^k; lambda: lambdaDefault
     ceiling:   { targetWeight: 1, otherWeight: 0.1, lambda: 0, lockThreshold: 3, threshold: 0 },
     structure: { weights, lambda: 0.10, deadSlotMinGws: 2, deadSlotPenalty: 1, recoveredAvailability: 0.9, threshold: 0 },
@@ -465,7 +465,7 @@ when OutScore > 0, i.e. it beats rolling after the FT value or hit is paid
 4. **Price-predictor fields are undocumented** (risk 3). Phase 5 isolates them in one adapter file; if they are absent, the adapter falls back to `calcPriceChangeRisk`, flagged as an estimate. Snapshots keep unknown element fields from Phase 1 on, so the fields are logged even before the adapter reads them. Phase 5 read their shape from vaastav's 2026-27 capture of bootstrap-static (FPL itself is still unreachable here); a live check against FPL is still owed.
 5. **The MILP referee is Python.** open-fpl-solver needs Python + HiGHS; the repo says "zero Python anywhere in the stack". Phase 8 would run it as an offline tool outside the served app, or port the formulation to Node with a WASM HiGHS build (licence check first). Decide at Phase 8.
 6. **Performance (measured on synthetic data).** The real `scorePlayer` took 430 ms for 255 players x 6 single-GW calls and 570 ms for 615 x 6, so projecting every feasible candidate fits the 5 s budget; **no candidate cap**, as the brief decided brute force. `pickStartingXI` costs ~3 us, so single-swap enumeration (~5-15k `V` calls) is cheap. The two things that would not fit, unbounded mode 4 chaining (~1M `V` calls) and synchronous robustness, are bounded in §5.2. If Phase 3 measurement still blows the budget, a capped pre-filter comes back to you as a question, with its criterion. Measured in Phase 2: `buildProjections` takes 0.3 s for the real 616-player pool (vaastav 2026-27) and 0.8 s for a synthetic 620-player one, 6 GWs, real scorer; `squadValue` takes 43 us a call in probability mode and 7 us in linear mode, so a 15.7k-call cache fill (every same-position swap x 6 GWs on that pool) is ~0.7 s.
-7. **Brief inconsistencies, read as follows** (confirmed, Q10): `horizon_gws: 6` vs five weights per mode (plan: the 6th GW is used only by the mode 3 deferral test); mode 3 is titled "GW+3..+5" but its weights cover GW+1..+5 (plan: use the weights as written); Ceiling's upper tail does not exist before Phase 7 (plan: Phase 3 ships Ceiling on the mean at t\*, labelled as such). Mode 4's lambda "derived (see below)" is read from the same row: the funds credit is the chained second move's net gain, else `lambdaDefault`.
+7. **Brief inconsistencies, read as follows** (confirmed, Q10): `horizon_gws: 6` vs five weights per mode (plan: the 6th GW is used only by the mode 3 deferral test; since Phase 5's review, by your call, the deferral scores over the same five GWs, so the 6th GW now feeds only the chip plan's weeks and its Bench Boost / Triple Captain hints); mode 3 is titled "GW+3..+5" but its weights cover GW+1..+5 (plan: use the weights as written); Ceiling's upper tail does not exist before Phase 7 (plan: Phase 3 ships Ceiling on the mean at t\*, labelled as such). Mode 4's lambda "derived (see below)" is read from the same row: the funds credit is the chained second move's net gain, else `lambdaDefault`.
 8. **Units of DeltaEV** (kept as written, Q6). Modes 2 and 3 normalise their weights (sum 1, a per-GW average) while modes 4 and 6 do not (a horizon total), yet all are compared against the same one-off FT value and hit cost, so the same move can roll in mode 2 and go ahead in mode 6. Phase 7 reports whether this costs points; any change to the presets comes back to you.
 9. **Dashboard divergence.** The Dashboard keeps its own XI and captain from `expectedPoints`. The P1-P4 root fixes reach it, so it uses the same corrected rule; it still reads one projection per window rather than the per-GW projections. Moving the Dashboard onto the new projections is a follow-up.
 10. **Free transfer derivation.** 2026/27 FT rules (what Wildcard / Free Hit do to banked FTs, any mid-season top-up) are not in the API. Derived count is a pre-fill; the control stays editable.
@@ -488,7 +488,7 @@ when OutScore > 0, i.e. it beats rolling after the FT value or hit is paid
 - **Q7 Threshold. Decided:** OutScore > 0 in every mode (a config key per mode for Phase 7 tuning); Long term also keeps its DeltaEV gate.
 - **Q8 Blank next GW in mode 1. Decided:** Now stays a pure one-week preset - it may offer the sale, labelled "blank GW - one-week view"; a planned Free Hit that GW means he is never sold.
 - **Q9 Leftovers. Decided:** rewrite the landing card copy; keep `index-FXL00-CK7M8F4.html` and the `me/` route (risk 15).
-- **Q10 Brief readings. Decided:** the four readings in risk 7 stand.
+- **Q10 Brief readings. Decided:** the four readings in risk 7 stand. (Phase 5's review: you changed the mode 3 deferral to score both versions over the same five GWs.)
 
 ---
 
@@ -663,15 +663,15 @@ before the previous one passes. Phases 1, 2, 3 and 5 are strictly sequential.
 - **PriceTerm** = lambda x the expected change in sell(p) x the mode's unmasked weight share. The expected change is each chance times what one fall or rise does to his sell price, so a fall from an odd-tenths profit counts nothing. At lambda 0.10 it is worth at most 0.01 points: a tie-break, as the brief wants.
 - **Likely** = a chance of at least `priceMoveLikely` (0.95: FPL's own bands 4 and 5). A likely fall that lowers a seller's sell price stops Structure's hold and Now's wait for team news. Owned players whose sell price a likely move would change are flagged `priceFall` / `priceRise` ("Falling" / "Rising" in the table), and the move's `why.price` says what selling now gains or what buying now saves.
 - **Future prep's deferral** (`call: 'wait'`, `deferral: { gw, laterScore, epsilon }`):
-  - The root move is scored as the mode would score it next week: its weights one GW on, which is the only use of the sixth projected GW (risk 7), against q's expected price then. p sells at today's price there, because the fall that waiting risks is already in today's PriceTerm.
+  - The root move is scored as if made next week, over the same five GWs with the planning GW given up, against q's expected price then; money freed counts only for the GWs it covers. p sells at today's price there, because the fall that waiting risks is already in today's PriceTerm. It reuses the V values already computed, so it costs no extra V calls.
   - Its free transfer costs what it costs now. Either way the two weeks make one transfer and bank the same free transfers. The exception is with none banked, where waiting turns this week's hit into next week's free transfer (`transferCost(max(ft, 1))`).
-  - Within `deferralEpsilon` (0.25) of making it now, the mode waits. `gw` is the first GW the later move counts for (the one after a Free Hit, say).
+  - Within `deferralEpsilon` (0.1) of making it now, the mode waits. In Future prep's units, a weighted average where the planning GW weighs 0.5 / 4.25, that is a move gaining under about 0.85 points this week. `gw` is the first GW the later move counts for (the one after a Free Hit, say).
   - It never waits:
     - when no later GW counts (the season's last GW, a Wildcard next week);
     - when a likely fall in p's sell price or rise in q's price would put q out of reach (the brief's exception);
     - at the free-transfer cap, where waiting would roll one away (brief §10).
   - A waiting mode's seller is not flagged `sell`.
-  - **Open (your call): the window.** Scoring the later move over GW t+1..t+5 is the approved reading (risk 7, Q10). It never charges the gain the move would have made in the planning GW, so a move whose gain is the same every week always waits. Scoring both versions over the same five GWs, with the planning GW at zero for the later one, would charge that loss, and the sixth GW would go unused.
+  - **The window (your call after the review: option B).** The approved reading scored the later move over GW t+1..t+5. It never charged the gain the move would have made in the planning GW, so a move whose gain was the same every week always waited. Both versions are now scored over the same five GWs, with the planning GW at zero for the later one, so waiting costs that week's gain: a steady gain is made now, and WAIT appears when the gain comes later. `deferralEpsilon` went from 0.25 to 0.1 with it. At 0.25 a steady gain of up to about 2.1 points a GW would still have waited.
 - **Now's `waitForNews`.** All of these must hold:
   - a flagged (doubtful) player is in its move;
   - more than `waitForNewsMinHours` (24) remain to the deadline, so the press conferences are still to come; the planner passes `hoursToDeadline` from the event's deadline;
@@ -683,7 +683,7 @@ before the previous one passes. Phases 1, 2, 3 and 5 are strictly sequential.
   - Now's card says "Wait for team news" when it waits, and keeps the old "Team news pending" note otherwise.
   - The table shows Falling / Rising flags, red and green, AA on every surface; their title says when the signal is the transfer-flow estimate.
 - **Readings and defaults to check** (all in `config.js`, untuned):
-  - `priceMoveLikely` 0.95, `waitForNewsMinHours` 24, `deferralEpsilon` 0.25, `minFreedTenths` 5.
+  - `priceMoveLikely` 0.95, `waitForNewsMinHours` 24, `deferralEpsilon` 0.1, `minFreedTenths` 5.
   - Progress-as-chance for an undocumented field.
   - Now's wait also needs no likely rise in the buy's price; the brief names only a fall.
   - The deadline clock is the browser's.
@@ -696,7 +696,10 @@ before the previous one passes. Phases 1, 2, 3 and 5 are strictly sequential.
   - New tests: the season-end and Wildcard deferrals, the Free Hit GW, 0 FTs, the odd-tenths flag and hold, the estimate source end to end, malformed signals and -0.
   - Left as it is: `hoursToDeadline` is read on each run, so a tab left open past the 24-hour mark keeps "wait for team news" until the next run, as the planning GW does past a deadline.
 - **Verified** in headless Chromium on the 2025-26 GW20 payloads, with predictor fields injected:
-  - Future prep shows WAIT for M.Salah -> Gravenberch, +0.8 next week against +0.8 now (+1.2 before the review's FT-cost fix), with the price line; Funds and Structure show it too, and Salah's row is flagged Falling.
+  - Future prep showed WAIT for M.Salah -> Gravenberch at first: +1.2 next week against +0.8 now, then +0.8 against +0.8 after the review's FT-cost fix.
+    - Under option B it makes the move (+0.8), a steady gain.
+    - With `deferralEpsilon` widened in the page, its WAIT card reads +0.6 next week against +0.8 now.
+  - Funds and Structure show the price line, and Salah's row is flagged Falling.
   - Removing the fields falls back to the estimate without errors.
   - With the deadline 2099, a 25% Haaland in Now's move shows "Wait for team news"; with it 6 hours away, "Team news pending".
   - 360 px has no sideways scroll; no page errors; cards about 2 s after a reload, as before; an FT change repaints in about 150 ms.

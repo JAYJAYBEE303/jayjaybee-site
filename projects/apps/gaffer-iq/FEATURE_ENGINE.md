@@ -1238,7 +1238,7 @@ FPL's 2026/27 price-change predictor is undocumented, so one file reads it. `nor
 - **A tie-break, never a reason.** PriceTerm is lambda times the expected change in his sell price: at most lambda x £0.1m, 0.015 points in Future prep. Money alone never makes a move, except in Funds, which needs at least £0.5m freed.
 
 **Where prices time the calls**
-- **Future prep waits** when the same move made next week scores within `deferralEpsilon`. Its free transfer costs the same either way, except that with none banked waiting turns a hit into a free transfer. It does not wait at the free-transfer cap, when no later GW counts (the season's end, a Wildcard), or when a likely price move would put the buy out of reach.
+- **Future prep waits** when the same move made next week, scored over the same five GWs with this week given up, comes within `deferralEpsilon`. A steady gain is therefore made now, and WAIT appears when the gain comes later. Its free transfer costs the same either way, except that with none banked waiting turns a hit into a free transfer. It does not wait at the free-transfer cap, when no later GW counts (the season's end, a Wildcard), or when a likely price move would put the buy out of reach.
 - **Now flags "wait for team news"** when all of these hold:
   - a doubtful player is in its move;
   - more than a day is left to the deadline;
