@@ -3,8 +3,8 @@
  * Layer: module. Owns the DOM for the Transfer Planner view.
  * Side effects: DOM writes, localStorage reads/writes. Reads from store; every
  * recommendation comes from engine/decision.js (runDecisionEngine), fed by
- * engine/projections.js, plus the Wildcard and Free Hit hints of
- * engine/chips.js. It renders the DecisionResult and nothing else - no
+ * engine/projections.js and engine/price-adapter.js, plus the Wildcard and
+ * Free Hit hints of engine/chips.js. It renders the DecisionResult and nothing else - no
  * analysis lives here (ARCHITECTURE.md §12, docs/decision-engine-plan.md §5.3).
  * Layout, in reading order (plan §4.3): the settings bar (bank, free
  * transfers, squad, snapshot export), the live-round note, the chip plan, one
@@ -26,6 +26,7 @@ import { buildScoreContext } from '../engine/composite.js';
 import { scoreWildcardTiming, scoreFreeHitTiming } from '../engine/chips.js';
 import { buildProjections } from '../engine/projections.js';
 import { runDecisionEngine, createDecisionCache } from '../engine/decision.js';
+import { priceSignals } from '../engine/price-adapter.js';
 import { deriveFreeTransfers } from '../engine/ledger.js';
 import {
   fetchAndMapSquad, loadSavedTeamId, saveTeamId, resolveImportGw, loadLedger,
@@ -44,6 +45,9 @@ const RETIRED_KEYS = ['gafferiq_planner_run', 'gafferiq_chips_used'];
 
 /** The bank box's ceiling, £m (its max attribute in index.html). */
 const BANK_MAX = 100;
+
+/** An hour, in ms: the engine is told the hours left to the deadline. */
+const HOUR_MS = 60 * 60 * 1000;
 
 /** One line under each mode card's title: what the mode is for. */
 const MODE_BLURB = {
@@ -67,6 +71,8 @@ const FLAG_TEXT = {
   hold:        { text: 'Hold',      title: 'Doubtful now, back inside the horizon: Structure keeps him' },
   protected:   { text: 'Protected', title: 'Worth too much in the peak week for the first four modes to sell' },
   pendingNews: { text: 'News',      title: 'Flagged doubtful - press conferences may change this' },
+  priceFall:   { text: 'Falling',   title: 'His price is likely to fall soon, taking £0.1m off what he sells for' },
+  priceRise:   { text: 'Rising',    title: 'His price is likely to rise soon, adding £0.1m to what he sells for' },
 };
 
 const SORT_LABEL = { name: 'player', sell: 'sell price', keep: 'keep value', out: 'out score' };
@@ -105,6 +111,8 @@ let _basis = null;
 /** buildProjections output for every player, and the GW it was built for. */
 let _projections = null;
 let _projectionsGw = null;
+/** Every player's price signal (engine/price-adapter.js), read once per data load. */
+let _priceSignals = null;
 /** V values kept between runs, so a lock, ban or setting re-runs fast. */
 let _cache = createDecisionCache();
 /** The last DecisionResult, or null. */
@@ -544,6 +552,7 @@ async function buildAndRun(token, planningGw) {
     if (!ctx) throw new Error('no scoring context');
     const gwTable = gwTableFor(tables, store.getEvents(), planningGw);
     _projections = buildProjections(store.getPlayers(), ctx, { planningGw, gwTable });
+    _priceSignals = priceSignals(store.getPlayers());
     _projectionsGw = planningGw;
     _basis = gwTable ? 'table' : 'totals';
     _hints = wildcardAndFreeHitHints(ctx);
@@ -611,7 +620,8 @@ function runEngine() {
       bans: _bans,
       projections: _projections,
       candidates: store.getPlayers(),
-      priceSignals: null,
+      priceSignals: _priceSignals,
+      hoursToDeadline: hoursToDeadline(planningGw),
     }, DECISION_ENGINE, _cache);
     _state = 'ready';
   } catch (err) {
@@ -619,6 +629,12 @@ function runEngine() {
     _result = null;
     _state = 'failed';
   }
+}
+
+/** Hours from now to a gameweek's deadline, or null when it is not known. */
+function hoursToDeadline(gw) {
+  const deadline = store.getEvents().find(e => e.id === gw)?.deadline;
+  return deadline ? (Date.parse(deadline) - Date.now()) / HOUR_MS : null;
 }
 
 /** A setting, lock or ban changed: re-run on what is cached, or just repaint
@@ -807,7 +823,7 @@ function modeCardHTML(mode, i, settings, planningGw) {
     + `<p class="mc__blurb">${esc(MODE_BLURB[mode.modeId] ?? '')}</p>`;
   const delay = `style="--d:${Math.min(i, 6) * 50}ms"`;
   const root = mode.root;
-  if (mode.call !== 'move' || !root) {
+  if (mode.call === 'roll' || !root) {
     return `<li class="mc" data-mode="${mode.modeId}" data-call="roll" tabindex="-1" ${delay}>${head}`
       + '<p class="mc__call">Roll</p>'
       + `<p class="mc__sum">${esc(rollReason(mode, counted, settings))}</p></li>`;
@@ -826,9 +842,11 @@ function modeCardHTML(mode, i, settings, planningGw) {
   const why = [root.why.squad, root.why.funds, root.why.price, root.why.cost].filter(Boolean)
     .map(line => `<li>${esc(line)}</li>`).join('');
   const notes = (root.tags.includes('blankGwOneWeek') ? `<p class="mc__tag">Blank GW · one-week view</p>` : '')
-    + (root.tags.includes('pendingNews')
-      ? '<p class="mc__note">Team news pending: a flagged player is in this move, so the press conferences may change it.</p>'
-      : '');
+    + (mode.waitForNews
+      ? '<p class="mc__note">Wait for team news: a flagged player is in this move, the press conferences are still to come, and no price change is due before them.</p>'
+      : root.tags.includes('pendingNews')
+        ? '<p class="mc__note">Team news pending: a flagged player is in this move, so the press conferences may change it.</p>'
+        : '');
   const alts = mode.alternatives.length
     ? `<details class="mc__alts" data-alts="${mode.modeId}"${_openAlts.has(mode.modeId) ? ' open' : ''}><summary>${mode.alternatives.length} alternative${mode.alternatives.length === 1 ? '' : 's'}</summary><ol>`
       + mode.alternatives.map(a => `<li><span>Sell <b>${esc(nameOf(a.outId))}</b> → buy <b>${esc(nameOf(a.inId))}</b></span>`
@@ -836,10 +854,20 @@ function modeCardHTML(mode, i, settings, planningGw) {
       + '</ol></details>'
     : '';
   const robust = mode.robustness != null ? `<span class="mc__rb">Robust ${Math.round(mode.robustness * 100)}%</span>` : '';
+  const players = `<div class="mc__mv">${playerRowHTML('sell', root, seller?.sellPriceTenths ?? toTenths(store.getPlayer(root.outId)?.price ?? 0),
+    root.tags.includes('sellPriceEstimated'))}${playerRowHTML('buy', root)}</div>`;
+
+  if (mode.call === 'wait') {
+    const { gw, laterScore } = mode.deferral;
+    return `<li class="mc" data-mode="${mode.modeId}" data-call="wait" tabindex="-1" ${delay}>${head}`
+      + '<p class="mc__call">Wait</p>'
+      + `<p class="mc__sum">Made for GW${gw} instead, this move still scores ${pts(laterScore)} against ${pts(root.outScore)} now: `
+      + 'roll the free transfer and decide next week.</p>'
+      + players + (root.why.price ? `<p class="mc__note">${esc(root.why.price)}</p>` : '') + '</li>';
+  }
 
   return `<li class="mc" data-mode="${mode.modeId}" data-call="move" tabindex="-1" ${delay}>${head}`
-    + `<div class="mc__mv">${playerRowHTML('sell', root, seller?.sellPriceTenths ?? toTenths(store.getPlayer(root.outId)?.price ?? 0),
-      root.tags.includes('sellPriceEstimated'))}${playerRowHTML('buy', root)}</div>`
+    + players
     + `<p class="mc__ev"><b class="num">${pts(root.outScore)}</b><span>pts vs rolling</span>${robust}</p>`
     + perGw + `<ul class="mc__why">${why}</ul>` + notes + alts + '</li>';
 }
@@ -962,6 +990,7 @@ function renderTable() {
     best: p.best[mode],
     flags: p.flags,
     lockValue: p.lockValue,
+    priceSource: p.priceSource,
   })), _sort.key, _sort.desc);
   const ariaSort = key => (_sort.key === key ? ` aria-sort="${_sort.desc ? 'descending' : 'ascending'}"` : '');
   const targetGw = _result.modes.ceiling?.targetGw;
@@ -971,10 +1000,13 @@ function renderTable() {
     const team = store.getTeam(p?.teamId);
     const est = r.flags.includes('sellPriceEstimated')
       ? ' <abbr title="No purchase price on record: sold at his current price">est.</abbr>' : '';
-    const flags = ['sell', 'hold', 'protected', 'pendingNews'].filter(f => r.flags.includes(f)).map(f => {
-      const title = f === 'protected' && Number.isFinite(r.lockValue) && targetGw
+    const flags = ['sell', 'hold', 'protected', 'pendingNews', 'priceFall', 'priceRise'].filter(f => r.flags.includes(f)).map(f => {
+      let title = f === 'protected' && Number.isFinite(r.lockValue) && targetGw
         ? `Worth ${r.lockValue.toFixed(1)} points in peak GW${targetGw}: the first four modes won’t sell him`
         : FLAG_TEXT[f].title;
+      if ((f === 'priceFall' || f === 'priceRise') && r.priceSource === 'estimate') {
+        title += ' (estimated from this week’s transfers)';
+      }
       return `<span class="flag" data-flag="${f}" title="${esc(title)}">${FLAG_TEXT[f].text}</span>`;
     }).join('');
     const out = r.out === null ? '<span aria-hidden="true">–</span><span class="sr">no legal sale</span>' : pts(r.out);
@@ -1507,6 +1539,7 @@ function onDataReady() {
   // projection build still in flight is now out of date.
   ++_token;
   _projections = null;
+  _priceSignals = null;
   _gwTables = null;
   _hints = { wildcard: null, freehit: null };
   _cache = createDecisionCache();

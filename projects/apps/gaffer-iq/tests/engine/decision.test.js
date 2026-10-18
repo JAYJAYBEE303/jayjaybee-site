@@ -620,6 +620,121 @@ test('Structure holds a doubtful player who recovers inside the horizon', () => 
   assert.equal(runDecisionEngine(scenario(base), neverRecovered).modes.structure.root?.outId, 5);
 });
 
+// ─── Prices, timing and money (Phase 5) ──────────────────────────────────────
+
+/** A price signal in the adapter's shape: chances of a fall and a rise. */
+const signal = (fall, rise = 0) => ({ fall, rise, source: 'fpl' });
+
+test('PriceTerm is zero when a likely fall would not change his sell price', () => {
+  // Bought at £5.0m, now £5.3m: he sells for £5.1m, and still for £5.1m at £5.2m.
+  const input = scenario({ changes: [{ id: 1, price: 53, purchase: 50 }],
+    candidates: [{ id: 101, position: 'GKP', xip: 6 }], priceSignals: { 1: signal(1) } });
+  assert.equal(playerOf(runDecisionEngine(input), 1).best.longterm.priceTerm, 0);
+});
+
+test('a likely fall that lowers his sell price makes selling now worth lambda x £0.1m more; a rise that lifts it, less', () => {
+  // Bought at £5.0m, now £5.2m: he sells for £5.1m, and for £5.0m after a fall.
+  const changes = [{ id: 1, price: 52, purchase: 50 }];
+  const candidates = [{ id: 101, position: 'GKP', xip: 6 }];
+  const without = playerOf(runDecisionEngine(scenario({ changes, candidates })), 1).best.longterm;
+  const falling = playerOf(runDecisionEngine(scenario({ changes, candidates, priceSignals: { 1: signal(1) } })), 1);
+  close(falling.best.longterm.priceTerm, -0.1 * 0.1);
+  close(falling.best.longterm.outScore, without.outScore + 0.01);
+  assert.match(falling.best.longterm.why.price, /fall/);
+  assert.ok(falling.flags.includes('priceFall'));
+  close(falling.best.now.priceTerm, 0, 'Now puts no value on money');
+  // At £5.3m a rise to £5.4m lifts his sell price from £5.1m to £5.2m.
+  const rising = playerOf(runDecisionEngine(scenario({ changes: [{ id: 1, price: 53, purchase: 50 }], candidates,
+    priceSignals: { 1: signal(0, 1) } })), 1);
+  close(rising.best.longterm.priceTerm, 0.1 * 0.1);
+  assert.ok(rising.flags.includes('priceRise'));
+});
+
+test('Structure does not hold a recovering player whose sell price is likely to fall first', () => {
+  // The hold case above, with DEF 5's price about to fall.
+  const input = scenario({
+    changes: [{ id: 5, price: 60, pz: [0.5, 0.15, 0.045, 0.0135, 0.004, 0.0012],
+      av: [0.5, 0.85, 0.955, 0.9865, 0.996, 0.9988] }],
+    candidates: [{ id: 116, position: 'DEF', xip: 4, price: 55 }],
+    priceSignals: { 5: signal(1) },
+  });
+  const result = runDecisionEngine(input);
+  assert.ok(!playerOf(result, 5).flags.includes('hold'));
+  assert.equal(result.modes.structure.root?.outId, 5);
+});
+
+test('at five banked free transfers money alone moves no mode but Funds, and Funds only for £0.5m or more', () => {
+  // Keeper 101 projects exactly what keeper 1 does and costs £0.3m less.
+  const same = { id: 101, position: 'GKP', xip: 4, price: 47 };
+  const result = runDecisionEngine(scenario({ candidates: [same], freeTransfers: 5 }));
+  for (const mode of MODES) assert.equal(result.modes[mode].call, 'roll', mode);
+  assert.ok(playerOf(result, 1).best.future.outScore > 0, 'it clears Q7\'s threshold on money alone');
+  // £0.6m freed is worth a free transfer that would otherwise be wasted - to Funds.
+  const cheaper = runDecisionEngine(scenario({ candidates: [{ ...same, price: 44 }], freeTransfers: 5 }));
+  assert.equal(cheaper.modes.funds.call, 'move');
+  assert.equal(cheaper.modes.future.call, 'roll');
+});
+
+test('Future prep waits when the move made next week, on the free transfer then banked, scores within epsilon', () => {
+  // Keeper 101 is 2 points a GW better every week, so next week's move gains
+  // as much, at a cheaper free transfer.
+  const input = scenario({ candidates: [{ id: 101, position: 'GKP', xip: 6 }] });
+  const future = runDecisionEngine(input).modes.future;
+  assert.equal(future.call, 'wait');
+  assert.equal(future.root.inId, 101);
+  close(future.root.outScore, 2 - transferCost(1));
+  assert.deepEqual(Object.keys(future.deferral).sort(), ['epsilon', 'gw', 'laterScore']);
+  assert.equal(future.deferral.gw, GW + 1);
+  close(future.deferral.laterScore, 2 - transferCost(2));
+  assert.equal(future.deferral.epsilon, DECISION_ENGINE.modes.future.deferralEpsilon);
+
+  // A waiting mode sells nobody yet.
+  const futureOnly = { ...DECISION_ENGINE, modes: Object.fromEntries(Object.entries(DECISION_ENGINE.modes)
+    .map(([id, m]) => [id, id === 'future' ? m : { ...m, threshold: Infinity }])) };
+  assert.ok(!playerOf(runDecisionEngine(input, futureOnly), 1).flags.includes('sell'));
+});
+
+test('at five banked free transfers Future prep never waits: rolling would waste one', () => {
+  const input = scenario({ candidates: [{ id: 101, position: 'GKP', xip: 6 }], freeTransfers: 5 });
+  const future = runDecisionEngine(input).modes.future;
+  assert.equal(future.call, 'move');
+  assert.equal(future.deferral, null);
+});
+
+test('Future prep moves now when waiting a week would cost more than epsilon', () => {
+  // Keeper 101 is far better in the planning GW and the next, then no better.
+  const future = runDecisionEngine(scenario({
+    candidates: [{ id: 101, position: 'GKP', xip: [10, 10, 4, 4, 4, 4] }] })).modes.future;
+  assert.equal(future.call, 'move');
+  assert.equal(future.deferral, null);
+});
+
+test('Future prep does not wait when a likely price move would put the buy out of reach', () => {
+  // Keeper 101 costs £5.0m: keeper 1's sale and an empty bank pay for it, just.
+  const base = { candidates: [{ id: 101, position: 'GKP', xip: 6 }] };
+  const call = input => runDecisionEngine(scenario({ ...base, ...input })).modes.future.call;
+  assert.equal(call({ priceSignals: { 101: signal(0, 1) } }), 'move', 'the buy is about to rise');
+  assert.equal(call({ priceSignals: { 1: signal(1) } }), 'move', 'the sale is about to fall');
+  assert.equal(call({ priceSignals: { 101: signal(0, 0.5) } }), 'wait', 'a rise is not likely');
+  assert.equal(call({ bankTenths: 1, priceSignals: { 101: signal(0, 1) } }), 'wait', 'still affordable after it');
+});
+
+test('Now waits for team news when a flagged player is in its move, the press conferences are ahead and no price move is due', () => {
+  // DEF 5 is 50% now; DEF 116 is a better buy either way.
+  const base = { changes: [{ id: 5, pz: 0.5, av: 0.5 }], candidates: [{ id: 116, position: 'DEF', xip: 9 }] };
+  const now = input => runDecisionEngine(scenario({ ...base, ...input })).modes.now;
+  const early = now({ hoursToDeadline: 48 });
+  assert.equal(early.call, 'move');
+  assert.equal(early.root.outId, 5);
+  assert.equal(early.waitForNews, true);
+  assert.equal(now({ hoursToDeadline: 12 }).waitForNews, false, 'the press conferences are done');
+  assert.equal(now({}).waitForNews, false, 'no deadline to go by');
+  assert.equal(now({ hoursToDeadline: 48, priceSignals: { 5: signal(1) } }).waitForNews, false,
+    'his sell price is about to fall');
+  assert.equal(now({ hoursToDeadline: 48, priceSignals: { 116: signal(0, 1) } }).waitForNews, false,
+    'the buy is about to rise');
+});
+
 // ─── The V cache and the presets ─────────────────────────────────────────────
 
 test('a warm cache gives exactly the cold result after a lock, a ban, a bank, an FT or a chip change', () => {

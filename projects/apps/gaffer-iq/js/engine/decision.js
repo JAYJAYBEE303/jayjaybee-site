@@ -17,8 +17,14 @@
  * (gameweek, swap): pass the same cache back and a lock, ban or FT change
  * re-runs on cached values; a bank change, or a lock that changes which
  * downgrades Funds chains, computes only the swaps it newly makes legal.
- * PriceTerm is 0 until Phase 5's price layer; the Future prep deferral test
- * and Now's "wait for team news" call arrive with it.
+ *
+ * Prices (Phase 5) come in as signals (engine/price-adapter.js) and act on the
+ * seller's SELL price, never his price: PriceTerm is the change to expect in
+ * it, a tie-break worth lambda per £1.0m. They also time the calls: Future
+ * prep waits when the move made next week scores as well, unless a likely
+ * price move would put the buy out of reach; Now flags a move to wait for team
+ * news when the press conferences are still to come and waiting costs nothing
+ * in price. Money and price never make a move on their own (Funds aside).
  */
 
 import { DECISION_ENGINE, SQUAD_TOTAL, SEASON_GWS, CHIP_RESET_AFTER_GW, CHIP_LABELS } from '../config.js';
@@ -77,7 +83,11 @@ export function transferCost(freeTransfers, config = DECISION_ENGINE) {
  * @param {Set<number>} input.bans   never bought
  * @param {Map} input.projections    buildProjections output for the squad and every candidate
  * @param {Player[]} input.candidates  every possible replacement (price in millions)
- * @param {object|null} input.priceSignals  Phase 5; per player { fallLikely }
+ * @param {Object<number, {fall: number, rise: number, source: string}>|null} input.priceSignals
+ *   priceSignals() of engine/price-adapter.js: each player's chances of a price
+ *   fall and rise soon; null or a missing player means no move expected
+ * @param {number|null} [input.hoursToDeadline]  to the planning GW's deadline;
+ *   null when unknown (Now then never waits for team news)
  * @param {object} [config]  DECISION_ENGINE by default
  * @param {object} [cache]   createDecisionCache(), kept between runs; the
  *   one argument written to (by design: it holds the V values)
@@ -100,12 +110,12 @@ export function runDecisionEngine(input, config = DECISION_ENGINE, cache = creat
     // a Free Hit or Wildcard budget is the squad's value either way. So both
     // count for the share of the mode's weight that no planned chip covers.
     const share = total > 0 ? sum(weights) / total : 0;
-    const result = scoreMode(run, { modeId, mode, weights, share, pairs, ceiling, structure });
+    const result = scoreMode(run, { modeId, mode, raw, weights, share, pairs, ceiling, structure });
     modes[modeId] = result.summary;
     bestByMode[modeId] = result.bestByOwner;
   }
 
-  const rootSells = new Set(Object.values(modes).map(m => m.root?.outId).filter(id => id !== undefined));
+  const rootSells = new Set(Object.values(modes).filter(m => m.call === 'move').map(m => m.root.outId));
   const players = run.owned.map(p => {
     const keepValue = {};
     const outScore = {};
@@ -122,6 +132,7 @@ export function runDecisionEngine(input, config = DECISION_ENGINE, cache = creat
       flags: flagsFor(run, p, { rootSells, ceiling, structure }),
       lockValue: ceiling.lockValues.get(p.playerId),
       uncoveredLoss: structure.uncovered.get(p.playerId),
+      priceSource: input.priceSignals?.[p.playerId]?.source ?? null,
     };
   });
 
@@ -213,9 +224,13 @@ function prepare(input, config, cache) {
   const names = new Map([...owned.map(p => [p.playerId, p.name]),
     ...(input.candidates ?? []).map(c => [c.id, c.name])]);
 
+  const signals = input.priceSignals ?? {};
+  const outlook = new Map(owned.map(p => [p.playerId, sellOutlook(p, signals[p.playerId], config)]));
+
   return {
     input, config, owned, ids, chipPlan, overlay, candidatesByPosition, modeGws, chipAt, zeroed,
-    value, valueOpts, names,
+    value, valueOpts, names, outlook,
+    riseLikely: id => (signals[id]?.rise ?? 0) >= config.priceMoveLikely,
     state: { bankTenths, players: owned },
     locks: input.locks ?? new Set(),
     bans: input.bans ?? new Set(),
@@ -238,6 +253,25 @@ function weightsOf(run, mode) {
 /** A mode's weights with the Free Hit / Wildcard GWs zeroed. */
 function masked(run, weights) {
   return weights.map((w, k) => (run.zeroed(run.modeGws[k]) ? 0 : w));
+}
+
+/**
+ * What a player's price signal means for his sell price: the change to expect,
+ * in tenths, what one fall or rise would do to it, and whether a fall that
+ * lowers it, or a rise that lifts it, is likely. A fall from an odd-tenths
+ * profit costs the seller nothing (brief §7 Phase 5).
+ */
+function sellOutlook(p, signal, config) {
+  const purchase = p.sellPriceEstimated ? p.priceTenths : p.purchaseTenths;
+  const down = calcSellPrice(purchase, p.priceTenths - 1) - p.sellPriceTenths;
+  const up = calcSellPrice(purchase, p.priceTenths + 1) - p.sellPriceTenths;
+  return {
+    expected: signal ? (signal.fall * down) + (signal.rise * up) : 0,
+    down,
+    up,
+    fallLikely: down < 0 && (signal?.fall ?? 0) >= config.priceMoveLikely,
+    riseLikely: up > 0 && (signal?.rise ?? 0) >= config.priceMoveLikely,
+  };
 }
 
 // ─── V for every legal swap ──────────────────────────────────────────────────
@@ -332,11 +366,10 @@ function ceilingTarget(run, pairs) {
  *
  * A dead slot: expected GWs unavailable over the horizon reach deadSlotMinGws.
  * A hold: flagged now, his availability reaches recoveredAvailability inside
- * the horizon, and no fall in his sell price is expected.
- * MODEL: no price signal counts as no fall expected until Phase 5.
+ * the horizon, and no fall in his sell price is likely.
  */
 function structureSignals(run) {
-  const { config, modeGws, input } = run;
+  const { config, modeGws } = run;
   const mode = config.modes.structure;
   const weights = masked(run, weightsOf(run, mode));
   const losses = modeGws.map(gw => uncoveredLoss(run.ids, gw, run.overlay, run.valueOpts(gw)));
@@ -348,15 +381,14 @@ function structureSignals(run) {
     sum(availabilities(id).map(a => 1 - a)) >= mode.deadSlotMinGws;
   const holds = new Set(run.owned.map(p => p.playerId).filter(id => {
     const a = availabilities(id);
-    return a[0] < 1 && a.some(x => x >= mode.recoveredAvailability)
-      && input.priceSignals?.[id]?.fallLikely !== true;
+    return a[0] < 1 && a.some(x => x >= mode.recoveredAvailability) && !run.outlook.get(id).fallLikely;
   }));
   return { uncovered, isDeadSlot, holds };
 }
 
 // ─── Scoring one mode ────────────────────────────────────────────────────────
 
-function scoreMode(run, { modeId, mode, weights, share, pairs, ceiling, structure }) {
+function scoreMode(run, { modeId, mode, raw, weights, share, pairs, ceiling, structure }) {
   const { config, cost } = run;
   const lambda = mode.lambda ?? config.lambdaDefault;
   const gate = mode.pZeroGate;
@@ -379,7 +411,9 @@ function scoreMode(run, { modeId, mode, weights, share, pairs, ceiling, structur
     const record = {
       pair, perGw, deltaEv,
       fundsTerm: lambda * fromTenths(pair.moneyFreed) * share,
-      priceTerm: 0,
+      // The change his sell price can expect before the next chance to act,
+      // valued like money freed: selling now gains a likely fall it avoids.
+      priceTerm: lambda * fromTenths(run.outlook.get(pair.p.playerId).expected) * share,
       deadSlotTerm: 0,
       efficiency: null,
       chained: null,
@@ -420,9 +454,16 @@ function scoreMode(run, { modeId, mode, weights, share, pairs, ceiling, structur
 
   // A move is made only when it beats rolling (Q7); Long term also keeps the
   // brief's own gate: the squad gain alone must beat the transfer's cost.
+  // Money and price break ties but never make a move alone (brief §7 Phase 5):
+  // with no squad gain and no second move to pay for, only Funds moves, and
+  // only for minFreedTenths or more - at five banked FTs a move costs nothing,
+  // so £0.1m would otherwise be enough.
+  const forMoneyAlone = r => r.deltaEv + r.deadSlotTerm <= 0 && !r.chained
+    && (modeId !== 'funds' || r.pair.moneyFreed < mode.minFreedTenths);
   const admissible = records.filter(r => eligibleSeller(r.pair.p.playerId)
     && r.outScore > mode.threshold
-    && (modeId !== 'longterm' || r.deltaEv > cost));
+    && (modeId !== 'longterm' || r.deltaEv > cost)
+    && !forMoneyAlone(r));
   const [rootRecord, ...rest] = admissible;
   const root = rootRecord ? bestOrBuild(run, modeId, weights, rootRecord, bestByOwner) : null;
   const alternatives = rootRecord
@@ -431,20 +472,73 @@ function scoreMode(run, { modeId, mode, weights, share, pairs, ceiling, structur
       .map(r => bestOrBuild(run, modeId, weights, r, bestByOwner))
     : [];
 
+  const deferral = modeId === 'future' && rootRecord ? deferralOf(run, mode, raw, rootRecord) : null;
   const summary = {
     modeId,
     label: mode.label,
     weights,
-    call: root ? 'move' : 'roll',
+    call: deferral ? 'wait' : root ? 'move' : 'roll',
     root,
     rollValue: cost,
     alternatives,
-    waitForNews: false,
-    deferral: null,
+    waitForNews: modeId === 'now' && root !== null && waitsForNews(run, root),
+    deferral,
     robustness: null,
   };
   if (modeId === 'ceiling') summary.targetGw = ceiling.targetGw;
   return { summary, bestByOwner };
+}
+
+/**
+ * Future prep's deferral test (brief §6, mode 3): the same move made a week
+ * later, scored as the mode would score it then - its weights one GW on (the
+ * sixth projected GW is used here only), the money its prices are expected to
+ * leave, and the cost of the free transfer that rolling now would bank. Within
+ * deferralEpsilon of making it now, the mode waits - unless a likely price
+ * move would put the buy out of reach by then, or free transfers are at the
+ * cap, where waiting would roll one away (brief §10).
+ *
+ * @returns {{gw: number, laterScore: number, epsilon: number}|null}  null: make it now
+ */
+function deferralOf(run, mode, raw, record) {
+  const { config, input } = run;
+  if (input.freeTransfers >= config.maxBankedFt) return null;
+  const { p, q } = record.pair;
+  const gws = run.modeGws.map(gw => gw + 1);
+  const weights = raw.map((w, k) => (run.zeroed(gws[k]) ? 0 : w));
+  const total = sum(raw);
+  const share = total > 0 ? sum(weights) / total : 0;
+  const ids = swapIn(run.ids, p.playerId, q.id);
+  const key = `${p.playerId}>${q.id}`;
+  const deltaEv = sum(gws.map((gw, k) => (weights[k] === 0 ? 0
+    : weights[k] * (run.value(gw, ids, key) - run.value(gw, run.ids, 'S')))));
+
+  const outlook = run.outlook.get(p.playerId);
+  const qPrice = toTenths(q.price);
+  const qSignal = input.priceSignals?.[q.id];
+  const moneyLater = p.sellPriceTenths + outlook.expected - qPrice - (qSignal ? qSignal.rise - qSignal.fall : 0);
+  const lambda = mode.lambda ?? config.lambdaDefault;
+  const laterScore = deltaEv + (lambda * fromTenths(moneyLater) * share)
+    - transferCost(Math.min(input.freeTransfers + 1, config.maxBankedFt), config);
+
+  const reach = run.state.bankTenths + p.sellPriceTenths + (outlook.fallLikely ? outlook.down : 0);
+  const outOfReach = qPrice + (run.riseLikely(q.id) ? 1 : 0) > reach;
+  if (outOfReach || laterScore < record.outScore - mode.deferralEpsilon) return null;
+  return { gw: input.planningGw + 1, laterScore, epsilon: mode.deferralEpsilon };
+}
+
+/**
+ * Now's "wait for team news" (brief §6, mode 1): a flagged player is in its
+ * move, the press conferences are still to come (more than
+ * waitForNewsMinHours to the deadline), and waiting costs nothing in price - no
+ * likely fall in the seller's sell price, no likely rise in the buy's price.
+ */
+function waitsForNews(run, move) {
+  const hours = run.input.hoursToDeadline;
+  return move.tags.includes('pendingNews')
+    && Number.isFinite(hours) && hours > run.config.waitForNewsMinHours
+    && !run.outlook.get(move.outId).fallLikely
+    && !run.riseLikely(move.inId);
 }
 
 /** Reuse the per-owner Move object when the record is that owner's best. */
@@ -603,7 +697,24 @@ function explain(run, weights, record, freeTransfers, tags) {
     costText = `Uses a free transfer worth ${transferCost(freeTransfers, config).toFixed(1)} points if rolled.`;
   }
 
-  return { squad, funds, price: null, cost: costText };
+  return { squad, funds, price: priceText(run, p, q), cost: costText };
+}
+
+/** The price moves likely before the next chance to act, as they bear on this move; null with none. */
+function priceText(run, p, q) {
+  const name = id => run.names.get(id) ?? String(id);
+  const outlook = run.outlook.get(p.playerId);
+  const lines = [];
+  if (outlook.fallLikely) {
+    lines.push(`${name(p.playerId)}'s price is likely to fall soon, taking ${money(-outlook.down)} off his sell price: selling now avoids it.`);
+  }
+  if (outlook.riseLikely) {
+    lines.push(`${name(p.playerId)}'s price is likely to rise soon, adding ${money(outlook.up)} to his sell price if kept.`);
+  }
+  if (run.riseLikely(q.id)) lines.push(`${name(q.id)}'s price is likely to rise soon: buying now costs £0.1m less.`);
+  if (lines.length === 0) return null;
+  const estimated = [p.playerId, q.id].some(id => run.input.priceSignals?.[id]?.source === 'estimate');
+  return lines.join(' ') + (estimated ? ' (Estimated from this week’s transfers.)' : '');
 }
 
 // ─── Players, lineup, chip hints ─────────────────────────────────────────────
@@ -616,6 +727,8 @@ function flagsFor(run, p, { rootSells, ceiling, structure }) {
   if (run.locks.has(p.playerId)) flags.push('locked');
   if (pendingNews(run.gwOf(p.playerId, run.modeGws[0]))) flags.push('pendingNews');
   if (p.sellPriceEstimated) flags.push('sellPriceEstimated');
+  if (run.outlook.get(p.playerId).fallLikely) flags.push('priceFall');
+  if (run.outlook.get(p.playerId).riseLikely) flags.push('priceRise');
   return flags;
 }
 

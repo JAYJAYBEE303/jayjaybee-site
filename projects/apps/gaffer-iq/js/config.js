@@ -1333,6 +1333,17 @@ export const DECISION_ENGINE = {
   // The minutes-risk badge on a move's two players, from pZero in the planning GW.
   minutesRiskPZero: { medium: 0.1, high: 0.3 },
 
+  // ── Prices and timing (engine/price-adapter.js, plan Phase 5) ──
+  // A price move whose chance within FPL's predictor window reaches this is
+  // likely (FPL's own bands put 95% progress one step from a change). A likely
+  // fall in a seller's sell price stops Structure's hold and Now's wait for
+  // team news; a likely move that would put a buy out of reach stops Future
+  // prep's deferral.
+  priceMoveLikely: 0.95,
+  // Now waits for team news only with more than this many hours to the
+  // deadline: until then the press conferences are still to come.
+  waitForNewsMinHours: 24,
+
   // ── Projections (engine/projections.js, plan §2.2) ──
   // Gameweeks projected from the planning gameweek on (brief §3).
   horizonGws: 6,
@@ -1437,6 +1448,10 @@ export const DECISION_ENGINE = {
       // The brief gives 0.10-0.20; the midpoint until Phase 7 tunes it.
       lambda: 0.15,
       threshold: 0,
+      // The deferral test (brief §6): when the same move made next week, on
+      // the free transfer then banked, scores within this many points of
+      // making it now, the mode waits. Not tuned: Phase 7.
+      deferralEpsilon: 0.25,
     },
     funds: {
       label: 'Funds & flexibility',
@@ -1453,6 +1468,10 @@ export const DECISION_ENGINE = {
       eps: 0.1,
       chainTopK: 5,
       threshold: 0,
+      // A downgrade made for money alone - no squad gain, no second move it
+      // pays for - must free at least this much (tenths of £1m): never a
+      // transfer for £0.1m (brief §7 Phase 5).
+      minFreedTenths: 5,
     },
     ceiling: {
       label: 'Ceiling',

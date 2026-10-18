@@ -269,7 +269,8 @@ window.__verify.pairingPlayers()
 The Planner runs the decision engine (`FEATURE_ENGINE.md` §14,
 `docs/decision-engine-plan.md`). `npm test` covers the engine
 (`tests/engine/decision.test.js`, `projections.test.js`, `squad-value.test.js`,
-`minutes.test.js`), the minutes model's fitting tool (`tests/tools/minutes.test.js`)
+`minutes.test.js`, `price-adapter.test.js`), the minutes model's fitting tool
+(`tests/tools/minutes.test.js`)
 and the module's pure helpers (`tests/modules/planner.test.js`). The checklist
 below is the in-browser gate after a change to the engine, to `DECISION_ENGINE`
 in `config.js`, or to `modules/planner.js`.
@@ -306,6 +307,15 @@ s.setSquad([].concat(pick('GKP', 2), pick('DEF', 5), pick('MID', 5), pick('FWD',
       after.
 - [ ] The sell / hold table sorts by each sortable column both ways (no figure
       last) and follows the mode pills; a locked row carries the accent bar.
+- [ ] A player whose price FPL projects past its threshold carries Falling or
+      Rising in the table when it would change his sell price, and a move
+      selling him says so in its why lines. Without the predictor fields the
+      flags' titles say they are estimated from this week's transfers.
+- [ ] A Future prep card reading WAIT names the move and what it scores next
+      week against now; at five banked free transfers it never waits.
+- [ ] With a doubtful player in Now's move and more than a day to the
+      deadline, the card says to wait for team news; inside the last day it
+      says team news is pending instead.
 - [ ] The squad drawer's bench / start / C markers agree with the Captain and
       XI panel.
 - [ ] While a gameweek is in play, the live-round note names the matches still

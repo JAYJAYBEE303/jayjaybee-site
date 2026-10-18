@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  normaliseFixture, deriveUpcomingGw, deriveEventCompletion,
+  normalisePlayer, normaliseFixture, deriveUpcomingGw, deriveEventCompletion,
   normaliseGwStat, normaliseEntryPicks, normaliseEntryTransfers, normaliseEntryHistory,
   normaliseLiveGw, buildBootstrapSnapshot,
 } from '../../js/engine/normalise.js';
@@ -314,4 +314,16 @@ test('buildBootstrapSnapshot stamps both times and keeps the gameweek calendar',
     { id: 8, deadline_time: '2026-10-17T17:30:00Z', finished: false, data_checked: false,
       is_current: false, is_next: true },
   ]);
+});
+
+// ─── FPL's price-change predictor ────────────────────────────────────────────
+
+test('normalisePlayer passes FPL\'s price-change predictor through untouched, for the price adapter alone to read', () => {
+  const predictor = {
+    price_change_percent: '-56.6',
+    price_change_projections: [{ offset: 0, projected_percent: '-56.6', likelihood: -3 }],
+    price_change_calibrating: false,
+  };
+  assert.deepEqual(normalisePlayer({ ...RAW_ELEMENT, ...predictor }).priceFeed, predictor);
+  assert.equal(normalisePlayer(RAW_ELEMENT).priceFeed, null);
 });

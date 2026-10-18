@@ -248,9 +248,19 @@ export function normalisePlayer(raw) {
     // engine/prices.js → calcSeasonPriceChange, rather than at every call site.
     // Present in bootstrap-static.elements[]; zero-safe.
     costChangeStart:   raw.cost_change_start   || 0,
+    // FPL's 2026/27 price-change predictor (price_change_* fields), passed
+    // through untouched: the fields are undocumented, so engine/price-adapter.js
+    // is the only place that reads them. null when bootstrap-static has none.
+    priceFeed:         priceFeedOf(raw),
     history: null,   // populated lazily by normalisePlayerSummary
     form:    null,   // filled by engine/form.js
   };
+}
+
+/** Every price_change_* field of a raw element, values untouched; null with none. */
+function priceFeedOf(raw) {
+  const entries = Object.entries(raw).filter(([key]) => key.startsWith('price_change_'));
+  return entries.length > 0 ? Object.fromEntries(entries) : null;
 }
 
 /**

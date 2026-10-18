@@ -117,6 +117,7 @@ jayjaybee-site/                   ← repo root (not Gaffer IQ's concern)
             │   ├── ledger.js
             │   ├── feasibility.js
             │   ├── minutes.js
+            │   ├── price-adapter.js
             │   ├── projections.js
             │   ├── squad-value.js
             │   └── decision.js
@@ -193,6 +194,8 @@ gaffer-iq/                          (= projects/gaffer-iq/ in the repo)
     │   ├── feasibility.js      # Whether FPL would accept one transfer (decision engine).
     │   ├── minutes.js          # The minutes model: features from a player's record and the
     │   │                       #   fitted appear / start / 60-minute heads (tools/minutes).
+    │   ├── price-adapter.js    # The only reader of FPL's undocumented price-change predictor:
+    │   │                       #   chances of a fall / rise, or the transfer-flow estimate.
     │   ├── projections.js      # Per player, per GW of the horizon: xpts, pZero, xptsIfPlays,
     │   │                       #   pStart, p60 - the decision engine's data contract.
     │   ├── squad-value.js      # V_t(S): best XI + captain + expected autosubs (+ Bench Boost).

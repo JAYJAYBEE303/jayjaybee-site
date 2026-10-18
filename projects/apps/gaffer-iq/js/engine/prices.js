@@ -4,7 +4,8 @@
  * Predicts imminent FPL price rises and falls from in-GW transfer flow.
  * Inputs come from the normalised Player model (transfersInEvent,
  * transfersOutEvent, ownership) - all already present in bootstrap-static.
- * No new API calls are required.
+ * No new API calls are required. engine/price-adapter.js falls back to
+ * calcPriceChangeRisk where FPL's own price predictor is missing.
  * See ROADMAP.md Phase 4-4, ARCHITECTURE.md §8.
  */
 

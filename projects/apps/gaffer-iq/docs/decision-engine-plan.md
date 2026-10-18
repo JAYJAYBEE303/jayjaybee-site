@@ -5,8 +5,8 @@ revision 1 against the code and the brief: 58 findings, 44 confirmed and folded
 in below).
 Status: **approved**; grill-me questions Q1-Q10 answered (§7). Phase 1 done
 (`f4ef63f`); Phase 2 done (`cfad609`); Phase 3 done (`3870fc1`, review fixes
-`94d309a`); UI phase done (`17db173`, review fixes `3564ffc`); Phase 4 done,
-awaiting your check. Where the build departed from this plan, the text below
+`94d309a`); UI phase done (`17db173`, review fixes `3564ffc`); Phase 4 done
+(`a713624`); Phase 5 done, awaiting your check. Where the build departed from this plan, the text below
 was updated to match it.
 Brief: `fpl-decision-engine-brief.md` (16 Oct 2026). Section numbers below
 (§3, §5 ...) refer to the brief unless prefixed with a file name.
@@ -346,7 +346,8 @@ input = {
   locks: Set<playerId>, bans: Set<playerId>,
   projections,        // from buildProjections, for the squad and every candidate
   candidates,         // Player[]: every possible replacement (no cap); the engine applies checkSwap
-  priceSignals,       // Phase 5 adapter output, or null
+  priceSignals,       // Phase 5: priceSignals() of price-adapter.js, { [id]: { fall, rise, source } }, or null
+  hoursToDeadline,    // Phase 5: to the planning GW's deadline, or null (Now then never waits for team news)
 }
 // The engine prices each sale itself (calcSellPrice). The cache holds V per
 // (gw, swap) between runs and empties itself when the projections, the squad,
@@ -359,14 +360,16 @@ DecisionResult = {
     root: Move | null,
     rollValue,                       // display only: the value of the FT kept by rolling
     alternatives: Move[],            // within `alternativesWindow` points, at most `alternativesMax`
-    waitForNews: boolean, deferral: { laterScore, epsilon } | null,   // Phase 5
+    waitForNews: boolean, deferral: { gw, laterScore, epsilon } | null,   // Phase 5; call 'wait' with a deferral
     robustness: number | null,       // Phase 6
     targetGw,                        // Ceiling only: t*, null when a planned chip covers every GW
   } },
   players: [{ playerId, sellPriceTenths,   // what he sells for (flagged sellPriceEstimated without a ledger entry)
     keepValue: { [modeId]: number }, outScore: { [modeId]: number | null },
     best: { [modeId]: Move | null }, // full components for every owned player, every mode; null with no legal move
-    flags: Array<'sell' | 'hold' | 'protected' | 'locked' | 'pendingNews' | 'sellPriceEstimated'>,
+    flags: Array<'sell' | 'hold' | 'protected' | 'locked' | 'pendingNews' | 'sellPriceEstimated'
+      | 'priceFall' | 'priceRise'>,  // a likely move that would change his sell price (Phase 5)
+    priceSource: 'fpl' | 'estimate' | null,
     lockValue: number | null,        // null: no affordable replacement (or no t*), so no sale to protect against
     uncoveredLoss: number }],        // mode 6's structural exposure, Structure-weighted
   lineup: { xi, bench, captainId, viceId, captainGap, nextCaptainId },
@@ -387,7 +390,7 @@ Move = {
   minutesRisk: { out: Risk, in: Risk },   // Risk 'low' | 'medium' | 'high' by pZero in the planning GW; 'blank' with no fixture
   chained: Move | null,              // mode 4 only
   tags: Array<'blankGwOneWeek' | 'sellPriceEstimated' | 'pendingNews'>,
-  why: { squad, funds, price, cost }, // plain-English sentences, built in the engine; price null until Phase 5
+  why: { squad, funds, price, cost }, // plain-English sentences, built in the engine; price null with no likely price move
 }
 ```
 
@@ -431,11 +434,12 @@ export const DECISION_ENGINE = {
   minutesModel: { appear, start, p60, ahead },   // fitted by tools/minutes (Phase 4); null runs v1
   seasonMaxAgeMinutes: 60, snapshotMinIntervalMinutes: 360,
   minutesRiskPZero: { medium: 0.1, high: 0.3 },
+  priceMoveLikely: 0.95, waitForNewsMinHours: 24,   // Phase 5
   modes: {   // each also has a label
     now:       { weights, lambda: 0, pZeroGate: 0.25, threshold: 0 },
     longterm:  { weights, lambda: 0.10, threshold: 0 },
-    future:    { weights, lambda: 0.15, threshold: 0 },          // deferralEpsilon arrives in Phase 5
-    funds:     { weights: 'decay', tau: 1.0, eps: 0.1, chainTopK: 5, threshold: 0 },   // decayBase^k; lambda: lambdaDefault
+    future:    { weights, lambda: 0.15, threshold: 0, deferralEpsilon: 0.25 },
+    funds:     { weights: 'decay', tau: 1.0, eps: 0.1, chainTopK: 5, threshold: 0, minFreedTenths: 5 },   // decayBase^k; lambda: lambdaDefault
     ceiling:   { targetWeight: 1, otherWeight: 0.1, lambda: 0, lockThreshold: 3, threshold: 0 },
     structure: { weights, lambda: 0.10, deadSlotMinGws: 2, deadSlotPenalty: 1, recoveredAvailability: 0.9, threshold: 0 },
   },
@@ -458,7 +462,7 @@ when OutScore > 0, i.e. it beats rolling after the FT value or hit is paid
 1. **No server-side store.** Resolved: the ledger is a pure function over the public transfers endpoint, cached in `localStorage`; snapshots are captured in the browser on each visit and kept in IndexedDB (Q1).
 2. **Snapshots live on one device and have gaps.** Browser capture records only on days the app is opened, only in that browser. Phase 4 and Phase 7 read snapshots through an "Export snapshots" JSON download; a missed day is a missing row, never an interpolated one; clearing site data loses history (the export is the backup). Nothing runs outside `projects/apps/gaffer-iq/`.
 3. **Network.** You will allow `fantasy.premierleague.com` in this environment (Q3). When re-checked on 17 Oct it was still refused; `raw.githubusercontent.com` (vaastav) is reachable. Until the FPL host is allowed, Phases 1-3 run on synthetic squads, and the live checks (price-predictor fields, real-squad timing, ledger and Free Hit import against a real account) wait. Separately, the client calls the **production** proxy by absolute URL (`js/api.js` `PROXY_BASE_URL`), so the two new ledger routes only answer once this branch is merged and the `gaffer-iq` project deploys; until then the import carries on without purchase prices (each falls back to the current price, flagged).
-4. **Price-predictor fields are unverified** (risk 3). Phase 5 isolates them in one adapter file; if they are absent, the adapter falls back to `calcPriceChangeRisk`, flagged as an estimate. Snapshots keep unknown element fields from Phase 1 on, so the fields are logged even before the adapter reads them.
+4. **Price-predictor fields are undocumented** (risk 3). Phase 5 isolates them in one adapter file; if they are absent, the adapter falls back to `calcPriceChangeRisk`, flagged as an estimate. Snapshots keep unknown element fields from Phase 1 on, so the fields are logged even before the adapter reads them. Phase 5 read their shape from vaastav's 2026-27 capture of bootstrap-static (FPL itself is still unreachable here); a live check against FPL is still owed.
 5. **The MILP referee is Python.** open-fpl-solver needs Python + HiGHS; the repo says "zero Python anywhere in the stack". Phase 8 would run it as an offline tool outside the served app, or port the formulation to Node with a WASM HiGHS build (licence check first). Decide at Phase 8.
 6. **Performance (measured on synthetic data).** The real `scorePlayer` took 430 ms for 255 players x 6 single-GW calls and 570 ms for 615 x 6, so projecting every feasible candidate fits the 5 s budget; **no candidate cap**, as the brief decided brute force. `pickStartingXI` costs ~3 us, so single-swap enumeration (~5-15k `V` calls) is cheap. The two things that would not fit, unbounded mode 4 chaining (~1M `V` calls) and synchronous robustness, are bounded in §5.2. If Phase 3 measurement still blows the budget, a capped pre-filter comes back to you as a question, with its criterion. Measured in Phase 2: `buildProjections` takes 0.3 s for the real 616-player pool (vaastav 2026-27) and 0.8 s for a synthetic 620-player one, 6 GWs, real scorer; `squadValue` takes 43 us a call in probability mode and 7 us in linear mode, so a 15.7k-call cache fill (every same-position swap x 6 GWs on that pool) is ~0.7 s.
 7. **Brief inconsistencies, read as follows** (confirmed, Q10): `horizon_gws: 6` vs five weights per mode (plan: the 6th GW is used only by the mode 3 deferral test); mode 3 is titled "GW+3..+5" but its weights cover GW+1..+5 (plan: use the weights as written); Ceiling's upper tail does not exist before Phase 7 (plan: Phase 3 ships Ceiling on the mean at t\*, labelled as such). Mode 4's lambda "derived (see below)" is read from the same row: the funds credit is the chained second move's net gain, else `lambdaDefault`.
@@ -576,7 +580,7 @@ before the previous one passes. Phases 1, 2, 3 and 5 are strictly sequential.
 - **Measured:** the real 2025-26 league rebuilt as of GW20 from vaastav (790 players, live table GW1-19, the 15 most-selected players): projections 1.6 s, all six modes 0.7 s cold, a lock re-run 45 ms; the synthetic 600-candidate test asserts < 5 s and < 200 ms (with real squad prices and an FPL-like price spread, so the lock re-run searches new Funds chains: about 100 ms here).
 - **Review fixes** (the commit after `3870fc1`): a Free Hit / Wildcard GW counts for nothing, so a mode whose every GW a planned chip covers now rolls instead of moving on money alone, and money freed and the dead-slot penalty count only for the share of a mode's weight no chip covers (a Wildcard budget is the squad's value either way); chip plans for GWs already gone are ignored; t\* is never a covered GW (none when all are); `alternativesMax` is its own key, apart from the points window; Funds' weights are `decayBase^k` at run time; the V cache keys planned chips by GW; every preset must weigh as many GWs as Now; a player with no fixture reads `minutesRisk` 'blank', not 'high'; a move's text names only the GWs it counts; no Bench Boost / Triple Captain week is hinted at or after a planned Wildcard.
 - **Funds ranks by OutScore**, as every mode does (brief §5's max over q, which is where the chained second move's credit counts); efficiency, money freed per point lost, picks the `chainTopK` downgrades searched for a chain and is shown on the move.
-- **Open for Phase 5 (Q7's threshold):** at 5 banked FTs the cost is 0, so Future prep, Funds and Structure (no DeltaEV gate) can recommend a swap whose only gain is a little money freed (OutScore +0.01). It follows Q7 as decided; the hit threshold and FT economics in Phase 5 are where to revisit it.
+- **Open for Phase 5 (Q7's threshold):** at 5 banked FTs the cost is 0, so Future prep, Funds and Structure (no DeltaEV gate) can recommend a swap whose only gain is a little money freed (OutScore +0.01). It follows Q7 as decided; the hit threshold and FT economics in Phase 5 are where to revisit it. (Resolved in Phase 5: money never makes a move on its own; see its As built.)
 
 ### UI (brief §8) - after Phase 3, may run alongside Phase 4
 
@@ -646,6 +650,43 @@ before the previous one passes. Phases 1, 2, 3 and 5 are strictly sequential.
 **Acceptance (tests first)** FT cost table: banked 0 -> hit cost + margin, 1 -> 1.5, 2 -> 1.0, 4 -> 0.3, 5 -> 0 (flat mode at 5 also 0); deferral test and its affordability exception; price term is zero when a fall does not change the sell price (odd-tenths profit case); the fallback path is tested; a decision on money-only moves at 5 banked FTs (Phase 3 notes).
 
 **Review** `requesting-code-review`.
+
+**As built** (`js/engine/price-adapter.js`, `js/engine/decision.js`; tests `tests/engine/price-adapter.test.js`, `decision.test.js`)
+
+- **The adapter** is the only reader of FPL's predictor. `normalise.js` passes every `price_change_*` field through untouched as `player.priceFeed`. Their shape, read from vaastav's 2026-27 capture of bootstrap-static:
+  - `price_change_percent` is a player's progress towards a price change, signed (rise positive), where 100 makes the change.
+  - `price_change_projections` holds the progress FPL projects at its next three updates (offsets 0-2). Each entry has a `likelihood`, which is only a coarse band of the projected percent (±5 at 100 or more, ±4 at 95-100, and so on).
+  - `price_change_locked_until` and `price_change_hourly_rate` are not read; locked players project 0 anyway.
+  - A player's chance of a fall (or rise) is the furthest progress FPL projects towards it, as a share of the threshold, at most 1.
+  - While FPL calibrates a player, or without the fields, `calcPriceChangeRisk`'s transfer-flow confidence stands in, flagged `estimate`.
+  - On that capture, 615 of 616 players read from FPL; 53 had a likely fall and 11 a likely rise.
+- **PriceTerm** = lambda x the expected change in sell(p) x the mode's unmasked weight share. The expected change is each chance times what one fall or rise does to his sell price, so a fall from an odd-tenths profit counts nothing. At lambda 0.10 it is worth at most 0.01 points: a tie-break, as the brief wants.
+- **Likely** = a chance of at least `priceMoveLikely` (0.95: FPL's own bands 4 and 5). A likely fall that lowers a seller's sell price stops Structure's hold and Now's wait for team news. Owned players whose sell price a likely move would change are flagged `priceFall` / `priceRise` ("Falling" / "Rising" in the table), and the move's `why.price` says what selling now gains or what buying now saves.
+- **Future prep's deferral** (`call: 'wait'`, `deferral: { gw, laterScore, epsilon }`):
+  - The root move is scored as the mode would score it next week: its weights one GW on, which is the only use of the sixth projected GW (risk 7); the money its prices are expected to leave; and the free transfer then banked, `transferCost(min(ft + 1, maxBankedFt))`.
+  - Within `deferralEpsilon` (0.25) of making it now, the mode waits.
+  - It does not wait when a likely fall in p's sell price or rise in q's price would put q out of reach (the brief's exception), nor at the free-transfer cap, where waiting would roll one away (brief §10).
+  - A waiting mode's seller is not flagged `sell`.
+- **Now's `waitForNews`.** All of these must hold:
+  - a flagged (doubtful) player is in its move;
+  - more than `waitForNewsMinHours` (24) remain to the deadline, so the press conferences are still to come; the planner passes `hoursToDeadline` from the event's deadline;
+  - no likely fall lowers the seller's sell price and no likely rise lifts the buy's price.
+- **Money alone never makes a move** (the Phase 3 open item, resolved). A move with no squad gain (DeltaEV + dead-slot term ≤ 0) and no second move it pays for is not made in any mode but Funds. Funds makes it only when it frees at least `minFreedTenths` (£0.5m). Otherwise, at five banked FTs, a £0.1m downgrade cleared Q7's threshold.
+- **Already in place from Phase 3:** the FT cost table and the hit threshold, with their tests (0 -> 6, 1 -> 1.5, 2 -> 1.0, 4 -> 0.3, 5 -> 0, flat at 5 -> 0).
+- **UI.**
+  - A waiting Future prep card reads WAIT with a muted top bar. It says what the move scores if made next week against now, keeps the sell and buy rows with their Don't sell / Don't buy, and shows the price line when there is one.
+  - Now's card says "Wait for team news" when it waits, and keeps the old "Team news pending" note otherwise.
+  - The table shows Falling / Rising flags, red and green, AA on every surface; their title says when the signal is the transfer-flow estimate.
+- **Readings and defaults to check** (all in `config.js`, untuned):
+  - `priceMoveLikely` 0.95, `waitForNewsMinHours` 24, `deferralEpsilon` 0.25, `minFreedTenths` 5.
+  - Progress-as-chance for an undocumented field.
+  - Now's wait also needs no likely rise in the buy's price; the brief names only a fall.
+  - The deadline clock is the browser's.
+- **Verified** in headless Chromium on the 2025-26 GW20 payloads, with predictor fields injected:
+  - Future prep shows WAIT for M.Salah -> Gravenberch, +1.2 next week against +0.8 now, with the price line; Funds and Structure show it too, and Salah's row is flagged Falling.
+  - Removing the fields falls back to the estimate without errors.
+  - With the deadline 2099, a 25% Haaland in Now's move shows "Wait for team news"; with it 6 hours away, "Team news pending".
+  - 360 px has no sideways scroll; no page errors; cards about 2 s after a reload, as before; an FT change repaints in about 150 ms.
 
 ### Phase 6: Robustness layer
 

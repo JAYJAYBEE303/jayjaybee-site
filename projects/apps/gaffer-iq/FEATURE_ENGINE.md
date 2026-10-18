@@ -1213,7 +1213,7 @@ Still deliberately **not** applied to the Ranker's Next Fixture chip, the per-GW
 
 ---
 
-## 14. Transfer Planner: the decision engine (`engine/projections.js`, `engine/minutes.js`, `engine/squad-value.js`, `engine/decision.js`)
+## 14. Transfer Planner: the decision engine (`engine/projections.js`, `engine/minutes.js`, `engine/price-adapter.js`, `engine/squad-value.js`, `engine/decision.js`)
 
 The five lanes and the weekly verdict that lived here (`engine/transfers.js`, `engine/strategy.js`) are gone. In their place, every legal single transfer is scored by what it does to the whole squad's value V_t(S) over the next five gameweeks, and six modes - parameter presets of that one calculation - each name one move or "roll". The data contract, formulas, modes and config are in `docs/decision-engine-plan.md` (§2.2, §5) until its Final phase writes them up as `docs/decision-engine.md`. The old design stays in `docs/superpowers/specs/2026-08-30-planner-multi-lens-transfers-design.md` as history (superseded).
 
@@ -1228,6 +1228,22 @@ A player's chances of appearing, starting and playing 60 minutes in a fixture he
 Availability is not part of the model. `engine/projections.js` multiplies the chances by FPL's flag and its recovery (`absenceCarryOver`), and excuses a flagged player's current absence before his features are read; an unflagged player's zero run counts, as a dropping. Without the minutes tables, or for a player with no record, the v1 rates (`docs/decision-engine-plan.md` §2.2) stand in, flagged `estimated` and `p60Approx`.
 
 On the held-out 2025-26 season the model's P(60+) for the next gameweek scores a Brier of 0.081, against 0.106 for the last-5-starts baseline; on the players the v1 rates covered, 0.080 against v1's 0.104. `tools/minutes/REPORT.md` has the full test: calibration, return categories, gameweeks ahead, and the features tried and dropped. To refit, run `node tools/minutes/download.js && node tools/minutes/fit.js` from the app folder, then paste the block the report ends with into `config.js`.
+
+### 14.3 Prices and timing (`engine/price-adapter.js`)
+
+FPL's 2026/27 price-change predictor is undocumented, so one file reads it. `normalise.js` passes every `price_change_*` field through untouched as `player.priceFeed`. The adapter turns it into a chance of a fall and of a rise: the furthest progress towards the change threshold FPL projects over its next updates, at most 1. Where FPL is calibrating a player, or the fields are missing, the transfer-flow estimate `calcPriceChangeRisk` stands in, flagged.
+
+**Where prices enter the engine**
+- **Sell price only.** They act on what a player SELLS for, never on his price, so a fall from an odd-tenths profit costs nothing.
+- **A tie-break, never a reason.** PriceTerm is lambda times the expected change in his sell price: at most a hundredth of a point. Money alone never makes a move, except in Funds, which needs at least £0.5m freed.
+
+**Where prices time the calls**
+- **Future prep waits** when the same move made next week, on the free transfer then banked, scores within `deferralEpsilon`. It does not wait at the free-transfer cap, or when a likely price move would put the buy out of reach.
+- **Now flags "wait for team news"** when all of these hold:
+  - a doubtful player is in its move;
+  - more than a day is left to the deadline;
+  - neither player's price is likely to move against you first.
+- **Structure stops holding** a recovering player whose sell price is likely to fall.
 
 ---
 
