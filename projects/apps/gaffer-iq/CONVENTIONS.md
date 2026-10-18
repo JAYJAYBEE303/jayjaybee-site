@@ -38,7 +38,7 @@ Read `ARCHITECTURE.md` first for the file structure and layering rules this docu
 - `SCREAMING_SNAKE_CASE` for true constants defined in `config.js` (tunable model parameters and fixed config): `FORM_WINDOW_GWS`, `WEIGHTS`, `HORIZONS`.
 - Booleans read as assertions: prefix with `is`, `has`, `should`, `can`. `isHome`, `hasPlayed`, `shouldDecay`.
 - IDs are always suffixed `Id`/`Ids`: `teamId`, `playerId`, `fixtureIds`. Never bare `id` in a multi-entity context.
-- Never use raw FPL field names (`element_type`, `team_h_difficulty`) outside `engine/normalise.js`. The rest of the codebase speaks the internal model (see `ARCHITECTURE.md` §8).
+- Never use raw FPL field names (`element_type`, `team_h_difficulty`) outside `engine/normalise.js`. The rest of the codebase speaks the internal model (see `ARCHITECTURE.md` §8). The one exception: `engine/price-adapter.js` reads FPL's undocumented price-predictor fields from `player.priceFeed`, which normalise.js passes through untouched.
 
 ### 3.2 Function naming - by layer
 

@@ -40,6 +40,10 @@ test('a rise reads the same way, from the furthest the projections reach', () =>
   assert.equal(signal.fall, 0);
 });
 
+test('FPL\'s "-0.0" reads as no move at all, not a negative zero', () => {
+  assert.deepEqual(priceSignal(player(feed('-0.0', ['-0.0', '-0.0', '-0.0']))), { fall: 0, rise: 0, source: 'fpl' });
+});
+
 test('without projections his current progress stands alone', () => {
   close(priceSignal(player({ price_change_percent: '-75.0', price_change_calibrating: false })).fall, 0.75);
 });

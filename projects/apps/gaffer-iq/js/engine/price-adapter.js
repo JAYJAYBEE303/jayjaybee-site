@@ -31,8 +31,8 @@ export function priceSignal(player) {
   const progress = feed && feed.price_change_calibrating !== true ? projectedProgress(feed) : [];
   if (progress.length > 0) {
     return {
-      fall:   clamp(0, 1, -Math.min(...progress) / PERCENT),
-      rise:   clamp(0, 1, Math.max(...progress) / PERCENT),
+      fall:   chance(-Math.min(...progress) / PERCENT),
+      rise:   chance(Math.max(...progress) / PERCENT),
       source: 'fpl',
     };
   }
@@ -48,6 +48,9 @@ export function priceSignal(player) {
 export function priceSignals(players) {
   return Object.fromEntries(players.map(p => [p.id, priceSignal(p)]));
 }
+
+/** A share of the threshold as a chance, 0-1; FPL's "-0.0" gives 0, not -0. */
+const chance = share => clamp(0, 1, share) || 0;
 
 /** The progress FPL projects at each update it gives, or his current progress alone. */
 function projectedProgress(feed) {

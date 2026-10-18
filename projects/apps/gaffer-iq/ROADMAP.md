@@ -83,10 +83,10 @@ With the pipeline and scoring proven, go wide. Build the remaining three modules
 
 ### 2D. Transfer Planner
 - Rebuilt on the squad-aware decision engine (`docs/decision-engine-plan.md`, branch `Refactor/gaffer-IQ-transfer-suggestion-engine-redesign`): `engine/projections.js` projects every player per gameweek; `engine/decision.js` scores every legal single transfer - affordable at the seller's sell price, club limit kept - by its change to the whole squad's value V_t(S) (`engine/squad-value.js`) over five gameweeks.
-- Six mode presets of that one calculation - Now, Long term, Future prep, Funds & flexibility, Ceiling, Structure fix - each name one move or "roll", with the components (squad effect, funds, price, transfer cost) in plain English; a move is made only when it beats rolling the free transfer (or clears a hit and its margin).
+- Six mode presets of that one calculation - Now, Long term, Future prep, Funds & flexibility, Ceiling, Structure fix - each name one move or "roll" (Future prep may say "wait"), with the components (squad effect, funds, price, transfer cost) in plain English; a move is made only when it beats rolling the free transfer (or clears a hit and its margin).
 - `modules/planner.js` renders the result and nothing else: settings bar (bank, free transfers, squad, snapshot export), chip plan with hints, one card per mode, captain and XI, and a sortable sell / hold table with KeepValue and OutScore per mode and lock / ban re-runs.
 
-**Exit criterion:** for a given squad, bank and free transfers, the planner names one move or a roll per mode, each explained and hit-aware, and re-runs a lock or ban in well under a second. Phase 4 of the plan added the fitted minutes model (`tools/minutes/REPORT.md`) and Phase 5 the price layer and the timing calls (Future prep's wait, Now's wait for team news); later phases add robustness and a backtest.
+**Exit criterion:** for a given squad, bank and free transfers, the planner names one move, a roll or (Future prep) a wait per mode, each explained and hit-aware, and re-runs a lock or ban in well under a second. Phase 4 of the plan added the fitted minutes model (`tools/minutes/REPORT.md`) and Phase 5 the price layer and the timing calls (Future prep's wait, Now's wait for team news); later phases add robustness and a backtest.
 
 ---
 

@@ -5,7 +5,8 @@
  * Phase 3): every legal single transfer is scored by what it does to the whole
  * squad's value V_t(S) (engine/squad-value.js) over the next five gameweeks,
  * and six modes - parameter presets of that one calculation, differing in
- * their GW weights, funds rate and gates - each name one move or "roll".
+ * their GW weights, funds rate and gates - each name one move, a "roll", or
+ * (Future prep) a move to "wait" on.
  * Every component is kept, so the UI can explain each call.
  *
  * OutScore = DeltaEV + FundsTerm - PriceTerm - TransferCost: the gain over
@@ -230,7 +231,7 @@ function prepare(input, config, cache) {
   return {
     input, config, owned, ids, chipPlan, overlay, candidatesByPosition, modeGws, chipAt, zeroed,
     value, valueOpts, names, outlook,
-    riseLikely: id => (signals[id]?.rise ?? 0) >= config.priceMoveLikely,
+    riseLikely: id => chanceOf(signals[id], 'rise') >= config.priceMoveLikely,
     state: { bankTenths, players: owned },
     locks: input.locks ?? new Set(),
     bans: input.bans ?? new Set(),
@@ -265,13 +266,20 @@ function sellOutlook(p, signal, config) {
   const purchase = p.sellPriceEstimated ? p.priceTenths : p.purchaseTenths;
   const down = calcSellPrice(purchase, p.priceTenths - 1) - p.sellPriceTenths;
   const up = calcSellPrice(purchase, p.priceTenths + 1) - p.sellPriceTenths;
+  const fall = chanceOf(signal, 'fall');
+  const rise = chanceOf(signal, 'rise');
   return {
-    expected: signal ? (signal.fall * down) + (signal.rise * up) : 0,
+    expected: (fall * down) + (rise * up),
     down,
     up,
-    fallLikely: down < 0 && (signal?.fall ?? 0) >= config.priceMoveLikely,
-    riseLikely: up > 0 && (signal?.rise ?? 0) >= config.priceMoveLikely,
+    fallLikely: down < 0 && fall >= config.priceMoveLikely,
+    riseLikely: up > 0 && rise >= config.priceMoveLikely,
   };
+}
+
+/** A price signal's chance of a fall or rise; 0 when the signal or the number is missing. */
+function chanceOf(signal, key) {
+  return Number.isFinite(signal?.[key]) ? signal[key] : 0;
 }
 
 // ─── V for every legal swap ──────────────────────────────────────────────────
@@ -492,20 +500,25 @@ function scoreMode(run, { modeId, mode, raw, weights, share, pairs, ceiling, str
 /**
  * Future prep's deferral test (brief §6, mode 3): the same move made a week
  * later, scored as the mode would score it then - its weights one GW on (the
- * sixth projected GW is used here only), the money its prices are expected to
- * leave, and the cost of the free transfer that rolling now would bank. Within
- * deferralEpsilon of making it now, the mode waits - unless a likely price
- * move would put the buy out of reach by then, or free transfers are at the
- * cap, where waiting would roll one away (brief §10).
+ * sixth projected GW is used here only, risk 7), against q's price then. Its
+ * free transfer costs what it costs now: either way the two weeks make one
+ * transfer and bank the same free transfers - except with none banked, where
+ * waiting turns this week's hit into next week's free transfer. Within
+ * deferralEpsilon of making it now, the mode waits. It never waits when no
+ * later GW counts (the season's end, a Wildcard), when a likely price move
+ * would put the buy out of reach by then, or with free transfers at the cap,
+ * where waiting would roll one away (brief §10).
  *
- * @returns {{gw: number, laterScore: number, epsilon: number}|null}  null: make it now
+ * @returns {{gw: number, laterScore: number, epsilon: number}|null}  gw: the
+ *   first GW the later move counts for; null: make it now
  */
 function deferralOf(run, mode, raw, record) {
   const { config, input } = run;
   if (input.freeTransfers >= config.maxBankedFt) return null;
-  const { p, q } = record.pair;
   const gws = run.modeGws.map(gw => gw + 1);
   const weights = raw.map((w, k) => (run.zeroed(gws[k]) ? 0 : w));
+  if (weights.every(w => w === 0)) return null;
+  const { p, q } = record.pair;
   const total = sum(raw);
   const share = total > 0 ? sum(weights) / total : 0;
   const ids = swapIn(run.ids, p.playerId, q.id);
@@ -513,18 +526,20 @@ function deferralOf(run, mode, raw, record) {
   const deltaEv = sum(gws.map((gw, k) => (weights[k] === 0 ? 0
     : weights[k] * (run.value(gw, ids, key) - run.value(gw, run.ids, 'S')))));
 
-  const outlook = run.outlook.get(p.playerId);
+  // p sells at today's price: the fall that waiting risks is already in
+  // today's PriceTerm, so it is not counted twice.
   const qPrice = toTenths(q.price);
   const qSignal = input.priceSignals?.[q.id];
-  const moneyLater = p.sellPriceTenths + outlook.expected - qPrice - (qSignal ? qSignal.rise - qSignal.fall : 0);
+  const qChange = chanceOf(qSignal, 'rise') - chanceOf(qSignal, 'fall');
   const lambda = mode.lambda ?? config.lambdaDefault;
-  const laterScore = deltaEv + (lambda * fromTenths(moneyLater) * share)
-    - transferCost(Math.min(input.freeTransfers + 1, config.maxBankedFt), config);
+  const laterScore = deltaEv + (lambda * fromTenths(p.sellPriceTenths - qPrice - qChange) * share)
+    - transferCost(Math.max(input.freeTransfers, 1), config);
 
+  const outlook = run.outlook.get(p.playerId);
   const reach = run.state.bankTenths + p.sellPriceTenths + (outlook.fallLikely ? outlook.down : 0);
   const outOfReach = qPrice + (run.riseLikely(q.id) ? 1 : 0) > reach;
   if (outOfReach || laterScore < record.outScore - mode.deferralEpsilon) return null;
-  return { gw: input.planningGw + 1, laterScore, epsilon: mode.deferralEpsilon };
+  return { gw: gws[weights.findIndex(w => w > 0)], laterScore, epsilon: mode.deferralEpsilon };
 }
 
 /**
@@ -704,17 +719,17 @@ function explain(run, weights, record, freeTransfers, tags) {
 function priceText(run, p, q) {
   const name = id => run.names.get(id) ?? String(id);
   const outlook = run.outlook.get(p.playerId);
-  const lines = [];
+  const lines = [];   // [sentence, the player whose signal gives it]
   if (outlook.fallLikely) {
-    lines.push(`${name(p.playerId)}'s price is likely to fall soon, taking ${money(-outlook.down)} off his sell price: selling now avoids it.`);
+    lines.push([`${name(p.playerId)}'s price is likely to fall soon, taking ${money(-outlook.down)} off his sell price: selling now avoids it.`, p.playerId]);
   }
   if (outlook.riseLikely) {
-    lines.push(`${name(p.playerId)}'s price is likely to rise soon, adding ${money(outlook.up)} to his sell price if kept.`);
+    lines.push([`${name(p.playerId)}'s price is likely to rise soon, adding ${money(outlook.up)} to his sell price if kept.`, p.playerId]);
   }
-  if (run.riseLikely(q.id)) lines.push(`${name(q.id)}'s price is likely to rise soon: buying now costs £0.1m less.`);
+  if (run.riseLikely(q.id)) lines.push([`${name(q.id)}'s price is likely to rise soon: buying now costs £0.1m less.`, q.id]);
   if (lines.length === 0) return null;
-  const estimated = [p.playerId, q.id].some(id => run.input.priceSignals?.[id]?.source === 'estimate');
-  return lines.join(' ') + (estimated ? ' (Estimated from this week’s transfers.)' : '');
+  const estimated = lines.some(([, id]) => run.input.priceSignals?.[id]?.source === 'estimate');
+  return lines.map(([text]) => text).join(' ') + (estimated ? ' (Estimated from this week’s transfers.)' : '');
 }
 
 // ─── Players, lineup, chip hints ─────────────────────────────────────────────

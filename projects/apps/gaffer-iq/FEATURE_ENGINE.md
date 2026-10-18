@@ -1215,7 +1215,7 @@ Still deliberately **not** applied to the Ranker's Next Fixture chip, the per-GW
 
 ## 14. Transfer Planner: the decision engine (`engine/projections.js`, `engine/minutes.js`, `engine/price-adapter.js`, `engine/squad-value.js`, `engine/decision.js`)
 
-The five lanes and the weekly verdict that lived here (`engine/transfers.js`, `engine/strategy.js`) are gone. In their place, every legal single transfer is scored by what it does to the whole squad's value V_t(S) over the next five gameweeks, and six modes - parameter presets of that one calculation - each name one move or "roll". The data contract, formulas, modes and config are in `docs/decision-engine-plan.md` (§2.2, §5) until its Final phase writes them up as `docs/decision-engine.md`. The old design stays in `docs/superpowers/specs/2026-08-30-planner-multi-lens-transfers-design.md` as history (superseded).
+The five lanes and the weekly verdict that lived here (`engine/transfers.js`, `engine/strategy.js`) are gone. In their place, every legal single transfer is scored by what it does to the whole squad's value V_t(S) over the next five gameweeks, and six modes - parameter presets of that one calculation - each name one move or "roll" (Future prep may also say "wait": a move as good next week). The data contract, formulas, modes and config are in `docs/decision-engine-plan.md` (§2.2, §5) until its Final phase writes them up as `docs/decision-engine.md`. The old design stays in `docs/superpowers/specs/2026-08-30-planner-multi-lens-transfers-design.md` as history (superseded).
 
 ### 14.1 Picking the XI (`engine/lineup.js → pickStartingXI`)
 
@@ -1235,10 +1235,10 @@ FPL's 2026/27 price-change predictor is undocumented, so one file reads it. `nor
 
 **Where prices enter the engine**
 - **Sell price only.** They act on what a player SELLS for, never on his price, so a fall from an odd-tenths profit costs nothing.
-- **A tie-break, never a reason.** PriceTerm is lambda times the expected change in his sell price: at most a hundredth of a point. Money alone never makes a move, except in Funds, which needs at least £0.5m freed.
+- **A tie-break, never a reason.** PriceTerm is lambda times the expected change in his sell price: at most lambda x £0.1m, 0.015 points in Future prep. Money alone never makes a move, except in Funds, which needs at least £0.5m freed.
 
 **Where prices time the calls**
-- **Future prep waits** when the same move made next week, on the free transfer then banked, scores within `deferralEpsilon`. It does not wait at the free-transfer cap, or when a likely price move would put the buy out of reach.
+- **Future prep waits** when the same move made next week scores within `deferralEpsilon`. Its free transfer costs the same either way, except that with none banked waiting turns a hit into a free transfer. It does not wait at the free-transfer cap, when no later GW counts (the season's end, a Wildcard), or when a likely price move would put the buy out of reach.
 - **Now flags "wait for team news"** when all of these hold:
   - a doubtful player is in its move;
   - more than a day is left to the deadline;

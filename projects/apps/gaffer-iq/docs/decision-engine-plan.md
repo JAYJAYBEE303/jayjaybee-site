@@ -663,10 +663,15 @@ before the previous one passes. Phases 1, 2, 3 and 5 are strictly sequential.
 - **PriceTerm** = lambda x the expected change in sell(p) x the mode's unmasked weight share. The expected change is each chance times what one fall or rise does to his sell price, so a fall from an odd-tenths profit counts nothing. At lambda 0.10 it is worth at most 0.01 points: a tie-break, as the brief wants.
 - **Likely** = a chance of at least `priceMoveLikely` (0.95: FPL's own bands 4 and 5). A likely fall that lowers a seller's sell price stops Structure's hold and Now's wait for team news. Owned players whose sell price a likely move would change are flagged `priceFall` / `priceRise` ("Falling" / "Rising" in the table), and the move's `why.price` says what selling now gains or what buying now saves.
 - **Future prep's deferral** (`call: 'wait'`, `deferral: { gw, laterScore, epsilon }`):
-  - The root move is scored as the mode would score it next week: its weights one GW on, which is the only use of the sixth projected GW (risk 7); the money its prices are expected to leave; and the free transfer then banked, `transferCost(min(ft + 1, maxBankedFt))`.
-  - Within `deferralEpsilon` (0.25) of making it now, the mode waits.
-  - It does not wait when a likely fall in p's sell price or rise in q's price would put q out of reach (the brief's exception), nor at the free-transfer cap, where waiting would roll one away (brief §10).
+  - The root move is scored as the mode would score it next week: its weights one GW on, which is the only use of the sixth projected GW (risk 7), against q's expected price then. p sells at today's price there, because the fall that waiting risks is already in today's PriceTerm.
+  - Its free transfer costs what it costs now. Either way the two weeks make one transfer and bank the same free transfers. The exception is with none banked, where waiting turns this week's hit into next week's free transfer (`transferCost(max(ft, 1))`).
+  - Within `deferralEpsilon` (0.25) of making it now, the mode waits. `gw` is the first GW the later move counts for (the one after a Free Hit, say).
+  - It never waits:
+    - when no later GW counts (the season's last GW, a Wildcard next week);
+    - when a likely fall in p's sell price or rise in q's price would put q out of reach (the brief's exception);
+    - at the free-transfer cap, where waiting would roll one away (brief §10).
   - A waiting mode's seller is not flagged `sell`.
+  - **Open (your call): the window.** Scoring the later move over GW t+1..t+5 is the approved reading (risk 7, Q10). It never charges the gain the move would have made in the planning GW, so a move whose gain is the same every week always waits. Scoring both versions over the same five GWs, with the planning GW at zero for the later one, would charge that loss, and the sixth GW would go unused.
 - **Now's `waitForNews`.** All of these must hold:
   - a flagged (doubtful) player is in its move;
   - more than `waitForNewsMinHours` (24) remain to the deadline, so the press conferences are still to come; the planner passes `hoursToDeadline` from the event's deadline;
@@ -682,8 +687,16 @@ before the previous one passes. Phases 1, 2, 3 and 5 are strictly sequential.
   - Progress-as-chance for an undocumented field.
   - Now's wait also needs no likely rise in the buy's price; the brief names only a fall.
   - The deadline clock is the browser's.
+- **Review fixes** (the commit after `7386ef1`):
+  - The deferral's free transfer costs the same now and next week. Before, next week's cheaper FT gave waiting an unearned 0.3-0.5 points.
+  - It never waits when no later GW counts; its GW skips a Free Hit; p's expected fall is not counted twice.
+  - A signal without numeric chances (such as the old `{ fallLikely }` shape) reads as no move expected instead of NaN.
+  - "Estimated" goes only on the price lines an estimate gives, and FPL's "-0.0" is no longer a negative zero.
+  - The WAIT card's words fit 0 FTs and say that waiting has a price.
+  - New tests: the season-end and Wildcard deferrals, the Free Hit GW, 0 FTs, the odd-tenths flag and hold, the estimate source end to end, malformed signals and -0.
+  - Left as it is: `hoursToDeadline` is read on each run, so a tab left open past the 24-hour mark keeps "wait for team news" until the next run, as the planning GW does past a deadline.
 - **Verified** in headless Chromium on the 2025-26 GW20 payloads, with predictor fields injected:
-  - Future prep shows WAIT for M.Salah -> Gravenberch, +1.2 next week against +0.8 now, with the price line; Funds and Structure show it too, and Salah's row is flagged Falling.
+  - Future prep shows WAIT for M.Salah -> Gravenberch, +0.8 next week against +0.8 now (+1.2 before the review's FT-cost fix), with the price line; Funds and Structure show it too, and Salah's row is flagged Falling.
   - Removing the fields falls back to the estimate without errors.
   - With the deadline 2099, a 25% Haaland in Now's move shows "Wait for team news"; with it 6 hours away, "Team news pending".
   - 360 px has no sideways scroll; no page errors; cards about 2 s after a reload, as before; an FT change repaints in about 150 ms.

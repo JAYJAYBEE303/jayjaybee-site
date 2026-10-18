@@ -859,11 +859,14 @@ function modeCardHTML(mode, i, settings, planningGw) {
 
   if (mode.call === 'wait') {
     const { gw, laterScore } = mode.deferral;
+    const decide = settings.freeTransfers > 0
+      ? 'roll the free transfer and decide then.'
+      : 'make it then on a free transfer, not a hit now.';
     return `<li class="mc" data-mode="${mode.modeId}" data-call="wait" tabindex="-1" ${delay}>${head}`
       + '<p class="mc__call">Wait</p>'
-      + `<p class="mc__sum">Made for GW${gw} instead, this move still scores ${pts(laterScore)} against ${pts(root.outScore)} now: `
-      + 'roll the free transfer and decide next week.</p>'
-      + players + (root.why.price ? `<p class="mc__note">${esc(root.why.price)}</p>` : '') + '</li>';
+      + `<p class="mc__sum">Made for GW${gw} instead, this move scores ${pts(laterScore)} against ${pts(root.outScore)} now: `
+      + `${decide}</p>`
+      + players + (root.why.price ? `<p class="mc__note">Waiting has a price. ${esc(root.why.price)}</p>` : '') + '</li>';
   }
 
   return `<li class="mc" data-mode="${mode.modeId}" data-call="move" tabindex="-1" ${delay}>${head}`
