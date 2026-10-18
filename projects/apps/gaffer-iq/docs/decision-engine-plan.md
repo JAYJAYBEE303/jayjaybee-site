@@ -333,7 +333,7 @@ Rules the signatures do not show:
 - **Ghost** (KeepValue): `{ xpts: 0, xptsIfPlays: 0, pZero: 1 }`, built directly, never passed through `checkSwap` or the funds term.
 - **No ledger entry** for a player (drawer edit, Dashboard import): purchase = current price, so sell = current price, flagged `estimated` on the move and in the table.
 - **Free transfer cost.** With `n` FTs banked: `n == 0` -> `hitCost + hitMargin`; `n >= maxBankedFt` -> 0; otherwise the value of the FT that rolling would bank, `ftValueSchedule[n + 1]` (or `ftValueFlat`). So 1 -> 1.5, 2 -> 1.0, 4 -> 0.3, 5 -> 0.
-- **Performance bounds.** `V_t(S - p + q)` is computed once per `(p, q, t)` and reused by all six modes, which differ only in weights, lambda and gates; lock and ban only re-filter. Mode 4 chaining takes the top-K downgrades only, draws the second buy from the newly affordable price band, and scores the pair jointly as `V(S - p + q - r + s)` with the club check across both moves. Robustness runs after first paint and never on the lock / ban path.
+- **Performance bounds.** `V_t(S - p + q)` is computed once per `(p, q, t)` and reused by all six modes, which differ only in weights, lambda and gates; lock and ban only re-filter. Mode 4 chaining takes the top-K downgrades only, draws the second buy from the newly affordable price band, and scores the pair jointly as `V(S - p + q - r + s)` with the club check across both moves. Robustness runs after first paint, in a module worker, and never on the lock / ban path (Phase 6).
 
 ```js
 // runDecisionEngine(input, config = DECISION_ENGINE, cache = createDecisionCache())
@@ -359,11 +359,14 @@ DecisionResult = {
     call: 'move' | 'roll' | 'wait',
     root: Move | null,
     rollValue,                       // display only: the value of the FT kept by rolling
-    alternatives: Move[],            // within `alternativesWindow` points, at most `alternativesMax`
+    alternatives: Move[],            // within `alternativesWindow` points, at most `alternativesMax`; each
+                                     //   with its own robustness once withRobustness has run (Phase 6)
     waitForNews: boolean, deferral: { gw, laterScore, epsilon } | null,   // Phase 5; call 'wait' with a deferral
-    robustness: number | null,       // Phase 6
+    robustness: number | null,       // Phase 6: the root's share of the most 3/2/1 points the noisy re-runs
+                                     //   could give it, set by withRobustness (robustness.js); null when it rolls
     targetGw,                        // Ceiling only: t*, null when a planned chip covers every GW
   } },
+  shortlist: number[],               // Phase 6: the candidate ids the robustness re-runs buy from
   players: [{ playerId, sellPriceTenths,   // what he sells for (flagged sellPriceEstimated without a ledger entry)
     keepValue: { [modeId]: number }, outScore: { [modeId]: number | null },
     best: { [modeId]: Move | null }, // full components for every owned player, every mode; null with no legal move
@@ -426,7 +429,8 @@ export const DECISION_ENGINE = {
   benchOrder: 'xptsIfPlays',
   benchWeightsLinear: { s1: 0.30, s2: 0.10, s3: 0.03, gk: 0.03 },
   fundsModeTau: 1.0,
-  robustnessRuns: 30,
+  robustnessRuns: 30, robustnessPoints: [3, 2, 1], robustnessSeed: 1,   // Phase 6
+  robustnessNoise: { xpts: 0.2, pZero: 0.5, ftValue: 0.2, decay: 0.05 }, robustnessShortlist: 10,
   alternativesWindow: 2, alternativesMax: 2,
   absenceCarryOver: { doubtful: 0.3, injured: 0.6, suspended: 0, unavailable: 1 },
   absenceMinRunGws: 2, absenceLookbackGws: 5, minContentionGws: 3,
@@ -711,6 +715,38 @@ before the previous one passes. Phases 1, 2, 3 and 5 are strictly sequential.
 **Implement** Seeded PRNG; `robustnessRuns` re-runs with noise on `xpts`, `pZero`, FT value and decay; 3/2/1 scoring of top-3 per run; robustness % and alternatives within `alternativesWindow`. Runs after first paint, off the lock / ban path (a module Web Worker if it blocks the main thread).
 
 **Acceptance** Dominant move shows high robustness; two near-identical moves split.
+
+**As built** (`js/engine/robustness.js`, `robustness-worker.js`, `decision.js`, `js/util.js`; tests `tests/engine/robustness.test.js`, with the decision tests' fixtures moved to `tests/engine/decision-fixtures.js` for both)
+
+- **Seeded noise.** `util.js` gains `seededRandom(seed)` (mulberry32) and `normalDeviate(random)` (Box-Muller). The re-runs draw from `robustnessSeed`, so the same input always reads the same. Each run gets fresh draws (`robustnessNoise`):
+  - each player's `xptsIfPlays` scales by exp(0.2 z), one draw for all his GWs, so a projection that is off is off all horizon;
+  - his `pZero` moves by 0.5 z on the logit scale, unless it is 0 or 1;
+  - `xpts` is re-derived as (1 - pZero) x xptsIfPlays, and a blank stays a blank;
+  - the free transfer's value, flat and schedule alike, scales by one exp(0.2 z);
+  - `decayBase` moves by 0.05 z, within [0, 1]. It shapes Funds' weights.
+- **Scoring.** Each run's top three moves per mode (root, then alternatives) score 3, 2 and 1. The run opens the alternatives window (`alternativesWindow: Infinity`), so a third far behind still scores. A move's robustness is its points as a share of the most it could get, 3 x runs: top in every run reads 100%, second in every run 67%. A run that rolls, or ranks fewer than three moves, awards the rest nothing. `withRobustness` sets each mode's `robustness` (null when it rolls) and each alternative's.
+- **The shortlist (an approximation).** A full engine run takes about 0.7 s on the real pool, so thirty would take some 20 s. The re-runs buy only from `DecisionResult.shortlist`:
+  - the buys of each mode's `robustnessShortlist` (10) best moves;
+  - the second buys Funds chains to them;
+  - each owned player's best replacement at Ceiling's target GW, which its lock values need.
+  A buy outside it that the noise would lift into a top three is missed.
+- **Off the main thread.** The plan said a module Web Worker if the re-runs block the main thread, and they did. Run on the page one re-run per task, the longest task was 72 ms on desktop, but 263 ms at 4x CPU throttling (Lighthouse's mid-range phone), about 5.7 s of busy main thread in all. So `robustness-worker.js` runs them:
+  - The planner posts the engine's input, its candidates cut to the shortlist, and paints the labels in place when the shares come back, so focus and open alternatives stay.
+  - A new engine run terminates the worker; a result replaced meanwhile ignores its reply.
+  - Where a worker cannot run, the cards show no robustness.
+- **UI.** "Robust N%" on a moving card's points line and on each alternative, titled with what it means (30 varied runs, 3/2/1).
+- **Mutation check.** 19 mutants of the noise, the scoring, the shortlist and `withRobustness`. All 16 that change behaviour fail a test (flat points only after a test for second place). Three survive as equivalent:
+  - noising a blank (already 0 points and certain);
+  - noising a certain `pZero` (logistic(logit(0 or 1)) is 0 or 1);
+  - Box-Muller over half a turn (the same distribution).
+- **Readings and defaults to check** (all in `config.js`, untuned until Phase 7):
+  - `robustnessRuns` 30, `robustnessPoints` [3, 2, 1], `robustnessSeed` 1, `robustnessShortlist` 10;
+  - the noise sizes, and one draw per player for the whole horizon rather than per GW.
+- **Verified** in headless Chromium on the 2025-26 GW20 payloads:
+  - The labels land about 1.3-1.5 s after the cards. After the cards there is no long task on desktop, and one of 52 ms at 4x CPU (posting the input).
+  - Card heights do not change when they land; 360 px has no sideways scroll; no page errors.
+  - Locking a card's seller before the labels land keeps focus in the card. The old run's labels never land, and the new cards get their own.
+  - The real squad reads Future prep 48%, Funds 34%, Ceiling 19% and Structure 32%; Now and Long term roll. These are small gains (+0.1 to +1.2 points) under untuned noise. The alternatives read 10-18%.
 
 ### Phase 7: Backtest harness and ceiling mode
 

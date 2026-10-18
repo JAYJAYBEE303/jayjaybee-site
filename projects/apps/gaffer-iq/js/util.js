@@ -113,3 +113,29 @@ export function toTenths(millions) {
 export function fromTenths(tenths) {
   return tenths / 10;
 }
+
+/**
+ * A seeded pseudo-random generator (mulberry32): the same seed gives the same
+ * sequence, so a noisy computation repeats exactly.
+ * @param {number} seed  any integer
+ * @returns {() => number}  uniform in [0, 1)
+ */
+export function seededRandom(seed) {
+  let state = seed | 0;
+  return () => {
+    state = (state + 0x6D2B79F5) | 0;
+    let t = Math.imul(state ^ (state >>> 15), 1 | state);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * A standard normal deviate (Box-Muller) from a uniform generator.
+ * @param {() => number} random  uniform in [0, 1)
+ * @returns {number}  mean 0, standard deviation 1
+ */
+export function normalDeviate(random) {
+  const u = 1 - random();   // in (0, 1], so the log is finite
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * random());
+}

@@ -269,7 +269,7 @@ window.__verify.pairingPlayers()
 The Planner runs the decision engine (`FEATURE_ENGINE.md` §14,
 `docs/decision-engine-plan.md`). `npm test` covers the engine
 (`tests/engine/decision.test.js`, `projections.test.js`, `squad-value.test.js`,
-`minutes.test.js`, `price-adapter.test.js`), the minutes model's fitting tool
+`minutes.test.js`, `price-adapter.test.js`, `robustness.test.js`), the minutes model's fitting tool
 (`tests/tools/minutes.test.js`)
 and the module's pure helpers (`tests/modules/planner.test.js`). The checklist
 below is the in-browser gate after a change to the engine, to `DECISION_ENGINE`
@@ -316,6 +316,10 @@ s.setSquad([].concat(pick('GKP', 2), pick('DEF', 5), pick('MID', 5), pick('FWD',
 - [ ] With a doubtful player in Now's move and more than a day to the
       deadline, the card says to wait for team news; inside the last day it
       says team news is pending instead.
+- [ ] A second or two after the cards, each moving card shows "Robust N%"
+      and each alternative its own, with no jump in the layout. A lock made
+      before they land drops them, and the new cards get their own. The page
+      stays responsive meanwhile: the re-runs are in a worker.
 - [ ] The squad drawer's bench / start / C markers agree with the Captain and
       XI panel.
 - [ ] While a gameweek is in play, the live-round note names the matches still

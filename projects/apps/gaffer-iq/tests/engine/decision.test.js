@@ -16,79 +16,9 @@ import { runDecisionEngine, transferCost, createDecisionCache } from '../../js/e
 import { squadValue } from '../../js/engine/squad-value.js';
 import { DECISION_ENGINE, SEASON_GWS } from '../../js/config.js';
 
-// ─── Test utilities ──────────────────────────────────────────────────────────
-
-const GW = 10;
-const GWS = 6;
-const MODES = ['now', 'longterm', 'future', 'funds', 'ceiling', 'structure'];
-
-const perGw = v => (Array.isArray(v) ? v : Array(GWS).fill(v));
-const close = (actual, expected, message) =>
-  assert.ok(Math.abs(actual - expected) < 1e-9, message ?? `${actual} vs ${expected}`);
-
-/**
- * A projection in buildProjections' shape. xip: xptsIfPlays, pz: pZero, fx:
- * fixtures, av: availability - each a constant or one value per GW.
- */
-function projectionOf({ id, position, team, price, xip, pz = 0, fx = 1, av = 1 }, from) {
-  const [x, z, f, a] = [perGw(xip), perGw(pz), perGw(fx), perGw(av)];
-  return {
-    playerId: id, position, teamId: team, price: price / 10,
-    gws: x.map((xIfP, k) => {
-      const blank = f[k] === 0;
-      const pZero = blank ? 1 : z[k];
-      return {
-        gw: from + k, fixtures: f[k], xpts: blank ? 0 : (1 - pZero) * xIfP,
-        xptsIfPlays: blank ? 0 : xIfP, pZero, pStart: 1 - pZero, p60: 1 - pZero,
-        p60Approx: true, pP90: null, estimated: false, availability: a[k], availabilitySource: 'status',
-      };
-    }),
-  };
-}
-
-const BASE = [
-  { id: 1, position: 'GKP', xip: 4 }, { id: 2, position: 'GKP', xip: 2 },
-  { id: 3, position: 'DEF', xip: 5 }, { id: 4, position: 'DEF', xip: 5 }, { id: 5, position: 'DEF', xip: 4 },
-  { id: 6, position: 'DEF', xip: 3 }, { id: 7, position: 'DEF', xip: 1 },
-  { id: 8, position: 'MID', xip: 8 }, { id: 9, position: 'MID', xip: 7 }, { id: 10, position: 'MID', xip: 6 },
-  { id: 11, position: 'MID', xip: 5 }, { id: 12, position: 'MID', xip: 2.5 },
-  { id: 13, position: 'FWD', xip: 9 }, { id: 14, position: 'FWD', xip: 6 }, { id: 15, position: 'FWD', xip: 2.2 },
-];
-
-const withDefaults = s => ({
-  team: s.id, price: 50, ...s, purchase: s.purchase === undefined ? (s.price ?? 50) : s.purchase,
-});
-
-/**
- * An engine input: the base squad with `changes` merged in by id, plus
- * `candidates`. Prices and purchases in tenths; a purchase of null means no
- * ledger entry. Anything else overrides the input's defaults.
- */
-function scenario({ changes = [], candidates = [], planningGw = GW, ...input } = {}) {
-  const byId = new Map(BASE.map(s => [s.id, s]));
-  for (const c of changes) byId.set(c.id, { ...byId.get(c.id), ...c });
-  const squad = [...byId.values()].map(withDefaults);
-  const others = candidates.map(withDefaults);
-  return {
-    planningGw,
-    squad: squad.map(s => ({ playerId: s.id, name: `P${s.id}`, position: s.position, teamId: s.team,
-      priceTenths: s.price, purchaseTenths: s.purchase })),
-    bankTenths: 0,
-    freeTransfers: 1,
-    chipPlan: {},
-    chipsUsed: [],
-    locks: new Set(),
-    bans: new Set(),
-    projections: new Map([...squad, ...others].map(s => [s.id, projectionOf(s, planningGw)])),
-    candidates: others.map(s => ({ id: s.id, name: `P${s.id}`, position: s.position, teamId: s.team,
-      price: s.price / 10 })),
-    priceSignals: null,
-    ...input,
-  };
-}
-
-const playerOf = (result, id) => result.players.find(p => p.playerId === id);
-const allBest = result => result.players.flatMap(p => MODES.map(m => p.best[m]).filter(Boolean));
+import {
+  GW, MODES, BASE, close, scenario, playerOf, allBest,
+} from './decision-fixtures.js';
 
 // ─── Transfer cost (plan §5.2) ───────────────────────────────────────────────
 

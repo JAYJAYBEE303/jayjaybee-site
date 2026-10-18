@@ -157,7 +157,7 @@
   .mc__ev { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
   .mc__ev b { font: 700 40px/1 var(--font-score); letter-spacing: 0; }
   .mc__ev span { font-size: 12px; color: var(--color-muted); }
-  .mc__ev .mc__rb { margin-left: auto; font-weight: 700; color: var(--color-text); }
+  .mc__ev .mc__rb { margin-left: auto; font-weight: 700; color: var(--color-text); cursor: help; }
   .pgw { display: flex; flex-wrap: wrap; gap: 4px; }
   .pgw li { display: grid; justify-items: center; gap: 2px; min-width: 52px; padding: 4px 6px; border: 1px solid var(--color-border-subtle); font-size: 11px; }
   .pgw li > span:first-child { color: var(--color-muted); }
@@ -173,6 +173,8 @@
   .mc__alts summary:hover { color: var(--color-text); }
   .mc__alts ol { display: grid; gap: 4px; padding-top: 6px; }
   .mc__alts li { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--color-muted); }
+  .mc__an { display: flex; align-items: baseline; gap: 6px; }
+  .mc__ar { cursor: help; }
   .mc__alts li b { color: var(--color-text); }
 
   .mr { display: inline-flex; align-items: center; height: 20px; padding: 0 6px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); font: 700 10px/1 var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: var(--color-muted); white-space: nowrap; }

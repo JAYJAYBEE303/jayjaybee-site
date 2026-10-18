@@ -1213,7 +1213,7 @@ Still deliberately **not** applied to the Ranker's Next Fixture chip, the per-GW
 
 ---
 
-## 14. Transfer Planner: the decision engine (`engine/projections.js`, `engine/minutes.js`, `engine/price-adapter.js`, `engine/squad-value.js`, `engine/decision.js`)
+## 14. Transfer Planner: the decision engine (`engine/projections.js`, `engine/minutes.js`, `engine/price-adapter.js`, `engine/squad-value.js`, `engine/decision.js`, `engine/robustness.js`)
 
 The five lanes and the weekly verdict that lived here (`engine/transfers.js`, `engine/strategy.js`) are gone. In their place, every legal single transfer is scored by what it does to the whole squad's value V_t(S) over the next five gameweeks, and six modes - parameter presets of that one calculation - each name one move or "roll" (Future prep may also say "wait": a move as good next week). The data contract, formulas, modes and config are in `docs/decision-engine-plan.md` (§2.2, §5) until its Final phase writes them up as `docs/decision-engine.md`. The old design stays in `docs/superpowers/specs/2026-08-30-planner-multi-lens-transfers-design.md` as history (superseded).
 
@@ -1244,6 +1244,17 @@ FPL's 2026/27 price-change predictor is undocumented, so one file reads it. `nor
   - more than a day is left to the deadline;
   - neither player's price is likely to move against you first.
 - **Structure stops holding** a recovering player whose sell price is likely to fall.
+
+### 14.4 Robustness (`engine/robustness.js`)
+
+How far to trust a card. The engine re-runs 30 times on seeded noisy copies of its input:
+- every player's projected points scale by one random factor across his gameweeks;
+- his chance of no minutes moves on the logit scale, unless it is certain;
+- the free transfer's value and the decay move too.
+
+Each run's top three moves per mode score 3, 2 and 1. A move's robustness is its points as a share of the most it could get, so "Robust 100%" means it came out best every time. A move that came second every time reads 67%.
+
+The re-runs buy only from a shortlist: each mode's ten best moves, Funds' chained second buys, and each player's best replacement at Ceiling's target week. So they cost a fraction of thirty full runs. They run in a module worker once the cards have painted; a lock, ban or setting stops them and starts again on the new result. The noise sizes are untuned (`robustnessNoise`, Phase 7).
 
 ---
 

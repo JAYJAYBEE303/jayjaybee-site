@@ -103,6 +103,10 @@ export function runDecisionEngine(input, config = DECISION_ENGINE, cache = creat
 
   const modes = {};
   const bestByMode = {};
+  // The buys engine/robustness.js re-scores: each mode's best moves, with the
+  // second buys Funds chains to them, and each player's peak-week replacement
+  // (Ceiling's lock values read them).
+  const shortlist = new Set(ceiling.replacements);
   for (const [modeId, mode] of Object.entries(config.modes)) {
     const raw = modeId === 'ceiling' ? ceiling.weights : weightsOf(run, mode);
     const weights = masked(run, raw);
@@ -114,6 +118,7 @@ export function runDecisionEngine(input, config = DECISION_ENGINE, cache = creat
     const result = scoreMode(run, { modeId, mode, raw, weights, share, pairs, ceiling, structure });
     modes[modeId] = result.summary;
     bestByMode[modeId] = result.bestByOwner;
+    for (const id of result.top) shortlist.add(id);
   }
 
   const rootSells = new Set(Object.values(modes).filter(m => m.call === 'move').map(m => m.root.outId));
@@ -137,7 +142,7 @@ export function runDecisionEngine(input, config = DECISION_ENGINE, cache = creat
     };
   });
 
-  return { modes, players, lineup: lineupOf(run), chipHints: chipHints(run) };
+  return { modes, players, lineup: lineupOf(run), chipHints: chipHints(run), shortlist: [...shortlist] };
 }
 
 // ─── Setup ───────────────────────────────────────────────────────────────────
@@ -330,7 +335,8 @@ function ghostDeltas(run, p) {
  * affordable replacement, or no t*, there is no sale to protect against: null.
  *
  * @returns {{ targetGw: number|null, weights: number[], lockValues: Map,
- *   protectedIds: Set }}  weights before Free Hit / Wildcard masking
+ *   protectedIds: Set, replacements: Set }}  weights before Free Hit / Wildcard
+ *   masking; replacements: each player's best affordable replacement at t*
  */
 function ceilingTarget(run, pairs) {
   const { config, modeGws } = run;
@@ -351,17 +357,19 @@ function ceilingTarget(run, pairs) {
     : gw === target.gw ? mode.targetWeight : mode.otherWeight));
 
   const lockValues = new Map();
+  const replacements = new Set();
   for (const p of run.owned) {
-    let bestDelta = null;
+    let best = null;
     for (const pair of pairs) {
       if (target === null || pair.p !== p || run.bans.has(pair.q.id)) continue;
-      if (bestDelta === null || pair.dV[target.k] > bestDelta) bestDelta = pair.dV[target.k];
+      if (best === null || pair.dV[target.k] > best.dV[target.k]) best = pair;
     }
-    lockValues.set(p.playerId, bestDelta === null ? null : -bestDelta);
+    lockValues.set(p.playerId, best === null ? null : -best.dV[target.k]);
+    if (best) replacements.add(best.q.id);
   }
   const protectedIds = new Set(run.owned.map(p => p.playerId)
     .filter(id => lockValues.get(id) !== null && lockValues.get(id) >= mode.lockThreshold));
-  return { targetGw: target?.gw ?? null, weights, lockValues, protectedIds };
+  return { targetGw: target?.gw ?? null, weights, lockValues, protectedIds, replacements };
 }
 
 // ─── Mode 6: uncovered loss, dead slots, holds ───────────────────────────────
@@ -494,7 +502,9 @@ function scoreMode(run, { modeId, mode, raw, weights, share, pairs, ceiling, str
     robustness: null,
   };
   if (modeId === 'ceiling') summary.targetGw = ceiling.targetGw;
-  return { summary, bestByOwner };
+  const top = records.slice(0, config.robustnessShortlist)
+    .flatMap(r => (r.chained ? [r.pair.q.id, r.chained.inId] : [r.pair.q.id]));
+  return { summary, bestByOwner, top };
 }
 
 /**

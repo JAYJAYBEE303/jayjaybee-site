@@ -1344,6 +1344,27 @@ export const DECISION_ENGINE = {
   // deadline: until then the press conferences are still to come.
   waitForNewsMinHours: 24,
 
+  // ── Robustness (engine/robustness.js, plan Phase 6) ──
+  // How far to trust each call: the engine re-runs this many times on noisy
+  // copies of its input, each run's top moves per mode scoring these points
+  // (brief §7: 3/2/1 for the top three). A move's robustness is its points as
+  // a share of the most it could get. The seed makes the noise repeat, so the
+  // same input always reads the same.
+  robustnessRuns: 30,
+  robustnessPoints: [3, 2, 1],
+  robustnessSeed: 1,
+  // The noise, drawn afresh for each run. Every player's projected points
+  // scale by exp(xpts x z), one draw for all his GWs; his chance of no minutes
+  // moves by pZero x z on the logit scale, unless it is certain either way;
+  // the free transfer's value scales by exp(ftValue x z); decayBase moves by
+  // decay x z. Not tuned: Phase 7.
+  robustnessNoise: { xpts: 0.2, pZero: 0.5, ftValue: 0.2, decay: 0.05 },
+  // The re-runs score only the buys of each mode's this many best moves (with
+  // the second buys Funds chains to them and each player's peak-week
+  // replacement), not every candidate: thirty full runs would take some
+  // twenty seconds.
+  robustnessShortlist: 10,
+
   // ── Projections (engine/projections.js, plan §2.2) ──
   // Gameweeks projected from the planning gameweek on (brief §3).
   horizonGws: 6,

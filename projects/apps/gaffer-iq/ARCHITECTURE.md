@@ -120,7 +120,9 @@ jayjaybee-site/                   ← repo root (not Gaffer IQ's concern)
             │   ├── price-adapter.js
             │   ├── projections.js
             │   ├── squad-value.js
-            │   └── decision.js
+            │   ├── decision.js
+            │   ├── robustness.js
+            │   └── robustness-worker.js
             └── modules/
                 ├── landing.js
                 ├── matchup.js
@@ -201,6 +203,9 @@ gaffer-iq/                          (= projects/gaffer-iq/ in the repo)
     │   ├── squad-value.js      # V_t(S): best XI + captain + expected autosubs (+ Bench Boost).
     │   ├── decision.js         # Every legal transfer scored as a change in V over six mode
     │   │                       #   presets: one move, roll or wait per mode, KeepValue/OutScore per player.
+    │   ├── robustness.js       # How often each mode's moves come out best when the engine re-runs on
+    │   │                       #   seeded noisy inputs (3/2/1 for each run's top three).
+    │   ├── robustness-worker.js # Module worker entry: runs robustness.js off the page's main thread.
     │   └── season.js           # Whole-season model for the Full Season strip: per-GW matchups,
     │                           #   postponement inference, chip windows (FEATURE_ENGINE §15).
     │

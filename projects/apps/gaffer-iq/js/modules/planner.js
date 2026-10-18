@@ -27,6 +27,7 @@ import { scoreWildcardTiming, scoreFreeHitTiming } from '../engine/chips.js';
 import { buildProjections } from '../engine/projections.js';
 import { runDecisionEngine, createDecisionCache } from '../engine/decision.js';
 import { priceSignals } from '../engine/price-adapter.js';
+import { withRobustness } from '../engine/robustness.js';
 import { deriveFreeTransfers } from '../engine/ledger.js';
 import {
   fetchAndMapSquad, loadSavedTeamId, saveTeamId, resolveImportGw, loadLedger,
@@ -117,6 +118,8 @@ let _priceSignals = null;
 let _cache = createDecisionCache();
 /** The last DecisionResult, or null. */
 let _result = null;
+/** The module worker re-running the engine for the last result's robustness. */
+let _robustWorker = null;
 /** Why there is no result: 'loading' | 'empty' | 'short' | 'over' | 'settling'
  *  | 'computing' | 'failed' | 'ready'. */
 let _state = 'loading';
@@ -608,26 +611,55 @@ function runEngine() {
   const ledger = loadLedger();
   const settings = resolveSettings(ledger, _saved, planningGw);
   const players = store.getSquad().map(id => store.getPlayer(id)).filter(Boolean);
+  const input = {
+    planningGw,
+    squad: decisionSquad(players, ledger?.purchasesTenths),
+    bankTenths: settings.bankTenths,
+    freeTransfers: settings.freeTransfers,
+    chipPlan: settings.chipPlan,
+    chipsUsed: chipsUsedList(settings.used),
+    locks: _locks,
+    bans: _bans,
+    projections: _projections,
+    candidates: store.getPlayers(),
+    priceSignals: _priceSignals,
+    hoursToDeadline: hoursToDeadline(planningGw),
+  };
   try {
-    _result = runDecisionEngine({
-      planningGw,
-      squad: decisionSquad(players, ledger?.purchasesTenths),
-      bankTenths: settings.bankTenths,
-      freeTransfers: settings.freeTransfers,
-      chipPlan: settings.chipPlan,
-      chipsUsed: chipsUsedList(settings.used),
-      locks: _locks,
-      bans: _bans,
-      projections: _projections,
-      candidates: store.getPlayers(),
-      priceSignals: _priceSignals,
-      hoursToDeadline: hoursToDeadline(planningGw),
-    }, DECISION_ENGINE, _cache);
+    _result = runDecisionEngine(input, DECISION_ENGINE, _cache);
     _state = 'ready';
+    startRobustness(input);
   } catch (err) {
     console.warn('[planner] decision engine failed:', err?.message ?? err);
     _result = null;
     _state = 'failed';
+  }
+}
+
+/**
+ * How far to trust each card (engine/robustness.js). The noisy re-runs go to
+ * a module worker, so the page, and a lock, ban or setting, never waits on
+ * them; the next run stops them, and a result replaced meanwhile ignores
+ * them. Where the worker cannot run, the cards show no robustness.
+ */
+function startRobustness(input) {
+  _robustWorker?.terminate();
+  const result = _result;
+  const shortlist = new Set(result.shortlist);
+  try {
+    _robustWorker = new Worker(new URL('../engine/robustness-worker.js', import.meta.url), { type: 'module' });
+    _robustWorker.onmessage = ({ data }) => {
+      if (_result !== result) return;
+      _result = withRobustness(result, data);
+      paintRobustness();
+    };
+    _robustWorker.onerror = event => console.warn('[planner] robustness failed:', event.message || 'the worker did not load');
+    _robustWorker.postMessage({
+      input: { ...input, candidates: input.candidates.filter(c => shortlist.has(c.id)) },
+      result: { shortlist: result.shortlist },
+    });
+  } catch (err) {
+    console.warn('[planner] robustness failed:', err?.message ?? err);
   }
 }
 
@@ -850,10 +882,10 @@ function modeCardHTML(mode, i, settings, planningGw) {
   const alts = mode.alternatives.length
     ? `<details class="mc__alts" data-alts="${mode.modeId}"${_openAlts.has(mode.modeId) ? ' open' : ''}><summary>${mode.alternatives.length} alternative${mode.alternatives.length === 1 ? '' : 's'}</summary><ol>`
       + mode.alternatives.map(a => `<li><span>Sell <b>${esc(nameOf(a.outId))}</b> → buy <b>${esc(nameOf(a.inId))}</b></span>`
-        + `<b class="num">${pts(a.outScore)}</b></li>`).join('')
+        + `<span class="mc__an"><b class="num">${pts(a.outScore)}</b>${robustHTML(a.robustness, 'mc__ar')}</span></li>`).join('')
       + '</ol></details>'
     : '';
-  const robust = mode.robustness != null ? `<span class="mc__rb">Robust ${Math.round(mode.robustness * 100)}%</span>` : '';
+  const robust = robustHTML(mode.robustness, 'mc__rb');
   const players = `<div class="mc__mv">${playerRowHTML('sell', root, seller?.sellPriceTenths ?? toTenths(store.getPlayer(root.outId)?.price ?? 0),
     root.tags.includes('sellPriceEstimated'))}${playerRowHTML('buy', root)}</div>`;
 
@@ -873,6 +905,33 @@ function modeCardHTML(mode, i, settings, planningGw) {
     + players
     + `<p class="mc__ev"><b class="num">${pts(root.outScore)}</b><span>pts vs rolling</span>${robust}</p>`
     + perGw + `<ul class="mc__why">${why}</ul>` + notes + alts + '</li>';
+}
+
+const ROBUST_TITLE = `How often this move came out on top when the projections, chances of playing, free-transfer value `
+  + `and decay were varied ${DECISION_ENGINE.robustnessRuns} times (each run's top ${DECISION_ENGINE.robustnessPoints.length} `
+  + `score ${DECISION_ENGINE.robustnessPoints.join('/')})`;
+
+/** A move's robustness, or nothing until the re-runs are done (or when the card rolls). */
+function robustHTML(share, cls) {
+  return share == null ? '' : `<span class="${cls}" title="${ROBUST_TITLE}">Robust ${Math.round(share * 100)}%</span>`;
+}
+
+/** Write each card's robustness in place, so focus and open alternatives stay as they are. */
+function paintRobustness() {
+  if (!_root || _state !== 'ready') return;
+  for (const mode of Object.values(_result.modes)) {
+    const card = _root.querySelector(`#pl-modes .mc[data-mode="${mode.modeId}"]`);
+    if (!card) continue;
+    const ev = card.querySelector('.mc__ev');
+    if (ev) {
+      ev.querySelector('.mc__rb')?.remove();
+      ev.insertAdjacentHTML('beforeend', robustHTML(mode.robustness, 'mc__rb'));
+    }
+    card.querySelectorAll('.mc__an').forEach((cell, i) => {
+      cell.querySelector('.mc__ar')?.remove();
+      cell.insertAdjacentHTML('beforeend', robustHTML(mode.alternatives[i]?.robustness, 'mc__ar'));
+    });
+  }
 }
 
 function modesNote(settings, planningGw) {
