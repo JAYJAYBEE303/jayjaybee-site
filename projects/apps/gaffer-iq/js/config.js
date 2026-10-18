@@ -1340,8 +1340,8 @@ export const DECISION_ENGINE = {
   // later, by status: availability k gameweeks ahead = 1 - (1 - a0) x carry^k.
   // A doubt usually clears within the week; an injury FPL lists at 0% runs
   // longer; most suspensions are served in one match; 'unavailable' (left the
-  // club, on loan) does not come back. REASONED, NOT FITTED - Phase 4 replaces
-  // this with a fitted model.
+  // club, on loan) does not come back. REASONED, NOT FITTED: no history of
+  // FPL's flags exists to fit it on (plan Phase 4).
   absenceCarryOver: { doubtful: 0.3, injured: 0.6, suspended: 0, unavailable: 1 },
   // A zero-minute run he has since played through is excused from his rates
   // only if it lasted this many gameweeks (one missed week is as likely a
@@ -1349,9 +1349,55 @@ export const DECISION_ENGINE = {
   absenceMinRunGws: 2,
   // ... and ended within this many gameweeks of the latest one.
   absenceLookbackGws: 5,
-  // With fewer contention gameweeks than this, his price prior stands in for
-  // his appearance and start rates.
+  // For the v1 rates (no minutes model, or no live table): with fewer
+  // contention gameweeks than this, his price prior stands in for his
+  // appearance and start rates.
   minContentionGws: 3,
+
+  // ── Minutes model (engine/minutes.js, plan Phase 4) ──
+  // The features a player's selection chances are read from. tools/minutes
+  // builds its training rows with these same settings: change one only with a
+  // refit.
+  minutesFeatures: {
+    // Gameweeks the recent start, appearance and minutes features average
+    // over; `long` also caps the history term.
+    windows: { short: 3, mid: 5, long: 10 },
+    // FPL's threshold for full appearance points. Where a record has no
+    // starts, this many minutes a fixture stands in for one.
+    playedMinutes: 60,
+    // With fewer contention gameweeks than this he has no features, and the
+    // v1 rates above stand in.
+    minHistoryGws: 1,
+  },
+  // The fitted heads and their recalibration by gameweeks ahead: fitted by
+  // tools/minutes/fit.js on vaastav's 2023-24 and 2024-25 seasons and tested
+  // on 2025-26 (tools/minutes/REPORT.md). Paste a refit here; null runs the
+  // v1 rates.
+  minutesModel: {
+    appear: {
+      intercept: -2.08, startShort: -0.5771, startLong: -0.5761, startSeason: 1.215,
+      appearMid: 1.15, minutesMid: 0.8724, startedLast: -0.7363, played60Last: 1.271,
+      zeroRun: -1.19, fullRun: 0.3108, history: 0.5531, def: 0.4114, mid: 0.6145, fwd: 0.5616,
+      price: 0.0134,
+    },
+    start: {
+      intercept: -2.214, startShort: -0.3199, startLong: -0.4047, startSeason: 1.342,
+      appearMid: -0.2481, minutesMid: 2.45, startedLast: -0.4534, played60Last: 1.253,
+      zeroRun: -1.284, fullRun: 0.2003, history: 0.3438, def: -0.05377, mid: -0.2446, fwd: -0.4161,
+      price: 0.009594,
+    },
+    p60: {
+      intercept: -2.2, startShort: -0.409, startLong: -0.4103, startSeason: 1.331,
+      appearMid: -0.3019, minutesMid: 2.518, startedLast: -0.4853, played60Last: 1.223,
+      zeroRun: -1.29, fullRun: 0.1404, history: 0.397, def: -0.2034, mid: -0.4876, fwd: -0.6155,
+      price: 0.01041,
+    },
+    ahead: {
+      appear: [[-0.01339, 0.8574], [-0.02874, 0.7757], [-0.04454, 0.7232], [-0.05798, 0.6886], [-0.06794, 0.6612]],
+      start: [[-0.04316, 0.814], [-0.07849, 0.7253], [-0.1087, 0.6663], [-0.1315, 0.6301], [-0.1488, 0.6041]],
+      p60: [[-0.04544, 0.8247], [-0.08096, 0.7384], [-0.1121, 0.6807], [-0.1336, 0.6479], [-0.1519, 0.6192]],
+    },
+  },
 
   // ── Squad value (engine/squad-value.js, brief §4) ──
   // 'probability': expected autosub recovery from every starter's pZero and

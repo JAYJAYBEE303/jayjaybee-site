@@ -1213,13 +1213,21 @@ Still deliberately **not** applied to the Ranker's Next Fixture chip, the per-GW
 
 ---
 
-## 14. Transfer Planner: the decision engine (`engine/projections.js`, `engine/squad-value.js`, `engine/decision.js`)
+## 14. Transfer Planner: the decision engine (`engine/projections.js`, `engine/minutes.js`, `engine/squad-value.js`, `engine/decision.js`)
 
 The five lanes and the weekly verdict that lived here (`engine/transfers.js`, `engine/strategy.js`) are gone. In their place, every legal single transfer is scored by what it does to the whole squad's value V_t(S) over the next five gameweeks, and six modes - parameter presets of that one calculation - each name one move or "roll". The data contract, formulas, modes and config are in `docs/decision-engine-plan.md` (§2.2, §5) until its Final phase writes them up as `docs/decision-engine.md`. The old design stays in `docs/superpowers/specs/2026-08-30-planner-multi-lens-transfers-design.md` as history (superseded).
 
 ### 14.1 Picking the XI (`engine/lineup.js → pickStartingXI`)
 
 `pickStartingXI(scoredSquad, valueOf)` is the app's one XI rule: each position's best fill FPL's formation minimums (1 GKP, 3 DEF, 2 MID, 1 FWD), the best of the rest take the remaining four slots, and the reserve keeper always sits last on the bench. It ranks by `valueOf` - by default `score.expectedPoints.value` (§10.2), the real points-scale projection, never the 0–100 composite, which has no relationship to whether a player starts. The Dashboard calls it as is; the decision engine's V passes a gameweek's `xpts`. Minimum-then-fill is optimal for "maximise the XI's sum" (the squad's limits are the formation maximums), and a test checks it against enumerating every formation.
+
+### 14.2 The minutes model (`engine/minutes.js`)
+
+A player's chances of appearing, starting and playing 60 minutes in a fixture he is available for come from three logistic heads fitted offline (`tools/minutes/`, shipped as `DECISION_ENGINE.minutesModel`). Their 14 features are read from his record in the archived per-gameweek minutes tables before the planning gameweek: start share over the last 3 and 10 gameweeks and the season, appearances and minutes over the last 5, whether he started and played 60 minutes last time, the zero-minute and 60-minute runs still going, how much record there is, position and price. Each later gameweek of the horizon reads the same features through a fitted recalibration that pulls the chances towards the average, because the record says less about later weeks.
+
+Availability is not part of the model. `engine/projections.js` multiplies the chances by FPL's flag and its recovery (`absenceCarryOver`), and excuses a flagged player's current absence before his features are read; an unflagged player's zero run counts, as a dropping. Without the minutes tables, or for a player with no record, the v1 rates (`docs/decision-engine-plan.md` §2.2) stand in, flagged `estimated` and `p60Approx`.
+
+On the held-out 2025-26 season the model's P(60+) for the next gameweek scores a Brier of 0.081, against 0.106 for the last-5-starts baseline; on the players the v1 rates covered, 0.080 against v1's 0.104. `tools/minutes/REPORT.md` has the full test: calibration, return categories, gameweeks ahead, and the features tried and dropped. To refit, run `node tools/minutes/download.js && node tools/minutes/fit.js` from the app folder, then paste the block the report ends with into `config.js`.
 
 ---
 

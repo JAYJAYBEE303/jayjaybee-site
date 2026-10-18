@@ -1,10 +1,12 @@
 /**
  * tests/engine/projections.test.js
- * The projection adapter (docs/decision-engine-plan.md §2.2, Phase 2): per
- * player, per gameweek, the data contract the decision engine reads. Most
+ * The projection adapter (docs/decision-engine-plan.md §2.2, Phases 2 and 4):
+ * per player, per gameweek, the data contract the decision engine reads. Most
  * tests inject a neutral-fixture scorer so the expected points read straight
  * off the rates; the double-gameweek, summary and identity tests run the real
- * scorer on a synthetic league.
+ * scorer on a synthetic league. Most tests also pin the v1 rates (no minutes
+ * model), which still stand in without the live table; the minutes-model
+ * tests pass a model of their own, or the shipped one.
  */
 
 import { test } from 'node:test';
@@ -58,10 +60,13 @@ const missed = n => Array(n).fill([0, 0]);
 /** A neutral fixture every gameweek: the fixture multiplier is exactly 1. */
 const neutralScorer = () => ({ nextFixtureScore: { value: 50, estimated: false } });
 
-function project(season, ctx, { gwTable = null, scorePlayerFn = neutralScorer } = {}) {
+function project(season, ctx, { gwTable = null, scorePlayerFn = neutralScorer, minutesModel = null } = {}) {
   return buildProjections(season.players, ctx,
-    { planningGw: PLANNING_GW, horizonGws: 6, gwTable, scorePlayerFn });
+    { planningGw: PLANNING_GW, horizonGws: 6, gwTable, scorePlayerFn, minutesModel });
 }
+
+const close = (actual, expected, label = '') =>
+  assert.ok(Math.abs(actual - expected) < 1e-12, `${label} ${actual} is not ${expected}`);
 
 // ─── Expected points: minutes counted once (P1) ──────────────────────────────
 
@@ -277,6 +282,82 @@ test('with too few contention gameweeks his price prior stands in, flagged estim
   assert.equal(gw.estimated, true);
 });
 
+// ─── The minutes model (Phase 4) ─────────────────────────────────────────────
+
+/** Heads that ignore the record: appear logistic(2), start logistic(1), 60 minutes logistic(0) = 0.5. */
+const FLAT_MODEL = { appear: { intercept: 2 }, start: { intercept: 1 }, p60: { intercept: 0 } };
+const logistic = z => 1 / (1 + Math.exp(-z));
+
+test('with the minutes model his chances come from its heads, and are neither approximate nor estimated', () => {
+  const { season, ctx } = league([rawPlayer(1, 1, 'MID', { total_points: 48, minutes: 720, starts: 8 })]);
+  const gw = project(season, ctx, { gwTable: liveTable({ 1: played(8) }), minutesModel: FLAT_MODEL }).get(1).gws[0];
+  close(gw.pZero, 1 - logistic(2));
+  close(gw.pStart, logistic(1));
+  close(gw.p60, 0.5);
+  // A neutral fixture: his 6 points an appearance, when he appears.
+  close(gw.xpts, logistic(2) * 6);
+  close(gw.xptsIfPlays, 6);
+  assert.equal(gw.p60Approx, false);
+  assert.equal(gw.estimated, false);
+});
+
+test('the model\'s recalibration applies gameweek by gameweek over the horizon', () => {
+  const { season, ctx } = league([rawPlayer(1, 1, 'MID', { total_points: 48, minutes: 720, starts: 8 })]);
+  // From one gameweek ahead every logit reads 0: an even chance.
+  const model = { ...FLAT_MODEL, ahead: { appear: [[0, 0]], start: [[0, 0]], p60: [[0, 0]] } };
+  const gws = project(season, ctx, { gwTable: liveTable({ 1: played(8) }), minutesModel: model }).get(1).gws;
+  close(gws[0].pZero, 1 - logistic(2));
+  for (const g of gws.slice(1)) close(g.pZero, 0.5, `GW${g.gw}`);
+});
+
+test('with the model, each fixture of a double is its own chance to be picked, availability shared', () => {
+  const fixtures = [...homeRun(1, 8, true), [9, 1, 2], [9, 1, 3], ...homeRun(10, 14, false)];
+  const { season, ctx } = league([rawPlayer(1, 1, 'MID', {
+    status: 'd', chance_of_playing_next_round: 50, total_points: 48, minutes: 720, starts: 8 })], fixtures);
+  const gw = project(season, ctx, { gwTable: liveTable({ 1: played(8) }), minutesModel: FLAT_MODEL }).get(1).gws[0];
+  close(gw.pZero, 1 - (0.5 * (1 - ((1 - logistic(2)) ** 2))));
+  close(gw.p60, 0.5 * (1 - (0.5 ** 2)));
+});
+
+test('a flagged player\'s current absence is excused before the model reads his record; a fit player\'s is not', () => {
+  // Heads that read only the zero run: a fit player two weeks out has been dropped.
+  const head = { intercept: 0, zeroRun: -10 };
+  const model = { appear: head, start: head, p60: head };
+  const { season, ctx } = league([
+    rawPlayer(1, 1, 'MID', { status: 'd', chance_of_playing_next_round: 50, total_points: 36, minutes: 540, starts: 6 }),
+    rawPlayer(2, 1, 'MID', { total_points: 36, minutes: 540, starts: 6 }),
+  ]);
+  const record = [...played(6), ...missed(2)];
+  const projections = project(season, ctx, { gwTable: liveTable({ 1: record, 2: record }), minutesModel: model });
+  close(projections.get(1).gws[0].pZero, 1 - (0.5 * 0.5));
+  assert.ok(projections.get(2).gws[0].pZero > 0.99);
+});
+
+test('with the model but no live table, or no record before the planning gameweek, the v1 rates stand in', () => {
+  const { season, ctx } = league([
+    rawPlayer(1, 1, 'MID', { total_points: 48, minutes: 720, starts: 8 }),
+    rawPlayer(2, 1, 'MID'),                     // just signed: no row in the table
+  ]);
+  const noTable = project(season, ctx, { minutesModel: FLAT_MODEL }).get(1).gws[0];
+  assert.deepEqual([noTable.estimated, noTable.p60Approx], [true, true]);
+  const signed = project(season, ctx, { gwTable: liveTable({ 1: played(8) }), minutesModel: FLAT_MODEL }).get(2).gws[0];
+  assert.deepEqual([signed.estimated, signed.p60Approx], [true, true]);
+});
+
+test('the shipped model ranks an ever-present starter over a rotation player over one dropped three weeks', () => {
+  const alternate = [[90, 6], [0, 0], [90, 6], [0, 0], [90, 6], [0, 0], [90, 6], [0, 0]];
+  const { season, ctx } = league([
+    rawPlayer(1, 1, 'DEF', { now_cost: 45, total_points: 32, minutes: 720, starts: 8 }),
+    rawPlayer(2, 1, 'MID', { total_points: 24, minutes: 360, starts: 4 }),
+    rawPlayer(3, 1, 'FWD', { total_points: 30, minutes: 450, starts: 5 }),
+  ]);
+  const table = liveTable({ 1: played(8, 4), 2: alternate, 3: [...played(5), ...missed(3)] });
+  const projections = project(season, ctx, { gwTable: table, minutesModel: DECISION_ENGINE.minutesModel });
+  const [nailed, rotated, dropped] = [1, 2, 3].map(id => projections.get(id).gws[0].pZero);
+  assert.ok(nailed < 0.1, `ever-present ${nailed}`);
+  assert.ok(nailed < rotated && rotated < dropped, `${nailed} ${rotated} ${dropped}`);
+});
+
 // ─── Contract ────────────────────────────────────────────────────────────────
 
 test('projections are identical whether or not an element-summary is loaded', () => {
@@ -308,10 +389,10 @@ test('xpts = (1 - pZero) x xptsIfPlays for every projection', () => {
     1: played(8), 2: [[90, 6], [0, 0], [90, 6], [0, 0], [90, 6], [0, 0], [90, 6], [0, 0]],
     3: [...played(6, 3), ...missed(2)], 4: [...played(5), ...missed(3)], 5: missed(8),
   });
-  for (const gwTable of [table, null]) {
+  for (const [gwTable, minutesModel] of [[table, DECISION_ENGINE.minutesModel], [table, null], [null, null]]) {
     for (const scorePlayerFn of [undefined, neutralScorer]) {
       const projections = buildProjections(season.players, ctx,
-        { planningGw: PLANNING_GW, horizonGws: 6, gwTable, scorePlayerFn });
+        { planningGw: PLANNING_GW, horizonGws: 6, gwTable, scorePlayerFn, minutesModel });
       for (const { playerId, gws } of projections.values()) {
         for (const g of gws) {
           assert.ok(Math.abs(g.xpts - (1 - g.pZero) * g.xptsIfPlays) < 1e-12,

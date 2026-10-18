@@ -94,6 +94,8 @@ jayjaybee-site/                   ← repo root (not Gaffer IQ's concern)
         │   ├── ranker.css
         │   ├── dashboard.css
         │   └── planner.css
+        ├── tools/
+        │   └── minutes/
         └── js/
             ├── main.js
             ├── config.js
@@ -114,6 +116,7 @@ jayjaybee-site/                   ← repo root (not Gaffer IQ's concern)
             │   ├── prices.js
             │   ├── ledger.js
             │   ├── feasibility.js
+            │   ├── minutes.js
             │   ├── projections.js
             │   ├── squad-value.js
             │   └── decision.js
@@ -156,6 +159,10 @@ gaffer-iq/                          (= projects/gaffer-iq/ in the repo)
 │   ├── dashboard.css           # GW Dashboard only, every rule nested under `.db`.
 │   └── planner.css             # Transfer Planner only, every rule nested under `.pl`.
 │
+├── tools/                      # Offline Node scripts. Never loaded by the app.
+│   └── minutes/                # Fits the minutes model and writes REPORT.md (download.js,
+│                               #   fit.js; lib.js holds the maths). data/ is gitignored.
+│
 └── js/
     ├── main.js                 # ENTRY POINT (ESM). Imports modules, reads URL hash to
     │                           #   pick the active view, wires nav,
@@ -184,6 +191,8 @@ gaffer-iq/                          (= projects/gaffer-iq/ in the repo)
     │   ├── ledger.js           # Purchase prices and banked free transfers, from a manager's
     │   │                       #   transfer list and history (decision engine).
     │   ├── feasibility.js      # Whether FPL would accept one transfer (decision engine).
+    │   ├── minutes.js          # The minutes model: features from a player's record and the
+    │   │                       #   fitted appear / start / 60-minute heads (tools/minutes).
     │   ├── projections.js      # Per player, per GW of the horizon: xpts, pZero, xptsIfPlays,
     │   │                       #   pStart, p60 - the decision engine's data contract.
     │   ├── squad-value.js      # V_t(S): best XI + captain + expected autosubs (+ Bench Boost).

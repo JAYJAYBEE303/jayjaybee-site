@@ -5,8 +5,9 @@ revision 1 against the code and the brief: 58 findings, 44 confirmed and folded
 in below).
 Status: **approved**; grill-me questions Q1-Q10 answered (§7). Phase 1 done
 (`f4ef63f`); Phase 2 done (`cfad609`); Phase 3 done (`3870fc1`, review fixes
-`94d309a`); UI phase done, awaiting your check. Where the build departed from this plan, the text below was
-updated to match it.
+`94d309a`); UI phase done (`17db173`, review fixes `3564ffc`); Phase 4 done,
+awaiting your check. Where the build departed from this plan, the text below
+was updated to match it.
 Brief: `fpl-decision-engine-brief.md` (16 Oct 2026). Section numbers below
 (§3, §5 ...) refer to the brief unless prefixed with a file name.
 Scope: `projects/apps/gaffer-iq/` only. Branch:
@@ -171,21 +172,26 @@ For a single GW this gives `xptsIfPlays = ppa x fm x count`, independent of
 `a_t`, so an injured nailed starter keeps a positive `xptsIfPlays` (needed by
 mode 6's uncovered loss), and `xpts = (1 - pZero) x xptsIfPlays` holds exactly.
 With the fallbacks, `xpts = a x avgPointsPerGw x fm x count`, i.e. P1 removed.
-Phase 4 swaps only the sources of `a_t` and `appearRate`; the formulas stay.
+Phase 4 swapped the sources of `appearRate` and `startRate`, and of `p60`
+(`a_t x (1 - (1 - p60Rate)^n_t)`, `p60Approx: false`), for the fitted minutes
+model's per-fixture chances wherever the live table holds his record; the
+formulas stay. `a_t` stays FPL's flag and its recovery: no history of flags
+exists to fit it on.
 
-Known v1 limits, all replaced by Phase 4: an impact sub's appearances are
+Known v1 limits: an impact sub's appearances are
 undercounted without the live table; a benched (not injured) player's finished
 zero run is excluded like an injury; a mid-season arrival's early GWs count
-against him.
+against him. The minutes model needs the table, so it never meets the first;
+it reads the same record as v1, so the other two remain (Phase 4).
 
 ### 2.3 Field status
 
 | Field | Status today | v1 (this plan) |
 |---|---|---|
 | `xpts` | **Approximation, and wrong** (P1-P4, per window not per GW) | §2.2, per GW |
-| `p_start` | **Approximation** (`startShare` is a minutes share; `playtime.startRate` is price-shrunk) | `a_t x startRate`, flagged approximate |
-| `p_zero` | **Not produced** | §2.2 |
-| `p_60` | **Not produced** | `pStart x completion`, `p60Approx: true` |
+| `p_start` | **Approximation** (`startShare` is a minutes share; `playtime.startRate` is price-shrunk) | `a_t x startRate`, flagged approximate; Phase 4: the minutes model's start head |
+| `p_zero` | **Not produced** | §2.2; Phase 4: from the appear head |
+| `p_60` | **Not produced** | `pStart x completion`, `p60Approx: true`; Phase 4: the 60-minute head, `p60Approx: false` |
 | `xpts_if_plays` | **Not produced** | §2.2 |
 | `p_p90` | **Not produced** (Ceiling's haul rate is a backward proxy) | `null` until Phase 7 |
 | Point-in-time snapshots | **Not produced** (`calibration.js` stores fixture composites only, in `localStorage`) | Phase 1, in the browser (Q1) |
@@ -274,15 +280,16 @@ New pure module `js/engine/projections.js`:
  * @property {number}  pStart        brief: p_start
  * @property {number}  pZero         brief: p_zero
  * @property {number}  p60           brief: p_60
- * @property {boolean} p60Approx     true until Phase 4
+ * @property {boolean} p60Approx     true where the v1 rates stood in (Phase 4)
  * @property {number}  xptsIfPlays   brief: xpts_if_plays
  * @property {number|null} pP90      brief: p_p90, null until Phase 7
  * @property {boolean} estimated
- * @property {'fpl'|'status'|'recovery'|'model'} availabilitySource
+ * @property {'fpl'|'status'|'recovery'} availabilitySource
  */
 
 /** @returns {Map<number, { playerId, position, teamId, price, gws: GwProjection[] }>} */
-export function buildProjections(players, ctx, { planningGw, horizonGws, gwTable, scorePlayerFn = scorePlayer })
+export function buildProjections(players, ctx,
+  { planningGw, horizonGws, gwTable, scorePlayerFn = scorePlayer, minutesModel = DECISION_ENGINE.minutesModel })
 ```
 
 `ctx` is built for the engine with `playerSummariesById: {}`; `gwTable` is the
@@ -420,6 +427,8 @@ export const DECISION_ENGINE = {
   alternativesWindow: 2, alternativesMax: 2,
   absenceCarryOver: { doubtful: 0.3, injured: 0.6, suspended: 0, unavailable: 1 },
   absenceMinRunGws: 2, absenceLookbackGws: 5, minContentionGws: 3,
+  minutesFeatures: { windows: { short: 3, mid: 5, long: 10 }, playedMinutes: 60, minHistoryGws: 1 },
+  minutesModel: { appear, start, p60, ahead },   // fitted by tools/minutes (Phase 4); null runs v1
   seasonMaxAgeMinutes: 60, snapshotMinIntervalMinutes: 360,
   minutesRiskPZero: { medium: 0.1, high: 0.3 },
   modes: {   // each also has a label
@@ -519,7 +528,7 @@ before the previous one passes. Phases 1, 2, 3 and 5 are strictly sequential.
 3. `pickStartingXI` gains an optional value accessor (Dashboard call unchanged).
 4. `js/engine/squad-value.js`: `squadValue` (optimal XI by `xpts`; captain and vice per §5.2; Triple Captain; Bench Boost counts only the increment over autosub value; blanks via `xpts = 0`, `pZero = 1`) and `autosubRecovery` (linear mode first, then probability mode per §5.2). Then switch the default to `probability`. FPL facts the new files need (`MATCH_MINUTES`, `PERCENT`, `CAPTAIN_MULTIPLIER`, `TRIPLE_CAPTAIN_MULTIPLIER`) are config constants, so the engine files hold no numeric literals but 0 and 1.
 
-**Known v1 limit seen on real data.** Until a player has `minContentionGws` contention gameweeks, his appearance rate is the price prior: after GW1 a nailed but mid-priced starter reads `pZero` ~0.6, and `ppa` rests on one appearance. Both are flagged `estimated`; Phase 4's model replaces them.
+**Known v1 limit seen on real data.** Until a player has `minContentionGws` contention gameweeks, his appearance rate is the price prior: after GW1 a nailed but mid-priced starter reads `pZero` ~0.6, and `ppa` rests on one appearance. Both are flagged `estimated`; Phase 4's model replaces them. (Phase 4: with the live table the model reads him from his first GW; that starter reads `pZero` ~0.10 after GW1.)
 
 **Acceptance (tests first)**
 - Brief §7 Phase 2 cases, with their conditions pinned: the 3rd-sub defender's ~3% / ~100% case in `linear` mode, plus a hand-computed probability-mode case; the injured-starter and exactly-3-DEF cases run through `autosubRecovery` against a fixed XI (re-picking the XI would bench the injured starter and skip the autosub code); selling the only strong captain costs more than the raw xpts difference.
@@ -610,6 +619,23 @@ before the previous one passes. Phases 1, 2, 3 and 5 are strictly sequential.
 **Acceptance** Brier on P(60+) beats the last-5-starts baseline on a held-out period; calibration table by bucket, reported by return category; `xpts = (1 - pZero) x xptsIfPlays` still holds for every model projection.
 
 **Guards** No bulk `element-summary` fetches in the app. No future data in training rows.
+
+**As built**
+
+- **The model.** `js/engine/minutes.js` (pure, shared with the tool). `minutesFeatures` reads a player's contention record - the GWs his club played before the planning GW, an excused absence removed, a double counted per fixture - as 14 features: start share over the last 3 and 10 GWs and the season, appearances and minutes over the last 5, whether he started and played 60 minutes last time, the zero-minute run and the 60-minute run still going (each `log(1 + n)`), how much record there is (capped at 10 GWs), position and price. `selectionChances` turns them into per-fixture chances to appear, start and play 60+ with three logistic heads. k = 1-5 GWs ahead, each head's logit z reads `a_k + b_k z` (fitted per head and k): the record before the planning GW says less about later GWs, so the chances drift towards the average. Start and 60 are capped at appear. `excusedAbsence` moved here from `projections.js`, so training rows and the app excuse a finished absence the same way; a running one is excused only when FPL flags him, which training rows cannot know, so there it always counts.
+- **In `projections.js`.** With the live table and at least `minHistoryGws` (1) GW of record, `appearRate`, `startRate` and the 60-minute rate come from the model for each GW of the horizon; `p60 = a_t (1 - (1 - p60Rate)^n)`, `p60Approx: false`, `estimated: false`. `xpts`, `pZero` and `xptsIfPlays` follow through §2.2 unchanged, and `ppa` still comes from his record. Without the table, or with no record (a new signing), the v1 rates stand in. `buildProjections` takes `minutesModel` (default `DECISION_ENGINE.minutesModel`; `null` runs v1, which the v1 tests pin).
+- **The fit.** `tools/minutes/` (Node, offline, never loaded by the app). `download.js` caches vaastav's `merged_gw.csv` per season in `tools/minutes/data/` (gitignored). `lib.js` builds the rows - one per player per single-fixture GW, read with nothing from the planning GW on but the outcome and the kickoff - fits ridge logistic regression by IRLS, and scores. `fit.js` chooses each head's penalty on 2024-25, fits the heads and the recalibration on 2023-24 and 2024-25, tests on 2025-26, and writes `tools/minutes/REPORT.md`, ending with the block pasted into `DECISION_ENGINE.minutesModel`.
+- **Acceptance.** P(60+) for the next GW of held-out 2025-26: Brier 0.0809 against 0.1055 for last-5-starts (0.1502 against 0.1980 for players who played in one of their last five); log loss 0.261 against 0.473. The model also beats the v1 rates on every head (P(60+) Brier 0.0804 against 0.1037 on the rows v1 covers). Next GW, every decile of the calibration table is within 4 points. Five GWs ahead the recalibration brings the Brier from 0.1327 to 0.1241. The report gives the calibration table and the scores by return category (OpenFPL's: Zeros did not play, Blanks 2 or fewer points, Tickers 3-4, Haulers 5+). `xpts = (1 - pZero) x xptsIfPlays` holds for every model projection: the projections test checks it with the shipped model, and in the browser all 790 players passed.
+- **Departures from the plan and brief.**
+  - **Availability is not fitted.** `a_t` is not fitted and `availabilitySource` is never `'model'`: vaastav has no history of FPL's flags or news. Availability stays the flag and `absenceCarryOver`. Injury-type recovery priors would need that news history too.
+  - **vaastav only.** Our exported snapshots and live tables cover a few weeks on one device, so they are not training data yet; a refit can add them.
+  - **2022-23 left out.** FPL recorded no starts before its GW16.
+  - **No congestion or rotation features.** Two club measures were tried: days of rest before the match, and the share of the club's XI changed per GW over its last five. Neither improved any head's validation log loss or Brier by more than 0.0003 (the ablation in `REPORT.md`), so the app does not compute them. European and cup fixtures are in no source here.
+  - **No suspension counters.** FPL flags a ban once it is triggered; the risk of a fifth yellow inside the horizon is left as a follow-up.
+  - **Added beyond the plan: the per-GW recalibration.** Without it the model is overconfident further out: players given about 86% five GWs ahead played 60 minutes 69% of the time.
+  - **Added beyond the plan: the 60-minute run feature.** Without it, ever-present starters read about 2.5 points low on appearing.
+- **Known residual.** Keepers are stickier than the model allows. An ever-present keeper gets a 7% chance of no minutes where 4% got none. A keeper-only start term moved the validation scores by under 0.0002, so it is not in the model.
+- **Verified** in headless Chromium on the 2025-26 GW20 payloads, with all 19 minutes tables archived. 780 of 790 players ran on the model; the other ten have no record. Projections build in about 1.15 s, against about 1.0 s with the v1 rates. The cards appear about 2 s after a reload, with no page errors.
 
 ### Phase 5: Transfer economics and price layer
 

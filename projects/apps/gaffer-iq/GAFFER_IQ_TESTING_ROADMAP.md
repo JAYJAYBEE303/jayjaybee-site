@@ -268,10 +268,16 @@ window.__verify.pairingPlayers()
 
 The Planner runs the decision engine (`FEATURE_ENGINE.md` §14,
 `docs/decision-engine-plan.md`). `npm test` covers the engine
-(`tests/engine/decision.test.js`, `projections.test.js`, `squad-value.test.js`)
+(`tests/engine/decision.test.js`, `projections.test.js`, `squad-value.test.js`,
+`minutes.test.js`), the minutes model's fitting tool (`tests/tools/minutes.test.js`)
 and the module's pure helpers (`tests/modules/planner.test.js`). The checklist
 below is the in-browser gate after a change to the engine, to `DECISION_ENGINE`
 in `config.js`, or to `modules/planner.js`.
+
+A change to `DECISION_ENGINE.minutesFeatures` or to `engine/minutes.js` needs a
+refit as well: `node tools/minutes/download.js && node tools/minutes/fit.js`
+from the app folder, check that `tools/minutes/REPORT.md` still says the
+acceptance passes, and paste the block it ends with into `minutesModel`.
 
 **Never enter a real FPL team ID for this.** Seed a synthetic squad from the
 console instead:
@@ -308,7 +314,8 @@ s.setSquad([].concat(pick('GKP', 2), pick('DEF', 5), pick('MID', 5), pick('FWD',
       frame, the player column pinned); with reduced motion, no entrance
       animation plays.
 - [ ] `window.__engine.buildProjections` and `runDecisionEngine` are there for
-      spot checks.
+      spot checks. Once every finished GW's minutes table is archived, a player
+      with a record projects `p60Approx: false` (the minutes model ran).
 
 ## End of Season Review
 
