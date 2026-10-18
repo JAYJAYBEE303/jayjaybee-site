@@ -327,3 +327,23 @@ test('normalisePlayer passes FPL\'s price-change predictor through untouched, fo
   assert.deepEqual(normalisePlayer({ ...RAW_ELEMENT, ...predictor }).priceFeed, predictor);
   assert.equal(normalisePlayer(RAW_ELEMENT).priceFeed, null);
 });
+
+test('normalisePlayer carries the season totals the points model reads', () => {
+  const totals = normalisePlayer({
+    ...RAW_ELEMENT, expected_goals_conceded: '9.25', goals_conceded: 11, saves: 31, bonus: 7,
+    defensive_contribution: 84, yellow_cards: 3, red_cards: 1,
+  }).totals;
+  assert.deepEqual(
+    [totals.xGC, totals.goalsConceded, totals.saves, totals.bonus, totals.defensiveContribution, totals.yellowCards, totals.redCards],
+    [9.25, 11, 31, 7, 84, 3, 1]);
+  const bare = normalisePlayer(RAW_ELEMENT).totals;
+  assert.deepEqual([bare.xGC, bare.saves, bare.defensiveContribution, bare.redCards], [0, 0, 0, 0]);
+});
+
+test('normalisePlayer reads the points model\'s counts as numbers even when they arrive as text', () => {
+  const totals = normalisePlayer({
+    ...RAW_ELEMENT, goals_conceded: '26', saves: '60', bonus: '11', defensive_contribution: '84', yellow_cards: '1', red_cards: '0',
+  }).totals;
+  assert.deepEqual([totals.goalsConceded, totals.saves, totals.bonus, totals.defensiveContribution, totals.yellowCards, totals.redCards],
+    [26, 60, 11, 84, 1, 0]);
+});

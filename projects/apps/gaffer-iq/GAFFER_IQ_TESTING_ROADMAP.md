@@ -269,8 +269,9 @@ window.__verify.pairingPlayers()
 The Planner runs the decision engine (`FEATURE_ENGINE.md` §14,
 `docs/decision-engine-plan.md`). `npm test` covers the engine
 (`tests/engine/decision.test.js`, `projections.test.js`, `squad-value.test.js`,
-`minutes.test.js`, `price-adapter.test.js`, `robustness.test.js`), the minutes model's fitting tool
-(`tests/tools/minutes.test.js`)
+`minutes.test.js`, `points.test.js`, `team-goals.test.js`, `price-adapter.test.js`,
+`robustness.test.js`), the offline tools (`tests/tools/minutes.test.js`,
+`backtest.test.js`, `points.test.js`)
 and the module's pure helpers (`tests/modules/planner.test.js`). The checklist
 below is the in-browser gate after a change to the engine, to `DECISION_ENGINE`
 in `config.js`, or to `modules/planner.js`.
@@ -279,6 +280,13 @@ A change to `DECISION_ENGINE.minutesFeatures` or to `engine/minutes.js` needs a
 refit as well: `node tools/minutes/download.js && node tools/minutes/fit.js`
 from the app folder, check that `tools/minutes/REPORT.md` still says the
 acceptance passes, and paste the block it ends with into `minutesModel`.
+
+A change to `engine/points.js`, `engine/team-goals.js` or `FPL_SCORING` needs
+the points model refitted the same way: `node tools/backtest/download.js &&
+node tools/points/fit.js`, check `tools/points/REPORT.md` still shows the model
+beating the v1 basis on the held-out season, and paste the block it ends with
+into `pointsModel`. Refit once a season, too: its club priors are last
+season's ratings.
 
 **Never enter a real FPL team ID for this.** Seed a synthetic squad from the
 console instead:

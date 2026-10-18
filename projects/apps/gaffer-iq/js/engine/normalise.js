@@ -229,6 +229,16 @@ export function normalisePlayer(raw) {
       xG:          parseFloat(raw.expected_goals)   || 0,
       xA:          parseFloat(raw.expected_assists) || 0,
       cleanSheets: raw.clean_sheets || 0,
+      // The rest of what engine/points.js reads (plan Phase 6b): his xG
+      // conceded while on the pitch, and the other counts FPL pays for. Read
+      // as numbers whatever their type, since the points model adds them up.
+      xGC:                   parseFloat(raw.expected_goals_conceded) || 0,
+      goalsConceded:         Number(raw.goals_conceded) || 0,
+      saves:                 Number(raw.saves) || 0,
+      bonus:                 Number(raw.bonus) || 0,
+      defensiveContribution: Number(raw.defensive_contribution) || 0,
+      yellowCards:           Number(raw.yellow_cards) || 0,
+      redCards:              Number(raw.red_cards) || 0,
     },
     // FPL ICT index components (season totals as decimal strings upstream).
     // Used by engine/counter.js → classifyRole to refine raw element_type

@@ -868,6 +868,11 @@ export const PROJ_MINUTES = 0.20;   // playing likelihood - will he actually sta
 // meaningfully swing the pick without ever driving the multiplier negative.
 export const EXPECTED_PTS_FIXTURE_SWING = 0.5;
 
+// The even point of the composite's 0-100 fixture score (scoreFixture): 50 is
+// an even fixture, and a fixture's two sides add up to twice this. The points
+// model reads a side's score as (score - even) / even, from -1 to 1.
+export const FIXTURE_SCORE_EVEN = 50;
+
 // How much the SECOND (and each further) fixture of a double gameweek is worth
 // to a real-points projection, relative to the first.
 //
@@ -1306,6 +1311,26 @@ export const TRIPLE_CAPTAIN_MULTIPLIER = 3;
 // and STATUS_PLAY_CHANCE above); the decision engine works in 0-1.
 export const PERCENT = 100;
 
+// FPL's scoring rules, as engine/points.js reads them. Every row of vaastav's
+// 2024-25, 2025-26 and 2026-27 GW1 data reproduces its total from these (the
+// defensive contribution from 2025-26 on); a keeper's goal is too rare to
+// check. Points for playing: `short` under fullMinutes, `full` at it or more;
+// a clean sheet needs fullMinutes; goals conceded cost `points` per `per`
+// while on the pitch; saves pay `points` per `per`; reaching a position's
+// defensive-contribution threshold in a match pays `points`.
+export const FPL_SCORING = {
+  appearance: { short: 1, full: 2 },
+  fullMinutes: 60,
+  goal: { GKP: 6, DEF: 6, MID: 5, FWD: 4 },
+  assist: 3,
+  cleanSheet: { GKP: 4, DEF: 4, MID: 1, FWD: 0 },
+  conceded: { per: 2, points: -1, positions: ['GKP', 'DEF'] },
+  saves: { per: 3, points: 1 },
+  defensiveContribution: { threshold: { DEF: 10, MID: 12, FWD: 12 }, points: 2 },
+  yellow: -1,
+  red: -3,
+};
+
 export const DECISION_ENGINE = {
   // FPL: free transfers bank up to this many; a sixth would be wasted.
   maxBankedFt: 5,
@@ -1429,6 +1454,89 @@ export const DECISION_ENGINE = {
       start: [[-0.04316, 0.814], [-0.07849, 0.7253], [-0.1087, 0.6663], [-0.1315, 0.6301], [-0.1488, 0.6041]],
       p60: [[-0.04544, 0.8247], [-0.08096, 0.7384], [-0.1121, 0.6807], [-0.1336, 0.6479], [-0.1519, 0.6192]],
     },
+  },
+  // The points model (engine/points.js and team-goals.js, plan Phase 6b): a
+  // player's expected points if he plays, built from the parts FPL pays for,
+  // with each club's expected goals for and against carrying the fixture.
+  // Fitted by tools/points/fit.js (tools/points/REPORT.md); paste a refit
+  // here. null runs the v1 basis: his raw points per appearance times the
+  // fixture multiplier (plan §2.2).
+  pointsModel: {
+    goalsPerXg: 0.9753,
+    assistsPerXa: 1.393,
+    minutesIfFull: 85.3,
+    minutesIfShort: 22.11,
+    defconDispersion: 27.53,
+    bonus: {
+      GKP: { base: 0.04806, goal: 0, assist: 0.7922, cleanSheet: 0.7772 },
+      DEF: { base: -0.01233, goal: 0.9648, assist: 0.5734, cleanSheet: 0.5974 },
+      MID: { base: 0.04185, goal: 1.244, assist: 0.4893, cleanSheet: -0.02647 },
+      FWD: { base: 0.0163, goal: 1.374, assist: 0.2674, cleanSheet: 0.02765 },
+    },
+    priors: {
+      GKP: {
+        goalShare: [-0.00008362, 0.00003287],
+        assistShare: [-0.001922, 0.0006423],
+        defconPer90: [0, 0],
+        savesPerXga: 2.072,
+        yellowsPer90: 0.07676,
+        redsPer90: 0.0008773,
+      },
+      DEF: {
+        goalShare: [0.02062, 0.003301],
+        assistShare: [0.003691, 0.007468],
+        defconPer90: [8.685, -0.2126],
+        savesPerXga: 0,
+        yellowsPer90: 0.1859,
+        redsPer90: 0.008112,
+      },
+      MID: {
+        goalShare: [-0.03556, 0.02534],
+        assistShare: [0.0161, 0.01225],
+        defconPer90: [12.94, -0.75],
+        savesPerXga: 0,
+        yellowsPer90: 0.2068,
+        redsPer90: 0.006104,
+      },
+      FWD: {
+        goalShare: [0.2091, 0.01214],
+        assistShare: [0.0584, -0.001058],
+        defconPer90: [6.029, -0.184],
+        savesPerXga: 0,
+        yellowsPer90: 0.164,
+        redsPer90: 0.004011,
+      },
+    },
+    priorWeight: { share: 4, per90: 5, saves: 20 },
+    teams: {
+      leagueXg: 1.478,
+      priorMatches: 32,
+      homeAdvantage: 1.102,
+      promoted: { attack: 0.6956, defence: 1.29 },
+    },
+    teamPriors: {
+      1: { attack: 1.107, defence: 0.9568 },
+      2: { attack: 1.007, defence: 1.018 },
+      3: { attack: 1.124, defence: 0.7759 },
+      4: { attack: 1.041, defence: 0.9864 },
+      6: { attack: 0.8874, defence: 0.985 },
+      7: { attack: 0.9669, defence: 1.007 },
+      8: { attack: 1.127, defence: 0.9944 },
+      11: { attack: 0.9342, defence: 1.028 },
+      14: { attack: 1.066, defence: 0.9508 },
+      17: { attack: 0.932, defence: 1.027 },
+      21: { attack: 0.9357, defence: 1.064 },
+      31: { attack: 1.043, defence: 1.009 },
+      36: { attack: 1.041, defence: 0.9634 },
+      39: { attack: 0.8386, defence: 1.053 },
+      43: { attack: 1.171, defence: 0.918 },
+      54: { attack: 0.9543, defence: 0.996 },
+      56: { attack: 0.8597, defence: 1.009 },
+      90: { attack: 0.8057, defence: 1.217 },
+      91: { attack: 1.092, defence: 1.031 },
+      94: { attack: 1.066, defence: 1.01 },
+    },
+    fixtureRating: { weight: 0 },
   },
 
   // ── Squad value (engine/squad-value.js, brief §4) ──

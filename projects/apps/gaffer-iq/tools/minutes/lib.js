@@ -323,8 +323,8 @@ export function fitLogistic(X, y, { lambda = 0, maxIterations = 100, tolerance =
   throw new Error(`fitLogistic: no convergence in ${maxIterations} iterations`);
 }
 
-/** Gaussian elimination with partial pivoting: x with A x = b. */
-function solve(A, b) {
+/** Gaussian elimination with partial pivoting: x with A x = b. Also used by tools/points. */
+export function solve(A, b) {
   const n = b.length;
   const M = A.map((row, i) => [...row, b[i]]);
   for (let col = 0; col < n; col++) {

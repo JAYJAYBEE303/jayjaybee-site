@@ -139,3 +139,40 @@ export function normalDeviate(random) {
   const u = 1 - random();   // in (0, 1], so the log is finite
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * random());
 }
+
+/** Probability mass below which a count's sums stop: far past anything one match produces. */
+const COUNT_TAIL = 1e-12;
+
+/**
+ * E[floor(X / divisor)] for X ~ Poisson(lambda): the points from a count paid
+ * per `divisor` (goals conceded, saves). For the small means of one match.
+ */
+export function poissonFloorMean(lambda, divisor) {
+  if (!(lambda > 0)) return 0;
+  let p = Math.exp(-lambda);
+  let mean = 0;
+  for (let k = 0; k <= lambda || p > COUNT_TAIL; k++) {
+    mean += p * Math.floor(k / divisor);
+    p *= lambda / (k + 1);
+  }
+  return mean;
+}
+
+/**
+ * P(X >= threshold) for a negative binomial count with this mean and
+ * dispersion (the "size": variance = mean + mean^2 / dispersion); an infinite
+ * dispersion is the Poisson count.
+ */
+export function negativeBinomialTail(mean, dispersion, threshold) {
+  if (threshold <= 0) return 1;
+  if (!(mean > 0)) return 0;
+  const poisson = !Number.isFinite(dispersion);
+  const keep = poisson ? 0 : dispersion / (dispersion + mean);
+  let p = poisson ? Math.exp(-mean) : keep ** dispersion;
+  let below = 0;
+  for (let k = 0; k < threshold; k++) {
+    below += p;
+    p *= poisson ? mean / (k + 1) : ((k + dispersion) / (k + 1)) * (1 - keep);
+  }
+  return Math.max(0, 1 - below);
+}

@@ -25,11 +25,13 @@
  * See docs/decision-engine-plan.md §2.2, §5.1 and Phase 4.
  */
 
-import { DECISION_ENGINE, HORIZONS, MATCH_MINUTES, PERCENT, STATUS_PLAY_CHANCE } from '../config.js';
+import { DECISION_ENGINE, FIXTURE_SCORE_EVEN, HORIZONS, MATCH_MINUTES, PERCENT, STATUS_PLAY_CHANCE } from '../config.js';
 import { clamp, toTenths } from '../util.js';
-import { scorePlayer, calcExpectedPoints, fixtureCountFactor } from './composite.js';
+import { scorePlayer, scoreFixture, calcExpectedPoints, fixtureCountFactor } from './composite.js';
 import { calcPlaytimeSecurity } from './form.js';
 import { excusedAbsence, minutesFeatures, selectionChances } from './minutes.js';
+import { fixturePoints, playerRates } from './points.js';
+import { fixtureGoals, teamRates, teamStrengths } from './team-goals.js';
 
 /**
  * @typedef {object} GwProjection
@@ -67,7 +69,8 @@ import { excusedAbsence, minutesFeatures, selectionChances } from './minutes.js'
  */
 export function buildProjections(players, ctx, {
   planningGw, horizonGws = DECISION_ENGINE.horizonGws, gwTable = null, scorePlayerFn = scorePlayer,
-  minutesModel = DECISION_ENGINE.minutesModel,
+  minutesModel = DECISION_ENGINE.minutesModel, pointsModel = DECISION_ENGINE.pointsModel,
+  scoreFixtureFn = scoreFixture,
 } = {}) {
   if (!Array.isArray(players) || !ctx || !Number.isInteger(planningGw)) {
     throw new TypeError('buildProjections: players, ctx and an integer planningGw are required');
@@ -78,13 +81,17 @@ export function buildProjections(players, ctx, {
   const rowsByPlayer  = indexTable(gwTable, planningGw);
   const gws = Array.from({ length: horizonGws }, (_, k) => planningGw + k);
   const ctxByGw = gws.map((gw, k) => contextFor(ctx, gw, k));
+  const goals = pointsModel ? fixtureGoalsByTeam(players, ctx, gws, pointsModel, scoreFixtureFn) : null;
 
   const projections = new Map();
   for (const player of players) {
     const rates = contentionRates(player, ctx, playedCounts.get(player.teamId), rowsByPlayer, planningGw);
+    const priceTenths = toTenths(player.price);
     const features = minutesModel && rates.record
-      ? minutesFeatures(rates.record, { position: player.position, priceTenths: toTenths(player.price) })
+      ? minutesFeatures(rates.record, { position: player.position, priceTenths })
       : null;
+    const pointsRates = goals
+      && playerRates(player.totals, goals.rates.get(player.teamId), { position: player.position, priceTenths }, pointsModel);
     projections.set(player.id, {
       playerId: player.id,
       position: player.position,
@@ -92,7 +99,8 @@ export function buildProjections(players, ctx, {
       price:    player.price,
       gws: gws.map((gw, k) => projectGw(player, gw, k, rates,
         features && selectionChances(features, minutesModel, k),
-        fixtureCounts.get(player.teamId)?.get(gw) ?? 0, ctxByGw[k], scorePlayerFn)),
+        fixtureCounts.get(player.teamId)?.get(gw) ?? 0, ctxByGw[k], scorePlayerFn,
+        goals && { rates: pointsRates, sides: goals.byTeam.get(player.teamId)?.get(gw) ?? [], model: pointsModel })),
     });
   }
   return projections;
@@ -101,9 +109,10 @@ export function buildProjections(players, ctx, {
 /**
  * One gameweek of one player's projection (plan §2.2). `chances` are the
  * minutes model's per-fixture chances for this gameweek, or null for the v1
- * rates.
+ * rates; `parts` is the points model's reading of his fixtures, or null for
+ * the v1 basis.
  */
-function projectGw(player, gw, k, rates, chances, fixtures, ctxForGw, scorePlayerFn) {
+function projectGw(player, gw, k, rates, chances, fixtures, ctxForGw, scorePlayerFn, parts) {
   const available = availability(player, k);
   const appearRate = chances ? chances.appear : rates.appearRate;
   const startRate  = chances ? chances.start : rates.startRate;
@@ -115,12 +124,9 @@ function projectGw(player, gw, k, rates, chances, fixtures, ctxForGw, scorePlaye
     return { ...base, xpts: 0, pStart: 0, pZero: 1, p60: 0, xptsIfPlays: 0 };
   }
 
-  // MODEL: the fixture multiplier and the fixture count from calcExpectedPoints,
-  // so every projection in the app prices a fixture and a double the same way.
-  // Fit and picked for every fixture, he scores ppa x fm x count(n) on average.
-  const { nextFixtureScore } = scorePlayerFn(asOf(player, k), HORIZONS.GW1, ctxForGw);
-  const xptsIfAvailable = calcExpectedPoints(
-    { value: appearRate * rates.ppa }, nextFixtureScore, { value: PERCENT }, fixtures).value;
+  const xptsIfAvailable = parts
+    ? partsPoints(parts, appearRate, chances ? chances.p60 : rates.startRate * rates.completion, fixtures)
+    : v1Points(player, k, appearRate * rates.ppa, fixtures, ctxForGw, scorePlayerFn);
 
   // Availability is shared by the fixtures of a double; selection is per fixture.
   const pPicked = 1 - (1 - appearRate) ** fixtures;
@@ -136,6 +142,73 @@ function projectGw(player, gw, k, rates, chances, fixtures, ctxForGw, scorePlaye
     // on his return. 0 when he is never picked (then xpts is 0 as well).
     xptsIfPlays: pPicked > 0 ? xptsIfAvailable / pPicked : 0,
   };
+}
+
+/**
+ * Fit, his expected points from the v1 basis. MODEL: the fixture multiplier
+ * and the fixture count from calcExpectedPoints, so every projection in the
+ * app prices a fixture and a double the same way. Fit and picked for every
+ * fixture, he scores ppa x fm x count(n) on average.
+ */
+function v1Points(player, k, basis, fixtures, ctxForGw, scorePlayerFn) {
+  const { nextFixtureScore } = scorePlayerFn(asOf(player, k), HORIZONS.GW1, ctxForGw);
+  return calcExpectedPoints({ value: basis }, nextFixtureScore, { value: PERCENT }, fixtures).value;
+}
+
+/**
+ * Fit, his expected points from the points model: each fixture's parts
+ * (engine/points.js) at his chance of 60 minutes once he is on, times his
+ * chance of being picked, with a double's rotation haircut as in
+ * calcExpectedPoints.
+ */
+function partsPoints({ rates, sides, model }, appearRate, p60Rate, fixtures) {
+  if (!(appearRate > 0) || sides.length === 0) return 0;
+  const p60 = clamp(0, 1, p60Rate / appearRate);
+  const minutes = (p60 * model.minutesIfFull) + ((1 - p60) * model.minutesIfShort);
+  const perGame = sides.reduce((sum, side) => sum + fixturePoints(rates, { ...side, p60, minutes }, model).total, 0);
+  return appearRate * perGame * (fixtureCountFactor(fixtures) / fixtures);
+}
+
+/**
+ * Each club's expected goals for and against in each of its fixtures over the
+ * horizon (engine/team-goals.js), from every player's season totals and the
+ * clubs' priors (model.teamPriors, by FPL club code; a club without one reads
+ * as promoted). With model.fixtureRating.weight, each side's expected goals
+ * also scale by exp(weight x (s - even) / even), s being the fixture engine's
+ * 0-100 score for that side (scoreFixture), so a side it rates well expects
+ * more goals and its opponent fewer.
+ *
+ * @returns {{rates: Map, byTeam: Map<number, Map<number, Array<{lambdaFor: number, lambdaAgainst: number}>>>}}
+ */
+function fixtureGoalsByTeam(players, ctx, gws, model, scoreFixtureFn) {
+  const rates = teamRates(players);
+  const priors = new Map();
+  for (const team of Object.values(ctx.teamsById ?? {})) {
+    if (!rates.has(team.id)) rates.set(team.id, { xgFor90: 0, xgAgainst90: 0, matches: 0 });
+    const prior = model.teamPriors?.[team.code];
+    if (prior) priors.set(team.id, prior);
+  }
+  const strengths = teamStrengths(rates, priors, model.teams);
+  const horizon = new Set(gws);
+  const byTeam = new Map();
+  const add = (teamId, gw, side) => {
+    const byGw = byTeam.get(teamId) ?? new Map();
+    byGw.set(gw, [...(byGw.get(gw) ?? []), side]);
+    byTeam.set(teamId, byGw);
+  };
+  const weight = model.fixtureRating?.weight ?? 0;
+  const rated = (teamId, f, goals) => (weight
+    ? goals * Math.exp(weight * ((scoreFixtureFn(ctx.teamsById[teamId], f, ctx).value - FIXTURE_SCORE_EVEN) / FIXTURE_SCORE_EVEN))
+    : goals);
+  for (const f of ctx.fixtures ?? []) {
+    if (!horizon.has(f.gw)) continue;
+    const plain = fixtureGoals(strengths, f.homeTeamId, f.awayTeamId, model.teams);
+    const home = rated(f.homeTeamId, f, plain.home);
+    const away = rated(f.awayTeamId, f, plain.away);
+    add(f.homeTeamId, f.gw, { lambdaFor: home, lambdaAgainst: away });
+    add(f.awayTeamId, f.gw, { lambdaFor: away, lambdaAgainst: home });
+  }
+  return { rates, byTeam };
 }
 
 /**

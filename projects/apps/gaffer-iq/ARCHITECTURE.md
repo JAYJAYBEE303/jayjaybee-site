@@ -95,7 +95,9 @@ jayjaybee-site/                   ← repo root (not Gaffer IQ's concern)
         │   ├── dashboard.css
         │   └── planner.css
         ├── tools/
-        │   └── minutes/
+        │   ├── minutes/
+        │   ├── backtest/
+        │   └── points/
         └── js/
             ├── main.js
             ├── config.js
@@ -118,6 +120,8 @@ jayjaybee-site/                   ← repo root (not Gaffer IQ's concern)
             │   ├── feasibility.js
             │   ├── minutes.js
             │   ├── price-adapter.js
+            │   ├── points.js
+            │   ├── team-goals.js
             │   ├── projections.js
             │   ├── squad-value.js
             │   ├── decision.js
@@ -163,8 +167,12 @@ gaffer-iq/                          (= projects/gaffer-iq/ in the repo)
 │   └── planner.css             # Transfer Planner only, every rule nested under `.pl`.
 │
 ├── tools/                      # Offline Node scripts. Never loaded by the app.
-│   └── minutes/                # Fits the minutes model and writes REPORT.md (download.js,
-│                               #   fit.js; lib.js holds the maths). data/ is gitignored.
+│   ├── minutes/                # Fits the minutes model and writes REPORT.md (download.js,
+│   │                           #   fit.js; lib.js holds the maths). data/ is gitignored.
+│   ├── backtest/               # vaastav's past seasons (download.js; data/ is gitignored) and
+│   │                           #   history.js: each season as it stood before a planning GW.
+│   └── points/                 # Fits the points model and scores it on a held-out season;
+│                               #   writes REPORT.md (fit.js; lib.js holds the maths).
 │
 └── js/
     ├── main.js                 # ENTRY POINT (ESM). Imports modules, reads URL hash to
@@ -198,6 +206,10 @@ gaffer-iq/                          (= projects/gaffer-iq/ in the repo)
     │   │                       #   fitted appear / start / 60-minute heads (tools/minutes).
     │   ├── price-adapter.js    # The only reader of FPL's undocumented price-change predictor:
     │   │                       #   chances of a fall / rise, or the transfer-flow estimate.
+    │   ├── points.js           # The points model: a player's expected points in a fixture he
+    │   │                       #   plays, part by part under FPL's rules (tools/points).
+    │   ├── team-goals.js       # Each club's expected goals for and against a fixture, from its
+    │   │                       #   players' season xG / xGC and last season's rating.
     │   ├── projections.js      # Per player, per GW of the horizon: xpts, pZero, xptsIfPlays,
     │   │                       #   pStart, p60 - the decision engine's data contract.
     │   ├── squad-value.js      # V_t(S): best XI + captain + expected autosubs (+ Bench Boost).

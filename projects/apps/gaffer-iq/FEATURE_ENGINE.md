@@ -1213,7 +1213,7 @@ Still deliberately **not** applied to the Ranker's Next Fixture chip, the per-GW
 
 ---
 
-## 14. Transfer Planner: the decision engine (`engine/projections.js`, `engine/minutes.js`, `engine/price-adapter.js`, `engine/squad-value.js`, `engine/decision.js`, `engine/robustness.js`)
+## 14. Transfer Planner: the decision engine (`engine/projections.js`, `engine/minutes.js`, `engine/points.js`, `engine/team-goals.js`, `engine/price-adapter.js`, `engine/squad-value.js`, `engine/decision.js`, `engine/robustness.js`)
 
 The five lanes and the weekly verdict that lived here (`engine/transfers.js`, `engine/strategy.js`) are gone. In their place, every legal single transfer is scored by what it does to the whole squad's value V_t(S) over the next five gameweeks, and six modes - parameter presets of that one calculation - each name one move or "roll" (Future prep may also say "wait": a move as good next week). The data contract, formulas, modes and config are in `docs/decision-engine-plan.md` (§2.2, §5) until its Final phase writes them up as `docs/decision-engine.md`. The old design stays in `docs/superpowers/specs/2026-08-30-planner-multi-lens-transfers-design.md` as history (superseded).
 
@@ -1228,6 +1228,25 @@ A player's chances of appearing, starting and playing 60 minutes in a fixture he
 Availability is not part of the model. `engine/projections.js` multiplies the chances by FPL's flag and its recovery (`absenceCarryOver`), and excuses a flagged player's current absence before his features are read; an unflagged player's zero run counts, as a dropping. Without the minutes tables, or for a player with no record, the v1 rates (`docs/decision-engine-plan.md` §2.2) stand in, flagged `estimated` and `p60Approx`.
 
 On the held-out 2025-26 season the model's P(60+) for the next gameweek scores a Brier of 0.081, against 0.106 for the last-5-starts baseline; on the players the v1 rates covered, 0.080 against v1's 0.104. `tools/minutes/REPORT.md` has the full test: calibration, return categories, gameweeks ahead, and the features tried and dropped. To refit, run `node tools/minutes/download.js && node tools/minutes/fit.js` from the app folder, then paste the block the report ends with into `config.js`.
+
+### 14.2b The points model (`engine/points.js`, `engine/team-goals.js`)
+
+A player's expected points in a gameweek are built, fixture by fixture, from the parts FPL pays for (`FPL_SCORING` in `config.js`), given he plays:
+- **Playing time**: 1 point, or 2 at 60 minutes, at the minutes model's chance of 60 once he is on.
+- **Goals and assists**: his share of his club's expected goals in that fixture - his season xG and xA over his club's xG while he was on - times FPL's points for a goal at his position or for an assist. FPL credits more assists than Opta's expected assists count, and the model scales xA by the fitted ratio.
+- **Clean sheet and goals conceded**: from his club's expected goals against, as a Poisson count. A clean sheet's chance is e^(-expected goals against); a defender or keeper loses a point per two conceded.
+- **Saves**: a keeper's saves per expected goal against.
+- **Defensive contributions**: 2 points at 10 actions (defenders) or 12 (midfielders and forwards), from his actions per 90 as a negative binomial count.
+- **Bonus**: a fitted model of bonus on goals, assists and clean sheets, plus his own tendency beyond it.
+- **Cards**: his rate per 90.
+
+**The fixture enters once**, through each club's expected goals for and against: the league's level x its attack x the opponent's defence x home advantage. A club's attack and defence are its players' season xG and xGC per 90 against the league's, counted against last season's rating; a promoted club starts as the average promoted club. An easier opponent raises an attacker's goals and assists and a defender's clean sheet, not the points either gets for turning up.
+
+**Every rate is pulled towards a prior** for his position and price, by as much as his record is thin. A player with a few good games keeps most of the prior; one with a season's minutes keeps mostly his own. A hot streak, or a lucky goal, moves his projection only as far as it has earned. xG and xA, not goals and assists, drive the shares, so finishing luck does not carry forward.
+
+The fixture engine's own 0-100 rating can scale each side's expected goals too (`pointsModel.fixtureRating`). As far as it can be replayed offline it added nothing to the xG ratings, so its weight is 0.
+
+The fitted figures live in `DECISION_ENGINE.pointsModel`, from `tools/points/fit.js`. The tool also tests the model on a held-out season against the v1 basis and FPL's own expected points (`tools/points/REPORT.md`). To refit, run `node tools/backtest/download.js && node tools/points/fit.js` from the app folder and paste the block it prints. With `pointsModel` null, the v1 basis stands in: his raw points per appearance times the fixture multiplier.
 
 ### 14.3 Prices and timing (`engine/price-adapter.js`)
 

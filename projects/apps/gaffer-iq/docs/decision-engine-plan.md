@@ -436,6 +436,7 @@ export const DECISION_ENGINE = {
   absenceMinRunGws: 2, absenceLookbackGws: 5, minContentionGws: 3,
   minutesFeatures: { windows: { short: 3, mid: 5, long: 10 }, playedMinutes: 60, minHistoryGws: 1 },
   minutesModel: { appear, start, p60, ahead },   // fitted by tools/minutes (Phase 4); null runs v1
+  pointsModel: { goalsPerXg, assistsPerXa, bonus, priors, priorWeight, teams, teamPriors, fixtureRating, ... },   // fitted by tools/points (Phase 6b); null runs the v1 basis
   seasonMaxAgeMinutes: 60, snapshotMinIntervalMinutes: 360,
   minutesRiskPZero: { medium: 0.1, high: 0.3 },
   priceMoveLikely: 0.95, waitForNewsMinHours: 24,   // Phase 5
@@ -747,6 +748,69 @@ before the previous one passes. Phases 1, 2, 3 and 5 are strictly sequential.
   - Card heights do not change when they land; 360 px has no sideways scroll; no page errors.
   - Locking a card's seller before the labels land keeps focus in the card. The old run's labels never land, and the new cards get their own.
   - The real squad reads Future prep 48%, Funds 34%, Ceiling 19% and Structure 32%; Now and Long term roll. These are small gains (+0.1 to +1.2 points) under untuned noise. The alternatives read 10-18%.
+
+### Phase 6b: Points model (your call, after the projection audit)
+
+> **How this serves the primary goal:** the engine's advice is only as good as the points it is given; this replaces the guesses it runs on.
+
+**Why.** You doubted the guesses (a low-owned Henderson recommended strongly; hot fixtures and long-term value read poorly), and the evidence agreed:
+- On the 2025-26 GW20 payloads, the engine's top 20 midfielders were projected 22% above what they then scored over GW20-24, and the most-owned players by 5.2 points over the five.
+- On 2024-25 and 2025-26 at GW8, the top fifth of players by raw points per appearance (5.3) scored 3.8 a game over the next five GWs.
+- The cause: the projection's basis (Phase 2) is this season's raw points per appearance, never pulled towards a prior. The fixture enters as one multiplier, 0.5x to 1.5x, on all of a player's points, from a rating built to rank players rather than predict points. Underlying stats (xG, xA) are not used.
+- A rough spike, points built from parts with shrunk shares of team xG and xG-based team ratings, cut the error per appearance at GW6-8 of 2024-25 by 17-20% against raw points per appearance.
+
+**Implement**
+- `js/engine/points.js`: a player's expected points in one fixture he plays, part by part, under FPL's rules (`FPL_SCORING`, which reproduces every row of 2024-25, 2025-26 and 2026-27 GW1):
+  - playing time; goals and assists as his shares of his team's expected goals;
+  - clean sheet and goals conceded from his team's expected goals against; saves;
+  - defensive contributions; bonus (a fitted model on his returns, plus his own residual); cards.
+  - His rates are his season totals pulled towards a prior for his position and price.
+- `js/engine/team-goals.js` (the plain-xG source): each club's xG for and against per 90 from its players' season totals; its attack and defence against the league, pulled towards last season's (or a promoted club's) prior; each side's expected goals in a fixture, with home advantage.
+- The fixture engine's rating as a second source: its score for each side turned into a multiplier on that side's expected goals for and against, fitted offline. The two sources are blended by a fitted weight.
+- `projections.js` reads the points model when `DECISION_ENGINE.pointsModel` is set (as with the minutes model) and keeps the data contract; `normalise.js` carries the season totals it needs.
+- `tools/backtest/history.js`: the point-in-time season from vaastav, every figure from before the planning GW. `tools/points/`: the fit and the scoreboard, reported in `tools/points/REPORT.md`.
+
+**Acceptance** On the held-out 2025-26 season, the new projections beat the current ones on mean squared error per player-GW early (GW4-10), mid and late season, with a paired bootstrap 95% interval that excludes zero; and the overstatement of each GW's top projected players shrinks. The fits use 2023-24 and the choices 2024-25: vaastav has 2022-23's xG only from GW16, so that season serves only as 2023-24's club priors. Squared error is the right score for an expected value; absolute error, which rewards guessing low on points this skewed, is reported but not judged on. FPL's own expected points were to be reported alongside, but vaastav records them after each gameweek (see As built), so they are no benchmark.
+
+**Guards** The fixture engine can only be replayed in part offline. Its xG-matchup metric needs Understat history this environment cannot reach, and vaastav's FDR and team strengths are end-of-season values, which flatter it. The report says so and gives its result with and without them. Suspect leakage first when numbers look good.
+
+**As built** (`js/engine/points.js`, `team-goals.js`, `projections.js`, `normalise.js`, `js/util.js`, `config.js`; tools `tools/backtest/`, `tools/points/`; tests `tests/engine/points.test.js`, `team-goals.test.js`, `projections.test.js`, `normalise.test.js`, `tests/tools/backtest.test.js`, `points.test.js`)
+
+- **The parts**, under `FPL_SCORING`, which reproduces every row of 2024-25, 2025-26 and 2026-27 GW1 exactly:
+  - playing time, at the minutes model's chance of 60 once he is on;
+  - goals: his share of his club's expected goals in the fixture, at 0.975 goals per xG;
+  - assists: the same share of xA, at FPL's 1.39 assists per expected assist;
+  - clean sheet: P(60+) x e^(-expected goals against x 85.3 / 90), 85.3 minutes being a full appearance's average;
+  - goals conceded, a point per two, and a keeper's saves per expected goal against, both as Poisson counts;
+  - defensive contributions: the chance of 10 (defenders) or 12 actions, as a negative binomial count (dispersion 27.5);
+  - bonus: per position, fitted on goals, assists and clean sheets, plus his own residual;
+  - cards, at his rate.
+- **Shrinkage.** His shares weigh against 4 team-xG of prior, his per-90 rates against five 90s, a keeper's saves against 20 expected goals against. The priors are lines in price per position (a midfielder's defensive actions: 9.2 a 90 at £5.0m, 5.4 at £10.0m).
+- **Clubs.** Attack and defence come from the players' season xG and xGC per 90 against the league's 1.478 a match, with home advantage of 1.102 each way. Last season's rating counts as 32 matches, pulled halfway to the league's level; a promoted club starts at attack 0.70 and defence 1.29.
+- **The fixture engine.** Its 0-100 rating can scale each side's expected goals (`pointsModel.fixtureRating`). Offline it can only be replayed without Understat history, with FDR and strengths neutral, or with hindsight at their end-of-season values.
+  - Its best weight cut the choice season's MSE by 0.006% (0.1% with hindsight). That is under the 0.1% bar, set before the test was read, so its weight is 0.
+  - On the test season it improved one-week goal prediction by 0.3% (Poisson deviance 1.061 to 1.058), too little to show in points.
+  - Its xG-matchup metric needs Understat history and could not be tested at all.
+- **The test** (2025-26, held out; `tools/points/REPORT.md`):
+  - MSE 7.347 against the v1 basis's 7.726 (7.699 with hindsight), better in all 31 planning GWs.
+  - v1 less the points model: early 0.625, mid 0.390 [0.323, 0.472], late 0.195 [0.165, 0.243]. The early band's seven GWs leave its bootstrap interval degenerate; the count (7 of 7) carries it.
+  - Each GW's top 10 projected per position were overstated by 0.42 points over the five GWs (v1: 5.16) and scored 18.45 (v1: 17.88).
+- **FPL's own expected points are no benchmark.** vaastav records its xP after each gameweek: a GW's figure correlates 0.67-0.68 with that GW's points against 0.36-0.38 with the next one's, which no forecast made before it could.
+- **Data notes.**
+  - vaastav's 2022-23 has xG only from GW16, so that season serves only as 2023-24's club priors.
+  - The browser harness's bootstrap carried end-of-season xG and counts, which the old basis never read. The checks use a point-in-time copy, and `normalise.js` now reads the points model's counts as numbers whatever their type.
+- **Speed.** In the page, the projections take 26-47 ms against the v1 basis's 866-951 ms (790 players x 6 GWs), and the cards appear about 1.25 s after a reload against about 2 s.
+- **Mutation check.** 25 mutants of the parts, the shrinkage, the clubs, the projection path and the count helpers all fail a test. Six did so only after tests for a part-time player, a rotation player, a super-sub, the assist ratio and club priors.
+- **Readings and defaults to check** (all in `config.js`):
+  - the test had no FPL flags (everyone available), which the live app adds;
+  - clubs are rated on their season so far, not adjusted for whom they have played;
+  - 2026-27's club priors are 2025-26's ratings, so refit each season;
+  - one bonus model per position across the rule changes;
+  - defensive contributions are fitted on one season.
+- **Verified** in headless Chromium on the 2025-26 GW20 payloads, with the season totals made point-in-time:
+  - The top 20 projected midfielders scored 404 over GW20-24 against 374 projected; v1's top 20 scored 351 against 461. Defenders: 362 against 360; v1 335 against 452.
+  - Every ownership band's error fell.
+  - The cards, robustness labels and a mid-run lock behave as in Phase 6; no page errors.
 
 ### Phase 7: Backtest harness and ceiling mode
 

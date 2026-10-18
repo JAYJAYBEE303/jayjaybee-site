@@ -5,8 +5,9 @@
  * tests inject a neutral-fixture scorer so the expected points read straight
  * off the rates; the double-gameweek, summary and identity tests run the real
  * scorer on a synthetic league. Most tests also pin the v1 rates (no minutes
- * model), which still stand in without the live table; the minutes-model
- * tests pass a model of their own, or the shipped one.
+ * model), which still stand in without the live table, and the v1 points
+ * basis (no points model); the minutes- and points-model tests pass a model
+ * of their own, or the shipped one.
  */
 
 import { test } from 'node:test';
@@ -17,6 +18,8 @@ import { buildScoreContext } from '../../js/engine/composite.js';
 import { calcPlaytimeSecurity } from '../../js/engine/form.js';
 import { channelPersonnelFactor } from '../../js/engine/channel.js';
 import { DECISION_ENGINE } from '../../js/config.js';
+import { fixturePoints, playerRates } from '../../js/engine/points.js';
+import { teamRates, teamStrengths, fixtureGoals } from '../../js/engine/team-goals.js';
 import { syntheticSeason, rawPlayer } from './synthetic-season.js';
 
 // ─── Test utilities ──────────────────────────────────────────────────────────
@@ -60,9 +63,9 @@ const missed = n => Array(n).fill([0, 0]);
 /** A neutral fixture every gameweek: the fixture multiplier is exactly 1. */
 const neutralScorer = () => ({ nextFixtureScore: { value: 50, estimated: false } });
 
-function project(season, ctx, { gwTable = null, scorePlayerFn = neutralScorer, minutesModel = null } = {}) {
+function project(season, ctx, { gwTable = null, scorePlayerFn = neutralScorer, minutesModel = null, pointsModel = null } = {}) {
   return buildProjections(season.players, ctx,
-    { planningGw: PLANNING_GW, horizonGws: 6, gwTable, scorePlayerFn, minutesModel });
+    { planningGw: PLANNING_GW, horizonGws: 6, gwTable, scorePlayerFn, minutesModel, pointsModel });
 }
 
 const close = (actual, expected, label = '') =>
@@ -134,7 +137,7 @@ test('a double against identical opponents projects exactly 1.9x a single', () =
     fixtures: [[9, 1, 4], [10, 1, 2], [10, 1, 3], ...homeRun(11, 14, false)],
     players: [rawPlayer(1, 1, 'MID', { total_points: 48, minutes: 720, starts: 8 })] });
   const projections = buildProjections(season.players, buildScoreContext(season),
-    { planningGw: PLANNING_GW, horizonGws: 6, gwTable: null });
+    { planningGw: PLANNING_GW, horizonGws: 6, gwTable: null, pointsModel: null });
   const [single, double] = projections.get(1).gws;
   assert.ok(single.xpts > 0);
   assert.ok(Math.abs(double.xpts / single.xpts - 1.9) < 1e-9, `double/single = ${double.xpts / single.xpts}`);
@@ -390,9 +393,9 @@ test('xpts = (1 - pZero) x xptsIfPlays for every projection', () => {
     3: [...played(6, 3), ...missed(2)], 4: [...played(5), ...missed(3)], 5: missed(8),
   });
   for (const [gwTable, minutesModel] of [[table, DECISION_ENGINE.minutesModel], [table, null], [null, null]]) {
-    for (const scorePlayerFn of [undefined, neutralScorer]) {
+    for (const [scorePlayerFn, pointsModel] of [[undefined, null], [neutralScorer, null], [undefined, DECISION_ENGINE.pointsModel]]) {
       const projections = buildProjections(season.players, ctx,
-        { planningGw: PLANNING_GW, horizonGws: 6, gwTable, scorePlayerFn, minutesModel });
+        { planningGw: PLANNING_GW, horizonGws: 6, gwTable, scorePlayerFn, minutesModel, pointsModel });
       for (const { playerId, gws } of projections.values()) {
         for (const g of gws) {
           assert.ok(Math.abs(g.xpts - (1 - g.pZero) * g.xptsIfPlays) < 1e-12,
@@ -402,4 +405,125 @@ test('xpts = (1 - pZero) x xptsIfPlays for every projection', () => {
       }
     }
   }
+});
+
+// ─── The points model (Phase 6b) ─────────────────────────────────────────────
+
+const ZERO_BONUS = { base: 0, goal: 0, assist: 0, cleanSheet: 0 };
+const POINTS_MODEL = {
+  goalsPerXg: 1, assistsPerXa: 1, minutesIfFull: 90, minutesIfShort: 30, defconDispersion: Infinity,
+  bonus: { GKP: ZERO_BONUS, DEF: ZERO_BONUS, MID: ZERO_BONUS, FWD: ZERO_BONUS },
+  priors: Object.fromEntries(['GKP', 'DEF', 'MID', 'FWD'].map(p => [p, {
+    goalShare: [p === 'FWD' ? 0.3 : 0.02, 0], assistShare: [0.05, 0], defconPer90: [5, 0],
+    savesPerXga: 2, yellowsPer90: 0.1, redsPer90: 0,
+  }])),
+  priorWeight: { share: 1, per90: 1, saves: 1 },
+  teams: { leagueXg: 1.4, priorMatches: 2, homeAdvantage: 1.1, promoted: { attack: 1, defence: 1 } },
+  teamPriors: {},
+};
+
+/** Every club's strength as the projection reads it: a club with no players yet reads as its prior. */
+const strengthsOf = season => {
+  const rates = teamRates(season.players);
+  for (const team of season.teams) if (!rates.has(team.id)) rates.set(team.id, { xgFor90: 0, xgAgainst90: 0, matches: 0 });
+  return teamStrengths(rates, new Map(), POINTS_MODEL.teams);
+};
+
+/** A nailed starter's eight full matches so far, in the live table. */
+const nailed = id => ({ [id]: played(8) });
+const projectParts = (season, ctx, gwTable, pointsModel = POINTS_MODEL) =>
+  buildProjections(season.players, ctx, { planningGw: PLANNING_GW, horizonGws: 6, gwTable, minutesModel: null, pointsModel });
+
+test('with a points model a fit nailed starter projects the parts of his fixture', () => {
+  const striker = rawPlayer(1, 1, 'FWD', { minutes: 720, starts: 8, total_points: 48, expected_goals: '4.0',
+    expected_assists: '1.0', expected_goals_conceded: '8.0' });
+  const { season, ctx } = league([striker, rawPlayer(2, 2, 'DEF', { minutes: 720, starts: 8, expected_goals_conceded: '12.0' })]);
+  const gw = projectParts(season, ctx, liveTable(nailed(1))).get(1).gws[0];
+
+  const { home, away } = fixtureGoals(strengthsOf(season), 1, 2, POINTS_MODEL.teams);    // GW9: club 1 at home to club 2
+  const rates = playerRates(season.players.find(p => p.id === 1).totals, teamRates(season.players).get(1),
+    { position: 'FWD', priceTenths: 60 }, POINTS_MODEL);
+  close(gw.xpts, fixturePoints(rates, { lambdaFor: home, lambdaAgainst: away, p60: 1, minutes: 90 }, POINTS_MODEL).total);
+  close(gw.xpts, (1 - gw.pZero) * gw.xptsIfPlays, 'identity');
+});
+
+test('with a points model a blank projects nothing and a double sums both fixtures, less the rotation haircut', () => {
+  const fixtures = [...homeRun(1, 8, true), [9, 1, 2], [11, 1, 3], [11, 4, 1], [12, 1, 2], [13, 1, 3], [14, 1, 4]];
+  const players = [rawPlayer(1, 1, 'MID', { minutes: 720, starts: 8, expected_goals: '2.0', expected_goals_conceded: '8.0' })];
+  const { season, ctx } = league(players, fixtures);
+  const gws = projectParts(season, ctx, liveTable(nailed(1))).get(1).gws;
+  assert.equal(gws[1].xpts, 0, 'GW10 blank');
+  const one = (homeId, awayId, isHome) => {
+    const g = fixtureGoals(strengthsOf(season), homeId, awayId, POINTS_MODEL.teams);
+    const rates = playerRates(season.players[0].totals, teamRates(season.players).get(1), { position: 'MID', priceTenths: 60 }, POINTS_MODEL);
+    return fixturePoints(rates, { lambdaFor: isHome ? g.home : g.away, lambdaAgainst: isHome ? g.away : g.home, p60: 1, minutes: 90 },
+      POINTS_MODEL).total;
+  };
+  close(gws[2].xpts, (1.9 / 2) * (one(1, 3, true) + one(4, 1, false)), 'GW11 double');
+});
+
+test('with a points model a leaky, dangerous opponent lifts a forward and sinks a defender', () => {
+  // Club 2 creates and concedes plenty; club 3 neither. Club 1 meets club 2 in GW9 and club 3 in GW10.
+  const fixtures = [...homeRun(1, 8, true), [9, 1, 2], [10, 1, 3], [11, 1, 4], [12, 1, 2], [13, 1, 3], [14, 1, 4]];
+  const players = [
+    rawPlayer(1, 1, 'FWD', { minutes: 720, starts: 8, expected_goals: '4.0', expected_goals_conceded: '8.0' }),
+    rawPlayer(2, 1, 'DEF', { minutes: 720, starts: 8, expected_goals_conceded: '8.0' }),
+    rawPlayer(3, 2, 'FWD', { minutes: 720, starts: 8, expected_goals: '16.0', expected_goals_conceded: '16.0' }),
+    rawPlayer(4, 3, 'FWD', { minutes: 720, starts: 8, expected_goals: '2.0', expected_goals_conceded: '4.0' }),
+  ];
+  const { season, ctx } = league(players, fixtures);
+  const projections = projectParts(season, ctx, liveTable({ ...nailed(1), ...nailed(2) }));
+  const [forwardV2, forwardV3] = projections.get(1).gws.slice(0, 2).map(g => g.xpts);
+  const [defenderV2, defenderV3] = projections.get(2).gws.slice(0, 2).map(g => g.xpts);
+  assert.ok(forwardV2 > forwardV3, `forward ${forwardV2} v club 2, ${forwardV3} v club 3`);
+  assert.ok(defenderV2 < defenderV3, `defender ${defenderV2} v club 2, ${defenderV3} v club 3`);
+});
+
+test('with a points model a doubtful player keeps xpts = (1 - pZero) x xptsIfPlays', () => {
+  const doubt = rawPlayer(1, 1, 'MID', { minutes: 720, starts: 8, expected_goals: '2.0', status: 'd', chance_of_playing_next_round: 50 });
+  const { season, ctx } = league([doubt]);
+  for (const g of projectParts(season, ctx, liveTable(nailed(1))).get(1).gws) {
+    close(g.xpts, (1 - g.pZero) * g.xptsIfPlays, `GW${g.gw}`);
+  }
+});
+
+test('with a fixture-rating weight, a side the fixture engine rates well expects more goals and its opponent fewer', () => {
+  // A scorer that rates every fixture 80 for the home side (so 20 for the away side).
+  const rating = { scoreFixture: (team, fixture) => ({ value: team.id === fixture.homeTeamId ? 80 : 20 }) };
+  const players = [rawPlayer(1, 1, 'FWD', { minutes: 720, starts: 8, expected_goals: '4.0', expected_goals_conceded: '8.0' })];
+  const { season, ctx } = league(players);
+  const plain = projectParts(season, ctx, liveTable(nailed(1))).get(1).gws[0].xpts;
+  const rated = buildProjections(season.players, ctx, { planningGw: PLANNING_GW, horizonGws: 6, gwTable: liveTable(nailed(1)),
+    minutesModel: null, pointsModel: { ...POINTS_MODEL, fixtureRating: { weight: 0.5 } }, scoreFixtureFn: rating.scoreFixture,
+  }).get(1).gws[0].xpts;
+  assert.ok(rated > plain, `${rated} rated v ${plain} plain`);
+  const off = buildProjections(season.players, ctx, { planningGw: PLANNING_GW, horizonGws: 6, gwTable: liveTable(nailed(1)),
+    minutesModel: null, pointsModel: { ...POINTS_MODEL, fixtureRating: { weight: 0 } }, scoreFixtureFn: rating.scoreFixture,
+  }).get(1).gws[0].xpts;
+  close(off, plain);
+});
+
+test('with a points model a rotation player plays his full match when picked, and a super-sub his short one', () => {
+  // Player 1 starts every other gameweek, a full match each time; player 2 comes off the bench for 20 minutes every gameweek.
+  const players = [rawPlayer(1, 1, 'MID', { minutes: 360, starts: 4, expected_goals: '1.0', expected_goals_conceded: '4.0' }),
+    rawPlayer(2, 1, 'MID', { minutes: 160, starts: 0, expected_goals: '0.4', expected_goals_conceded: '1.6' })];
+  const { season, ctx } = league(players);
+  const table = liveTable({ 1: [[90, 6], [0, 0], [90, 6], [0, 0], [90, 6], [0, 0], [90, 6], [0, 0]], 2: Array(8).fill([20, 1]) });
+  table.forEach(gw => gw.players.forEach(p => { if (p.playerId === 2) p.starts = 0; }));
+  const projections = projectParts(season, ctx, table);
+  const { home, away } = fixtureGoals(strengthsOf(season), 1, 2, POINTS_MODEL.teams);
+  const side = { lambdaFor: home, lambdaAgainst: away };
+  const ratesOf = id => playerRates(season.playersById[id].totals, teamRates(season.players).get(1), { position: 'MID', priceTenths: 60 }, POINTS_MODEL);
+  close(projections.get(1).gws[0].xpts, 0.5 * fixturePoints(ratesOf(1), { ...side, p60: 1, minutes: 90 }, POINTS_MODEL).total, 'rotation');
+  close(projections.get(2).gws[0].xpts, fixturePoints(ratesOf(2), { ...side, p60: 0, minutes: 30 }, POINTS_MODEL).total, 'super-sub');
+});
+
+test('with a points model last season\'s rating of a club, by its FPL code, counts', () => {
+  const players = [rawPlayer(1, 1, 'DEF', { minutes: 720, starts: 8, expected_goals_conceded: '8.0' })];
+  const { season, ctx } = league(players);
+  const table = liveTable(nailed(1));
+  const plain = projectParts(season, ctx, table).get(1).gws[0].xpts;
+  // Club 2 (code 2), GW9's opponent, was dangerous last season.
+  const rated = projectParts(season, ctx, table, { ...POINTS_MODEL, teamPriors: { 2: { attack: 2, defence: 1 } } }).get(1).gws[0].xpts;
+  assert.ok(rated < plain, `${rated} with the prior v ${plain}`);
 });
