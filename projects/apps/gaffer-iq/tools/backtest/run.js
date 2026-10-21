@@ -76,9 +76,11 @@ const MODES = Object.keys(DECISION_ENGINE.modes);
 // normalised as written, so their variant is the horizon total (largest weight
 // 1); Funds and Structure are totals as written, so theirs sums to 1. A gate
 // stated in the mode's own units (Funds' tau and eps, Future prep's deferral
-// epsilon) moves with its weights, so only the comparison with the one-off
-// free-transfer value and hit changes. Structure's dead-slot penalty never
-// fires here (no status flags), so it is left alone.
+// epsilon) moves with its weights. The one-off terms stay as written - the
+// free-transfer value, the hit and lambda's money terms (FundsTerm, PriceTerm,
+// Funds' chain credit) - so what changes is how the weighted gain compares
+// with them. Structure's dead-slot penalty never fires here (no status flags),
+// so it is left alone.
 const DM = DECISION_ENGINE.modes;
 const decayWeights = DM.now.weights.map((_, k) => DECISION_ENGINE.decayBase ** k);
 const largest = ws => Math.max(...ws);
@@ -385,7 +387,8 @@ const f = (x, d = 1) => (Number.isFinite(x) ? x.toFixed(d) : '-');
 const signed = (x, d = 1) => (Number.isFinite(x) ? `${x >= 0 ? '+' : ''}${x.toFixed(d)}` : '-');
 const ci = (r, scale = 1, d = 1) => `${signed(r.mean * scale, d)} [${signed(r.lo * scale, d)}, ${signed(r.hi * scale, d)}]`;
 const verdictOf = r => (r.lo > 0 ? 'better' : (r.hi < 0 ? 'worse' : 'no clear difference'));
-const mean = xs => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : NaN);
+const sum = xs => xs.reduce((a, b) => a + b, 0);
+const mean = xs => (xs.length ? sum(xs) / xs.length : NaN);
 const net = run => run.gws.map(g => g.points - g.hits);
 
 function of(results, season, schedule) {
@@ -404,9 +407,12 @@ function seasonTable(results, season, schedule, policies) {
   const lines = policies.filter(p => rows[0]?.out[p]).map(p => {
     const runs = rows.map(r => r.out[p]);
     return `| ${p} | ${f(mean(runs.map(r => r.total)))} | ${f(mean(runs.map(r => r.gws.reduce((a, g) => a + g.moves, 0))))}`
-      + ` | ${f(mean(runs.map(r => r.gws.reduce((a, g) => a + g.hits, 0))))} | ${f(mean(runs.map(r => r.gws.filter(g => g.lostFt).length)))} |`;
+      + ` | ${f(mean(runs.map(r => r.gws.reduce((a, g) => a + g.hits, 0))))}`
+      + ` | ${f(mean(runs.map(r => r.gws.filter(g => g.ft >= DECISION_ENGINE.maxBankedFt).length)))}`
+      + ` | ${f(mean(runs.map(r => r.gws.filter(g => g.lostFt).length)))} |`;
   });
-  return ['| policy | points (net of hits) | transfers | hit points | free transfers lost |', '|---|---|---|---|---|', ...lines].join('\n');
+  return ['| policy | points (net of hits) | transfers | hit points | weeks at the free-transfer cap | free transfers lost |',
+    '|---|---|---|---|---|---|', ...lines].join('\n');
 }
 
 function pairedTable(results, seasons, schedule, policies, against) {
@@ -471,7 +477,7 @@ function verdictLines(results, seasons, schedule) {
   return [...summary, ...lines].join('\n');
 }
 
-function report(results, squadsBySeason, minutes) {
+function report(results, squadsBySeason) {
   const both = RUN_SEASONS;
   const other = RUN_SEASONS.filter(s => s !== HELD_OUT);
   const oldCounts = ['asItStood'].flatMap(sch => RUN_SEASONS.flatMap(s => of(results, s, sch))).map(r => r.out.old?.counts).filter(Boolean);
@@ -545,8 +551,10 @@ ${moveTable(results, both, 'asItStood', ALL)}
 ## Risk 8: the mixed weight units
 
 Long term and Future prep weigh a per-GW average and Funds and Structure a horizon total, yet all four are compared
-against the same free-transfer value and hit (plan risk 8). Each re-run in the other unit, less the preset as
-written (points a season):
+against the same free-transfer value and hit (plan risk 8). Each re-run in the other unit, its gates in that unit
+too, while the one-off terms stay as written (the free-transfer value, the hit, and lambda's money terms), less the
+preset as written (points a season). The intervals are wide (about 50-100 points either way), so "no clear
+difference" is not "no difference":
 
 ${[[HELD_OUT], both].map(ss => `### ${ss.join(' and ')}\n\n| variant | less the preset |\n|---|---|\n${RISK8.map(r => {
     const d = paired(results, ss, 'asItStood', r.name, r.mode);
@@ -575,9 +583,13 @@ were computed as its planner did, though no chip was played.
   and both engines miss injury news a manager had.
 - No price signals: vaastav's weekly transfer counts are recorded after the deadline. PriceTerm is zero for every move.
 - No chips, for anyone.
+- Every policy makes at most one move a week (Funds two, with its chained move), so free transfers banked past one go
+  unused: in ${HELD_OUT}, after the AFCON top-up, every policy sits at the cap of five from GW16, where a move costs
+  nothing and a threshold of zero is all it must clear. With one free transfer always in hand, no policy can take a
+  hit except Funds' second move.
 - A player whose club has no fixture in a week has no vaastav row for it, so his price that week is his last one.
 
-Run time: ${f(minutes)} minutes.
+Worker time: ${f(sum(results.map(r => r.ms)) / 60000)} minutes over ${results.length} tasks.
 `;
 }
 
@@ -585,12 +597,11 @@ Run time: ${f(minutes)} minutes.
 
 async function main() {
   const argv = process.argv.slice(2);
-  const started = Date.now();
   const seasons = await Promise.all(SEASONS.map(n => loadSeason(n)));
   const squadsBySeason = Object.fromEntries(RUN_SEASONS.map(n => [n, startingSquads(seasons.find(s => s.name === n))]));
   if (argv.includes('--report')) {
     const saved = JSON.parse(await readFile(RESULTS, 'utf8'));
-    await writeReport(saved.results, squadsBySeason, saved.minutes);
+    await writeReport(saved.results, squadsBySeason);
     return;
   }
   const oldAt = argv.indexOf('--old');
@@ -627,18 +638,24 @@ async function main() {
   const fresh = await runPool(tasks.filter(t => !have.has(keyOf(t))), oldDir, os.availableParallelism(),
     r => appendFileSync(PARTIAL, `${JSON.stringify(r)}\n`));
   const results = [...done, ...fresh];
-  const minutes = (Date.now() - started) / 60000;
-  await writeFile(RESULTS, JSON.stringify({ minutes, results }));
-  await writeReport(results, squadsBySeason, minutes);
+  await writeFile(RESULTS, JSON.stringify({ results }));
+  await writeReport(results, squadsBySeason);
 }
 
 async function readPartial() {
   const text = await readFile(PARTIAL, 'utf8').catch(() => '');
-  return text.split('\n').filter(Boolean).map(line => JSON.parse(line));
+  // A run killed mid-write leaves a last line cut short: that task runs again.
+  return text.split('\n').filter(Boolean).flatMap(line => {
+    try {
+      return [JSON.parse(line)];
+    } catch {
+      return [];
+    }
+  });
 }
 
-async function writeReport(results, squadsBySeason, minutes) {
-  const md = report(results, squadsBySeason, minutes);
+async function writeReport(results, squadsBySeason) {
+  const md = report(results, squadsBySeason);
   await writeFile(new URL('../../docs/decision-engine-backtest.md', import.meta.url), md);
   console.log(md.slice(0, md.indexOf('## What was run')));
 }

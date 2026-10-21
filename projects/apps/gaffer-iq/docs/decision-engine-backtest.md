@@ -59,41 +59,41 @@ In short: against the old engine 6 of 6 modes better and 0 worse; against the ro
 
 Means over the squads.
 
-| policy | points (net of hits) | transfers | hit points | free transfers lost |
-|---|---|---|---|---|
-| none | 1617.3 | 0.0 | 0.0 | 30.0 |
-| roll | 2048.7 | 34.3 | 0.0 | 0.0 |
-| old | 1840.6 | 35.0 | 0.0 | 0.0 |
-| now | 2115.2 | 33.6 | 0.0 | 0.0 |
-| longterm | 2077.8 | 32.1 | 0.0 | 0.0 |
-| future | 2031.4 | 31.0 | 0.0 | 0.0 |
-| funds | 2041.8 | 39.6 | 21.7 | 0.0 |
-| ceiling | 2075.6 | 33.6 | 0.0 | 0.0 |
-| structure | 2107.0 | 33.8 | 0.0 | 0.0 |
-| longterm (total) | 2088.2 | 33.8 | 0.0 | 0.0 |
-| future (total) | 2034.8 | 31.0 | 0.0 | 0.0 |
-| funds (normalised) | 2030.0 | 32.2 | 0.0 | 0.0 |
-| structure (normalised) | 2089.6 | 31.6 | 0.0 | 0.0 |
+| policy | points (net of hits) | transfers | hit points | weeks at the free-transfer cap | free transfers lost |
+|---|---|---|---|---|---|
+| none | 1617.3 | 0.0 | 0.0 | 31.0 | 30.0 |
+| roll | 2048.7 | 34.3 | 0.0 | 0.0 | 0.0 |
+| old | 1840.6 | 35.0 | 0.0 | 0.0 | 0.0 |
+| now | 2115.2 | 33.6 | 0.0 | 0.0 | 0.0 |
+| longterm | 2077.8 | 32.1 | 0.0 | 0.0 | 0.0 |
+| future | 2031.4 | 31.0 | 0.0 | 21.4 | 0.0 |
+| funds | 2041.8 | 39.6 | 21.7 | 0.0 | 0.0 |
+| ceiling | 2075.6 | 33.6 | 0.0 | 0.0 | 0.0 |
+| structure | 2107.0 | 33.8 | 0.0 | 0.0 | 0.0 |
+| longterm (total) | 2088.2 | 33.8 | 0.0 | 0.0 | 0.0 |
+| future (total) | 2034.8 | 31.0 | 0.0 | 21.3 | 0.0 |
+| funds (normalised) | 2030.0 | 32.2 | 0.0 | 0.3 | 0.0 |
+| structure (normalised) | 2089.6 | 31.6 | 0.0 | 1.4 | 0.0 |
 
 ### 2025-26 (held out)
 
 Means over the squads.
 
-| policy | points (net of hits) | transfers | hit points | free transfers lost |
-|---|---|---|---|---|
-| none | 1487.7 | 0.0 | 0.0 | 30.0 |
-| roll | 1923.0 | 35.0 | 0.0 | 0.0 |
-| old | 1859.3 | 35.0 | 0.0 | 0.0 |
-| now | 1869.8 | 34.1 | 0.0 | 0.0 |
-| longterm | 1902.9 | 33.3 | 0.0 | 0.0 |
-| future | 1913.3 | 32.5 | 0.0 | 0.0 |
-| funds | 1858.4 | 39.4 | 8.3 | 0.0 |
-| ceiling | 1882.7 | 34.6 | 0.0 | 0.0 |
-| structure | 1903.1 | 35.0 | 0.0 | 0.0 |
-| longterm (total) | 1870.3 | 34.8 | 0.0 | 0.0 |
-| future (total) | 1912.3 | 32.1 | 0.0 | 0.0 |
-| funds (normalised) | 1784.9 | 34.4 | 0.0 | 0.0 |
-| structure (normalised) | 1912.3 | 33.3 | 0.0 | 0.0 |
+| policy | points (net of hits) | transfers | hit points | weeks at the free-transfer cap | free transfers lost |
+|---|---|---|---|---|---|
+| none | 1487.7 | 0.0 | 0.0 | 31.0 | 30.0 |
+| roll | 1923.0 | 35.0 | 0.0 | 23.0 | 0.0 |
+| old | 1859.3 | 35.0 | 0.0 | 23.0 | 0.0 |
+| now | 1869.8 | 34.1 | 0.0 | 23.0 | 0.0 |
+| longterm | 1902.9 | 33.3 | 0.0 | 23.0 | 0.0 |
+| future | 1913.3 | 32.5 | 0.0 | 24.0 | 0.0 |
+| funds | 1858.4 | 39.4 | 8.3 | 3.7 | 0.0 |
+| ceiling | 1882.7 | 34.6 | 0.0 | 23.0 | 0.0 |
+| structure | 1903.1 | 35.0 | 0.0 | 23.0 | 0.0 |
+| longterm (total) | 1870.3 | 34.8 | 0.0 | 23.0 | 0.0 |
+| future (total) | 1912.3 | 32.1 | 0.0 | 23.8 | 0.0 |
+| funds (normalised) | 1784.9 | 34.4 | 0.0 | 3.8 | 0.0 |
+| structure (normalised) | 1912.3 | 33.3 | 0.0 | 23.0 | 0.0 |
 
 ## Paired differences (points a season)
 
@@ -169,8 +169,10 @@ neighbouring weeks), so they are narrower than the truth; the paired season tota
 ## Risk 8: the mixed weight units
 
 Long term and Future prep weigh a per-GW average and Funds and Structure a horizon total, yet all four are compared
-against the same free-transfer value and hit (plan risk 8). Each re-run in the other unit, less the preset as
-written (points a season):
+against the same free-transfer value and hit (plan risk 8). Each re-run in the other unit, its gates in that unit
+too, while the one-off terms stay as written (the free-transfer value, the hit, and lambda's money terms), less the
+preset as written (points a season). The intervals are wide (about 50-100 points either way), so "no clear
+difference" is not "no difference":
 
 ### 2025-26
 
@@ -222,6 +224,10 @@ were computed as its planner did, though no chip was played.
   and both engines miss injury news a manager had.
 - No price signals: vaastav's weekly transfer counts are recorded after the deadline. PriceTerm is zero for every move.
 - No chips, for anyone.
+- Every policy makes at most one move a week (Funds two, with its chained move), so free transfers banked past one go
+  unused: in 2025-26, after the AFCON top-up, every policy sits at the cap of five from GW16, where a move costs
+  nothing and a threshold of zero is all it must clear. With one free transfer always in hand, no policy can take a
+  hit except Funds' second move.
 - A player whose club has no fixture in a week has no vaastav row for it, so his price that week is his last one.
 
-Run time: 58.8 minutes.
+Worker time: 232.8 minutes over 48 tasks.

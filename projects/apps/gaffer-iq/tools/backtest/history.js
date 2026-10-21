@@ -165,6 +165,8 @@ export function fixturesIn(season, from, to) {
  */
 export function scheduleAt(season, gw) {
   const perGw = season.teams.length / 2;
+  // By place, not id: a fixture vaastav lists with no gameweek (parseSeason
+  // drops it) would shift every later one back. None does in these seasons.
   const byId = [...season.fixtures].sort((a, b) => a.id - b.id);
   return new Map(byId.map((f, rank) => {
     const original = Math.floor(rank / perGw) + 1;
