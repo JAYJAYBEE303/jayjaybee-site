@@ -28,11 +28,14 @@
  * in price. Money and price never make a move on their own (Funds aside).
  */
 
-import { DECISION_ENGINE, SQUAD_TOTAL, SEASON_GWS, CHIP_RESET_AFTER_GW, CHIP_LABELS } from '../config.js';
+import {
+  DECISION_ENGINE, SQUAD_TOTAL, SEASON_GWS, CHIP_RESET_AFTER_GW, CHIP_LABELS, CAPTAIN_MULTIPLIER, TRIPLE_CAPTAIN_MULTIPLIER,
+} from '../config.js';
 import { fromTenths, toTenths } from '../util.js';
 import { calcSellPrice } from './prices.js';
 import { checkSwap } from './feasibility.js';
 import { squadValue, uncoveredLoss } from './squad-value.js';
+import { drawGameweek, quantile, squadQuantile } from './ceiling.js';
 
 const POSITIONS = ['GKP', 'DEF', 'MID', 'FWD'];
 
@@ -137,6 +140,7 @@ export function runDecisionEngine(input, config = DECISION_ENGINE, cache = creat
       keepValue, outScore, best,
       flags: flagsFor(run, p, { rootSells, ceiling, structure }),
       lockValue: ceiling.lockValues.get(p.playerId),
+      pP90: ceiling.tail?.pP90.get(p.playerId) ?? null,
       uncoveredLoss: structure.uncovered.get(p.playerId),
       priceSource: input.priceSignals?.[p.playerId]?.source ?? null,
     };
@@ -235,7 +239,7 @@ function prepare(input, config, cache) {
 
   return {
     input, config, owned, ids, chipPlan, overlay, candidatesByPosition, modeGws, chipAt, zeroed,
-    value, valueOpts, names, outlook,
+    value, valueOpts, names, outlook, cache,
     riseLikely: id => chanceOf(signals[id], 'rise') >= config.priceMoveLikely,
     state: { bankTenths, players: owned },
     locks: input.locks ?? new Set(),
@@ -369,7 +373,64 @@ function ceilingTarget(run, pairs) {
   }
   const protectedIds = new Set(run.owned.map(p => p.playerId)
     .filter(id => lockValues.get(id) !== null && lockValues.get(id) >= mode.lockThreshold));
-  return { targetGw: target?.gw ?? null, weights, lockValues, protectedIds, replacements };
+  const tail = target && mode.tail ? upperTail(run, pairs, target, mode.tail) : null;
+  return { targetGw: target?.gw ?? null, targetK: target?.k ?? null, weights, lockValues, protectedIds, replacements, tail };
+}
+
+/**
+ * Ceiling's upper tail at t* (brief §6 mode 5, Phase 7b): the squad's score
+ * quantile over Monte Carlo draws (engine/ceiling.js), and for each owned
+ * player's `shortlist` best swaps by expected points at t*, the change the swap
+ * makes to it - every swap on the same draws. Chip-aware: Triple Captain
+ * triples the armband, Bench Boost counts all fifteen. Null when a squad
+ * player has nothing to draw from (the v1 basis): Ceiling then reads the mean.
+ * The draws are kept in the cache, so a lock or ban re-runs on them.
+ *
+ * @returns {{quantile: number, squad: number, delta: Map<object, number>, pP90: Map<number, number>}|null}
+ */
+function upperTail(run, pairs, target, opts) {
+  const has = id => Boolean(run.gwOf(id, target.gw)?.draw);
+  if (!run.ids.every(has)) return null;
+  const shortlisted = run.owned.flatMap(p => pairs
+    .filter(pair => pair.p === p && !run.bans.has(pair.q.id) && has(pair.q.id))
+    .sort((a, b) => (b.dV[target.k] - a.dV[target.k]) || (a.q.id - b.q.id))
+    .slice(0, opts.shortlist));
+  const ids = [...new Set([...run.ids, ...shortlisted.map(pair => pair.q.id)])];
+  // Draws are kept per player and scores per squad, so a lock or ban re-runs
+  // on them; a player's draws do not depend on who else is drawn.
+  const { projections } = run.input;
+  const key = `${target.gw}|${opts.draws}|${opts.seed}|${opts.quantile}`;
+  if (run.cache.tail?.key !== key || run.cache.tail.projections !== projections) {
+    run.cache.tail = { key, projections, points: new Map(), played: new Map(), scores: new Map() };
+  }
+  const store = run.cache.tail;
+  const missing = ids.filter(id => !store.points.has(id));
+  if (missing.length) {
+    const drawn = drawGameweek(projections, target.gw, missing, opts);
+    if (!drawn) return null;
+    for (const id of missing) {
+      store.points.set(id, drawn.points.get(id));
+      store.played.set(id, drawn.played.get(id));
+    }
+  }
+  const sample = { points: store.points, played: store.played };
+
+  const chip = run.chipAt(target.gw);
+  const scoring = { multiplier: chip === 'triplecaptain' ? TRIPLE_CAPTAIN_MULTIPLIER : CAPTAIN_MULTIPLIER,
+    benchBoost: chip === 'benchboost' };
+  const positions = new Map(ids.map(id => [id, run.overlay.get(id).position]));
+  const tailOf = squad => {
+    const k = `${chip ?? ''}|${squad.join(',')}`;
+    if (!store.scores.has(k)) {
+      store.scores.set(k, squadQuantile(squadValue(squad, target.gw, run.overlay, run.valueOpts(target.gw)),
+        positions, sample, opts.quantile, scoring));
+    }
+    return store.scores.get(k);
+  };
+  const squad = tailOf(run.ids);
+  const delta = new Map(shortlisted.map(pair => [pair, tailOf(swapIn(run.ids, pair.p.playerId, pair.q.id)) - squad]));
+  const pP90 = new Map(run.ids.map(id => [id, quantile(sample.points.get(id), opts.quantile)]));
+  return { quantile: opts.quantile, squad, delta, pP90 };
 }
 
 // ─── Mode 6: uncovered loss, dead slots, holds ───────────────────────────────
@@ -411,8 +472,12 @@ function scoreMode(run, { modeId, mode, raw, weights, share, pairs, ceiling, str
   const pointsLostOf = deltaEv => Math.max(0, -deltaEv);
 
   // A mode whose every GW a planned chip covers has nothing to weigh: it
-  // rolls, whatever money a move would free.
-  const scored = weights.some(w => w > 0) ? pairs : [];
+  // rolls, whatever money a move would free. Ceiling with its upper tail
+  // weighs only the swaps it drew, on the tail at t* and the mean elsewhere.
+  const tail = modeId === 'ceiling' ? ceiling.tail : null;
+  const candidates = tail ? pairs.filter(pair => tail.delta.has(pair)) : pairs;
+  const scored = weights.some(w => w > 0) ? candidates : [];
+  const dVOf = pair => (tail ? pair.dV.map((v, k) => (k === ceiling.targetK ? tail.delta.get(pair) : v)) : pair.dV);
   const records = [];
   for (const pair of scored) {
     if (run.bans.has(pair.q.id)) continue;
@@ -422,7 +487,8 @@ function scoreMode(run, { modeId, mode, raw, weights, share, pairs, ceiling, str
       const first = run.gwOf(pair.q.id, run.modeGws[0]);
       if (first.availability === 0 || first.pZero > gate) continue;
     }
-    const perGw = weights.map((w, k) => w * pair.dV[k]);
+    const dV = dVOf(pair);
+    const perGw = weights.map((w, k) => w * dV[k]);
     const deltaEv = sum(perGw);
     const record = {
       pair, perGw, deltaEv,
@@ -501,7 +567,10 @@ function scoreMode(run, { modeId, mode, raw, weights, share, pairs, ceiling, str
     deferral,
     robustness: null,
   };
-  if (modeId === 'ceiling') summary.targetGw = ceiling.targetGw;
+  if (modeId === 'ceiling') {
+    summary.targetGw = ceiling.targetGw;
+    summary.tail = ceiling.tail && { quantile: ceiling.tail.quantile, squad: ceiling.tail.squad };
+  }
   const top = records.slice(0, config.robustnessShortlist)
     .flatMap(r => (r.chained ? [r.pair.q.id, r.chained.inId] : [r.pair.q.id]));
   return { summary, bestByOwner, top };

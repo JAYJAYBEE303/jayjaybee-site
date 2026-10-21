@@ -1617,6 +1617,12 @@ export const DECISION_ENGINE = {
       // at or above which he is protected from sale in the four modes above.
       lockThreshold: 3,
       threshold: 0,
+      // The upper tail at t* (Phase 7b, engine/ceiling.js): the change a swap
+      // makes to the squad's score at this quantile over Monte Carlo draws of
+      // the points model's parts, for each player's `shortlist` best swaps by
+      // expected points there; the same seed every run, so the card holds
+      // still. null reads the mean at t* instead (as the v1 basis must).
+      tail: { quantile: 0.9, draws: 500, seed: 1, shortlist: 10 },
     },
     structure: {
       label: 'Structure fix',

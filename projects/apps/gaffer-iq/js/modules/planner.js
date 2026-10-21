@@ -20,7 +20,7 @@
 import { store } from '../store.js';
 import {
   HORIZONS, SQUAD_LIMITS, SQUAD_TOTAL, SEASON_GWS, CHIP_IDS, CHIP_LABELS, CHIP_RESET_AFTER_GW,
-  DECISION_ENGINE, GW_TABLES_WAIT_MS,
+  DECISION_ENGINE, GW_TABLES_WAIT_MS, PERCENT,
 } from '../config.js';
 import { buildScoreContext } from '../engine/composite.js';
 import { scoreWildcardTiming, scoreFreeHitTiming } from '../engine/chips.js';
@@ -849,7 +849,8 @@ function playerRowHTML(role, move, sellTenths, estimated) {
 function modeCardHTML(mode, i, settings, planningGw) {
   const counted = countedGws(mode.weights, planningGw);
   const span = mode.modeId === 'ceiling'
-    ? (mode.targetGw ? `Peak GW${mode.targetGw} · on expected points` : 'No peak week')
+    ? (mode.targetGw ? `Peak GW${mode.targetGw} · ${mode.tail
+      ? `on its ${Math.round(mode.tail.quantile * PERCENT)}th percentile` : 'on expected points'}` : 'No peak week')
     : gwSpan(counted);
   const head = `<header class="mc__hd"><h3>${esc(mode.label)}</h3><span class="mc__span">${esc(span)}</span></header>`
     + `<p class="mc__blurb">${esc(MODE_BLURB[mode.modeId] ?? '')}</p>`;

@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  nextFreeTransfers, pickSquad, randomSquad, scoreGameweek, applyMoves, simulate, moveMetrics, rollPolicy,
+  nextFreeTransfers, pickSquad, randomSquad, scoreGameweek, applyMoves, simulate, simulateAll, moveMetrics, rollPolicy,
   enginePolicy, pairedBootstrap, slope, slopeInterval,
 } from '../../tools/backtest/lib.js';
 import { seededRandom } from '../../js/util.js';
@@ -245,7 +245,65 @@ test('enginePolicy makes its mode\'s root move, and Funds\' chained move after i
   assert.deepEqual(policy('move')('now').decide(ctx).moves, [{ outId: 3, inId: 18 }]);
   assert.deepEqual(policy('wait')('now').decide(ctx).moves, []);
   assert.deepEqual(policy('roll')('funds').decide(ctx).moves, []);
-  assert.equal(seen[0], ctx);
+  assert.deepEqual([seen[0].t, seen[0].state, [...seen[0].locks]], [ctx.t, ctx.state, []]);
+});
+
+test('simulateAll runs every policy a week at a time, each exactly as simulate would on its own', () => {
+  const calls = [];
+  const plan = { 2: [{ outId: 1, inId: 16 }] };
+  const policies = {
+    mover: { decide: ({ t }) => { calls.push(`mover@${t}`); return { moves: plan[t] ?? [] }; } },
+    roller: { decide: ({ t }) => { calls.push(`roller@${t}`); return { moves: [] }; } },
+  };
+  const opts = { fromGw: 1, toGw: 3, maxBankedFt: 5, hitCost: 4 };
+  const runs = simulateAll(fakeWorld(), startState(), policies, opts);
+  assert.deepEqual(calls, ['mover@1', 'roller@1', 'mover@2', 'roller@2', 'mover@3', 'roller@3']);
+  for (const [name, policy] of Object.entries(policies)) {
+    assert.deepEqual(runs[name], simulate(fakeWorld(), startState(), policy, opts));
+  }
+});
+
+/** A stub engine that sells the lowest unlocked id for the next buy while a free transfer is left, recording what it was asked. */
+function greedyEngine(asked, { buys = [16, 17, 18, 19, 20, 21] } = {}) {
+  return ({ state, locks }) => {
+    asked.push({ ft: state.ft, locks: [...locks].sort((a, b) => a - b) });
+    const owned = new Set(state.squad.map(p => p.id));
+    const out = state.squad.map(p => p.id).filter(id => !locks.has(id)).sort((a, b) => a - b)[0];
+    const inId = buys.find(id => !owned.has(id));
+    return { modes: { now: state.ft > 0 ? { call: 'move', root: { outId: out, inId, chained: null } } : { call: 'roll', root: null } } };
+  };
+}
+
+test('a multi-move engine policy asks again on the new squad, a free transfer fewer, until the engine rolls', () => {
+  const asked = [];
+  const policy = enginePolicy('now', greedyEngine(asked), { maxPicks: 5 });
+  const moves = policy.decide({ t: 2, state: { ...startState(), ft: 2 }, world: fakeWorld() }).moves;
+  assert.deepEqual(moves, [{ outId: 1, inId: 16 }, { outId: 2, inId: 17 }]);
+  // Never sells what it bought this week.
+  assert.deepEqual(asked, [{ ft: 2, locks: [] }, { ft: 1, locks: [16] }, { ft: 0, locks: [16, 17] }]);
+  // ... and stops at maxPicks.
+  const capped = enginePolicy('now', greedyEngine([]), { maxPicks: 3 });
+  assert.equal(capped.decide({ t: 2, state: { ...startState(), ft: 5 }, world: fakeWorld() }).moves.length, 3);
+  // Single-move (the default) asks once and passes no locks.
+  const once = [];
+  assert.equal(enginePolicy('now', greedyEngine(once)).decide({ t: 2, state: { ...startState(), ft: 5 }, world: fakeWorld() }).moves.length, 1);
+  assert.deepEqual(once, [{ ft: 5, locks: [] }]);
+});
+
+test('the multi-move roll baseline keeps making free moves past the threshold, never selling what it bought', () => {
+  const xpts = { 1: 2, 2: 2, 16: 3, 17: 2.5, 18: 2.1 };
+  const projections = new Map(Object.entries(xpts).map(([id, x]) => [Number(id), { gws: Array.from({ length: 5 }, () => ({ xpts: x })) }]));
+  const world = {
+    player: id => ({ id, position: 'MID', teamId: id }),
+    priceTenths: () => 50,
+    projections: () => projections,
+    candidates: () => [16, 17, 18, 1, 2].map(id => ({ id, position: 'MID', teamId: id, price: 5 })),
+  };
+  const state = { squad: [{ id: 1, purchaseTenths: 50 }, { id: 2, purchaseTenths: 50 }], bankTenths: 0, ft: 3 };
+  const roll = rollPolicy({ gain: 2, horizon: 5, maxBankedFt: 5, maxPicks: 5 });
+  // 16 for 1 (+5), then 17 for 2 (+2.5); 18 for 2 would be +0.5, under the threshold, and 16 is not sold again.
+  assert.deepEqual(roll.decide({ t: 1, state, world }).moves, [{ outId: 1, inId: 16 }, { outId: 2, inId: 17 }]);
+  assert.equal(roll.decide({ t: 1, state: { ...state, ft: 1 }, world }).moves.length, 1);
 });
 
 // ─── Statistics ──────────────────────────────────────────────────────────────

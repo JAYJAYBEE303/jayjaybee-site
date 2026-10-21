@@ -190,43 +190,70 @@ export function randomSquad(pool, random, { budgetTenths, minSpendTenths, maxPer
 // ─── Policies ────────────────────────────────────────────────────────────────
 
 /**
+ * A week's moves made a pick at a time: `pick` sees the squad after the moves
+ * so far, a free transfer fewer for each, and the players bought this week
+ * (never sold again the same week), and returns its next moves (Funds' pick
+ * is two) or none. Stops when it has none or after maxPicks picks.
+ */
+function pickRepeatedly(ctx, maxPicks, pick) {
+  const moves = [];
+  let state = ctx.state;
+  const locks = new Set();
+  for (let picks = 1; ; picks++) {
+    const next = pick({ ...ctx, state, locks });
+    moves.push(...next);
+    if (!next.length || picks >= maxPicks) return { moves };
+    state = { ...applyMoves(state, next, ctx.world, ctx.t), ft: Math.max(0, state.ft - next.length) };
+    for (const m of next) locks.add(m.inId);
+  }
+}
+
+/**
  * The roll baseline: the free move whose buy out-projects his sale by the
  * most over `horizon` GWs on their own points (no squad, no lineup), made
  * only when it clears `gain` - any gain at all once the free transfers are at
- * the cap, where rolling wastes one. Never a hit.
+ * the cap, where rolling wastes one. Never a hit. With maxPicks above one it
+ * keeps going while free transfers last.
  */
-export function rollPolicy({ gain, horizon, maxBankedFt }) {
+export function rollPolicy({ gain, horizon, maxBankedFt, maxPicks = 1 }) {
   return {
-    decide({ t, state, world }) {
-      if (state.ft <= 0) return { moves: [] };
-      const projections = world.projections(t);
-      const own = id => sum(projections.get(id)?.gws.slice(0, horizon) ?? [], g => g.xpts);
-      const current = squadState(state, world, t);
-      let best = null;
-      for (const p of current.players) {
-        const mine = own(p.playerId);
-        for (const q of world.candidates(t)) {
-          if (q.position !== p.position || !checkSwap(current, p.playerId, q).ok) continue;
-          const g = own(q.id) - mine;
-          if (!best || g > best.gain) best = { outId: p.playerId, inId: q.id, gain: g };
+    decide(ctx) {
+      return pickRepeatedly(ctx, maxPicks, ({ t, state, world, locks }) => {
+        if (state.ft <= 0) return [];
+        const projections = world.projections(t);
+        const own = id => sum(projections.get(id)?.gws.slice(0, horizon) ?? [], g => g.xpts);
+        const current = squadState(state, world, t);
+        let best = null;
+        for (const p of current.players) {
+          if (locks.has(p.playerId)) continue;
+          const mine = own(p.playerId);
+          for (const q of world.candidates(t)) {
+            if (q.position !== p.position || !checkSwap(current, p.playerId, q).ok) continue;
+            const g = own(q.id) - mine;
+            if (!best || g > best.gain) best = { outId: p.playerId, inId: q.id, gain: g };
+          }
         }
-      }
-      const threshold = state.ft >= maxBankedFt ? 0 : gain;
-      return { moves: best && best.gain > threshold ? [{ outId: best.outId, inId: best.inId }] : [] };
+        const threshold = state.ft >= maxBankedFt ? 0 : gain;
+        return best && best.gain > threshold ? [{ outId: best.outId, inId: best.inId }] : [];
+      });
     },
   };
 }
 
 /**
  * The new engine in one mode: its root move, and Funds' chained second move
- * after it. `engine({t, state, world})` returns runDecisionEngine's result.
+ * after it. `engine({t, state, world, locks})` returns runDecisionEngine's
+ * result. With maxPicks above one it asks again on the new squad, as the
+ * planner is used, until the engine's own costs make it roll.
  */
-export function enginePolicy(modeId, engine) {
+export function enginePolicy(modeId, engine, { maxPicks = 1 } = {}) {
   return {
     decide(ctx) {
-      const mode = engine(ctx).modes[modeId];
-      if (mode.call !== 'move') return { moves: [] };
-      return { moves: [mode.root, mode.root.chained].filter(Boolean).map(m => ({ outId: m.outId, inId: m.inId })) };
+      return pickRepeatedly(ctx, maxPicks, c => {
+        const mode = engine(c).modes[modeId];
+        if (mode.call !== 'move') return [];
+        return [mode.root, mode.root.chained].filter(Boolean).map(m => ({ outId: m.outId, inId: m.inId }));
+      });
     },
   };
 }
@@ -234,33 +261,43 @@ export function enginePolicy(modeId, engine) {
 // ─── The season ──────────────────────────────────────────────────────────────
 
 /**
- * One policy's season from `start` ({squad: [{id, purchaseTenths}], bankTenths, ft}).
- * Each week: the policy's moves, the hits past the free transfers, the
- * squad after them scored on that week's actual points.
+ * Each policy's season from `start` ({squad: [{id, purchaseTenths}], bankTenths, ft}),
+ * a week at a time across them all, so whatever the world caches for a week
+ * is shared while it is current. Each week: the policy's moves, the hits past
+ * the free transfers, the squad after them scored on that week's actual points.
  *
- * @returns {{gws: object[], total: number}}  total is net of hits
+ * @param {Object<string, {decide: Function}>} policies
+ * @returns {Object<string, {gws: object[], total: number}>}  total is net of hits
  */
-export function simulate(world, start, policy, { fromGw, toGw, maxBankedFt, hitCost }) {
-  let state = { squad: start.squad, bankTenths: start.bankTenths };
-  let ft = start.ft;
-  const gws = [];
+export function simulateAll(world, start, policies, { fromGw, toGw, maxBankedFt, hitCost }) {
+  const runs = Object.fromEntries(Object.keys(policies).map(name => [name,
+    { state: { squad: start.squad, bankTenths: start.bankTenths }, ft: start.ft, gws: [] }]));
   for (let t = fromGw; t <= toGw; t++) {
-    const decision = policy.decide({ t, state: { ...state, ft }, world });
-    const { moves } = decision;
-    const next = applyMoves(state, moves, world, t);
-    const after = next.squad.map(p => p.id);
-    gws.push({
-      t, ft, moves, note: decision.note ?? null,
-      hits: Math.max(0, moves.length - ft) * hitCost,
-      points: world.gwPoints(after, t),
-      before: state.squad.map(p => p.id), after, stateBefore: state, bankTenths: next.bankTenths,
-      // At the cap, a week without a move loses the free transfer it would have banked.
-      lostFt: t < toGw && ft >= maxBankedFt && moves.length === 0,
-    });
-    ft = nextFreeTransfers(ft, moves.length, { max: maxBankedFt, topUp: world.ftTopUp(t + 1) });
-    state = next;
+    for (const [name, policy] of Object.entries(policies)) {
+      const run = runs[name];
+      const { state, ft } = run;
+      const decision = policy.decide({ t, state: { ...state, ft }, world });
+      const { moves } = decision;
+      const next = applyMoves(state, moves, world, t);
+      const after = next.squad.map(p => p.id);
+      run.gws.push({
+        t, ft, moves, note: decision.note ?? null,
+        hits: Math.max(0, moves.length - ft) * hitCost,
+        points: world.gwPoints(after, t),
+        before: state.squad.map(p => p.id), after, stateBefore: state, bankTenths: next.bankTenths,
+        // At the cap, a week without a move loses the free transfer it would have banked.
+        lostFt: t < toGw && ft >= maxBankedFt && moves.length === 0,
+      });
+      run.ft = nextFreeTransfers(ft, moves.length, { max: maxBankedFt, topUp: world.ftTopUp(t + 1) });
+      run.state = next;
+    }
   }
-  return { gws, total: sum(gws, g => g.points - g.hits) };
+  return Object.fromEntries(Object.entries(runs).map(([name, { gws }]) => [name, { gws, total: sum(gws, g => g.points - g.hits) }]));
+}
+
+/** One policy's season: simulateAll with one policy. */
+export function simulate(world, start, policy, opts) {
+  return simulateAll(world, start, { policy }, opts).policy;
 }
 
 /**

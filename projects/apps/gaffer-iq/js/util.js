@@ -115,6 +115,19 @@ export function fromTenths(tenths) {
 }
 
 /**
+ * An integer seed for one named stream of draws (FNV-1a over its parts), so
+ * each entity's draws depend on the run's seed and its own name only - never
+ * on what else is drawn alongside it.
+ * @param {...(number|string)} parts
+ * @returns {number}
+ */
+export function streamSeed(...parts) {
+  let h = 2166136261;
+  for (const c of parts.join('|')) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+  return h | 0;
+}
+
+/**
  * A seeded pseudo-random generator (mulberry32): the same seed gives the same
  * sequence, so a noisy computation repeats exactly.
  * @param {number} seed  any integer

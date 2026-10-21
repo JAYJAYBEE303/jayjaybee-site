@@ -13,8 +13,11 @@
  *   node tools/backtest/run.js --report
  *
  * --quick runs one squad for a few weeks and prints, writing nothing.
- * --report rewrites the report from the last run's data/results.json.
+ * --report rewrites the report from the last runs' data/*.json.
  * --resume finishes a run that died, keeping the tasks it had finished.
+ * --tune runs the tuning sweep on 2024-25 (data/tune.json); --test-tuned runs
+ * the values it chose on 2025-26 (data/tuned.json); --alt runs Long term's
+ * alternative preset (data/alt.json). The report includes each once it exists.
  *
  * Every week of every season replays the app's own path - normaliseSeason,
  * buildScoreContext, buildProjections, runDecisionEngine - on vaastav as it
@@ -33,17 +36,17 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
 
-import { DECISION_ENGINE, SEASON_GWS } from '../../js/config.js';
+import { DECISION_ENGINE, PERCENT, SEASON_GWS } from '../../js/config.js';
 import { normaliseSeason } from '../../js/engine/normalise.js';
 import { buildScoreContext } from '../../js/engine/composite.js';
 import { buildProjections } from '../../js/engine/projections.js';
-import { runDecisionEngine } from '../../js/engine/decision.js';
+import { createDecisionCache, runDecisionEngine } from '../../js/engine/decision.js';
 import { squadValue } from '../../js/engine/squad-value.js';
 import { checkSwap } from '../../js/engine/feasibility.js';
 import { fromTenths, seededRandom, toTenths } from '../../js/util.js';
 import { SEASONS, gwTablesBefore, loadSeason, rawSeasonAt, totalsBefore } from './history.js';
 import {
-  GAIN_WINDOWS, enginePolicy, moveMetrics, pairedBootstrap, pickSquad, randomSquad, rollPolicy, scoreGameweek, simulate,
+  GAIN_WINDOWS, enginePolicy, moveMetrics, pairedBootstrap, pickSquad, randomSquad, rollPolicy, scoreGameweek, simulateAll,
   slopeInterval, squadState,
 } from './lib.js';
 import { pointsModelAt } from '../points/model.js';
@@ -63,13 +66,12 @@ const ROLL = { gain: 2, horizon: 5 };    // points over five GWs a free move mus
 const FT_TOPUPS = { '2025-26': { 16: 5 } };
 const OLD_HORIZON = 'GW5';               // the old planner's default window
 const BOOT = { block: 5, draws: 2000, seed: 1 };
+const CEILING_BEST_WEEKS = 5;            // Ceiling's tail is judged on the weeks that go big as well
 // A buy is held for weeks, so neighbouring weeks' differences are related for
 // longer than five: the verdict is re-read with blocks this long.
 const LONG_BLOCK = 10;
 const NONE = { points: 0, minutes: 0 };
-// Every task's results, kept (gitignored with the data) so --report can rewrite the report without a rerun.
-const RESULTS = new URL('./data/results.json', import.meta.url);
-const PARTIAL = new URL('./data/results-partial.jsonl', import.meta.url);
+// Every stage's results are kept in data/ (gitignored with the data), so --report can rewrite the report without a rerun.
 const MODES = Object.keys(DECISION_ENGINE.modes);
 
 // Risk 8: each preset in the other unit. Long term and Future prep are
@@ -87,30 +89,100 @@ const largest = ws => Math.max(...ws);
 const total = ws => ws.reduce((a, w) => a + w, 0);
 const toTotal = 1 / largest(DM.future.weights);
 const toNormalised = 1 / total(decayWeights);
-const withModes = changes => ({
-  ...DECISION_ENGINE,
-  modes: Object.fromEntries(Object.entries(DECISION_ENGINE.modes).map(([id, m]) => [id, { ...m, ...changes[id] }])),
+
+/** DECISION_ENGINE with plain-JSON overrides laid over it, each mode merged on its own (tasks carry them to workers). */
+const configWith = (overrides = {}) => ({
+  ...DECISION_ENGINE, ...overrides,
+  modes: Object.fromEntries(Object.entries(DECISION_ENGINE.modes).map(([id, m]) => [id, { ...m, ...overrides.modes?.[id] }])),
 });
 const VARIANTS = {
-  asWritten: DECISION_ENGINE,
-  totals: withModes({
+  asWritten: {},
+  totals: { modes: {
     longterm: { weights: DM.longterm.weights.map(w => w / largest(DM.longterm.weights)) },
     future: { weights: DM.future.weights.map(w => w * toTotal), deferralEpsilon: DM.future.deferralEpsilon * toTotal },
-  }),
-  normalised: withModes({
+  } },
+  normalised: { modes: {
     funds: { weights: decayWeights.map(w => w * toNormalised), tau: DM.funds.tau * toNormalised, eps: DM.funds.eps * toNormalised },
     structure: { weights: DM.structure.weights.map(w => w / total(DM.structure.weights)) },
-  }),
+  } },
+  ceilingMean: { modes: { ceiling: { tail: null } } },
+  // The brief's alternative for Long term (§6): decay 0.85 over five GWs, as a per-GW average like the preset.
+  longtermDecay: { modes: { longterm: { weights: decayWeights.map(w => w * toNormalised) } } },
 };
+
+// A policy: kind none | roll | old | engine; an engine policy plays one mode
+// of one config variant; picks above one ask again on the new squad (lib.js).
+const MAX_PICKS = 5;
+const policy = (name, kind, extra = {}) => ({ name, kind, variant: 'asWritten', picks: 1, ...extra });
+const BASE = [policy('none', 'none'), policy('roll', 'roll'), policy('old', 'old')];
+const SINGLE = MODES.map(mode => policy(mode, 'engine', { mode }));
 const RISK8 = [
-  { name: 'longterm (total)', variant: 'totals', mode: 'longterm' },
-  { name: 'future (total)', variant: 'totals', mode: 'future' },
-  { name: 'funds (normalised)', variant: 'normalised', mode: 'funds' },
-  { name: 'structure (normalised)', variant: 'normalised', mode: 'structure' },
+  policy('longterm (total)', 'engine', { variant: 'totals', mode: 'longterm', preset: 'longterm' }),
+  policy('future (total)', 'engine', { variant: 'totals', mode: 'future', preset: 'future' }),
+  policy('funds (normalised)', 'engine', { variant: 'normalised', mode: 'funds', preset: 'funds' }),
+  policy('structure (normalised)', 'engine', { variant: 'normalised', mode: 'structure', preset: 'structure' }),
 ];
-const BASELINES = ['none', 'roll', 'old'];
+// Several moves a week: the roll baseline and each mode, as the planner is used.
+const MULTI = [policy('roll+', 'roll', { picks: MAX_PICKS }),
+  ...MODES.map(mode => policy(`${mode}+`, 'engine', { mode, picks: MAX_PICKS }))];
+// Ceiling on its mean at t*, as before Phase 7b's upper tail.
+const CEILING_MEAN = policy('ceiling (mean)', 'engine', { variant: 'ceilingMean', mode: 'ceiling' });
+const BASELINES = BASE.map(p => p.name);
 const HEADLINE = [...BASELINES, ...MODES];
-const ALL = [...HEADLINE, ...RISK8.map(r => r.name)];
+const ALL_POLICIES = [...BASE, ...SINGLE, ...RISK8, ...MULTI, CEILING_MEAN];
+const ALL = ALL_POLICIES.map(p => p.name);
+// The brief's alternative preset for Long term, one move and several (--alt), beside the preset as written.
+const ALT = [policy('longterm (decay)', 'engine', { mode: 'longterm', variant: 'longtermDecay' }),
+  policy('longterm+ (decay)', 'engine', { mode: 'longterm', variant: 'longtermDecay', picks: MAX_PICKS })];
+
+// ─── Tuning (Phase 7b) ───────────────────────────────────────────────────────
+//
+// One-at-a-time departures from the presets as written, each run on the modes
+// it touches, one move a week, over TUNE_SEASON; a value is chosen when it
+// gains at least TUNE_MATERIAL points a season on average over those modes,
+// and the choices together are then tested on the held-out season. The mode
+// weights stay as written (Q6).
+const TUNE_SEASON = '2024-25';
+const TUNE_MATERIAL = 10;
+const LAMBDA_MODES = ['longterm', 'future', 'funds', 'structure'];
+const scaleFt = k => ({
+  ftValueFlat: DECISION_ENGINE.ftValueFlat * k,
+  ftValueSchedule: Object.fromEntries(Object.entries(DECISION_ENGINE.ftValueSchedule).map(([n, v]) => [n, v * k])),
+});
+const everyMode = (modes, change) => ({ modes: Object.fromEntries(modes.map(m => [m, change(DM[m])])) });
+const TUNING = [
+  ...[0, 0.5, 2, 3].map(k => ({ param: 'free-transfer value', value: `x${k}`, modes: MODES, overrides: scaleFt(k) })),
+  ...[0.5, 1].map(h => ({ param: 'threshold', value: String(h), modes: MODES, overrides: everyMode(MODES, () => ({ threshold: h })) })),
+  ...[0, 4].map(m => ({ param: 'hit margin', value: String(m), modes: ['funds'], overrides: { hitMargin: m } })),
+  ...[0, 2].map(k => ({ param: 'lambda', value: `x${k}`, modes: LAMBDA_MODES, overrides: {
+    lambdaDefault: DECISION_ENGINE.lambdaDefault * k,
+    ...everyMode(LAMBDA_MODES.filter(m => DM[m].lambda !== undefined), m => ({ lambda: m.lambda * k })),
+  } })),
+  ...[0.5, 2].map(t => ({ param: 'tau', value: String(t), modes: ['funds'], overrides: everyMode(['funds'], () => ({ tau: t })) })),
+  ...[0.7, 1].map(d => ({ param: 'decay', value: String(d), modes: ['funds'], overrides: { decayBase: d } })),
+].map(t => ({ ...t, variant: `${t.param} ${t.value}` }));
+const tuningPolicies = () => TUNING.flatMap(t => t.modes.map(mode => policy(`${mode} @ ${t.variant}`, 'engine', { mode, variant: t.variant })));
+
+/** Two overrides objects as one, modes merged. */
+const merged = (a, b) => ({ ...a, ...b, modes: Object.fromEntries([...new Set([...Object.keys(a.modes ?? {}), ...Object.keys(b.modes ?? {})])]
+  .map(m => [m, { ...a.modes?.[m], ...b.modes?.[m] }])) });
+
+/** Each sweep value's mean paired gain over the modes it touches, and the choice per parameter. */
+function tuningChoices(tune) {
+  const rows = TUNING.map(t => {
+    const gains = t.modes.map(mode => {
+      const r = paired(tune, [TUNE_SEASON], 'asItStood', `${mode} @ ${t.variant}`, mode);
+      return r ? r.mean * r.gws : NaN;
+    });
+    return { ...t, gains, gain: mean(gains) };
+  });
+  const params = [...new Set(TUNING.map(t => t.param))];
+  const chosen = params.map(param => {
+    const best = rows.filter(r => r.param === param).reduce((a, b) => (b.gain > a.gain ? b : a));
+    return best.gain >= TUNE_MATERIAL ? best : null;
+  }).filter(Boolean);
+  return { rows, chosen, overrides: chosen.reduce((acc, c) => merged(acc, c.overrides), {}) };
+}
 
 const memo = (fn, key) => {
   const cache = new Map();
@@ -178,8 +250,24 @@ function buildWorld(seasons, name, schedule, old) {
 }
 
 /** The squad-dependent parts of a world, kept per task so memory stays bounded. */
-function forTask(world) {
+function forTask(world, variants) {
   const lineup = (ids, t) => squadValue(ids, t, world.at(t).projections);
+  const configs = new Map(Object.entries(variants).map(([name, overrides]) => [name, configWith(overrides)]));
+  // V depends on the week's projections and the squad, not on the bank, the
+  // free transfers or a config's gates and weights: every policy holding the
+  // same squad (in the same order) that week shares one cache. Weeks run in
+  // lockstep (lib.js simulateAll), so a past week's caches are dropped.
+  let week = null;
+  let caches = new Map();
+  const decisionCache = (t, ids) => {
+    if (t !== week) {
+      week = t;
+      caches = new Map();
+    }
+    const k = ids.join(',');
+    if (!caches.has(k)) caches.set(k, createDecisionCache());
+    return caches.get(k);
+  };
   return {
     ...world,
     gwPoints: memo((ids, t) => scoreGameweek(lineup(ids, t), world.at(t).positions, id => world.actual(id, t)).points,
@@ -187,8 +275,9 @@ function forTask(world) {
     expectedPoints: memo((ids, gw, t) => squadValue(ids, gw, world.at(t).projections).value,
       (ids, gw, t) => `${t}|${gw}|${idsKey(ids)}`),
     // Only each mode's call and moves are kept: a full result per state would fill memory.
-    engine: memo((variant, t, state) => calls(runDecisionEngine(engineInput(world.at(t), t, state), VARIANTS[variant])),
-      (variant, t, state) => `${variant}|${t}|${stateKey(state)}`),
+    engine: memo((variant, t, state, locks) => calls(runDecisionEngine(engineInput(world.at(t), t, state, locks), configs.get(variant),
+      decisionCache(t, state.squad.map(p => p.id)))),
+    (variant, t, state, locks) => `${variant}|${t}|${stateKey(state)}|${idsKey(locks)}`),
   };
 }
 
@@ -197,8 +286,8 @@ const calls = result => ({
   modes: Object.fromEntries(Object.entries(result.modes).map(([id, m]) => [id, { call: m.call, root: moveOf(m.root) }])),
 });
 
-/** runDecisionEngine's input as the planner builds it (modules/planner.js runEngine), with no chips, locks, bans or price signals. */
-function engineInput({ s, projections }, t, state) {
+/** runDecisionEngine's input as the planner builds it (modules/planner.js runEngine), with no chips, bans or price signals. */
+function engineInput({ s, projections }, t, state, locks) {
   return {
     planningGw: t,
     squad: state.squad.map(p => {
@@ -207,7 +296,7 @@ function engineInput({ s, projections }, t, state) {
         priceTenths: toTenths(player.price), purchaseTenths: p.purchaseTenths };
     }),
     bankTenths: state.bankTenths, freeTransfers: state.ft, chipPlan: {}, chipsUsed: [],
-    locks: new Set(), bans: new Set(), projections, candidates: s.players, priceSignals: null, hoursToDeadline: null,
+    locks, bans: new Set(), projections, candidates: s.players, priceSignals: null, hoursToDeadline: null,
   };
 }
 
@@ -291,36 +380,70 @@ function oldPolicy(old) {
 
 // ─── A task: one squad's season under every policy ───────────────────────────
 
-function policyFor(name, old) {
-  if (name === 'none') return { decide: () => ({ moves: [] }) };
-  if (name === 'roll') return rollPolicy({ ...ROLL, maxBankedFt: DECISION_ENGINE.maxBankedFt });
-  if (name === 'old') return oldPolicy(old);
-  const risk8 = RISK8.find(r => r.name === name);
-  const variant = risk8?.variant ?? 'asWritten';
-  return enginePolicy(risk8?.mode ?? name, ({ t, state, world }) => world.engine(variant, t, state));
+function policyFor(spec, old) {
+  if (spec.kind === 'none') return { decide: () => ({ moves: [] }) };
+  if (spec.kind === 'roll') return rollPolicy({ ...ROLL, maxBankedFt: DECISION_ENGINE.maxBankedFt, maxPicks: spec.picks });
+  if (spec.kind === 'old') return oldPolicy(old);
+  return enginePolicy(spec.mode, ({ t, state, world, locks }) => world.engine(spec.variant, t, state, locks), { maxPicks: spec.picks });
+}
+
+/**
+ * Which move, on the same squads: each week of the roll baseline's season,
+ * every mode is also asked for its pick on roll's squad, and both picks are
+ * scored on what happened over the next five GWs (cut at the season's end)
+ * against keeping the squad, less hits; a roll scores 0. Also each pick's
+ * gain on that week's projections (V) and on its players' own points.
+ */
+function shadowOf(world, run, toGw) {
+  const hitCost = DECISION_ENGINE.hitCost;
+  return run.gws.map(g => {
+    const window = Array.from({ length: Math.min(5, toGw - g.t + 1) }, (_, i) => g.t + i);
+    const own = id => sum(world.at(g.t).projections.get(id).gws.slice(0, window.length).map(x => x.xpts));
+    const score = moves => {
+      const after = moves.reduce((ids, m) => ids.map(id => (id === m.outId ? m.inId : id)), g.before);
+      const hits = Math.max(0, moves.length - g.ft) * hitCost;
+      return {
+        moves: moves.length,
+        realised: sum(window.map(u => world.gwPoints(after, u) - world.gwPoints(g.before, u))) - hits,
+        expected: sum(window.map(u => world.expectedPoints(after, u, g.t) - world.expectedPoints(g.before, u, g.t))) - hits,
+        own: sum(moves.map(m => own(m.inId) - own(m.outId))),
+        key: moves.map(m => `${m.outId}>${m.inId}`).join(','),
+      };
+    };
+    const result = world.engine('asWritten', g.t, { ...g.stateBefore, ft: g.ft }, new Set());
+    return {
+      t: g.t, ft: g.ft, roll: score(g.moves),
+      modes: Object.fromEntries(MODES.map(mode => {
+        const m = result.modes[mode];
+        return [mode, score(m.call === 'move' ? [m.root, m.root.chained].filter(Boolean) : [])];
+      })),
+    };
+  });
 }
 
 function runTask(world, task, old) {
   const started = Date.now();
-  const taskWorld = forTask(world);
+  const taskWorld = forTask(world, task.variants);
   const start = {
     squad: task.squad.ids.map(id => ({ id, purchaseTenths: world.priceTenths(id, START_GW) })),
     bankTenths: BUDGET_TENTHS - task.squad.costTenths,
     ft: 1,
   };
   const opts = { fromGw: START_GW, toGw: task.toGw, maxBankedFt: DECISION_ENGINE.maxBankedFt, hitCost: DECISION_ENGINE.hitCost };
+  const policies = Object.fromEntries(task.policies.map(spec => [spec.name, policyFor(spec, old)]));
+  const runs = simulateAll(taskWorld, start, policies, opts);
   const out = {};
-  for (const name of task.policies) {
-    const policy = policyFor(name, old);
-    const run = simulate(taskWorld, start, policy, opts);
+  for (const [name, run] of Object.entries(runs)) {
     out[name] = {
       total: run.total,
       gws: run.gws.map(g => ({ t: g.t, points: g.points, hits: g.hits, ft: g.ft, moves: g.moves.length, lostFt: g.lostFt })),
       metrics: moveMetrics(run, taskWorld, opts).map(m => ({ ...m, moves: m.moves.length })),
-      counts: policy.counts ?? null,
+      counts: policies[name].counts ?? null,
     };
   }
-  return { season: task.season, schedule: task.schedule, squad: task.squad.index, label: task.squad.label, out, ms: Date.now() - started };
+  const shadow = task.shadow && runs.roll ? shadowOf(taskWorld, runs.roll, task.toGw) : null;
+  return { season: task.season, schedule: task.schedule, squad: task.squad.index, label: task.squad.label, out, shadow,
+    ms: Date.now() - started };
 }
 
 // ─── Workers ─────────────────────────────────────────────────────────────────
@@ -449,23 +572,28 @@ function moveTable(results, seasons, schedule, policies) {
   '|---|---|---|---|---|---|---|---|---|---|---|', ...lines].join('\n');
 }
 
-const AGAINST = { roll: 'the roll baseline', old: 'the old engine', none: 'no transfers' };
+const AGAINST = { roll: 'the roll baseline', 'roll+': 'roll+ (the roll baseline, several moves a week)', old: 'the old engine',
+  none: 'no transfers' };
 
 /** One line per baseline: each mode's paired season difference and its verdict; then any verdict longer blocks change. */
-function verdictLines(results, seasons, schedule) {
+const labelOf = name => (name.endsWith('+') ? `${DECISION_ENGINE.modes[name.slice(0, -1)]?.label ?? name}+`
+  : DECISION_ENGINE.modes[name]?.label ?? name);
+
+/** Each row's paired season difference against each baseline, with a tally and the longer-block check. */
+function verdictLines(results, seasons, schedule, rows = MODES, against = ['old', 'roll', 'none']) {
   const changed = [];
-  const tally = ['old', 'roll', 'none'].map(b => {
-    const verdicts = MODES.map(mode => paired(results, seasons, schedule, mode, b)).filter(Boolean).map(verdictOf);
+  const tally = against.map(b => {
+    const verdicts = rows.map(row => paired(results, seasons, schedule, row, b)).filter(Boolean).map(verdictOf);
     const count = v => verdicts.filter(x => x === v).length;
     return verdicts.length ? `against ${AGAINST[b]} ${count('better')} of ${verdicts.length} modes better and ${count('worse')} worse` : null;
   }).filter(Boolean);
   const summary = tally.length ? [`In short: ${tally.join('; ')}.`, ''] : [];
-  const lines = ['old', 'roll', 'none'].map(b => `- **Against ${AGAINST[b]}:** ${MODES.map(mode => {
-    const r = paired(results, seasons, schedule, mode, b);
+  const lines = against.map(b => `- **Against ${AGAINST[b]}:** ${rows.map(row => {
+    const r = paired(results, seasons, schedule, row, b);
     if (!r) return null;
-    const long = paired(results, seasons, schedule, mode, b, { ...BOOT, block: LONG_BLOCK });
-    if (verdictOf(long) !== verdictOf(r)) changed.push(`${DECISION_ENGINE.modes[mode].label} against ${AGAINST[b]} (${verdictOf(long)})`);
-    return `${DECISION_ENGINE.modes[mode].label} ${ci(r, r.gws)}${verdictOf(r) === 'no clear difference' ? '' : ` **${verdictOf(r)}**`}`;
+    const long = paired(results, seasons, schedule, row, b, { ...BOOT, block: LONG_BLOCK });
+    if (verdictOf(long) !== verdictOf(r)) changed.push(`${labelOf(row)} against ${AGAINST[b]} (${verdictOf(long)})`);
+    return `${labelOf(row)} ${ci(r, r.gws)}${verdictOf(r) === 'no clear difference' ? '' : ` **${verdictOf(r)}**`}`;
   }).filter(Boolean).join('; ')}.`);
   lines.push(changed.length ? `- With ${LONG_BLOCK}-week blocks these verdicts change: ${changed.join('; ')}.`
     : `- With ${LONG_BLOCK}-week blocks every verdict stands.`);
@@ -473,11 +601,111 @@ function verdictLines(results, seasons, schedule) {
     const d = paired(results, seasons, schedule, r.name, r.mode);
     return d ? `${r.name} ${ci(d, d.gws)}${verdictOf(d) === 'no clear difference' ? '' : ` **${verdictOf(d)}**`}` : null;
   }).filter(Boolean);
-  if (units.length) lines.push(`- **Risk 8, each preset in the other unit, less as written:** ${units.join('; ')}.`);
+  if (units.length && rows === MODES) lines.push(`- **Risk 8, each preset in the other unit, less as written:** ${units.join('; ')}.`);
   return [...summary, ...lines].join('\n');
 }
 
-function report(results, squadsBySeason) {
+/** The several-moves policies: each against its one-move version, the several-moves roll baseline and the old engine. */
+function multiTable(results, seasons, schedule) {
+  const cell = (a, b) => {
+    const r = paired(results, seasons, schedule, a, b);
+    return r ? `${ci(r, r.gws)}${verdictOf(r) === 'no clear difference' ? '' : ` **${verdictOf(r)}**`}` : '-';
+  };
+  const lines = MULTI.map(p => `| ${p.name} | ${cell(p.name, p.name.slice(0, -1))} | ${p.name === 'roll+' ? '' : cell(p.name, 'roll+')}`
+    + ` | ${cell(p.name, 'old')} |`);
+  return ['| policy | less its one-move version | less roll+ | less the old engine |', '|---|---|---|---|', ...lines].join('\n');
+}
+
+/**
+ * Which move, on the same squads (shadowOf): per mode, on the roll baseline's
+ * own path, its pick's realised five-GW gain less roll's pick's, a week each.
+ */
+function shadowTable(results, seasons) {
+  const rows = seasons.flatMap(season => of(results, season, 'asItStood')).filter(r => r.shadow);
+  if (!rows.length) return '';
+  const cap = DECISION_ENGINE.maxBankedFt;
+  const lines = MODES.map(mode => {
+    const strata = seasons.map(season => of(results, season, 'asItStood').filter(r => r.shadow)
+      .map(r => r.shadow.map(w => w.modes[mode].realised - w.roll.realised))).filter(m => m.length);
+    const all = pairedBootstrap(strata, BOOT);
+    const weeks = rows.flatMap(r => r.shadow);
+    const part = keep => mean(weeks.filter(keep).map(w => w.modes[mode].realised - w.roll.realised));
+    const same = weeks.filter(w => w.modes[mode].key === w.roll.key).length / weeks.length;
+    return `| ${labelOf(mode)} | ${weeks.length} | ${f(same * PERCENT, 0)}% | ${ci(all, 1, 2)}${verdictOf(all) === 'no clear difference' ? '' : ` **${verdictOf(all)}**`}`
+      + ` | ${signed(part(w => w.ft < cap), 2)} | ${signed(part(w => w.ft >= cap), 2)}`
+      + ` | ${signed(mean(weeks.map(w => w.modes[mode].expected - w.roll.expected)), 2)}`
+      + ` | ${signed(mean(weeks.map(w => w.modes[mode].own - w.roll.own)), 2)} |`;
+  });
+  return ['| mode | weeks | same pick as roll | its pick less roll\'s, realised over 5 GWs | below the cap | at the cap'
+    + ' | expected (V) | own projected points |', '|---|---|---|---|---|---|---|---|', ...lines].join('\n');
+}
+
+/** Ceiling on its upper tail less on its mean: season points, and each squad's five best weeks. */
+function ceilingLines(results, seasons) {
+  const season = paired(results, seasons, 'asItStood', 'ceiling', CEILING_MEAN.name);
+  const runs = seasons.flatMap(s => of(results, s, 'asItStood')).filter(r => r.out.ceiling && r.out[CEILING_MEAN.name]);
+  if (!season || !runs.length) return '';
+  const best = run => net(run).sort((a, b) => b - a).slice(0, CEILING_BEST_WEEKS).reduce((a, x) => a + x, 0);
+  const top = pairedBootstrap([[runs.map(r => best(r.out.ceiling) - best(r.out[CEILING_MEAN.name]))]], { ...BOOT, block: 1 });
+  return `- Season points: ${ci(season, season.gws)} - ${verdictOf(season)}.\n`
+    + `- Each squad's ${CEILING_BEST_WEEKS} best weeks: ${ci(top)} - ${verdictOf(top)} (squad-seasons resampled).`;
+}
+
+/** The brief's alternative preset for Long term, less the preset as written and less the roll baseline. */
+function altSection(alt) {
+  if (!alt) return '';
+  const cell = (seasons, a, b) => {
+    const r = paired(alt, seasons, 'asItStood', a, b);
+    return r ? `${ci(r, r.gws)}${verdictOf(r) === 'no clear difference' ? '' : ` **${verdictOf(r)}**`}` : '-';
+  };
+  const rows = [[HELD_OUT], RUN_SEASONS].flatMap(ss => [
+    `| ${ss.join(' and ')} | one move | ${cell(ss, 'longterm (decay)', 'longterm')} | ${cell(ss, 'longterm (decay)', 'roll')} |`,
+    `| ${ss.join(' and ')} | several | ${cell(ss, 'longterm+ (decay)', 'longterm+')} | ${cell(ss, 'longterm+ (decay)', 'roll')} |`]);
+  return `## Long term's alternative: decay 0.85 over five GWs
+
+The brief gives Long term "[1,1,1,0,0] / 3, or decay 0.85"; the preset is the first (Q6). The second, as a per-GW
+average like the first, run on the same squads (points a season):
+
+| seasons | moves a week | less the preset as written | less the roll baseline |
+|---|---|---|---|
+${rows.join('\n')}
+`;
+}
+
+/** The tuning sweep (2024-25) and the chosen values' test on the held-out season. */
+function tuningSection(tune, tuned) {
+  if (!tune) return '';
+  const { rows, chosen } = tuningChoices(tune);
+  const widths = TUNING.flatMap(t => t.modes.map(mode => paired(tune, [TUNE_SEASON], 'asItStood', `${mode} @ ${t.variant}`, mode)))
+    .filter(Boolean).map(r => ((r.hi - r.lo) / 2) * r.gws).sort((a, b) => a - b);
+  const halfWidth = widths[Math.floor(widths.length / 2)];
+  const sweep = rows.map(r => `| ${r.param} | ${r.value} | ${r.modes.map(labelOf).join(', ')} | ${signed(r.gain)}`
+    + ` | ${r.gains.map(g => signed(g, 0)).join(', ')} |`);
+  const test = !tuned ? '' : `\n\nThe chosen values together, on ${HELD_OUT} (held out), less the presets as written (points a season):\n\n`
+    + `| mode | one move a week | several a week |\n|---|---|---|\n${MODES.map(mode => {
+      const cell = (a, b) => {
+        const r = paired(tuned, [HELD_OUT], 'asItStood', a, b);
+        return r ? `${ci(r, r.gws)}${verdictOf(r) === 'no clear difference' ? '' : ` **${verdictOf(r)}**`}` : '-';
+      };
+      return `| ${labelOf(mode)} | ${cell(`${mode} (tuned)`, mode)} | ${cell(`${mode}+ (tuned)`, `${mode}+`)} |`;
+    }).join('\n')}`;
+  return `## Tuning: chosen on ${TUNE_SEASON}, tested on ${HELD_OUT}
+
+Each value below replaced its preset alone, one move a week, on ${TUNE_SEASON}; the gain is the paired season
+difference against the presets as written, averaged over the modes it touches (each mode's own in the last
+column). A value is chosen if its gain is at least ${TUNE_MATERIAL} points a season. The mode weights are not tuned (Q6).
+For scale, one value on one mode carries a 95% interval of about ${f(halfWidth)} points either way (the median over
+the sweep), so the sweep can show only a large effect.
+
+| parameter | value | modes | mean gain | per mode |
+|---|---|---|---|---|
+${sweep.join('\n')}
+
+Chosen: ${chosen.length ? chosen.map(c => `${c.param} ${c.value} (${signed(c.gain)})`).join('; ') : 'nothing clears the bar; the presets stand'}.${test}
+`;
+}
+
+function report(results, squadsBySeason, { tune = null, tuned = null, alt = null } = {}) {
   const both = RUN_SEASONS;
   const other = RUN_SEASONS.filter(s => s !== HELD_OUT);
   const oldCounts = ['asItStood'].flatMap(sch => RUN_SEASONS.flatMap(s => of(results, s, sch))).map(r => r.out.old?.counts).filter(Boolean);
@@ -503,6 +731,10 @@ Both seasons together (${both.join(' and ')}):
 
 ${verdictLines(results, both, 'asItStood')}
 
+Several moves a week (each mode asking again on its new squad until it rolls; see below), on ${HELD_OUT}:
+
+${verdictLines(results, [HELD_OUT], 'asItStood', MULTI.filter(p => p.kind === 'engine').map(p => p.name), ['old', 'roll+', 'none'])}
+
 ## What was run
 
 - **Seasons.** ${both.join(', ')}, planning ${gwsLabel}. ${HELD_OUT} is held out; ${other.join(', ')}'s
@@ -524,7 +756,8 @@ ${verdictLines(results, both, 'asItStood')}
 - **Policies.** none: no transfers. roll: the free move whose buy out-projects his sale by most over ${ROLL.horizon} GWs on their
   own points, made when that clears ${ROLL.gain} (any gain at the cap), never a hit. old: the old engine at \`3aa8f3a\`
   (its planner's default ${OLD_HORIZON} window, budget the bank), its verdict's move. The six modes: the new engine's root move
-  in that mode, and Funds' chained second move.
+  in that mode, and Funds' chained second move; Ceiling on its upper tail (and, as \`ceiling (mean)\`, on its mean).
+  A name ending + makes several moves a week (below).
 
 ## Season points
 
@@ -561,6 +794,34 @@ ${[[HELD_OUT], both].map(ss => `### ${ss.join(' and ')}\n\n| variant | less the 
     return `| ${r.name} | ${d ? `${ci(d, d.gws)} ${verdictOf(d) === 'no clear difference' ? '' : `**${verdictOf(d)}**`}` : '-'} |`;
   }).join('\n')}`).join('\n\n')}
 
+## Several moves a week
+
+Each mode, and the roll baseline, made a pick and then asked again on the new squad with one free transfer
+fewer, until it rolled (at most ${MAX_PICKS} a week): the planner's cards used one after another. The engine's own
+costs stop it - the free transfer's value, then the hit and its margin - so banked free transfers, and hits, come
+into play (roll+ never takes a hit). Points a season:
+
+${[[HELD_OUT], both].map(ss => `### ${ss.join(' and ')}\n\n${multiTable(results, ss, 'asItStood')}`).join('\n\n')}
+
+## Which move, on the same squads
+
+The verdict above mixes which move is made with whether one is made, and each policy's squad drifts its own way.
+Here every week of the roll baseline's season, on roll's squad, each mode was asked for its one-move pick, and both
+picks were scored over the next five GWs against keeping the squad (a roll scores 0). Per week; the interval
+resamples squads and five-week blocks, both seasons. Expected (V) and own projected points: the same difference on
+that week's projections, by the engine's measure and by roll's.
+
+${shadowTable(results, both)}
+
+## Ceiling's upper tail
+
+Ceiling now scores a swap at its target GW by the change to the squad's 90th-percentile score over Monte Carlo draws
+of the points model's parts (engine/ceiling.js), not by its expected points. Less Ceiling on the mean, both seasons:
+
+${ceilingLines(results, both)}
+
+${tuningSection(tune, tuned)}
+${altSection(alt)}
 ## Sensitivity: the final schedule
 
 The same runs with vaastav's final schedule, which knows every blank and double from the start (more than a manager
@@ -600,8 +861,7 @@ async function main() {
   const seasons = await Promise.all(SEASONS.map(n => loadSeason(n)));
   const squadsBySeason = Object.fromEntries(RUN_SEASONS.map(n => [n, startingSquads(seasons.find(s => s.name === n))]));
   if (argv.includes('--report')) {
-    const saved = JSON.parse(await readFile(RESULTS, 'utf8'));
-    await writeReport(saved.results, squadsBySeason);
+    await writeReport(squadsBySeason);
     return;
   }
   const oldAt = argv.indexOf('--old');
@@ -614,36 +874,86 @@ async function main() {
   for (const schedule of SCHEDULES) {
     for (const season of RUN_SEASONS) {
       for (const squad of squadsBySeason[season]) {
-        tasks.push({ season, schedule, squad, toGw: SEASON_GWS, policies: schedule === 'final' ? HEADLINE : ALL });
+        tasks.push({
+          season, schedule, squad, toGw: SEASON_GWS, variants: VARIANTS, shadow: schedule === 'asItStood',
+          policies: schedule === 'final' ? ALL_POLICIES.filter(p => HEADLINE.includes(p.name)) : ALL_POLICIES,
+        });
       }
     }
   }
+  let stage = 'results';
+  let stageTasks = tasks;
+  if (argv.includes('--tune')) {
+    const variants = { ...VARIANTS, ...Object.fromEntries(TUNING.map(t => [t.variant, t.overrides])) };
+    stage = 'tune';
+    stageTasks = squadsBySeason[TUNE_SEASON].map(squad => ({
+      season: TUNE_SEASON, schedule: 'asItStood', squad, toGw: SEASON_GWS, variants, shadow: false,
+      policies: [...SINGLE, ...tuningPolicies()],
+    }));
+  } else if (argv.includes('--alt')) {
+    stage = 'alt';
+    stageTasks = RUN_SEASONS.flatMap(season => squadsBySeason[season].map(squad => ({
+      season, schedule: 'asItStood', squad, toGw: SEASON_GWS, variants: VARIANTS, shadow: false,
+      policies: [...BASE.filter(p => p.name === 'roll'), ...ALL_POLICIES.filter(p => p.name === 'longterm' || p.name === 'longterm+'), ...ALT],
+    })));
+  } else if (argv.includes('--test-tuned')) {
+    const tune = await readStage('tune');
+    if (!tune) throw new Error('run.js: run --tune first');
+    const { overrides, chosen } = tuningChoices(tune.results);
+    if (!chosen.length) {
+      console.log('run.js: the sweep chose nothing, so the tuned presets are the presets as written: nothing to test');
+      return;
+    }
+    const asWritten = [...SINGLE, ...MULTI.filter(p => p.kind === 'engine')];
+    stage = 'tuned';
+    stageTasks = squadsBySeason[HELD_OUT].map(squad => ({
+      season: HELD_OUT, schedule: 'asItStood', squad, toGw: SEASON_GWS, variants: { ...VARIANTS, tuned: overrides }, shadow: false,
+      policies: [...asWritten, ...asWritten.map(p => ({ ...p, name: `${p.name} (tuned)`, variant: 'tuned' }))],
+    }));
+  }
   if (quick) {
     // Two squads on two workers, so the pool's hand-over and shutdown run too.
-    const short = tasks.filter(t => t.season === HELD_OUT && t.schedule === 'asItStood').slice(0, 2)
+    const short = stageTasks.filter(t => t.schedule === 'asItStood' && (stage !== 'results' || t.season === HELD_OUT)).slice(0, 2)
       .map(t => ({ ...t, toGw: START_GW + QUICK_GWS - 1 }));
     const [result] = (await runPool(short, oldDir, short.length)).sort((a, b) => a.squad - b.squad);
     for (const [name, run] of Object.entries(result.out)) {
-      console.log(name.padEnd(24), String(run.total).padStart(5), run.gws.map(g => `${g.points}-${g.hits}/${g.moves}`).join(' '),
+      console.log(name.padEnd(36), String(run.total).padStart(5), run.gws.map(g => `${g.points}-${g.hits}/${g.moves}`).join(' '),
         run.counts ? JSON.stringify(run.counts) : '');
     }
+    // The report's own code on these few weeks, so a full run cannot die at its end.
+    const md = stage === 'results' ? report([result], squadsBySeason)
+      : stage === 'alt' ? altSection([result])
+        : tuningSection(stage === 'tune' ? [result] : (await readStage('tune')).results, stage === 'tuned' ? [result] : null);
+    console.log(stage === 'results' ? md.slice(md.indexOf('## Several moves'), md.indexOf('## Sensitivity')) : md);
     console.log(`${Math.round(result.ms / 1000)}s, rss ${Math.round(process.memoryUsage().rss / 1e6)} MB (main)`);
     return;
   }
-  // Each result is appended as it lands, so a run that dies keeps its finished tasks; --resume runs only the rest.
-  const done = argv.includes('--resume') ? await readPartial() : [];
-  const keyOf = t => `${t.season}|${t.schedule}|${t.squad.index ?? t.squad}`;
-  const have = new Set(done.map(keyOf));
-  if (!argv.includes('--resume')) await writeFile(PARTIAL, '');
-  const fresh = await runPool(tasks.filter(t => !have.has(keyOf(t))), oldDir, os.availableParallelism(),
-    r => appendFileSync(PARTIAL, `${JSON.stringify(r)}\n`));
-  const results = [...done, ...fresh];
-  await writeFile(RESULTS, JSON.stringify({ results }));
-  await writeReport(results, squadsBySeason);
+  await runStage(stage, stageTasks, oldDir, argv);
+  await writeReport(squadsBySeason);
 }
 
-async function readPartial() {
-  const text = await readFile(PARTIAL, 'utf8').catch(() => '');
+/**
+ * A stage's tasks on the worker pool: each result appended to
+ * data/<stage>-partial.jsonl as it lands (so a run that dies keeps them, and
+ * --resume runs only the rest), then all saved to data/<stage>.json.
+ */
+async function runStage(stage, tasks, oldDir, argv) {
+  const resume = argv.includes('--resume');
+  const done = resume ? await readPartial(stage) : [];
+  const keyOf = t => `${t.season}|${t.schedule}|${t.squad.index ?? t.squad}`;
+  const have = new Set(done.map(keyOf));
+  if (!resume) await writeFile(partialOf(stage), '');
+  const fresh = await runPool(tasks.filter(t => !have.has(keyOf(t))), oldDir, os.availableParallelism(),
+    r => appendFileSync(partialOf(stage), `${JSON.stringify(r)}\n`));
+  await writeFile(stageFile(stage), JSON.stringify({ results: [...done, ...fresh] }));
+}
+
+const stageFile = stage => new URL(`./data/${stage}.json`, import.meta.url);
+const partialOf = stage => new URL(`./data/${stage}-partial.jsonl`, import.meta.url);
+const readStage = async stage => JSON.parse(await readFile(stageFile(stage), 'utf8').catch(() => 'null'));
+
+async function readPartial(stage) {
+  const text = await readFile(partialOf(stage), 'utf8').catch(() => '');
   // A run killed mid-write leaves a last line cut short: that task runs again.
   return text.split('\n').filter(Boolean).flatMap(line => {
     try {
@@ -654,8 +964,11 @@ async function readPartial() {
   });
 }
 
-async function writeReport(results, squadsBySeason) {
-  const md = report(results, squadsBySeason);
+async function writeReport(squadsBySeason) {
+  const [main, tune, tuned, alt] = await Promise.all(['results', 'tune', 'tuned', 'alt'].map(readStage));
+  if (!main) throw new Error('run.js: no data/results.json yet - run the backtest first');
+  const md = report(main.results, squadsBySeason,
+    { tune: tune?.results ?? null, tuned: tuned?.results ?? null, alt: alt?.results ?? null });
   await writeFile(new URL('../../docs/decision-engine-backtest.md', import.meta.url), md);
   console.log(md.slice(0, md.indexOf('## What was run')));
 }

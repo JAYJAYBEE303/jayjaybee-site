@@ -193,7 +193,7 @@ it reads the same record as v1, so the other two remain (Phase 4).
 | `p_zero` | **Not produced** | §2.2; Phase 4: from the appear head |
 | `p_60` | **Not produced** | `pStart x completion`, `p60Approx: true`; Phase 4: the 60-minute head, `p60Approx: false` |
 | `xpts_if_plays` | **Not produced** | §2.2 |
-| `p_p90` | **Not produced** (Ceiling's haul rate is a backward proxy) | `null` until Phase 7 |
+| `p_p90` | **Not produced** (Ceiling's haul rate is a backward proxy) | `null` until Phase 7; from Phase 7b Ceiling's draws (`engine/ceiling.js`) give each owned player's 90th percentile for the target GW (`players[].pP90`), and each projection carries the `draw` spec they come from |
 | Point-in-time snapshots | **Not produced** (`calibration.js` stores fixture composites only, in `localStorage`) | Phase 1, in the browser (Q1) |
 
 ---
@@ -365,6 +365,8 @@ DecisionResult = {
     robustness: number | null,       // Phase 6: the root's share of the most 3/2/1 points the noisy re-runs
                                      //   could give it, set by withRobustness (robustness.js); null when it rolls
     targetGw,                        // Ceiling only: t*, null when a planned chip covers every GW
+    tail: { quantile, squad } | null,  // Ceiling only (Phase 7b): the squad's score at that quantile in t*,
+                                     //   over the draws; null when it reads the mean (no draws: the v1 basis)
   } },
   shortlist: number[],               // Phase 6: the candidate ids the robustness re-runs buy from
   players: [{ playerId, sellPriceTenths,   // what he sells for (flagged sellPriceEstimated without a ledger entry)
@@ -374,6 +376,7 @@ DecisionResult = {
       | 'priceFall' | 'priceRise'>,  // a likely move that would change his sell price (Phase 5)
     priceSource: 'fpl' | 'estimate' | null,
     lockValue: number | null,        // null: no affordable replacement (or no t*), so no sale to protect against
+    pP90: number | null,             // Phase 7b: his 90th-percentile points in t*, from Ceiling's draws; null without them
     uncoveredLoss: number }],        // mode 6's structural exposure, Structure-weighted
   lineup: { xi, bench, captainId, viceId, captainGap, nextCaptainId },
   chipHints: {                       // pre-fill only; never applied unless you accept them (Q4)
@@ -869,6 +872,41 @@ before the previous one passes. Phases 1, 2, 3 and 5 are strictly sequential.
   - A degenerate slope no longer loops.
 - **Run** 58.8 minutes on four cores (233 worker-minutes). Deferred to 7b: tuning, Ceiling's Monte Carlo tail and `pP90`.
 - **Second review fixes** (the commit after `165310d`): the claims above corrected (free transfers do bank, hits are impossible by construction, risk 8's money terms stay fixed, the expected-gain gap is partly selection); the report adds weeks at the free-transfer cap and the one-move-a-week handicap; `--resume` survives a half-written line.
+
+**7b design** (after your check of 7a)
+- **Speed first.** Every policy steps through the season in lockstep, a week at a time, and all policies at the same squad that week share one V cache (V depends on the squad and the projections, not on the bank, the free transfers or the mode's settings). A setting that only changes the gates or weights then re-runs on cached values.
+- **Pick quality on the same states.** On the roll baseline's own path, each week, every mode is also asked for its pick, and both picks are scored on what happened over the next five GWs, against keeping the squad. This separates "which move" from "whether to move" and from path effects: the 7a verdict cannot.
+- **Several moves a week.** A multi-move variant of every engine mode and of the roll baseline: make the pick, then ask again on the new squad with one free transfer fewer, until it rolls (at most five a week). The engine's own costs stop it: the free transfer's value, then the hit plus its margin. This is how the planner is used (one move per card, then the next), and the only way banked free transfers, and hits, come into play.
+- **Ceiling's upper tail** (`js/engine/ceiling.js`): a Monte Carlo of the squad's score in the target GW, drawn from the points model's own parts: each fixture's team goals as Poisson counts, each player's goals and assists thinned from his team's by his shares, clean sheets and goals conceded from the goals his team concedes while he is on, saves, defensive contributions, bonus and cards; minutes from the minutes model. Teammates share their team's draws, so a stack's upside is counted. Every swap is scored on the same draws. Ceiling's target-GW term becomes the change in the squad's 90th-percentile score (`modes.ceiling.tail`; null keeps the mean). `pP90` is each player's 90th percentile from the same draws, for the target GW. The v1 basis has no parts, so Ceiling keeps the mean there. The card says which.
+- **Tuning** on 2024-25, tested on 2025-26: one-at-a-time sweeps of the free-transfer value (scaled), the hit margin, decayBase, lambda, Funds' tau and each mode's threshold, on the single- and multi-move policies. The mode weights stay as written (Q6), as does every other preset. A tuned value ships only if it gains on 2024-25 and does not lose on 2025-26; the intervals are wide, so every change is reported as a weak finding and comes back to you before it lands in config.
+
+**7b as built** (`js/engine/ceiling.js`, `decision.js`, `projections.js`, `config.js` modes.ceiling.tail, `modules/planner.js`; `tools/backtest/lib.js`, `run.js`; tests `tests/engine/ceiling.test.js`, `decision.test.js`, `tests/tools/backtest-sim.test.js`)
+
+- **Harness.** The policies step through each season together, and every policy holding the same squad that week shares its V cache. Single-move results are identical to 7a's (Ceiling aside, which changed). New stages: `--tune`, `--test-tuned`, `--alt`.
+- **Several moves a week** (points a season, 2025-26 held out):
+  - Against the old engine every mode lands between -40 and +64, and the roll baseline at +52; none is clear.
+  - Against roll+ (roll, several a week), every mode lies between -92 and +12, and none is clear. Each mode against its own one-move version: +3 to +33, none clear.
+  - Pooled over both seasons, every mode but Ceiling+ beats the old engine (+95 to +164).
+  - They use the banked free transfers: most sit at the cap about 1 week in 35, against 23 for one move a week; Future prep+ sits there 15. Structure+ and Funds+ take the most hits (13 and 21 points a season), since their units clear the hit's bar most easily (risk 8); Ceiling+ takes 5.
+- **Which move, on the same squads.** Every week of the roll baseline's season, on its squad, each mode's pick against roll's, realised over five GWs:
+  - Future prep's pick gains 1.81 points a week less [-3.41, -0.30], and Ceiling's 2.22 less [-3.97, -0.37]. Now, Long term and Structure are 0.4-0.9 lower (not clear); Funds is +2.2 (not clear). The gap is wider in weeks at the cap.
+  - On that week's projections, over the same five GWs, the modes' picks are also worth less than roll's, except Funds and Structure (-1.4 to -2.1 points). Each mode optimises its own weighted window, and the five-GW yardstick favours a five-GW rule.
+  - So the squad-aware engine, as configured, picks no better than the naive rule on the same squad.
+- **Long term's alternative** (the brief's decay 0.85 over five GWs, as a per-GW average): no different from the preset (+1.2 [-45, +49] on 2025-26, -3.7 pooled). The window length alone is not it.
+- **Ceiling's upper tail** (`engine/ceiling.js`):
+  - A swap at t* is scored by its change to the squad's 90th-percentile score over 500 Monte Carlo draws of the points model's parts. Teammates share team goals. The draws average each player's projected points (tests). Chip-aware, cached for lock and ban re-runs: about 30-60 ms a re-run, and a fresh run about 0.1-0.3 s more.
+  - The card reads "on its 90th percentile" ("on expected points" on the v1 basis). `players[].pP90` gives each owned player's 90th percentile at t*.
+  - Backtest: it costs 70.5 points a season against Ceiling on the mean [-125, -22]. Each squad's five best weeks are no higher (-2.9 [-12, +6]). On 2025-26 it trails the roll baseline by 132 [-218, -45]. As built, the brief's upper tail buys no measurable upside in these seasons; whether Ceiling keeps it is your call.
+  - Mutation check: 17 mutants of the draws, the quantile and the engine hook. 15 fail a test. Of the other two, the vice's armband without his minutes is equivalent (he scores 0); the bonus floor matters only for a negative bonus residual.
+- **Tuning** (2024-25, one value at a time, six modes; a value needed +10 points a season on average over the modes it touches):
+  - Nothing cleared the bar, so the presets stand and `--test-tuned` had nothing to test.
+  - Free-transfer value: x0 +8.0 and x0.5 +8.3, against x2 -10.5 and x3 -19.7. So moves should be cheaper, not dearer: the opposite of 7a's guess.
+  - Threshold: 0.5 gives +6.7 and 1 gives -11.6. Hit margin 0 and 4 both lose (-48, -32), and lambda, tau and decay move within noise.
+  - A single value on a single mode carries an interval of about 56 points either way, so the sweep could see only a large effect.
+- **For your call:**
+  - Ceiling's tail (keep, or back to the mean).
+  - Whether to try five-GW weights for Now or Ceiling. They are presets (Q6), and the same-squad comparison is the evidence against their windows.
+  - A lower free-transfer value (+8, below the bar).
 
 ### Phase 8 (optional): MILP referee
 

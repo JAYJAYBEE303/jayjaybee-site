@@ -507,6 +507,55 @@ test('Ceiling counts the bench in full when Bench Boost is planned for the targe
   close(boosted.perGw[2], 0.4);
 });
 
+/**
+ * Every projection given a draw spec (engine/ceiling.js): each player always
+ * plays 60+ in a fixture of his own, nobody scores and nobody concedes, so his
+ * draws are a fixed 2 (6 for a keeper or defender, 3 for a midfielder) -
+ * unless `scoring` gives his club goals and him a share of them.
+ */
+function withDraws(input, scoring = {}) {
+  const terms = goal => ({ share: 1, goal, assist: 0, defcon: 0, yellow: 0, red: 0, bonus: 0 });
+  const projections = new Map([...input.projections].map(([id, p]) => [id, { ...p, gws: p.gws.map(g => ({
+    ...g,
+    draw: {
+      position: p.position, availability: 1, appear: 1, p60: 1, savesPerXga: 0,
+      bonus: { goal: 0, assist: 0, cleanSheet: 0 },
+      full: terms(scoring[id]?.share ?? 0), short: terms(0),
+      sides: [{ fixtureId: id, teamId: id, opponentId: -id, goalsFor: scoring[id]?.goals ?? 0, goalsAgainst: 0, lambdaAgainst: 0 }],
+    },
+  })) }]));
+  return { ...input, projections };
+}
+
+test('Ceiling\'s upper tail buys the upside: of two forwards, the one a little lower on expected points but far higher at its 90th percentile', () => {
+  // 101 projects 8 and always scores 2; 102 projects 7.9 but takes half of his club's 3 expected goals.
+  const input = withDraws(scenario({ candidates: [
+    { id: 101, position: 'FWD', xip: 8 }, { id: 102, position: 'FWD', xip: 7.9 }] }), { 102: { goals: 3, share: 0.5 } });
+  const tailed = runDecisionEngine(input);
+  assert.equal(tailed.modes.ceiling.call, 'move');
+  assert.equal(tailed.modes.ceiling.root.inId, 102);
+  assert.equal(tailed.modes.ceiling.tail.quantile, 0.9);
+  // The fixed draws make the squad's own tail exact: 6 x 5 (keeper, four defenders) + 3 x 4 + 2 x 2, captain 13's 2 again.
+  assert.equal(tailed.modes.ceiling.tail.squad, 30 + 12 + 4 + 2);
+  assert.equal(playerOf(tailed, 13).pP90, 2);
+
+  const mean = runDecisionEngine(input, { ...DECISION_ENGINE, modes: { ...DECISION_ENGINE.modes,
+    ceiling: { ...DECISION_ENGINE.modes.ceiling, tail: null } } });
+  assert.equal(mean.modes.ceiling.root.inId, 101);
+  assert.equal(mean.modes.ceiling.tail, null);
+  assert.equal(playerOf(mean, 13).pP90, null);
+  // Without draws to read (the v1 basis), the tail stands down.
+  assert.equal(runDecisionEngine(scenario({ candidates: [{ id: 101, position: 'FWD', xip: 8 }] })).modes.ceiling.tail, null);
+});
+
+test('Ceiling\'s tail counts the armband three times under a planned Triple Captain', () => {
+  // The captain's draws vary: club 13 expects 2 goals and he takes all of them.
+  const plain = withDraws(scenario({}), { 13: { goals: 2, share: 1 } });
+  const tc = runDecisionEngine({ ...plain, chipPlan: { [GW]: 'triplecaptain' } }).modes.ceiling.tail.squad;
+  const normal = runDecisionEngine(plain).modes.ceiling.tail.squad;
+  assert.ok(tc > normal, `${tc} under Triple Captain v ${normal}`);
+});
+
 // ─── Mode 6: Structure fix ───────────────────────────────────────────────────
 
 test('Structure reports each starter\'s uncovered loss, summed with its decay', () => {

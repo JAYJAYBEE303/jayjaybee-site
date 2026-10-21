@@ -12,23 +12,32 @@ over 12 starting squads, with a 95% interval
 that resamples the squads and five-week blocks of the season. "better" or
 "worse" only where the interval excludes zero.
 
-In short: against the old engine 0 of 6 modes better and 0 worse; against the roll baseline 0 of 6 modes better and 0 worse; against no transfers 6 of 6 modes better and 0 worse.
+In short: against the old engine 0 of 6 modes better and 0 worse; against the roll baseline 0 of 6 modes better and 1 worse; against no transfers 6 of 6 modes better and 0 worse.
 
-- **Against the old engine:** Now +10.6 [-89.3, +104.2]; Long term +43.7 [-53.2, +134.9]; Future prep +54.0 [-36.9, +142.0]; Funds & flexibility -0.8 [-101.9, +87.2]; Ceiling +23.4 [-73.9, +115.9]; Structure fix +43.8 [-58.7, +146.1].
-- **Against the roll baseline:** Now -53.2 [-137.8, +34.8]; Long term -20.1 [-93.8, +50.0]; Future prep -9.8 [-84.3, +67.8]; Funds & flexibility -64.6 [-161.7, +30.0]; Ceiling -40.3 [-110.2, +31.8]; Structure fix -19.9 [-100.3, +57.1].
-- **Against no transfers:** Now +382.2 [+203.8, +570.9] **better**; Long term +415.3 [+248.5, +608.0] **better**; Future prep +425.6 [+263.4, +621.5] **better**; Funds & flexibility +370.8 [+228.1, +535.6] **better**; Ceiling +395.0 [+233.7, +576.7] **better**; Structure fix +415.4 [+253.9, +599.3] **better**.
+- **Against the old engine:** Now +10.6 [-89.3, +104.2]; Long term +43.7 [-53.2, +134.9]; Future prep +54.0 [-36.9, +142.0]; Funds & flexibility -0.8 [-101.9, +87.2]; Ceiling -68.7 [-156.2, +20.5]; Structure fix +43.8 [-58.7, +146.1].
+- **Against the roll baseline:** Now -53.2 [-137.8, +34.8]; Long term -20.1 [-93.8, +50.0]; Future prep -9.8 [-84.3, +67.8]; Funds & flexibility -64.6 [-161.7, +30.0]; Ceiling -132.4 [-218.0, -44.8] **worse**; Structure fix -19.9 [-100.3, +57.1].
+- **Against no transfers:** Now +382.2 [+203.8, +570.9] **better**; Long term +415.3 [+248.5, +608.0] **better**; Future prep +425.6 [+263.4, +621.5] **better**; Funds & flexibility +370.8 [+228.1, +535.6] **better**; Ceiling +302.9 [+154.6, +486.3] **better**; Structure fix +415.4 [+253.9, +599.3] **better**.
 - With 10-week blocks every verdict stands.
 - **Risk 8, each preset in the other unit, less as written:** longterm (total) -32.6 [-95.6, +22.7]; future (total) -1.0 [-52.7, +46.8]; funds (normalised) -73.5 [-168.5, +11.2]; structure (normalised) +9.3 [-57.0, +79.9].
 
 Both seasons together (2024-25 and 2025-26):
 
-In short: against the old engine 6 of 6 modes better and 0 worse; against the roll baseline 0 of 6 modes better and 0 worse; against no transfers 6 of 6 modes better and 0 worse.
+In short: against the old engine 5 of 6 modes better and 0 worse; against the roll baseline 0 of 6 modes better and 1 worse; against no transfers 6 of 6 modes better and 0 worse.
 
-- **Against the old engine:** Now +142.6 [+52.3, +238.6] **better**; Long term +140.5 [+59.5, +233.3] **better**; Future prep +122.4 [+50.9, +212.8] **better**; Funds & flexibility +100.2 [+6.0, +206.4] **better**; Ceiling +129.2 [+54.3, +211.0] **better**; Structure fix +155.1 [+75.6, +250.1] **better**.
-- **Against the roll baseline:** Now +6.7 [-59.0, +83.7]; Long term +4.5 [-54.4, +68.5]; Future prep -13.5 [-65.7, +38.6]; Funds & flexibility -35.7 [-125.0, +52.4]; Ceiling -6.7 [-60.5, +49.2]; Structure fix +19.2 [-33.9, +73.0].
-- **Against no transfers:** Now +440.0 [+304.5, +584.3] **better**; Long term +437.9 [+316.4, +570.5] **better**; Future prep +419.8 [+301.4, +548.6] **better**; Funds & flexibility +397.6 [+277.2, +523.3] **better**; Ceiling +426.6 [+308.0, +552.8] **better**; Structure fix +452.5 [+341.6, +575.7] **better**.
+- **Against the old engine:** Now +142.6 [+52.3, +238.6] **better**; Long term +140.5 [+59.5, +233.3] **better**; Future prep +122.4 [+50.9, +212.8] **better**; Funds & flexibility +100.2 [+6.0, +206.4] **better**; Ceiling +58.7 [-15.6, +143.6]; Structure fix +155.1 [+75.6, +250.1] **better**.
+- **Against the roll baseline:** Now +6.7 [-59.0, +83.7]; Long term +4.5 [-54.4, +68.5]; Future prep -13.5 [-65.7, +38.6]; Funds & flexibility -35.7 [-125.0, +52.4]; Ceiling -77.3 [-140.7, -13.5] **worse**; Structure fix +19.2 [-33.9, +73.0].
+- **Against no transfers:** Now +440.0 [+304.5, +584.3] **better**; Long term +437.9 [+316.4, +570.5] **better**; Future prep +419.8 [+301.4, +548.6] **better**; Funds & flexibility +397.6 [+277.2, +523.3] **better**; Ceiling +356.1 [+246.5, +475.5] **better**; Structure fix +452.5 [+341.6, +575.7] **better**.
 - With 10-week blocks every verdict stands.
 - **Risk 8, each preset in the other unit, less as written:** longterm (total) -11.1 [-57.4, +35.4]; future (total) +1.2 [-39.3, +37.7]; funds (normalised) -42.7 [-103.8, +13.7]; structure (normalised) -4.1 [-51.3, +44.2].
+
+Several moves a week (each mode asking again on its new squad until it rolls; see below), on 2025-26:
+
+In short: against the old engine 0 of 6 modes better and 0 worse; against roll+ (the roll baseline, several moves a week) 0 of 6 modes better and 0 worse; against no transfers 6 of 6 modes better and 0 worse.
+
+- **Against the old engine:** Now+ +43.2 [-43.3, +131.4]; Long term+ +53.9 [-39.8, +146.0]; Future prep+ +63.8 [-29.3, +163.4]; Funds & flexibility+ +2.2 [-99.0, +99.8]; Ceiling+ -39.9 [-129.8, +48.8]; Structure fix+ +54.9 [-38.2, +151.1].
+- **Against roll+ (the roll baseline, several moves a week):** Now+ -8.9 [-113.9, +108.3]; Long term+ +1.8 [-84.3, +98.9]; Future prep+ +11.7 [-56.2, +98.3]; Funds & flexibility+ -49.9 [-153.9, +55.8]; Ceiling+ -92.0 [-179.2, +6.3]; Structure fix+ +2.8 [-73.2, +85.3].
+- **Against no transfers:** Now+ +414.8 [+247.4, +603.5] **better**; Long term+ +425.5 [+270.3, +604.8] **better**; Future prep+ +435.3 [+256.8, +634.9] **better**; Funds & flexibility+ +373.8 [+223.6, +533.3] **better**; Ceiling+ +331.7 [+171.5, +509.7] **better**; Structure fix+ +426.5 [+261.4, +603.2] **better**.
+- With 10-week blocks these verdicts change: Ceiling+ against roll+ (the roll baseline, several moves a week) (worse).
 
 ## What was run
 
@@ -51,7 +60,8 @@ In short: against the old engine 6 of 6 modes better and 0 worse; against the ro
 - **Policies.** none: no transfers. roll: the free move whose buy out-projects his sale by most over 5 GWs on their
   own points, made when that clears 2 (any gain at the cap), never a hit. old: the old engine at `3aa8f3a`
   (its planner's default GW5 window, budget the bank), its verdict's move. The six modes: the new engine's root move
-  in that mode, and Funds' chained second move.
+  in that mode, and Funds' chained second move; Ceiling on its upper tail (and, as `ceiling (mean)`, on its mean).
+  A name ending + makes several moves a week (below).
 
 ## Season points
 
@@ -68,12 +78,20 @@ Means over the squads.
 | longterm | 2077.8 | 32.1 | 0.0 | 0.0 | 0.0 |
 | future | 2031.4 | 31.0 | 0.0 | 21.4 | 0.0 |
 | funds | 2041.8 | 39.6 | 21.7 | 0.0 | 0.0 |
-| ceiling | 2075.6 | 33.6 | 0.0 | 0.0 | 0.0 |
+| ceiling | 2026.6 | 34.4 | 0.0 | 0.0 | 0.0 |
 | structure | 2107.0 | 33.8 | 0.0 | 0.0 | 0.0 |
 | longterm (total) | 2088.2 | 33.8 | 0.0 | 0.0 | 0.0 |
 | future (total) | 2034.8 | 31.0 | 0.0 | 21.3 | 0.0 |
 | funds (normalised) | 2030.0 | 32.2 | 0.0 | 0.3 | 0.0 |
 | structure (normalised) | 2089.6 | 31.6 | 0.0 | 1.4 | 0.0 |
+| roll+ | 2055.7 | 34.7 | 0.0 | 0.0 | 0.0 |
+| now+ | 2124.7 | 35.0 | 0.7 | 0.0 | 0.0 |
+| longterm+ | 2099.7 | 32.2 | 0.0 | 0.2 | 0.0 |
+| future+ | 2055.1 | 31.0 | 0.0 | 10.8 | 0.0 |
+| funds+ | 2027.8 | 41.5 | 28.7 | 0.0 | 0.0 |
+| ceiling+ | 2040.3 | 37.5 | 10.7 | 0.0 | 0.0 |
+| structure+ | 2046.3 | 39.1 | 19.0 | 0.0 | 0.0 |
+| ceiling (mean) | 2075.6 | 33.6 | 0.0 | 0.0 | 0.0 |
 
 ### 2025-26 (held out)
 
@@ -88,12 +106,20 @@ Means over the squads.
 | longterm | 1902.9 | 33.3 | 0.0 | 23.0 | 0.0 |
 | future | 1913.3 | 32.5 | 0.0 | 24.0 | 0.0 |
 | funds | 1858.4 | 39.4 | 8.3 | 3.7 | 0.0 |
-| ceiling | 1882.7 | 34.6 | 0.0 | 23.0 | 0.0 |
+| ceiling | 1790.6 | 35.0 | 0.0 | 23.0 | 0.0 |
 | structure | 1903.1 | 35.0 | 0.0 | 23.0 | 0.0 |
 | longterm (total) | 1870.3 | 34.8 | 0.0 | 23.0 | 0.0 |
 | future (total) | 1912.3 | 32.1 | 0.0 | 23.8 | 0.0 |
 | funds (normalised) | 1784.9 | 34.4 | 0.0 | 3.8 | 0.0 |
 | structure (normalised) | 1912.3 | 33.3 | 0.0 | 23.0 | 0.0 |
+| roll+ | 1911.3 | 38.3 | 0.0 | 1.0 | 0.0 |
+| now+ | 1902.4 | 37.8 | 0.0 | 1.0 | 0.0 |
+| longterm+ | 1913.2 | 34.9 | 0.0 | 1.0 | 0.0 |
+| future+ | 1923.0 | 33.4 | 0.0 | 15.2 | 0.0 |
+| funds+ | 1861.4 | 43.3 | 21.3 | 1.0 | 0.0 |
+| ceiling+ | 1819.3 | 40.2 | 5.3 | 1.0 | 0.0 |
+| structure+ | 1914.2 | 41.1 | 13.0 | 1.0 | 0.0 |
+| ceiling (mean) | 1882.7 | 34.6 | 0.0 | 23.0 | 0.0 |
 
 ## Paired differences (points a season)
 
@@ -110,7 +136,7 @@ The row's policy less the column's, net of hits, paired by squad and week; 95% i
 | longterm | +415.3 [+248.5, +608.0] **better** | -20.1 [-93.8, +50.0]  | +43.7 [-53.2, +134.9]  |
 | future | +425.6 [+263.4, +621.5] **better** | -9.8 [-84.3, +67.8]  | +54.0 [-36.9, +142.0]  |
 | funds | +370.8 [+228.1, +535.6] **better** | -64.6 [-161.7, +30.0]  | -0.8 [-101.9, +87.2]  |
-| ceiling | +395.0 [+233.7, +576.7] **better** | -40.3 [-110.2, +31.8]  | +23.4 [-73.9, +115.9]  |
+| ceiling | +302.9 [+154.6, +486.3] **better** | -132.4 [-218.0, -44.8] **worse** | -68.7 [-156.2, +20.5]  |
 | structure | +415.4 [+253.9, +599.3] **better** | -19.9 [-100.3, +57.1]  | +43.8 [-58.7, +146.1]  |
 
 ### 2024-25
@@ -124,7 +150,7 @@ The row's policy less the column's, net of hits, paired by squad and week; 95% i
 | longterm | +460.5 [+277.2, +643.5] **better** | +29.2 [-61.4, +142.9]  | +237.3 [+106.3, +397.0] **better** |
 | future | +414.1 [+257.3, +579.5] **better** | -17.3 [-88.8, +52.4]  | +190.8 [+68.9, +349.3] **better** |
 | funds | +424.5 [+227.8, +624.9] **better** | -6.8 [-160.5, +144.4]  | +201.3 [+43.8, +400.0] **better** |
-| ceiling | +458.3 [+282.9, +622.8] **better** | +26.9 [-54.6, +111.8]  | +235.0 [+116.0, +381.4] **better** |
+| ceiling | +409.3 [+249.5, +574.8] **better** | -22.1 [-119.2, +77.7]  | +186.0 [+63.8, +331.6] **better** |
 | structure | +489.7 [+326.4, +647.1] **better** | +58.3 [-8.5, +132.8]  | +266.4 [+147.2, +432.9] **better** |
 
 ### 2024-25 and 2025-26
@@ -138,7 +164,7 @@ The row's policy less the column's, net of hits, paired by squad and week; 95% i
 | longterm | +437.9 [+316.4, +570.5] **better** | +4.5 [-54.4, +68.5]  | +140.5 [+59.5, +233.3] **better** |
 | future | +419.8 [+301.4, +548.6] **better** | -13.5 [-65.7, +38.6]  | +122.4 [+50.9, +212.8] **better** |
 | funds | +397.6 [+277.2, +523.3] **better** | -35.7 [-125.0, +52.4]  | +100.2 [+6.0, +206.4] **better** |
-| ceiling | +426.6 [+308.0, +552.8] **better** | -6.7 [-60.5, +49.2]  | +129.2 [+54.3, +211.0] **better** |
+| ceiling | +356.1 [+246.5, +475.5] **better** | -77.3 [-140.7, -13.5] **worse** | +58.7 [-15.6, +143.6]  |
 | structure | +452.5 [+341.6, +575.7] **better** | +19.2 [-33.9, +73.0]  | +155.1 [+75.6, +250.1] **better** |
 
 ## The moves
@@ -159,12 +185,20 @@ neighbouring weeks), so they are narrower than the truth; the paired season tota
 | longterm | 784 | +2.59 [+2.14, +3.06] | +4.65 [+3.89, +5.44] | +5.04 [+4.05, +6.03] | 6.34 | 1.02 [0.55, 1.49] | 4.47 | 0 | - | 5.04 |
 | future | 762 | +1.82 [+1.34, +2.29] | +3.34 [+2.60, +4.12] | +3.91 [+2.93, +4.91] | 6.35 | 1.41 [0.96, 1.79] | 4.57 | 0 | - | 3.91 |
 | funds | 759 | +1.59 [+1.11, +2.07] | +3.27 [+2.44, +4.08] | +3.25 [+2.21, +4.30] | 6.35 | 1.14 [0.77, 1.45] | 6.09 | 0 | - | 2.00 |
-| ceiling | 818 | +2.91 [+2.46, +3.38] | +4.51 [+3.82, +5.16] | +4.40 [+3.48, +5.27] | 6.09 | 0.58 [0.37, 0.79] | 4.82 | 0 | - | 4.40 |
+| ceiling | 833 | +2.10 [+1.68, +2.54] | +3.46 [+2.75, +4.16] | +3.66 [+2.76, +4.56] | 5.44 | 0.83 [0.60, 1.06] | 4.67 | 0 | - | 3.66 |
 | structure | 825 | +2.29 [+1.84, +2.75] | +4.08 [+3.32, +4.80] | +4.49 [+3.52, +5.42] | 6.02 | 1.03 [0.63, 1.46] | 4.68 | 0 | - | 4.49 |
 | longterm (total) | 823 | +2.36 [+1.90, +2.80] | +4.28 [+3.56, +5.03] | +4.23 [+3.31, +5.18] | 6.26 | 1.05 [0.67, 1.43] | 4.78 | 0 | - | 4.23 |
 | future (total) | 757 | +1.51 [+1.11, +1.93] | +2.84 [+2.14, +3.54] | +3.38 [+2.52, +4.26] | 6.09 | 0.83 [0.58, 1.07] | 4.88 | 0 | - | 3.38 |
 | funds (normalised) | 648 | +2.30 [+1.77, +2.88] | +4.53 [+3.67, +5.46] | +4.70 [+3.50, +5.92] | 7.34 | 1.03 [0.70, 1.39] | 5.43 | 0 | - | 3.81 |
 | structure (normalised) | 778 | +2.89 [+2.39, +3.40] | +4.22 [+3.45, +4.99] | +4.53 [+3.58, +5.54] | 6.41 | 1.39 [0.96, 1.78] | 4.88 | 0 | - | 4.53 |
+| roll+ | 818 | +1.49 [+1.10, +1.90] | +2.75 [+2.08, +3.43] | +3.49 [+2.61, +4.38] | 5.64 | 0.85 [0.59, 1.13] | 4.72 | 0 | - | 3.26 |
+| now+ | 726 | +4.77 [+4.15, +5.39] | +5.84 [+4.96, +6.78] | +6.07 [+4.94, +7.21] | 6.58 | 0.72 [0.48, 1.00] | 4.35 | 0 | - | 5.03 |
+| longterm+ | 644 | +3.31 [+2.74, +3.93] | +6.09 [+5.18, +7.07] | +6.95 [+5.74, +8.22] | 7.96 | 1.07 [0.70, 1.42] | 4.80 | 0 | - | 5.56 |
+| future+ | 608 | +1.84 [+1.30, +2.41] | +3.84 [+2.85, +4.77] | +5.45 [+4.16, +6.72] | 8.13 | 0.95 [0.66, 1.25] | 4.69 | 0 | - | 4.29 |
+| funds+ | 749 | +1.19 [+0.73, +1.65] | +3.46 [+2.60, +4.31] | +4.11 [+2.92, +5.24] | 6.67 | 0.92 [0.67, 1.12] | 5.56 | 0 | - | 2.23 |
+| ceiling+ | 818 | +1.93 [+1.47, +2.40] | +3.52 [+2.70, +4.26] | +3.89 [+2.87, +4.92] | 5.63 | 1.11 [0.90, 1.32] | 4.58 | 0 | - | 2.88 |
+| structure+ | 769 | +1.87 [+1.37, +2.38] | +2.92 [+2.19, +3.71] | +3.51 [+2.55, +4.52] | 6.51 | 0.85 [0.65, 1.02] | 5.03 | 0 | - | 2.15 |
+| ceiling (mean) | 818 | +2.91 [+2.46, +3.38] | +4.51 [+3.82, +5.16] | +4.40 [+3.48, +5.27] | 6.09 | 0.58 [0.37, 0.79] | 4.82 | 0 | - | 4.40 |
 
 ## Risk 8: the mixed weight units
 
@@ -192,6 +226,101 @@ difference" is not "no difference":
 | funds (normalised) | -42.7 [-103.8, +13.7]  |
 | structure (normalised) | -4.1 [-51.3, +44.2]  |
 
+## Several moves a week
+
+Each mode, and the roll baseline, made a pick and then asked again on the new squad with one free transfer
+fewer, until it rolled (at most 5 a week): the planner's cards used one after another. The engine's own
+costs stop it - the free transfer's value, then the hit and its margin - so banked free transfers, and hits, come
+into play (roll+ never takes a hit). Points a season:
+
+### 2025-26
+
+| policy | less its one-move version | less roll+ | less the old engine |
+|---|---|---|---|
+| roll+ | -11.7 [-66.0, +37.9] |  | +52.1 [-52.4, +158.1] |
+| now+ | +32.6 [-29.1, +106.2] | -8.9 [-113.9, +108.3] | +43.2 [-43.3, +131.4] |
+| longterm+ | +10.3 [-49.4, +69.0] | +1.8 [-84.3, +98.9] | +53.9 [-39.8, +146.0] |
+| future+ | +9.8 [-42.3, +58.7] | +11.7 [-56.2, +98.3] | +63.8 [-29.3, +163.4] |
+| funds+ | +3.0 [-60.3, +63.6] | -49.9 [-153.9, +55.8] | +2.2 [-99.0, +99.8] |
+| ceiling+ | +28.8 [-37.3, +95.8] | -92.0 [-179.2, +6.3] | -39.9 [-129.8, +48.8] |
+| structure+ | +11.1 [-65.9, +98.4] | +2.8 [-73.2, +85.3] | +54.9 [-38.2, +151.1] |
+
+### 2024-25 and 2025-26
+
+| policy | less its one-move version | less roll+ | less the old engine |
+|---|---|---|---|
+| roll+ | -2.3 [-29.3, +23.9] |  | +133.6 [+46.5, +224.8] **better** |
+| now+ | +21.0 [-20.2, +63.5] | +30.0 [-43.5, +109.7] | +163.6 [+70.5, +260.2] **better** |
+| longterm+ | +16.0 [-26.5, +58.8] | +22.9 [-39.8, +94.3] | +156.5 [+77.8, +246.1] **better** |
+| future+ | +16.7 [-15.6, +48.7] | +5.5 [-45.1, +64.1] | +139.1 [+59.6, +228.6] **better** |
+| funds+ | -5.5 [-52.0, +39.8] | -38.9 [-126.2, +44.5] | +94.7 [+5.9, +191.3] **better** |
+| ceiling+ | +21.2 [-18.2, +62.9] | -53.7 [-112.6, +12.0] | +79.9 [-3.0, +169.9] |
+| structure+ | -24.8 [-76.3, +30.6] | -3.3 [-54.3, +52.5] | +130.3 [+53.7, +218.0] **better** |
+
+## Which move, on the same squads
+
+The verdict above mixes which move is made with whether one is made, and each policy's squad drifts its own way.
+Here every week of the roll baseline's season, on roll's squad, each mode was asked for its one-move pick, and both
+picks were scored over the next five GWs against keeping the squad (a roll scores 0). Per week; the interval
+resamples squads and five-week blocks, both seasons. Expected (V) and own projected points: the same difference on
+that week's projections, by the engine's measure and by roll's.
+
+| mode | weeks | same pick as roll | its pick less roll's, realised over 5 GWs | below the cap | at the cap | expected (V) | own projected points |
+|---|---|---|---|---|---|---|---|
+| Now | 840 | 20% | -0.53 [-2.30, +1.48] | -0.30 | -1.00 | -1.66 | -3.79 |
+| Long term | 840 | 26% | -0.87 [-2.39, +0.53] | -0.77 | -1.08 | -1.39 | -3.63 |
+| Future prep | 840 | 25% | -1.81 [-3.41, -0.30] **worse** | -1.15 | -3.14 | -1.59 | -3.88 |
+| Funds & flexibility | 840 | 14% | +2.20 [-0.97, +6.18] | +1.94 | +2.72 | +2.19 | +0.82 |
+| Ceiling | 840 | 13% | -2.22 [-3.97, -0.37] **worse** | -1.33 | -4.03 | -2.06 | -4.69 |
+| Structure fix | 840 | 52% | -0.43 [-1.65, +0.89] | -0.10 | -1.11 | +0.49 | -0.97 |
+
+## Ceiling's upper tail
+
+Ceiling now scores a swap at its target GW by the change to the squad's 90th-percentile score over Monte Carlo draws
+of the points model's parts (engine/ceiling.js), not by its expected points. Less Ceiling on the mean, both seasons:
+
+- Season points: -70.5 [-125.4, -21.8] - worse.
+- Each squad's 5 best weeks: -2.9 [-11.6, +5.5] - no clear difference (squad-seasons resampled).
+
+## Tuning: chosen on 2024-25, tested on 2025-26
+
+Each value below replaced its preset alone, one move a week, on 2024-25; the gain is the paired season
+difference against the presets as written, averaged over the modes it touches (each mode's own in the last
+column). A value is chosen if its gain is at least 10 points a season. The mode weights are not tuned (Q6).
+For scale, one value on one mode carries a 95% interval of about 56.1 points either way (the median over
+the sweep), so the sweep can show only a large effect.
+
+| parameter | value | modes | mean gain | per mode |
+|---|---|---|---|---|
+| free-transfer value | x0 | Now, Long term, Future prep, Funds & flexibility, Ceiling, Structure fix | +8.0 | +13, +20, +11, -7, +1, +10 |
+| free-transfer value | x0.5 | Now, Long term, Future prep, Funds & flexibility, Ceiling, Structure fix | +8.3 | +13, +25, +11, -1, -5, +7 |
+| free-transfer value | x2 | Now, Long term, Future prep, Funds & flexibility, Ceiling, Structure fix | -10.5 | -30, -2, +7, +6, -26, -18 |
+| free-transfer value | x3 | Now, Long term, Future prep, Funds & flexibility, Ceiling, Structure fix | -19.7 | -22, -15, -15, -8, -32, -26 |
+| threshold | 0.5 | Now, Long term, Future prep, Funds & flexibility, Ceiling, Structure fix | +6.7 | -14, +26, +42, -2, -15, +2 |
+| threshold | 1 | Now, Long term, Future prep, Funds & flexibility, Ceiling, Structure fix | -11.6 | -30, -25, +19, +8, -15, -27 |
+| hit margin | 0 | Funds & flexibility | -47.8 | -48 |
+| hit margin | 4 | Funds & flexibility | -31.5 | -32 |
+| lambda | x0 | Long term, Future prep, Funds & flexibility, Structure fix | +3.1 | -10, +10, +5, +7 |
+| lambda | x2 | Long term, Future prep, Funds & flexibility, Structure fix | -6.0 | -8, +7, +4, -27 |
+| tau | 0.5 | Funds & flexibility | +1.8 | +2 |
+| tau | 2 | Funds & flexibility | +0.0 | +0 |
+| decay | 0.7 | Funds & flexibility | -6.8 | -7 |
+| decay | 1 | Funds & flexibility | -27.7 | -28 |
+
+Chosen: nothing clears the bar; the presets stand.
+
+## Long term's alternative: decay 0.85 over five GWs
+
+The brief gives Long term "[1,1,1,0,0] / 3, or decay 0.85"; the preset is the first (Q6). The second, as a per-GW
+average like the first, run on the same squads (points a season):
+
+| seasons | moves a week | less the preset as written | less the roll baseline |
+|---|---|---|---|
+| 2025-26 | one move | +1.2 [-44.8, +48.6] | -18.9 [-87.8, +54.2] |
+| 2025-26 | several | -14.3 [-74.9, +42.0] | -24.1 [-94.1, +52.7] |
+| 2024-25 and 2025-26 | one move | -3.7 [-55.9, +43.9] | +0.8 [-48.5, +54.4] |
+| 2024-25 and 2025-26 | several | -14.8 [-59.0, +26.7] | +5.8 [-44.9, +63.5] |
+
 ## Sensitivity: the final schedule
 
 The same runs with vaastav's final schedule, which knows every blank and double from the start (more than a manager
@@ -206,7 +335,7 @@ knew; the schedule as it stood knows less). Both seasons:
 | longterm | +437.1 [+321.6, +557.9] **better** | -21.2 [-85.7, +36.8]  | +103.5 [+19.9, +192.5] **better** |
 | future | +441.1 [+317.8, +566.9] **better** | -17.2 [-70.8, +35.3]  | +107.5 [+28.0, +197.6] **better** |
 | funds | +396.6 [+275.4, +524.7] **better** | -61.7 [-150.0, +30.0]  | +63.0 [-31.4, +169.0]  |
-| ceiling | +411.6 [+290.9, +539.0] **better** | -46.7 [-119.3, +26.7]  | +78.0 [-12.0, +181.2]  |
+| ceiling | +336.3 [+224.3, +454.5] **better** | -122.0 [-191.5, -53.0] **worse** | +2.8 [-78.8, +94.9]  |
 | structure | +449.8 [+332.8, +577.0] **better** | -8.5 [-61.9, +44.8]  | +116.3 [+39.7, +204.2] **better** |
 
 ## The old engine
@@ -230,4 +359,4 @@ were computed as its planner did, though no chip was played.
   hit except Funds' second move.
 - A player whose club has no fixture in a week has no vaastav row for it, so his price that week is his last one.
 
-Worker time: 232.8 minutes over 48 tasks.
+Worker time: 442.9 minutes over 48 tasks.

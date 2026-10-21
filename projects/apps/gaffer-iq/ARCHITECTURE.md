@@ -122,6 +122,7 @@ jayjaybee-site/                   ← repo root (not Gaffer IQ's concern)
             │   ├── price-adapter.js
             │   ├── points.js
             │   ├── team-goals.js
+            │   ├── ceiling.js
             │   ├── projections.js
             │   ├── squad-value.js
             │   ├── decision.js
@@ -214,6 +215,8 @@ gaffer-iq/                          (= projects/gaffer-iq/ in the repo)
     │   │                       #   plays, part by part under FPL's rules (tools/points).
     │   ├── team-goals.js       # Each club's expected goals for and against a fixture, from its
     │   │                       #   players' season xG / xGC and last season's rating.
+    │   ├── ceiling.js          # Ceiling's upper tail: Monte Carlo draws of a GW's points from the
+    │   │                       #   points model's parts (teammates share team goals); squad quantiles.
     │   ├── projections.js      # Per player, per GW of the horizon: xpts, pZero, xptsIfPlays,
     │   │                       #   pStart, p60 - the decision engine's data contract.
     │   ├── squad-value.js      # V_t(S): best XI + captain + expected autosubs (+ Bench Boost).

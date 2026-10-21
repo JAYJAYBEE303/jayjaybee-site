@@ -37,6 +37,7 @@ import { calcPlaytimeSecurity } from './form.js';
 import { excusedAbsence, minutesFeatures, selectionChances } from './minutes.js';
 import { fixturePoints, playerRates } from './points.js';
 import { fixtureGoals, teamRates, teamStrengths } from './team-goals.js';
+import { drawSpec } from './ceiling.js';
 
 /**
  * @typedef {object} GwProjection
@@ -48,7 +49,9 @@ import { fixtureGoals, teamRates, teamStrengths } from './team-goals.js';
  * @property {number}  p60           chance he plays 60 minutes or more (brief: p_60)
  * @property {boolean} p60Approx     the v1 rates stood in: p60 is pStart x completion
  * @property {number}  xptsIfPlays   expected points given he plays (brief: xpts_if_plays)
- * @property {number|null} pP90      upper-tail points, null until Phase 7
+ * @property {number|null} pP90      upper-tail points: null here; Ceiling reads each player's 90th
+ *   percentile from its draws for the target GW (engine/ceiling.js, DecisionResult players[].pP90)
+ * @property {object|null} draw      what those draws come from (ceiling.js drawSpec); null on the v1 basis
  * @property {boolean} estimated     his chances came from season totals or the price prior
  * @property {number}  availability  chance he is fit and permitted to play, 0-1 - apart
  *   from rotation, which pZero also carries (a fit squad player is available but may not play)
@@ -127,16 +130,23 @@ function projectGw(player, gw, k, rates, chances, fixtures, ctxForGw, scorePlaye
   const available = availability(player, k);
   const appearRate = chances ? chances.appear : rates.appearRate;
   const startRate  = chances ? chances.start : rates.startRate;
+  const p60Rate = chances ? chances.p60 : rates.startRate * rates.completion;
   const base = {
     gw, fixtures, pP90: null, p60Approx: !chances, estimated: !chances && rates.estimated,
     availability: available.value, availabilitySource: available.source,
+    // What Ceiling's Monte Carlo draws this week from (engine/ceiling.js); null on the v1 basis.
+    draw: parts?.rates ? drawSpec(parts.rates, parts.sides, parts.model, {
+      availability: available.value, appear: appearRate,
+      p60: appearRate > 0 ? clamp(0, 1, p60Rate / appearRate) : 0,
+      haircut: fixtures > 0 ? fixtureCountFactor(fixtures) / fixtures : 0,
+    }) : null,
   };
   if (fixtures === 0) {
     return { ...base, xpts: 0, pStart: 0, pZero: 1, p60: 0, xptsIfPlays: 0 };
   }
 
   const xptsIfAvailable = parts
-    ? partsPoints(parts, appearRate, chances ? chances.p60 : rates.startRate * rates.completion, fixtures)
+    ? partsPoints(parts, appearRate, p60Rate, fixtures)
     : v1Points(player, k, appearRate * rates.ppa, fixtures, ctxForGw, scorePlayerFn);
 
   // Availability is shared by the fixtures of a double; selection is per fixture.
@@ -231,8 +241,8 @@ function fixtureGoalsByTeam(players, ctx, gws, ctxByGw, model, scoreFixtureFn) {
     const plain = fixtureGoals(strengths, f.homeTeamId, f.awayTeamId, model.teams);
     const home = rated(f.homeTeamId, f, plain.home);
     const away = rated(f.awayTeamId, f, plain.away);
-    add(f.homeTeamId, f.gw, { lambdaFor: home, lambdaAgainst: away });
-    add(f.awayTeamId, f.gw, { lambdaFor: away, lambdaAgainst: home });
+    add(f.homeTeamId, f.gw, { fixtureId: f.id, teamId: f.homeTeamId, opponentId: f.awayTeamId, lambdaFor: home, lambdaAgainst: away });
+    add(f.awayTeamId, f.gw, { fixtureId: f.id, teamId: f.awayTeamId, opponentId: f.homeTeamId, lambdaFor: away, lambdaAgainst: home });
   }
   return { rates, byTeam };
 }
