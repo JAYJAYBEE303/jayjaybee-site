@@ -169,10 +169,14 @@ gaffer-iq/                          (= projects/gaffer-iq/ in the repo)
 ├── tools/                      # Offline Node scripts. Never loaded by the app.
 │   ├── minutes/                # Fits the minutes model and writes REPORT.md (download.js,
 │   │                           #   fit.js; lib.js holds the maths). data/ is gitignored.
-│   ├── backtest/               # vaastav's past seasons (download.js; data/ is gitignored) and
-│   │                           #   history.js: each season as it stood before a planning GW.
+│   ├── backtest/               # vaastav's past seasons (download.js; data/ is gitignored);
+│   │                           #   history.js: each season, and its fixture schedule, as it
+│   │                           #   stood before a planning GW; run.js: the decision backtest
+│   │                           #   (lib.js simulates a season), written to
+│   │                           #   docs/decision-engine-backtest.md.
 │   └── points/                 # Fits the points model and scores it on a held-out season;
-│                               #   writes REPORT.md (fit.js; lib.js holds the maths).
+│                               #   writes REPORT.md (fit.js; model.js builds the model,
+│                               #   lib.js holds the maths).
 │
 └── js/
     ├── main.js                 # ENTRY POINT (ESM). Imports modules, reads URL hash to

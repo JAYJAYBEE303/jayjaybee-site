@@ -1514,6 +1514,7 @@ export const DECISION_ENGINE = {
       priorMatches: 32,
       homeAdvantage: 1.102,
       promoted: { attack: 0.6956, defence: 1.29 },
+      priorRegression: 0.5,
     },
     teamPriors: {
       1: { attack: 1.107, defence: 0.9568 },

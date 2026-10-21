@@ -28,11 +28,9 @@ import { normaliseSeason } from '../../js/engine/normalise.js';
 import { buildScoreContext, scoreFixture } from '../../js/engine/composite.js';
 import { buildProjections } from '../../js/engine/projections.js';
 import { teamRates, teamStrengths, fixtureGoals } from '../../js/engine/team-goals.js';
-import { actualPoints, gwTablesBefore, loadSeason, rawSeasonAt, totalsBefore } from '../backtest/history.js';
-import {
-  appearanceConstants, blockBootstrap, fitBonus, fitDefconDispersion, fitPriors, leagueConstants, promotedPrior,
-  seasonTeamRatings, summarise, teamPriors, windowErrors,
-} from './lib.js';
+import { actualPoints, gwTablesBefore, loadSeason, rawSeasonAt } from '../backtest/history.js';
+import { blockBootstrap, promotedPrior, summarise, windowErrors } from './lib.js';
+import { constantsFrom, defconBefore, modelOf, POSITIONS } from './model.js';
 
 const DECISIONS = range(4, 34);          // planning gameweeks; each scores its five-gameweek window
 const WINDOW = 5;
@@ -55,7 +53,6 @@ const RATING_WEIGHTS = [-0.4, -0.2, 0, 0.1, 0.2, 0.3, 0.4, 0.6, 0.8, 1];
 const RATING_MATERIAL = 0.001;
 const PASSES = 2;
 const LITERAL_WIDTH = 100;               // the config block keeps an object this short on one line
-const POSITIONS = ['GKP', 'DEF', 'MID', 'FWD'];
 
 function range(from, to) {
   return Array.from({ length: to - from + 1 }, (_, i) => from + i);
@@ -77,60 +74,6 @@ function contexts(season, { hindsight = false } = {}) {
       cache.set(t, { s, ctx, gwTable: gwTablesBefore(season, t), population: [...recent].filter(id => s.playersById[id]) });
     }
     return cache.get(t);
-  };
-}
-
-// ─── The constants, the priors and the model ─────────────────────────────────
-
-/** A season's end-of-season totals with club ids made unique across seasons, and its clubs' rates. */
-function seasonTotals(season) {
-  const key = id => `${season.name}:${id}`;
-  const totals = [...totalsBefore(season, SEASON_GWS + 1).values()].map(t => ({ ...t, teamId: key(t.teamId) }));
-  const clubs = teamRates(totals.map(t => ({ teamId: t.teamId, totals: { minutes: t.minutes, xG: t.xg, xGC: t.xgc } })));
-  return { totals, clubs };
-}
-
-function constantsFrom(train) {
-  const rows = train.flatMap(s => s.rows);
-  const pooled = train.map(seasonTotals);
-  const clubs = new Map(pooled.flatMap(p => [...p.clubs]));
-  return {
-    ...appearanceConstants(rows),
-    bonus: fitBonus(rows),
-    priors: fitPriors(pooled.flatMap(p => p.totals), clubs),
-    defconDispersion: fitDefconDispersion(rows),
-    ...leagueConstants(train),
-  };
-}
-
-/** Defensive contributions' prior lines and spread from a season's rows before a gameweek. */
-function defconBefore(season, gw) {
-  const before = { ...season, rows: season.rows.filter(r => r.gw < gw) };
-  const { totals, clubs } = seasonTotals(before);
-  const priors = fitPriors(totals, clubs);
-  return {
-    dispersion: fitDefconDispersion(before.rows),
-    lines: Object.fromEntries(POSITIONS.map(p => [p, priors[p].defconPer90])),
-  };
-}
-
-function modelOf(constants, hyper, { previous, promoted, defcon = null }) {
-  return {
-    goalsPerXg: constants.goalsPerXg,
-    assistsPerXa: constants.assistsPerXa,
-    minutesIfFull: constants.minutesIfFull,
-    minutesIfShort: constants.minutesIfShort,
-    defconDispersion: defcon ? defcon.dispersion : constants.defconDispersion,
-    bonus: constants.bonus,
-    priors: Object.fromEntries(POSITIONS.map(p => [p, {
-      ...constants.priors[p], ...(defcon ? { defconPer90: defcon.lines[p] } : {}),
-    }])),
-    priorWeight: { share: hyper.share, per90: hyper.per90, saves: hyper.saves },
-    teams: {
-      leagueXg: constants.leagueXg, priorMatches: hyper.priorMatches, homeAdvantage: constants.homeAdvantage, promoted,
-    },
-    teamPriors: teamPriors(seasonTeamRatings(previous), hyper.regression),
-    fixtureRating: { weight: hyper.rating ?? 0 },
   };
 }
 

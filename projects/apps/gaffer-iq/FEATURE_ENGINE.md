@@ -1275,6 +1275,12 @@ Each run's top three moves per mode score 3, 2 and 1. A move's robustness is its
 
 The re-runs buy only from a shortlist: each mode's ten best moves, Funds' chained second buys, and each player's best replacement at Ceiling's target week. So they cost a fraction of thirty full runs. They run in a module worker once the cards have painted; a lock, ban or setting stops them and starts again on the new result. The noise sizes are untuned (`robustnessNoise`, Phase 7).
 
+### 14.5 How the advice was tested (`tools/backtest/run.js`)
+
+The decision backtest replays 2024-25 and 2025-26. Each policy manages its own squad from GW4 to GW38: no transfers, a naive roll rule, the old engine, and the new engine in each mode. Every week is decided on what was known before its deadline, including the fixture schedule as it stood, and scored on the points actually scored, with FPL's autosubs, hits and sell prices. `docs/decision-engine-backtest.md` holds the results, paired by squad and week with bootstrap intervals.
+
+On 2025-26, the held-out season, no mode clearly beats or trails the old engine or the roll rule. Every mode beats making no transfers by about 400 points a season. Over both seasons, every mode beats the old engine; the roll rule, which uses the same projections, does too, so most of that gain comes from the projections. The mixed weight units of plan risk 8 cost no points the backtest can see. Every policy moves almost every week, and the projections overstate a move's gain, so the free-transfer value and thresholds are the first things to tune (Phase 7b).
+
 ---
 
 ## 15. Full Season strip (`engine/season.js`)

@@ -9,7 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  parseSeason, totalsBefore, gwTablesBefore, actualPoints, fixturesIn, rawSeasonAt,
+  parseSeason, totalsBefore, gwTablesBefore, actualPoints, fixturesIn, rawSeasonAt, scheduleAt,
 } from '../../tools/backtest/history.js';
 import { normaliseSeason } from '../../js/engine/normalise.js';
 
@@ -104,4 +104,48 @@ test('with hindsight, rawSeasonAt uses vaastav\'s end-of-season difficulty ratin
   const raw = rawSeasonAt(s, 3, { hindsight: true });
   assert.deepEqual([raw.fixtures[0].team_h_difficulty, raw.fixtures[0].team_a_difficulty], [2, 4]);
   assert.deepEqual(raw.bootstrap.teams.map(team => team.strength), [5, 4]);
+});
+
+// ─── The schedule as it stood (Phase 7) ──────────────────────────────────────
+
+test('a fixture sits in its original GW (from its id order) until that GW passes without it or its new GW arrives', () => {
+  // Two clubs, so one fixture a GW: ids 10, 20, 30, 31 were GWs 1-4, and 31 was brought forward into GW3.
+  const s = season();
+  assert.deepEqual([...scheduleAt(s, 2)], [[10, 1], [20, 2], [30, 3], [31, 4]]);
+  assert.deepEqual(scheduleAt(s, 3).get(31), 3);
+  // Id 2 was GW2's, postponed into GW3: GW2 blanks only once it has come.
+  const postponed = parseSeason({
+    teams: TEAMS,
+    fixtures: 'id,event,kickoff_time,team_h,team_a,team_h_score,team_a_score\n'
+      + '1,1,2025-08-16T14:00:00Z,1,2,1,0\n2,3,2025-08-26T19:00:00Z,2,1,0,0\n3,3,2025-08-30T14:00:00Z,1,2,2,2\n',
+    mergedGw: [HEADER, ...ROWS].join('\n'),
+  });
+  assert.deepEqual([scheduleAt(postponed, 2).get(2), scheduleAt(postponed, 3).get(2), scheduleAt(postponed, 4).get(2)], [2, 3, 3]);
+  // Postponed from GW2 to GW4: between the two it has no date (its new one was not yet known).
+  const gap = parseSeason({
+    teams: TEAMS,
+    fixtures: 'id,event,kickoff_time,team_h,team_a,team_h_score,team_a_score\n'
+      + '1,1,2025-08-16T14:00:00Z,1,2,1,0\n2,4,2025-09-16T19:00:00Z,2,1,0,0\n'
+      + '3,3,2025-08-30T14:00:00Z,1,2,2,2\n4,4,2025-09-13T14:00:00Z,2,1,1,1\n',
+    mergedGw: [HEADER, ...ROWS].join('\n'),
+  });
+  assert.deepEqual([2, 3, 4, 5].map(t => scheduleAt(gap, t).get(2)), [2, null, 4, 4]);
+  const undated = rawSeasonAt(gap, 3, { schedule: 'asItStood' }).fixtures.find(f => f.id === 2);
+  assert.deepEqual([undated.event, undated.finished, undated.team_h_score], [null, false, null]);
+});
+
+test('rawSeasonAt serves the schedule as it stood when asked, and the final one by default', () => {
+  const s = season();
+  const at = (gw, schedule) => rawSeasonAt(s, gw, { schedule }).fixtures.find(f => f.id === 31);
+  assert.deepEqual([at(2, 'asItStood').event, at(2).event, at(3, 'asItStood').event], [4, 3, 3]);
+  const moved = rawSeasonAt(s, 4, { schedule: 'asItStood' }).fixtures.find(f => f.id === 31);
+  assert.deepEqual([moved.event, moved.finished, moved.team_h_score], [3, true, 1]);
+  assert.throws(() => rawSeasonAt(s, 2, { schedule: 'later' }), /schedule/);
+});
+
+test('each row keeps how many managers owned him at that GW', () => {
+  const header = `${HEADER},selected`;
+  const s = parseSeason({ teams: TEAMS, fixtures: FIXTURES, mergedGw: [header, `${ROWS[0]},123456`].join('\n') });
+  assert.equal(s.rows[0].selected, 123456);
+  assert.equal(season().rows[0].selected, 0);
 });

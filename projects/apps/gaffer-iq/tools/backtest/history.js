@@ -12,7 +12,7 @@
  * moved into a double sits in its final gameweek from the start, so every
  * planning gameweek sees the season's blanks and doubles. Harmless when every
  * model replayed sees the same schedule (Phase 6b); the decision backtest
- * (Phase 7) needs the schedule as it stood.
+ * (Phase 7) asks for the schedule as it stood (scheduleAt).
  */
 
 import { readFile } from 'node:fs/promises';
@@ -74,6 +74,8 @@ export function parseSeason({ teams, fixtures, mergedGw }) {
       element: Number(r.element), name: r.name, position, teamId: idByName.get(r.team),
       opponentId: Number(r.opponent_team), home: r.was_home === 'True', fixture: Number(r.fixture),
       gw: Number(r.GW ?? r.round), priceTenths: Number(r.value), fplXp: number(r.xP),
+      // Managers who owned him at that GW's deadline: not a total, so kept out of COUNTS.
+      selected: number(r.selected),
     };
     for (const [key, column] of Object.entries(COUNTS)) row[key] = number(r[column]);
     rows.push(row);
@@ -148,17 +150,45 @@ export function fixturesIn(season, from, to) {
 }
 
 /**
+ * Each fixture's gameweek as the schedule stood before a planning gameweek's
+ * deadline. FPL numbers a season's fixtures in their original order, a
+ * gameweek's worth at a time (vaastav's seasons bear it out: every fixture out
+ * of its original gameweek is a known postponement or move), so a fixture's
+ * original gameweek is its place in id order. It sits there until its new
+ * gameweek arrives, or until that gameweek passes without it, after which it
+ * has no date (null, as FPL shows a postponement) until the new one arrives.
+ * That knows less than a manager did: planned blanks and doubles were
+ * announced weeks ahead, which the final schedule (rawSeasonAt's default)
+ * overstates.
+ *
+ * @returns {Map<number, number|null>}  fixture id -> gameweek, in id order
+ */
+export function scheduleAt(season, gw) {
+  const perGw = season.teams.length / 2;
+  const byId = [...season.fixtures].sort((a, b) => a.id - b.id);
+  return new Map(byId.map((f, rank) => {
+    const original = Math.floor(rank / perGw) + 1;
+    if (gw >= f.gw) return [f.id, f.gw];
+    return [f.id, gw > original ? null : original];
+  }));
+}
+
+/**
  * The season as FPL would have served it before a planning gameweek's
  * deadline: bootstrap-static and fixtures/ JSON, for normaliseSeason. Results
  * only for earlier gameweeks; every player's totals from before it, at his
  * club and price then; everyone available (no history of flags exists).
  * vaastav keeps only end-of-season difficulty ratings and club strengths, so
  * without `hindsight` every fixture and club reads neutral; with it they are
- * the season's final values, which flatter whatever reads them.
+ * the season's final values, which flatter whatever reads them. The schedule
+ * is the season's final one unless `schedule` is 'asItStood' (scheduleAt); a
+ * fixture shown in its original gameweek keeps its final kickoff time.
  *
  * @returns {{bootstrap: object, fixtures: object[]}}
  */
-export function rawSeasonAt(season, gw, { hindsight = false } = {}) {
+export function rawSeasonAt(season, gw, { hindsight = false, schedule = 'final' } = {}) {
+  if (schedule !== 'final' && schedule !== 'asItStood') throw new Error(`rawSeasonAt: unknown schedule ${schedule}`);
+  const gwOf = schedule === 'asItStood' ? scheduleAt(season, gw) : new Map(season.fixtures.map(f => [f.id, f.gw]));
   const teams = season.teams.map(t => ({
     id: t.id, name: t.name, short_name: t.shortName, code: t.code,
     ...Object.fromEntries(STRENGTHS.map(k => [k, hindsight && t.strengths[k] !== undefined
@@ -182,9 +212,10 @@ export function rawSeasonAt(season, gw, { hindsight = false } = {}) {
     finished: id < gw, data_checked: id < gw, is_current: id === gw - 1, is_next: id === gw, average_entry_score: 0,
   }));
   const fixtures = season.fixtures.map(f => {
-    const played = f.gw < gw;
+    const event = gwOf.get(f.id);
+    const played = event !== null && event < gw;
     return {
-      id: f.id, event: f.gw, kickoff_time: f.kickoff, provisional_start_time: false,
+      id: f.id, event, kickoff_time: f.kickoff, provisional_start_time: false,
       team_h: f.home, team_a: f.away, started: played, finished: played, finished_provisional: played,
       team_h_score: played ? f.homeGoals : null, team_a_score: played ? f.awayGoals : null,
       team_h_difficulty: hindsight ? f.homeDifficulty : NEUTRAL_DIFFICULTY,

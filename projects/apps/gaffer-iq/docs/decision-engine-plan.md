@@ -828,6 +828,45 @@ before the previous one passes. Phases 1, 2, 3 and 5 are strictly sequential.
 
 **Guards** Suspect leakage first when numbers look good. `tools/backtest/history.js` replays vaastav's final fixture schedule, so every planning GW sees the season's blanks and doubles; the decision backtest needs the schedule as it stood (Phase 6b's review).
 
+**Split (my call).** Phase 7 is two steps with your check between them, because tuning only makes sense once the harness says where the engine stands:
+- **7a, the harness and the verdict:** everything below, with the presets as written. It meets the acceptance.
+- **7b, tuning and Ceiling:** FT value, decay, lambda, tau and hit margin tuned on 2024-25 and tested on 2025-26 with the same harness; Ceiling's Monte Carlo upper tail, `pP90` and its lock list on it.
+
+**7a design**
+- **Seasons.** 2025-26 is the held-out season and carries the verdict. 2024-25 is shown beside it: the projections' choices and the minutes model were fitted on it, so it is not clean. Each season replays the app's own path (normaliseSeason, buildScoreContext, buildProjections) on vaastav as it stood before each GW, with the points model rebuilt point-in-time exactly as Phase 6b's test did (2025-26: constants from 2023-24 and 2024-25, club priors from 2024-25, defensive contributions from 2025-26's GWs so far).
+- **The schedule as it stood.** FPL numbers fixtures in their original order, ten to a GW, and vaastav's 380 fixtures confirm it: every fixture outside its original GW is a known postponement or move (5 in 2024-25, 5 in 2025-26). So a fixture sits in its original GW until its new GW arrives; a postponed one has no date from its original GW until its new one arrives. That knows less than a manager did (planned blanks and doubles were announced weeks ahead); the final schedule, which knows more, runs as the sensitivity.
+- **Squads and bookkeeping.** Every policy manages its own squad from GW4 to GW38 with 1 FT at GW4: free transfers bank to 5 (2025-26's AFCON top-up to 5 before GW16 included); each extra transfer costs 4; sales go at the sell price on each player's own purchase price; prices are vaastav's per GW. No chips, for any policy. 12 starting squads at GW4 prices within £100.0m: the template (by GW3 ownership), a value squad (the template with nobody above £8.0m) and 10 seeded random squads (drawn from players who had appeared, spending at least £97.0m).
+- **Policies.** No transfers; roll unless a free move's own projected gain over five GWs (no squad context) clears 2 points, never a hit; the new engine, one policy per mode, making its mode's root move (and Funds' chained second move); the old engine at `3aa8f3a`, run from a git worktree on the same replayed JSON, making its verdict's move. It budgets on current prices and ignores the club limit, so its verdict is taken over the legal swaps only (the weeks its unchecked verdict was illegal are counted); its chip weeks, which can promote a lane, are computed as its planner did.
+- **Scoring.** Every policy fields its XI, bench order, captain and vice by the same rule (squadValue on that GW's projections), scored on actual points with FPL's autosubs and the vice taking the armband from a captain who did not play, less hits.
+- **Metrics.** The headline is the paired per-GW points difference (net of hits) against no transfers, the roll baseline and the old engine: same squad, same GW, averaged over squads, with a 95% bootstrap interval that resamples squads and circular five-GW blocks (ten-GW blocks as a check, since a buy is held for weeks). Per move: realised gain over 1, 3 and 5 GWs against keeping the squad as it was (minus hits), the expected gain at decision time from the projections (and the slope of realised on expected), sell regret (the best other sale for the same buy, realised, minus the one made), hit ROI and FT use (points per FT, FTs lost at the cap).
+- **Risk 8.** The four presets re-run in the other unit: Long term and Future prep as horizon totals, Funds and Structure normalised to sum 1, with the gates stated in the mode's own units (Funds' tau and eps, Future prep's deferral epsilon) moved with the weights; each paired against its preset as written.
+- **Known handicaps, stated in the report.** Neither engine gets Understat (unreachable here), which the old engine read in the live app and the new one does not; no FPL status flags exist historically, so Structure runs blind; no price signals (vaastav's per-GW transfer counts post-date the deadline).
+
+**7a as built** (`tools/backtest/lib.js`, `run.js`, `history.js` scheduleAt; `tools/points/model.js` split out of `fit.js`; tests `tests/tools/backtest-sim.test.js`, `backtest.test.js`; report `docs/decision-engine-backtest.md`)
+
+- **The verdict** (2025-26 held out, schedule as it stood, 12 squads, points a season with 95% intervals):
+  - Against the old engine: no mode is clearly better or worse. Now +10.6 [-89, +104], Long term +43.7 [-53, +135], Future prep +54.0 [-37, +142], Funds -0.8 [-102, +87], Ceiling +23.4 [-74, +116], Structure +43.8 [-59, +146].
+  - Against the roll baseline: no mode is clearly better or worse, and every point estimate is below it (-10 to -65).
+  - Against no transfers: every mode is better, by 371 to 426.
+  - Both seasons pooled: every mode beats the old engine (+100 to +155), none beats the roll baseline (-36 to +19). 2024-25 alone favours the new engine more (+191 to +275 against the old), but its projections were partly fitted on it.
+  - Ten-week blocks change no verdict. With the final schedule, Now is worse than the roll baseline (-76 [-148, -12]) and Long term, Future prep and Structure beat the old engine.
+- **Risk 8 costs no points that the backtest can see.** No variant in the other unit differs from its preset as written. The largest gap is Funds normalised: -73.5 [-169, +11] on 2025-26 and -42.7 [-104, +14] pooled.
+- **Where the gain comes from.** The roll baseline uses the new projections with a naive own-points rule, and it beats the old engine by +136 [+50, +228] pooled. So most of the gain over the old engine comes from the projections (Phase 6b), not from the squad-aware decision layer, which adds nothing measurable over the naive rule here.
+- **What the moves show**, for 7b:
+  - Every policy transfers almost every week (31-40 transfers in 35 weeks), so free transfers never bank. No policy ever took a hit on its own; only Funds' chained second moves did.
+  - The projections overstate a move's gain: over five GWs the new modes expected about 5.7-6.4 points a move and realised 3.3-5.0. Now's realised gain rises only 0.52 a point of expected gain (Ceiling 0.58); Long term's and Structure's slopes are near 1.
+  - Long term made the most of a free transfer (5.0 points over five GWs). The roll baseline made 3.6, Funds 2.0 and the old engine 1.9.
+  - So 7b should tune the free-transfer value and the thresholds first: a move clears its bar too easily for gains this overstated.
+- **The old engine.** Its verdict is taken over legal swaps. In 66 of its 840 move weeks, its unchecked verdict named a move FPL refuses.
+- **Review fixes before the run** (a code review of the harness):
+  - The old engine's fallback could make moves it would have rolled. Its verdict is now taken over the legal swaps, with its chip weeks computed as its planner did.
+  - The risk-8 variants left Funds' tau and eps and Future prep's deferral epsilon in the old unit; they now move with the weights.
+  - A postponed fixture's new GW was visible as soon as its original GW passed. It now has no date until the new GW arrives.
+  - The verdict is re-read with ten-week blocks.
+  - Results are saved per task (`--resume`, `--report`).
+  - A degenerate slope no longer loops.
+- **Run** 58.8 minutes on four cores. Deferred to 7b: tuning, Ceiling's Monte Carlo tail and `pP90`.
+
 ### Phase 8 (optional): MILP referee
 
 > **How this serves the primary goal:** cross-checks multi-transfer chains and chip timing the pairwise engine cannot see.

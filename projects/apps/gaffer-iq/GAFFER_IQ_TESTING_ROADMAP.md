@@ -271,7 +271,7 @@ The Planner runs the decision engine (`FEATURE_ENGINE.md` §14,
 (`tests/engine/decision.test.js`, `projections.test.js`, `squad-value.test.js`,
 `minutes.test.js`, `points.test.js`, `team-goals.test.js`, `price-adapter.test.js`,
 `robustness.test.js`), the offline tools (`tests/tools/minutes.test.js`,
-`backtest.test.js`, `points.test.js`)
+`backtest.test.js`, `backtest-sim.test.js`, `points.test.js`)
 and the module's pure helpers (`tests/modules/planner.test.js`). The checklist
 below is the in-browser gate after a change to the engine, to `DECISION_ENGINE`
 in `config.js`, or to `modules/planner.js`.
@@ -287,6 +287,15 @@ node tools/points/fit.js`, check `tools/points/REPORT.md` still shows the model
 beating the v1 basis on the held-out season, and paste the block it ends with
 into `pointsModel`. Refit once a season, too: its club priors are last
 season's ratings.
+
+A change to how the engine decides (`engine/decision.js`, `squad-value.js`,
+the projections, or a mode's preset) is judged by the decision backtest:
+`git worktree add --detach <dir> 3aa8f3a` once for the old engine, then
+`node tools/backtest/run.js --old <dir>/projects/apps/gaffer-iq` (about an
+hour on four cores; `--quick` checks two squads for four weeks). It rewrites
+`docs/decision-engine-backtest.md`; read its verdict against the last one.
+A run that dies keeps its finished tasks: `--resume` runs the rest, and
+`--report` rewrites the report from the saved results.
 
 **Never enter a real FPL team ID for this.** Seed a synthetic squad from the
 console instead:
