@@ -55,6 +55,8 @@ export function fixturePoints(rates, fixture, model, rules = FPL_SCORING) {
   const defcon = rules.defensiveContribution;
   const threshold = defcon?.threshold[position];
 
+  // MODEL: penalty saves (+5), penalty misses (-2) and own goals (-2) are left
+  // out: about 2% of a keeper's points and less of anyone else's.
   const parts = {
     appearance: rules.appearance.short + ((rules.appearance.full - rules.appearance.short) * p60),
     goals: rules.goal[position] * goals,

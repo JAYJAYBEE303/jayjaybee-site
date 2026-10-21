@@ -8,6 +8,11 @@
  *
  * vaastav's players_raw.csv and teams.csv hold end-of-season values (totals,
  * prices, strengths), so nothing here reads them but a club's id, name and code.
+ * Its fixtures.csv is the season's final schedule: a fixture postponed and
+ * moved into a double sits in its final gameweek from the start, so every
+ * planning gameweek sees the season's blanks and doubles. Harmless when every
+ * model replayed sees the same schedule (Phase 6b); the decision backtest
+ * (Phase 7) needs the schedule as it stood.
  */
 
 import { readFile } from 'node:fs/promises';

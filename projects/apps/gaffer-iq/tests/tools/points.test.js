@@ -75,9 +75,12 @@ test('the priors are exposure-weighted lines in price, and per-90 rates by posit
 // ─── Defensive contributions: their spread ───────────────────────────────────
 
 test('the dispersion of defensive actions, by the method of moments', () => {
-  // Every appearance has a mean of 10; actions of 5 and 15 give variance 25 against a Poisson's 10.
+  // Every appearance has a mean of 10; actions of 5 and 15 give squared deviations of 25, which his own
+  // two-match mean understates by (n - 1) / n: variance 50 against a Poisson's 10.
   const rows = [row({ element: 1, defcon: 5 }), row({ element: 1, defcon: 15 })];
-  close(fitDefconDispersion(rows), (10 * 10 * 2) / (2 * (25 - 10)));
+  close(fitDefconDispersion(rows), (10 * 10 * 2) / (2 * ((2 * 25) - 10)));
+  // A player with a single appearance has no spread to measure and is left out.
+  close(fitDefconDispersion([...rows, row({ element: 2, defcon: 30 })]), (10 * 10 * 2) / (2 * ((2 * 25) - 10)));
   // No more spread than a Poisson count: infinite dispersion.
   assert.equal(fitDefconDispersion([row({ defcon: 10 }), row({ defcon: 10 })]), Infinity);
 });
@@ -150,4 +153,10 @@ test('the block bootstrap repeats for a seed, is no wider than nothing for a con
   assert.deepEqual(a, blockBootstrap(values, { block: 5, draws: 500, seed: 4 }));
   assert.ok(a.lo < a.mean && a.mean < a.hi);
   close(a.mean, values.reduce((x, y) => x + y, 0) / values.length);
+});
+
+test('the block bootstrap wraps round the series, so its end values are drawn as often as the rest', () => {
+  // Without wrapping, the last value can sit in at most one drawn block and the mean is the interval's top.
+  const b = blockBootstrap([0, 0, 0, 0, 0, 0, 7], { block: 5, draws: 2000, seed: 3 });
+  assert.ok(b.hi > b.mean, `[${b.lo}, ${b.hi}] around ${b.mean}`);
 });

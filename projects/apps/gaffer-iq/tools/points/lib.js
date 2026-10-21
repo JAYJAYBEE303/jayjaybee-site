@@ -95,25 +95,29 @@ export function fitPriors(totals, clubs) {
 /**
  * The dispersion of defensive actions in an appearance (engine/points.js's
  * negative binomial), by the method of moments: each appearance's mean is
- * the player's rate per 90 for its minutes. Infinite when they spread no
- * more than a Poisson count.
+ * the player's rate per 90 for its minutes. His own mean soaks up part of his
+ * spread, so his squared deviations scale by n / (n - 1); a player with one
+ * appearance has none to give. Infinite when they spread no more than a
+ * Poisson count.
  */
 export function fitDefconDispersion(rows) {
   const apps = rows.filter(r => r.minutes > 0 && FPL_SCORING.defensiveContribution.threshold[r.position]);
   const rate = new Map();
   for (const r of apps) {
-    const p = rate.get(r.element) ?? { actions: 0, nineties: 0 };
+    const p = rate.get(r.element) ?? { actions: 0, nineties: 0, n: 0 };
     p.actions += r.defcon;
     p.nineties += r.minutes / MATCH_MINUTES;
+    p.n++;
     rate.set(r.element, p);
   }
   let squares = 0;
   let excess = 0;
   for (const r of apps) {
     const p = rate.get(r.element);
+    if (p.n < 2) continue;
     const mu = (p.actions / p.nineties) * (r.minutes / MATCH_MINUTES);
     squares += mu * mu;
-    excess += ((r.defcon - mu) ** 2) - mu;
+    excess += ((p.n / (p.n - 1)) * ((r.defcon - mu) ** 2)) - mu;
   }
   return excess > 0 ? squares / excess : Infinity;
 }
@@ -210,9 +214,10 @@ export function summarise(errors) {
 }
 
 /**
- * A moving-block bootstrap of a series' mean: blocks of `block` consecutive
- * values (neighbouring decision gameweeks share most of their window, so
- * they are not independent), `draws` resamples, seeded.
+ * A circular block bootstrap of a series' mean: blocks of `block`
+ * consecutive values (neighbouring decision gameweeks share most of their
+ * window, so they are not independent), wrapping round the end so every
+ * value is drawn as often; `draws` resamples, seeded.
  * @returns {{mean: number, lo: number, hi: number}}  the 95% interval
  */
 export function blockBootstrap(values, { block, draws, seed }) {
@@ -224,8 +229,8 @@ export function blockBootstrap(values, { block, draws, seed }) {
     let total = 0;
     let count = 0;
     while (count < n) {
-      const start = Math.floor(random() * (n - size + 1));
-      for (let i = start; i < start + size && count < n; i++, count++) total += values[i];
+      const start = Math.floor(random() * n);
+      for (let i = 0; i < size && count < n; i++, count++) total += values[(start + i) % n];
     }
     means.push(total / n);
   }

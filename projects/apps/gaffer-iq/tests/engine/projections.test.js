@@ -527,3 +527,28 @@ test('with a points model last season\'s rating of a club, by its FPL code, coun
   const rated = projectParts(season, ctx, table, { ...POINTS_MODEL, teamPriors: { 2: { attack: 2, defence: 1 } } }).get(1).gws[0].xpts;
   assert.ok(rated < plain, `${rated} with the prior v ${plain}`);
 });
+
+test('with a points model a part-timer\'s fixture is the mix of his full and short appearances, not one of averaged minutes', () => {
+  // Every gameweek on the pitch: five full matches, three 20-minute ones. Given he plays, P(60+) = 5/8.
+  const rows = [[90, 6], [90, 6], [20, 1], [90, 6], [20, 1], [90, 6], [20, 1], [90, 6]];
+  const players = [rawPlayer(1, 1, 'DEF', { minutes: 510, starts: 5, defensive_contribution: 60, expected_goals_conceded: '4.0' })];
+  const { season, ctx } = league(players);
+  const table = liveTable({ 1: rows });
+  table.forEach(gw => gw.players.forEach(p => { p.starts = p.minutes === 90 ? 1 : 0; }));
+  const gw = projectParts(season, ctx, table).get(1).gws[0];
+  const { home, away } = fixtureGoals(strengthsOf(season), 1, 2, POINTS_MODEL.teams);
+  const side = { lambdaFor: home, lambdaAgainst: away };
+  const rates = playerRates(season.playersById[1].totals, teamRates(season.players).get(1), { position: 'DEF', priceTenths: 60 }, POINTS_MODEL);
+  const full = fixturePoints(rates, { ...side, p60: 1, minutes: POINTS_MODEL.minutesIfFull }, POINTS_MODEL).total;
+  const short = fixturePoints(rates, { ...side, p60: 0, minutes: POINTS_MODEL.minutesIfShort }, POINTS_MODEL).total;
+  close(gw.xpts, (5 / 8) * full + (3 / 8) * short);
+});
+
+test('with a points model a position it has no prior for scores nothing, and a club with no record reads as promoted', () => {
+  const players = [rawPlayer(1, 1, 'MID', { minutes: 720, starts: 8 }), rawPlayer(2, 1, 'MID', { element_type: 5 })];
+  const fixtures = [...homeRun(1, 8, true), [9, 1, 9], ...homeRun(10, 14, false)];
+  const { season, ctx } = league(players, fixtures);
+  const projections = projectParts(season, ctx, liveTable(nailed(1)));
+  assert.ok(projections.get(1).gws[0].xpts > 0, 'club 9 has no record and no team entry, yet his fixture projects');
+  assert.ok(projections.get(2).gws.every(g => g.xpts === 0));
+});

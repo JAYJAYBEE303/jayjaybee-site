@@ -49,22 +49,22 @@ flatter it.
 |---|---|---|---|---|---|---|
 | v1 | 62460 | 7.726 | 1.855 | -0.068 | 5.16 | 17.88 |
 | v1, with hindsight | 62460 | 7.699 | 1.851 | -0.062 | 5.25 | 18.13 |
-| points model | 62460 | 7.347 | 1.829 | -0.057 | 0.42 | 18.45 |
+| points model | 62460 | 7.341 | 1.846 | -0.002 | 0.57 | 18.42 |
 
 MSE of v1 less the points model's, per planning gameweek: mean and 95%
-block-bootstrap interval (blocks of 5 gameweeks, 2000 draws). Above 0 means
-the points model is better.
+circular block-bootstrap interval (blocks of 5 gameweeks, 2000 draws), and the
+number of planning gameweeks it was better in. Above 0 means the points model
+is better.
 
 | Planning GWs | v1 less points model | Better in | v1 with hindsight less points model | Better in |
 |---|---|---|---|---|
-| all (GW4-34) | 0.380 [0.269, 0.504] | 31 of 31 | 0.353 [0.240, 0.473] | 31 of 31 |
-| early (GW4-10) | 0.625 [0.510, 0.625] | 7 of 7 | 0.559 [0.437, 0.559] | 7 of 7 |
-| mid (GW11-24) | 0.390 [0.323, 0.472] | 14 of 14 | 0.392 [0.319, 0.500] | 14 of 14 |
-| late (GW25-34) | 0.195 [0.165, 0.243] | 10 of 10 | 0.154 [0.095, 0.224] | 10 of 10 |
+| all (GW4-34) | 0.386 [0.272, 0.509] | 31 of 31 | 0.359 [0.241, 0.476] | 31 of 31 |
+| early (GW4-10) | 0.650 [0.538, 0.741] | 7 of 7 | 0.585 [0.465, 0.682] | 7 of 7 |
+| mid (GW11-24) | 0.392 [0.318, 0.467] | 14 of 14 | 0.395 [0.317, 0.485] | 14 of 14 |
+| late (GW25-34) | 0.193 [0.152, 0.232] | 10 of 10 | 0.152 [0.086, 0.218] | 10 of 10 |
 
 With few planning gameweeks in a band (seven early on) the interval rests on
-few distinct resamples; the count of gameweeks the points model was better in
-says the same thing without it.
+few distinct resamples; the count says the same thing without it.
 
 ## FPL's own expected points: not a benchmark here
 
@@ -90,8 +90,8 @@ Coordinate search, 2 passes, from {"share":4,"per90":5,"saves":5,"priorMatches":
 
 Fixture-engine weight, MSE on 2024-25 (it is used only if its best weight cuts the MSE at weight 0 by
 0.1% or more; best 0.1, 0.006% lower, so the weight is 0):
-neutral -0.4: 6.5072, -0.2: 6.4912, 0: 6.4837, 0.1: 6.4834, 0.2: 6.4853, 0.3: 6.4897, 0.4: 6.4967, 0.6: 6.5187, 0.8: 6.5525, 1: 6.5999;
-with hindsight -0.4: 6.5706, -0.2: 6.5157, 0: 6.4837, 0.1: 6.4770, 0.2: 6.4771, 0.3: 6.4843, 0.4: 6.4994, 0.6: 6.5564, 0.8: 6.6564, 1: 6.8115.
+neutral -0.4: 6.5065, -0.2: 6.4905, 0: 6.4831, 0.1: 6.4827, 0.2: 6.4847, 0.3: 6.4891, 0.4: 6.4961, 0.6: 6.5181, 0.8: 6.5520, 1: 6.5994;
+with hindsight -0.4: 6.5699, -0.2: 6.5150, 0: 6.4831, 0.1: 6.4764, 0.2: 6.4765, 0.3: 6.4837, 0.4: 6.4989, 0.6: 6.5559, 0.8: 6.6559, 1: 6.8110.
 
 ## The model to paste into js/config.js
 
@@ -104,7 +104,7 @@ Constants from 2023-24, 2024-25 and 2025-26; defensive contributions from
     assistsPerXa: 1.393,
     minutesIfFull: 85.3,
     minutesIfShort: 22.11,
-    defconDispersion: 27.53,
+    defconDispersion: 23.08,
     bonus: {
       GKP: { base: 0.04806, goal: 0, assist: 0.7922, cleanSheet: 0.7772 },
       DEF: { base: -0.01233, goal: 0.9648, assist: 0.5734, cleanSheet: 0.5974 },

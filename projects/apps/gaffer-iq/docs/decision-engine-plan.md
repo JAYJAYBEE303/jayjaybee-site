@@ -782,7 +782,7 @@ before the previous one passes. Phases 1, 2, 3 and 5 are strictly sequential.
   - assists: the same share of xA, at FPL's 1.39 assists per expected assist;
   - clean sheet: P(60+) x e^(-expected goals against x 85.3 / 90), 85.3 minutes being a full appearance's average;
   - goals conceded, a point per two, and a keeper's saves per expected goal against, both as Poisson counts;
-  - defensive contributions: the chance of 10 (defenders) or 12 actions, as a negative binomial count (dispersion 27.5);
+  - defensive contributions: the chance of 10 (defenders) or 12 actions, as a negative binomial count (dispersion 23.1);
   - bonus: per position, fitted on goals, assists and clean sheets, plus his own residual;
   - cards, at his rate.
 - **Shrinkage.** His shares weigh against 4 team-xG of prior, his per-90 rates against five 90s, a keeper's saves against 20 expected goals against. The priors are lines in price per position (a midfielder's defensive actions: 9.2 a 90 at £5.0m, 5.4 at £10.0m).
@@ -792,9 +792,9 @@ before the previous one passes. Phases 1, 2, 3 and 5 are strictly sequential.
   - On the test season it improved one-week goal prediction by 0.3% (Poisson deviance 1.061 to 1.058), too little to show in points.
   - Its xG-matchup metric needs Understat history and could not be tested at all.
 - **The test** (2025-26, held out; `tools/points/REPORT.md`):
-  - MSE 7.347 against the v1 basis's 7.726 (7.699 with hindsight), better in all 31 planning GWs.
-  - v1 less the points model: early 0.625, mid 0.390 [0.323, 0.472], late 0.195 [0.165, 0.243]. The early band's seven GWs leave its bootstrap interval degenerate; the count (7 of 7) carries it.
-  - Each GW's top 10 projected per position were overstated by 0.42 points over the five GWs (v1: 5.16) and scored 18.45 (v1: 17.88).
+  - MSE 7.341 against the v1 basis's 7.726 (7.699 with hindsight), better in all 31 planning GWs; mean bias -0.002 points a player-GW.
+  - v1 less the points model, with 95% circular block-bootstrap intervals: early 0.650 [0.538, 0.741], mid 0.392 [0.318, 0.467], late 0.193 [0.152, 0.232].
+  - Each GW's top 10 projected per position were overstated by 0.57 points over the five GWs (v1: 5.16) and scored 18.42 (v1: 17.88).
 - **FPL's own expected points are no benchmark.** vaastav records its xP after each gameweek: a GW's figure correlates 0.67-0.68 with that GW's points against 0.36-0.38 with the next one's, which no forecast made before it could.
 - **Data notes.**
   - vaastav's 2022-23 has xG only from GW16, so that season serves only as 2023-24's club priors.
@@ -808,9 +808,15 @@ before the previous one passes. Phases 1, 2, 3 and 5 are strictly sequential.
   - one bonus model per position across the rule changes;
   - defensive contributions are fitted on one season.
 - **Verified** in headless Chromium on the 2025-26 GW20 payloads, with the season totals made point-in-time:
-  - The top 20 projected midfielders scored 404 over GW20-24 against 374 projected; v1's top 20 scored 351 against 461. Defenders: 362 against 360; v1 335 against 452.
+  - The top 20 projected midfielders scored 381 over GW20-24 against 379 projected; v1's top 20 scored 351 against 461. Defenders: 362 against 364; v1 335 against 452.
   - Every ownership band's error fell.
   - The cards, robustness labels and a mid-run lock behave as in Phase 6; no page errors.
+- **Review fixes** (the commit after `6006536`):
+  - The season cache key moves to `gaffer-iq:season:v4`: a tab holding a season cached by the previous build lacked the new totals, and every projection came out NaN.
+  - A fixture is the mix of a full and a short appearance by his chance of 60, not one appearance of averaged minutes, which understated the parts not linear in minutes (defensive contributions by 0.1-0.3 points a fixture for a part-time defender or midfielder).
+  - The scoreboard's bootstrap is circular, so the end of each band's series is drawn as often as the rest; the early band's interval now excludes zero on its own.
+  - The defensive-contribution spread corrects each player's deviations by n / (n - 1); a position without a prior scores nothing instead of failing the build; a club in the fixtures with no record reads as promoted; the fixture-rating hook reads each fixture's own gameweek context.
+  - Comments and docs: penalty saves and misses and own goals are named as left out; the replay's fixture schedule is the season's final one (a Phase 7 guard).
 
 ### Phase 7: Backtest harness and ceiling mode
 
@@ -820,7 +826,7 @@ before the previous one passes. Phases 1, 2, 3 and 5 are strictly sequential.
 
 **Acceptance** States plainly, with confidence intervals, whether the new engine beats the old engine and the roll baseline, and whether the mixed weight units (risk 8) cost points.
 
-**Guards** Suspect leakage first when numbers look good.
+**Guards** Suspect leakage first when numbers look good. `tools/backtest/history.js` replays vaastav's final fixture schedule, so every planning GW sees the season's blanks and doubles; the decision backtest needs the schedule as it stood (Phase 6b's review).
 
 ### Phase 8 (optional): MILP referee
 

@@ -15,14 +15,19 @@
  *    to be loaded (P6);
  *  - an injury spell does not drag his rates once it is excused (P8);
  *  - xpts = (1 - pZero) x xptsIfPlays holds by algebra.
- * Only the fixture multiplier comes from the scorer, via nextFixtureScore.
+ * His expected points if he plays come from the points model (engine/points.js,
+ * Phase 6b) when DECISION_ENGINE.pointsModel is set: built from the parts FPL
+ * pays for, each club's expected goals (engine/team-goals.js) carrying the
+ * fixture. Without it the v1 basis stands in: raw points per appearance times
+ * the fixture multiplier, the one thing it takes from the scorer
+ * (nextFixtureScore).
  *
  * His chances of appearing, starting and playing 60 minutes come from the
  * fitted minutes model (engine/minutes.js) when the live table holds his
  * record; otherwise the v1 rates stand in. Availability is FPL's flag and its
  * recovery either way.
  *
- * See docs/decision-engine-plan.md §2.2, §5.1 and Phase 4.
+ * See docs/decision-engine-plan.md §2.2, §5.1, Phase 4 and Phase 6b.
  */
 
 import { DECISION_ENGINE, FIXTURE_SCORE_EVEN, HORIZONS, MATCH_MINUTES, PERCENT, STATUS_PLAY_CHANCE } from '../config.js';
@@ -64,6 +69,10 @@ import { fixtureGoals, teamRates, teamStrengths } from './team-goals.js';
  * @param {Function} [opts.scorePlayerFn]         scorePlayer, or a test's stand-in
  * @param {object|null} [opts.minutesModel]       DECISION_ENGINE.minutesModel by
  *   default; null runs the v1 rates
+ * @param {object|null} [opts.pointsModel]        DECISION_ENGINE.pointsModel by
+ *   default; null runs the v1 basis
+ * @param {Function} [opts.scoreFixtureFn]        scoreFixture, or a test's stand-in; read
+ *   only with pointsModel.fixtureRating.weight
  * @returns {Map<number, {playerId: number, position: string, teamId: number,
  *   price: number, gws: GwProjection[]}>}
  */
@@ -81,7 +90,7 @@ export function buildProjections(players, ctx, {
   const rowsByPlayer  = indexTable(gwTable, planningGw);
   const gws = Array.from({ length: horizonGws }, (_, k) => planningGw + k);
   const ctxByGw = gws.map((gw, k) => contextFor(ctx, gw, k));
-  const goals = pointsModel ? fixtureGoalsByTeam(players, ctx, gws, pointsModel, scoreFixtureFn) : null;
+  const goals = pointsModel ? fixtureGoalsByTeam(players, ctx, gws, ctxByGw, pointsModel, scoreFixtureFn) : null;
 
   const projections = new Map();
   for (const player of players) {
@@ -90,8 +99,10 @@ export function buildProjections(players, ctx, {
     const features = minutesModel && rates.record
       ? minutesFeatures(rates.record, { position: player.position, priceTenths })
       : null;
-    const pointsRates = goals
-      && playerRates(player.totals, goals.rates.get(player.teamId), { position: player.position, priceTenths }, pointsModel);
+    // A position the model has no prior for (FPL's 2024-25 assistant managers) scores nothing.
+    const pointsRates = goals && pointsModel.priors[player.position]
+      ? playerRates(player.totals, goals.rates.get(player.teamId), { position: player.position, priceTenths }, pointsModel)
+      : null;
     projections.set(player.id, {
       playerId: player.id,
       position: player.position,
@@ -157,15 +168,21 @@ function v1Points(player, k, basis, fixtures, ctxForGw, scorePlayerFn) {
 
 /**
  * Fit, his expected points from the points model: each fixture's parts
- * (engine/points.js) at his chance of 60 minutes once he is on, times his
- * chance of being picked, with a double's rotation haircut as in
- * calcExpectedPoints.
+ * (engine/points.js) as a full appearance (60 minutes or more, minutesIfFull)
+ * and as a short one (minutesIfShort), mixed by his chance of 60 once he is
+ * on - not one appearance of averaged minutes, which would understate the
+ * parts that are not linear in minutes (defensive contributions, the
+ * per-two and per-three counts) - times his chance of being picked, with a
+ * double's rotation haircut as in calcExpectedPoints.
  */
 function partsPoints({ rates, sides, model }, appearRate, p60Rate, fixtures) {
-  if (!(appearRate > 0) || sides.length === 0) return 0;
+  if (!rates || !(appearRate > 0) || sides.length === 0) return 0;
   const p60 = clamp(0, 1, p60Rate / appearRate);
-  const minutes = (p60 * model.minutesIfFull) + ((1 - p60) * model.minutesIfShort);
-  const perGame = sides.reduce((sum, side) => sum + fixturePoints(rates, { ...side, p60, minutes }, model).total, 0);
+  const full = { p60: 1, minutes: model.minutesIfFull };
+  const short = { p60: 0, minutes: model.minutesIfShort };
+  const perGame = sides.reduce((sum, side) => sum
+    + (p60 * fixturePoints(rates, { ...side, ...full }, model).total)
+    + ((1 - p60) * fixturePoints(rates, { ...side, ...short }, model).total), 0);
   return appearRate * perGame * (fixtureCountFactor(fixtures) / fixtures);
 }
 
@@ -173,20 +190,26 @@ function partsPoints({ rates, sides, model }, appearRate, p60Rate, fixtures) {
  * Each club's expected goals for and against in each of its fixtures over the
  * horizon (engine/team-goals.js), from every player's season totals and the
  * clubs' priors (model.teamPriors, by FPL club code; a club without one reads
- * as promoted). With model.fixtureRating.weight, each side's expected goals
- * also scale by exp(weight x (s - even) / even), s being the fixture engine's
- * 0-100 score for that side (scoreFixture), so a side it rates well expects
- * more goals and its opponent fewer.
+ * as promoted, as does a club in the fixtures with no players or record).
+ * With model.fixtureRating.weight, each side's expected goals also scale by
+ * exp(weight x (s - even) / even), s being the fixture engine's 0-100 score
+ * for that side (scoreFixture, read on its gameweek's context), so a side it
+ * rates well expects more goals and its opponent fewer.
  *
  * @returns {{rates: Map, byTeam: Map<number, Map<number, Array<{lambdaFor: number, lambdaAgainst: number}>>>}}
  */
-function fixtureGoalsByTeam(players, ctx, gws, model, scoreFixtureFn) {
+function fixtureGoalsByTeam(players, ctx, gws, ctxByGw, model, scoreFixtureFn) {
   const rates = teamRates(players);
   const priors = new Map();
+  const unrecorded = id => { if (!rates.has(id)) rates.set(id, { xgFor90: 0, xgAgainst90: 0, matches: 0 }); };
   for (const team of Object.values(ctx.teamsById ?? {})) {
-    if (!rates.has(team.id)) rates.set(team.id, { xgFor90: 0, xgAgainst90: 0, matches: 0 });
+    unrecorded(team.id);
     const prior = model.teamPriors?.[team.code];
     if (prior) priors.set(team.id, prior);
+  }
+  for (const f of ctx.fixtures ?? []) {
+    unrecorded(f.homeTeamId);
+    unrecorded(f.awayTeamId);
   }
   const strengths = teamStrengths(rates, priors, model.teams);
   const horizon = new Set(gws);
@@ -197,9 +220,12 @@ function fixtureGoalsByTeam(players, ctx, gws, model, scoreFixtureFn) {
     byTeam.set(teamId, byGw);
   };
   const weight = model.fixtureRating?.weight ?? 0;
-  const rated = (teamId, f, goals) => (weight
-    ? goals * Math.exp(weight * ((scoreFixtureFn(ctx.teamsById[teamId], f, ctx).value - FIXTURE_SCORE_EVEN) / FIXTURE_SCORE_EVEN))
-    : goals);
+  const rated = (teamId, f, goals) => {
+    if (!weight) return goals;
+    const gwCtx = ctxByGw[gws.indexOf(f.gw)];
+    const score = scoreFixtureFn(gwCtx.teamsById[teamId], f, gwCtx).value;
+    return goals * Math.exp(weight * ((score - FIXTURE_SCORE_EVEN) / FIXTURE_SCORE_EVEN));
+  };
   for (const f of ctx.fixtures ?? []) {
     if (!horizon.has(f.gw)) continue;
     const plain = fixtureGoals(strengths, f.homeTeamId, f.awayTeamId, model.teams);

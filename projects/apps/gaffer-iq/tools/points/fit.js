@@ -1,9 +1,9 @@
 /**
  * tools/points/fit.js
  * Fits DECISION_ENGINE.pointsModel on vaastav's seasons and scores the
- * projections it gives against the v1 basis the app used before and FPL's
- * own expected points (docs/decision-engine-plan.md, Phase 6b). Writes
- * tools/points/REPORT.md and prints the config block to paste.
+ * projections it gives against the v1 basis the app used before
+ * (docs/decision-engine-plan.md, Phase 6b). Writes tools/points/REPORT.md and
+ * prints the config block to paste.
  *
  *   node tools/backtest/download.js && node tools/points/fit.js
  *
@@ -374,16 +374,16 @@ ${line('v1, with hindsight', results.v1Hindsight)}
 ${line(`points model${best.rating ? ` (fixture engine weight ${best.rating})` : ''}`, results.parts)}
 
 MSE of v1 less the points model's, per planning gameweek: mean and 95%
-block-bootstrap interval (blocks of ${BOOTSTRAP.block} gameweeks, ${BOOTSTRAP.draws} draws). Above 0 means
-the points model is better.
+circular block-bootstrap interval (blocks of ${BOOTSTRAP.block} gameweeks, ${BOOTSTRAP.draws} draws), and the
+number of planning gameweeks it was better in. Above 0 means the points model
+is better.
 
 | Planning GWs | v1 less points model | Better in | v1 with hindsight less points model | Better in |
 |---|---|---|---|---|
 ${versusV1.map((r, i) => `| ${r.label} | ${ci(r)} | ${r.better} of ${r.of} | ${ci(versusV1Hindsight[i])} | ${versusV1Hindsight[i].better} of ${versusV1Hindsight[i].of} |`).join('\n')}
 
 With few planning gameweeks in a band (seven early on) the interval rests on
-few distinct resamples; the count of gameweeks the points model was better in
-says the same thing without it.
+few distinct resamples; the count says the same thing without it.
 
 ## FPL's own expected points: not a benchmark here
 

@@ -1246,7 +1246,7 @@ A player's expected points in a gameweek are built, fixture by fixture, from the
 
 The fixture engine's own 0-100 rating can scale each side's expected goals too (`pointsModel.fixtureRating`). As far as it can be replayed offline it added nothing to the xG ratings, so its weight is 0.
 
-The fitted figures live in `DECISION_ENGINE.pointsModel`, from `tools/points/fit.js`. The tool also tests the model on a held-out season against the v1 basis and FPL's own expected points (`tools/points/REPORT.md`). To refit, run `node tools/backtest/download.js && node tools/points/fit.js` from the app folder and paste the block it prints. With `pointsModel` null, the v1 basis stands in: his raw points per appearance times the fixture multiplier.
+The fitted figures live in `DECISION_ENGINE.pointsModel`, from `tools/points/fit.js`. The tool also tests the model on a held-out season against the v1 basis (`tools/points/REPORT.md`; FPL's own expected points are no benchmark there, as vaastav records them after each gameweek). Penalty saves and misses and own goals are left out as too rare to project. To refit, run `node tools/backtest/download.js && node tools/points/fit.js` from the app folder and paste the block it prints. With `pointsModel` null, the v1 basis stands in: his raw points per appearance times the fixture multiplier.
 
 ### 14.3 Prices and timing (`engine/price-adapter.js`)
 

@@ -19,7 +19,7 @@ import { SEASON_MAX_AGE_MS } from './config.js';
 
 // Bump the version suffix when the normalised model shape changes - old
 // cached payloads will then be ignored rather than feeding stale data through.
-const SS_KEY_SEASON = 'gaffer-iq:season:v3';
+const SS_KEY_SEASON = 'gaffer-iq:season:v4';
 
 // Shared squad key - the ONE place the user's 15-man squad is persisted.
 // Reuses the Dashboard's pre-existing key so an already-saved squad survives

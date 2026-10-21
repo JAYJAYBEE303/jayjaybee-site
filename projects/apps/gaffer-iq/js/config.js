@@ -1312,9 +1312,10 @@ export const TRIPLE_CAPTAIN_MULTIPLIER = 3;
 export const PERCENT = 100;
 
 // FPL's scoring rules, as engine/points.js reads them. Every row of vaastav's
-// 2024-25, 2025-26 and 2026-27 GW1 data reproduces its total from these (the
-// defensive contribution from 2025-26 on); a keeper's goal is too rare to
-// check. Points for playing: `short` under fullMinutes, `full` at it or more;
+// 2023-24 to 2025-26 and 2026-27 GW1 data reproduces its total from these (the
+// defensive contribution from 2025-26 on) together with penalty saves (+5),
+// penalty misses (-2) and own goals (-2), which the points model leaves out as
+// too rare to project; a keeper's goal is too rare to check. Points for playing: `short` under fullMinutes, `full` at it or more;
 // a clean sheet needs fullMinutes; goals conceded cost `points` per `per`
 // while on the pitch; saves pay `points` per `per`; reaching a position's
 // defensive-contribution threshold in a match pays `points`.
@@ -1466,7 +1467,7 @@ export const DECISION_ENGINE = {
     assistsPerXa: 1.393,
     minutesIfFull: 85.3,
     minutesIfShort: 22.11,
-    defconDispersion: 27.53,
+    defconDispersion: 23.08,
     bonus: {
       GKP: { base: 0.04806, goal: 0, assist: 0.7922, cleanSheet: 0.7772 },
       DEF: { base: -0.01233, goal: 0.9648, assist: 0.5734, cleanSheet: 0.5974 },

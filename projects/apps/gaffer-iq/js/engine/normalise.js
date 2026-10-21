@@ -230,8 +230,8 @@ export function normalisePlayer(raw) {
       xA:          parseFloat(raw.expected_assists) || 0,
       cleanSheets: raw.clean_sheets || 0,
       // The rest of what engine/points.js reads (plan Phase 6b): his xG
-      // conceded while on the pitch, and the other counts FPL pays for. Read
-      // as numbers whatever their type, since the points model adds them up.
+      // conceded while on the pitch, and the other counts FPL pays for. These
+      // are read as numbers whatever their type, since the model adds them up.
       xGC:                   parseFloat(raw.expected_goals_conceded) || 0,
       goalsConceded:         Number(raw.goals_conceded) || 0,
       saves:                 Number(raw.saves) || 0,
