@@ -1552,11 +1552,13 @@ export const DECISION_ENGINE = {
   benchWeightsLinear: { s1: 0.30, s2: 0.10, s3: 0.03, gk: 0.03 },
 
   // ── The six modes (brief §6; plan §5.4, Q6/Q7) ──
-  // Weights are w_1..w_5 for the planning GW and the four after it, exactly as
-  // the brief writes them (Q6): Long term and Future prep are normalised to a
-  // per-GW average, Funds and Structure are horizon totals. A move is made only
-  // when its OutScore - its gain over rolling, after the FT value or hit - is
-  // above `threshold` (Q7). Starting defaults, NOT tuned: Phase 7 tunes them.
+  // Weights are w_1..w_5 for the planning GW and the four after it. Every mode
+  // weighs its window as a horizon total, so every mode's gain is in the same
+  // points as the free transfer's value and the hit it is compared with (the
+  // solver pass's scale fix; before it Long term and Future prep were the
+  // brief's per-GW averages, ÷ 3 and ÷ 4.25). A move is made only when its
+  // OutScore - its gain over rolling, after the FT value or hit - is above
+  // `threshold` (Q7). Starting defaults: Phase 7's sweep found nothing to tune.
   modes: {
     now: {
       label: 'Now',
@@ -1569,23 +1571,25 @@ export const DECISION_ENGINE = {
     },
     longterm: {
       label: 'Long term',
-      weights: [1, 1, 1, 0, 0].map(w => w / 3),
-      lambda: 0.10,
+      weights: [1, 1, 1, 0, 0],
+      // lambdaDefault on the averaged scale, times the weights' sum (3), so £1m
+      // still weighs against a point as it did when the weights were ÷ 3.
+      lambda: 0.30,
       threshold: 0,
     },
     future: {
       label: 'Future prep',
-      weights: [0.5, 0.75, 1, 1, 1].map(w => w / 4.25),
-      // The brief gives 0.10-0.20; the midpoint until Phase 7 tunes it.
-      lambda: 0.15,
+      weights: [0.5, 0.75, 1, 1, 1],
+      // The brief's midpoint (0.10-0.20) of 0.15 on the averaged scale, times
+      // the weights' sum (4.25), so £1m weighs against a point as before.
+      lambda: 0.6375,
       threshold: 0,
       // The deferral test (brief §6): when the same move made next week -
       // scored over the same five GWs, the planning GW given up - comes within
-      // this much of making it now, the mode waits. In this mode's units (a
-      // weighted average where the planning GW weighs 0.5 / 4.25), 0.1 lets it
-      // wait when the move gains under about 0.85 points this week. Not tuned:
-      // Phase 7.
-      deferralEpsilon: 0.1,
+      // this much of making it now, the mode waits. In this mode's units (the
+      // planning GW weighs 0.5), 0.425 lets it wait when the move gains under
+      // about 0.85 points this week, as 0.1 did on the averaged scale.
+      deferralEpsilon: 0.425,
     },
     funds: {
       label: 'Funds & flexibility',

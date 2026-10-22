@@ -99,15 +99,18 @@ Weights cover the next five gameweeks, the planning week first.
 | Mode | Weights | lambda | Its own rule |
 |---|---|---|---|
 | Now | [1, 0, 0, 0, 0] | 0 | never buys a player flagged out or likelier than `pZeroGate` (0.25) to get no minutes; flags "wait for team news" when a doubt is in the move, the deadline is over `waitForNewsMinHours` away and no price is likely to move first |
-| Long term | [1, 1, 1, 0, 0] / 3 | 0.10 | DeltaEV must also beat the transfer's cost |
-| Future prep | [0.5, 0.75, 1, 1, 1] / 4.25 | 0.15 | waits when the same move made next week scores within `deferralEpsilon` (0.1), unless at the free-transfer cap, at the season's end or before a Wildcard, or when a likely price move would put the buy out of reach |
+| Long term | [1, 1, 1, 0, 0] | 0.30 | DeltaEV must also beat the transfer's cost |
+| Future prep | [0.5, 0.75, 1, 1, 1] | 0.6375 | waits when the same move made next week scores within `deferralEpsilon` (0.425), unless at the free-transfer cap, at the season's end or before a Wildcard, or when a likely price move would put the buy out of reach |
 | Funds & flexibility | 0.85^k, a horizon total | 0.10 | only downgrades losing at most `tau` (1.0) points; the `chainTopK` (5) most efficient (money freed per point lost) are credited with the best second move the money makes newly affordable, less its own transfer cost; money alone moves only from `minFreedTenths` (£0.5m) |
 | Ceiling | 1 at the target week t\*, 0.1 elsewhere | 0 | t\* is the week whose 15 highest `xpts` across all players sum highest; at t\* a swap scores its change to the squad's 90th-percentile score over 500 Monte Carlo draws (`tail`; null reads the mean). Lock value: V_t\*(S) - V_t\*(S - p + his best affordable replacement); at `lockThreshold` (3) or more, Now, Long term, Future prep and Funds will not sell him |
 | Structure fix | [1, 0.85, 0.72, 0.61, 0.52] | 0.10 | a dead slot (a player expected out `deadSlotMinGws` (2) weeks or more) costs `deadSlotPenalty` (1); holds a flagged player who recovers to `recoveredAvailability` (0.9) inside the window unless his sell price is likely to fall |
 
-The weights are the brief's presets as written: Long term and Future prep are
-per-week averages, Funds and Structure horizon totals (plan risk 8; the
-backtest found no cost from the mix).
+Every mode weighs its window as a horizon total, in the same points as the
+free transfer's value and the hit it is compared with. Long term and Future
+prep were the brief's per-week averages (÷ 3 and ÷ 4.25) until the solver
+plan's scale fix (`docs/decision-engine-solver-plan.md`, Phase 1), which also
+moved their lambda and Future prep's deferral epsilon by the same sums, so
+money and the wait weigh against points as before.
 
 ## Robustness
 

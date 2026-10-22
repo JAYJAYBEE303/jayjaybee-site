@@ -1,7 +1,7 @@
 # Solver-led decision engine: plan (Phase 0)
 
 Date: 2026-10-22. Status: **approved with conditions** (your reply of
-22 Oct, items 1-10, folded in below). Phase 1 is in progress.
+22 Oct, items 1-10, folded in below). Phase 1 done, awaiting your review.
 Source: "Gaffer IQ engine: recommended changes" (22 Oct 2026, Josh Bailey),
 its Build scope, Mode scale fix, Solver feasibility check and Phases table.
 Branch: `Refactor/gaffer-IQ-transfer-suggestion-engine-redesign`; `main` is
@@ -274,7 +274,7 @@ fallback):
 
 ## Phases
 
-### Phase 1: the mode scale fix (in progress)
+### Phase 1: the mode scale fix (done, awaiting your review)
 
 **Change.** Long term [1, 1, 1, 0, 0] (no ÷ 3) and Future prep
 [0.5, 0.75, 1, 1, 1] (no ÷ 4.25). The free-transfer schedule, the hit cost
@@ -303,6 +303,46 @@ and the margin stay.
   their place.
 
 **Stop:** you review the numbers.
+
+**Phase 1 as built** (`js/config.js`, `tests/engine/decision.test.js`, `tools/backtest/run.js`; report
+`docs/decision-engine-backtest.md`, "The weight units")
+
+- **The config.** Long term [1, 1, 1, 0, 0], λ 0.30; Future prep [0.5, 0.75, 1, 1, 1], λ 0.6375, `deferralEpsilon` 0.425.
+- **Tests.** Six tests moved to the new scale, with their arithmetic restated in totals (KeepValue 22.5, the money
+  terms ×3). A new test pins every mode as a total and λ in step.
+  - One test changed meaning: Future prep's "wait to turn a hit into a free transfer". With a gain of about 7
+    points a week, waiting saved 4.5 points of hit and gave up about 7 points of this week. The averaged scale
+    counted that week as 1.6, so the mode waited. In true totals it now moves at once, which is correct.
+  - The test now covers both sides: a 2-point-a-week move waits, a 14-point one moves.
+  - `npm test`: 512 of 517, the five `channel.test.js` baseline failures.
+- **The backtest.**
+  - The old presets ran as a variant, `averaged`, beside the new ones: both seasons, 12 squads, both schedules,
+    `--merge` over `data/results.json` (51 minutes).
+  - The variant reproduces the old presets week for week (24 of 24 squad-seasons, one move and several).
+  - The four untouched modes, the roll baseline and the old engine are identical before and after.
+- **After less before** (points a season, 95% intervals):
+
+  | Mode | 2025-26 | Both seasons |
+  |---|---|---|
+  | Long term | +15.8 [-30.7, +62.4] | +22.7 [-20.1, +62.4] |
+  | Future prep | -4.0 [-42.2, +25.1] | +3.3 [-19.5, +26.6] |
+  | Long term+ | +0.8 [-49.8, +58.8] | -5.3 [-48.0, +41.4] |
+  | Future prep+ | +5.3 [-32.8, +40.5] | -2.4 [-36.8, +28.4] |
+
+  **Pass:** no interval is wholly below zero.
+- **Transfers a season** (before → after; 2024-25, then 2025-26):
+  - Long term: 32.1 → 33.6, 33.3 → 34.8.
+  - Future prep: 31.0 → 31.0, 32.5 → 32.9.
+  - Long term+: 32.2 → 37.1, 34.9 → 40.8.
+  - Future prep+: 31.0 → 32.8, 33.4 → 36.1.
+  - Now, Funds, Ceiling and Structure, one move and several, are unchanged by construction: 33.6 / 34.1, 39.6 /
+    39.4, 34.8 / 35.0, 33.8 / 35.0; with several moves 35.0 / 37.8, 41.5 / 43.3, 37.4 / 40.3, 39.1 / 41.1.
+- **Elsewhere in the report:**
+  - Against the old engine, pooled, Long term is now +163.1 [+82.9, +247.3] (was +140.5) and Future prep +125.8
+    [+44.6, +219.1] (was +122.4).
+  - On roll's squads, Future prep's pick now realises 1.25 a week less than roll's [-2.81, +0.28], no longer
+    clearly worse (it was -1.81 [-3.41, -0.30]). Long term's gap is -0.32 [-1.94, +1.34].
+  - The tuning sweep and Long term's alternative ran before the fix, and the report says so.
 
 ### Phase 2: cards and Ceiling's default
 

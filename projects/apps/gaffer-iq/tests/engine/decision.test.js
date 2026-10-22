@@ -69,9 +69,9 @@ test('with no free transfer a move must clear the hit and its margin; with five 
 });
 
 test('Long term rolls a move that beats rolling only thanks to the money it frees', () => {
-  // Keeper 101 projects 5.4 (+1.4 a GW) and costs £2.0m less: OutScore
-  // 1.4 + 0.10 x 2.0 - 1.5 = 0.1, but the squad gain is under the FT's 1.5.
-  const result = runDecisionEngine(scenario({ candidates: [{ id: 101, position: 'GKP', xip: 5.4, price: 30 }] }));
+  // Keeper 101 projects 4.4 (+0.4 a GW, 1.2 over Long term's three GWs) and costs £2.0m less: OutScore
+  // 1.2 + 0.30 x 2.0 - 1.5 = 0.3, but the squad gain is under the FT's 1.5.
+  const result = runDecisionEngine(scenario({ candidates: [{ id: 101, position: 'GKP', xip: 4.4, price: 30 }] }));
   const best = playerOf(result, 1).best.longterm;
   assert.ok(best.outScore > 0, `OutScore ${best.outScore}`);
   assert.ok(best.deltaEv < 1.5, `DeltaEV ${best.deltaEv}`);
@@ -109,11 +109,26 @@ test('a player with no legal move in a mode has no best move and no OutScore the
 });
 
 test('the base squad\'s KeepValues: its captain is worth 7.5 to keep, its third sub nothing', () => {
-  // Without FWD 13 the XI turns 4-5-1 at 55.5 and MID 8 captains: 71 - 63.5.
+  // Without FWD 13 the XI turns 4-5-1 at 55.5 and MID 8 captains: 71 - 63.5, every GW alike - so Long term,
+  // a total over three GWs, has him at 22.5.
   const result = runDecisionEngine(scenario());
   close(playerOf(result, 13).keepValue.now, 7.5);
   close(playerOf(result, 7).keepValue.now, 0);
-  close(playerOf(result, 13).keepValue.longterm, 7.5);
+  close(playerOf(result, 13).keepValue.longterm, 22.5);
+});
+
+test('every mode weighs its window as a total: Long term and Future prep are not averages, and their lambda is in step', () => {
+  // Keeper 101 gains 1 every GW. As totals, Long term's three GWs make 3 and Future prep's five weights 4.25.
+  const result = runDecisionEngine(scenario({ candidates: [{ id: 101, position: 'GKP', xip: 5 }] }));
+  const keeper = playerOf(result, 1);
+  close(keeper.best.longterm.deltaEv, 3);
+  close(keeper.best.future.deltaEv, 4.25);
+  assert.deepEqual(DECISION_ENGINE.modes.longterm.weights, [1, 1, 1, 0, 0]);
+  assert.deepEqual(DECISION_ENGINE.modes.future.weights, [0.5, 0.75, 1, 1, 1]);
+  // The money terms value £1m against a point as they did on the averaged scale: lambda times the weights' sum.
+  close(DECISION_ENGINE.modes.longterm.lambda, 0.10 * 3);
+  close(DECISION_ENGINE.modes.future.lambda, 0.15 * 4.25);
+  close(DECISION_ENGINE.modes.future.deferralEpsilon, 0.1 * 4.25);
 });
 
 test('alternatives are the next-best moves within the window that also beat rolling, at most two', () => {
@@ -293,10 +308,10 @@ test('a chip planned for a GW already gone is ignored', () => {
 
 test('money freed counts only for the share of a mode\'s weight a planned chip leaves', () => {
   // A Wildcard in GW11 leaves Long term GW10's third of its weight, so keeper
-  // 101's £2.0m saving is worth 0.10 x 2.0 x 1/3 there.
+  // 101's £2.0m saving is worth 0.30 x 2.0 x 1/3 there.
   const result = runDecisionEngine(scenario({
     candidates: [{ id: 101, position: 'GKP', xip: 5, price: 30 }], chipPlan: { [GW + 1]: 'wildcard' } }));
-  close(playerOf(result, 1).best.longterm.fundsTerm, 0.10 * 2.0 / 3);
+  close(playerOf(result, 1).best.longterm.fundsTerm, 0.30 * 2.0 / 3);
 });
 
 test('the dead-slot penalty shrinks with the share of Structure\'s weight a planned chip leaves', () => {
@@ -491,7 +506,7 @@ test('Ceiling puts no value on money (brief §6: lambda 0)', () => {
   // Keeper 101 is £2.0m cheaper than keeper 1.
   const result = runDecisionEngine(scenario({ candidates: [{ id: 101, position: 'GKP', xip: 5, price: 30 }] }));
   assert.equal(playerOf(result, 1).best.ceiling.fundsTerm, 0);
-  close(playerOf(result, 1).best.longterm.fundsTerm, 0.10 * 2.0);
+  close(playerOf(result, 1).best.longterm.fundsTerm, 0.30 * 2.0);
 });
 
 test('Ceiling counts the bench in full when Bench Boost is planned for the target GW', () => {
@@ -673,15 +688,15 @@ test('a likely fall that lowers his sell price makes selling now worth lambda x 
   const candidates = [{ id: 101, position: 'GKP', xip: 6 }];
   const without = playerOf(runDecisionEngine(scenario({ changes, candidates })), 1).best.longterm;
   const falling = playerOf(runDecisionEngine(scenario({ changes, candidates, priceSignals: { 1: signal(1) } })), 1);
-  close(falling.best.longterm.priceTerm, -0.1 * 0.1);
-  close(falling.best.longterm.outScore, without.outScore + 0.01);
+  close(falling.best.longterm.priceTerm, -0.3 * 0.1);
+  close(falling.best.longterm.outScore, without.outScore + 0.03);
   assert.match(falling.best.longterm.why.price, /fall/);
   assert.ok(falling.flags.includes('priceFall'));
   close(falling.best.now.priceTerm, 0, 'Now puts no value on money');
   // At £5.3m a rise to £5.4m lifts his sell price from £5.1m to £5.2m.
   const rising = playerOf(runDecisionEngine(scenario({ changes: [{ id: 1, price: 53, purchase: 50 }], candidates,
     priceSignals: { 1: signal(0, 1) } })), 1);
-  close(rising.best.longterm.priceTerm, 0.1 * 0.1);
+  close(rising.best.longterm.priceTerm, 0.3 * 0.1);
   assert.ok(rising.flags.includes('priceRise'));
 });
 
@@ -744,13 +759,19 @@ test('at five banked free transfers Future prep never waits: rolling would waste
 });
 
 test('with no free transfer banked, waiting turns this week\'s hit into next week\'s free transfer', () => {
-  // DEF 3 projects 5; DEF 116 projects 12 a GW and takes the armband: a gain
-  // big enough to clear the hit now, and the same next week.
-  const future = runDecisionEngine(scenario({ candidates: [{ id: 116, position: 'DEF', xip: 12 }],
+  // DEF 3 projects 5; DEF 116 projects 7, 2 a GW better: over the five GWs the move clears the hit now
+  // (4.25 x 2 - 6), and waiting gives up only the planning GW's 0.5 x 2 to make the 6-point hit a 1.5 free transfer.
+  const future = runDecisionEngine(scenario({ candidates: [{ id: 116, position: 'DEF', xip: 7 }],
     freeTransfers: 0 })).modes.future;
   assert.equal(future.call, 'wait');
   close(future.deferral.laterScore - future.root.outScore,
     transferCost(0) - transferCost(1) - future.root.perGw[0]);
+  // DEF 116 at 12 a GW takes the armband: this week's gain (0.5 x 14) outweighs the 4.5 that waiting saves, so it
+  // moves now. On the averaged scale (÷ 4.25) the same week counted for 1.6 and the mode waited.
+  const big = runDecisionEngine(scenario({ candidates: [{ id: 116, position: 'DEF', xip: 12 }],
+    freeTransfers: 0 })).modes.future;
+  assert.equal(big.call, 'move');
+  assert.ok(big.root.perGw[0] > transferCost(0) - transferCost(1), `${big.root.perGw[0]}`);
 });
 
 test('Future prep never waits when no later GW counts: the season\'s last, or a Wildcard next week', () => {

@@ -79,20 +79,19 @@ const NONE = { points: 0, minutes: 0 };
 // Every stage's results are kept in data/ (gitignored with the data), so --report can rewrite the report without a rerun.
 const MODES = Object.keys(DECISION_ENGINE.modes);
 
-// Risk 8: each preset in the other unit. Long term and Future prep are
-// normalised as written, so their variant is the horizon total (largest weight
-// 1); Funds and Structure are totals as written, so theirs sums to 1. A gate
-// stated in the mode's own units (Funds' tau and eps, Future prep's deferral
-// epsilon) moves with its weights. The one-off terms stay as written - the
-// free-transfer value, the hit and lambda's money terms (FundsTerm, PriceTerm,
-// Funds' chain credit) - so what changes is how the weighted gain compares
-// with them. Structure's dead-slot penalty never fires here (no status flags),
-// so it is left alone.
+// The units. Since the solver plan's scale fix (its Phase 1) every preset is a
+// horizon total. `averaged` is Long term and Future prep as they were before
+// it: the brief's per-GW averages (÷ 3, ÷ 4.25), with lambda and Future prep's
+// deferral epsilon on that scale (0.10, 0.15, 0.1), so the fix is judged
+// against them on the same squads. `normalised` is plan risk 8's other unit for
+// Funds and Structure: their weights summing to 1, a gate stated in the mode's
+// own units (Funds' tau and eps) moving with them and the one-off terms (the
+// free-transfer value, the hit, lambda's money terms) as written. Structure's
+// dead-slot penalty never fires here (no status flags), so it is left alone.
 const DM = DECISION_ENGINE.modes;
 const decayWeights = DM.now.weights.map((_, k) => DECISION_ENGINE.decayBase ** k);
 const largest = ws => Math.max(...ws);
 const total = ws => ws.reduce((a, w) => a + w, 0);
-const toTotal = 1 / largest(DM.future.weights);
 const toNormalised = 1 / total(decayWeights);
 
 /** DECISION_ENGINE with plain-JSON overrides laid over it, each mode merged on its own (tasks carry them to workers). */
@@ -102,16 +101,18 @@ const configWith = (overrides = {}) => ({
 });
 const VARIANTS = {
   asWritten: {},
-  totals: { modes: {
-    longterm: { weights: DM.longterm.weights.map(w => w / largest(DM.longterm.weights)) },
-    future: { weights: DM.future.weights.map(w => w * toTotal), deferralEpsilon: DM.future.deferralEpsilon * toTotal },
+  averaged: { modes: {
+    longterm: { weights: DM.longterm.weights.map(w => w / total(DM.longterm.weights)), lambda: DM.longterm.lambda / total(DM.longterm.weights) },
+    future: { weights: DM.future.weights.map(w => w / total(DM.future.weights)), lambda: DM.future.lambda / total(DM.future.weights),
+      deferralEpsilon: DM.future.deferralEpsilon / total(DM.future.weights) },
   } },
   normalised: { modes: {
     funds: { weights: decayWeights.map(w => w * toNormalised), tau: DM.funds.tau * toNormalised, eps: DM.funds.eps * toNormalised },
     structure: { weights: DM.structure.weights.map(w => w / total(DM.structure.weights)) },
   } },
   ceilingMean: { modes: { ceiling: { tail: null } } },
-  // The brief's alternative for Long term (§6): decay 0.85 over five GWs, as a per-GW average like the preset.
+  // The brief's alternative for Long term (§6): decay 0.85 over five GWs, as a per-GW average like the preset was
+  // when --alt ran (before the solver plan's scale fix).
   longtermDecay: { modes: { longterm: { weights: decayWeights.map(w => w * toNormalised) } } },
 };
 
@@ -122,11 +123,14 @@ const policy = (name, kind, extra = {}) => ({ name, kind, variant: 'asWritten', 
 const BASE = [policy('none', 'none'), policy('roll', 'roll'), policy('old', 'old')];
 const SINGLE = MODES.map(mode => policy(mode, 'engine', { mode }));
 const RISK8 = [
-  policy('longterm (total)', 'engine', { variant: 'totals', mode: 'longterm', preset: 'longterm' }),
-  policy('future (total)', 'engine', { variant: 'totals', mode: 'future', preset: 'future' }),
+  policy('longterm (averaged)', 'engine', { variant: 'averaged', mode: 'longterm', preset: 'longterm' }),
+  policy('future (averaged)', 'engine', { variant: 'averaged', mode: 'future', preset: 'future' }),
   policy('funds (normalised)', 'engine', { variant: 'normalised', mode: 'funds', preset: 'funds' }),
   policy('structure (normalised)', 'engine', { variant: 'normalised', mode: 'structure', preset: 'structure' }),
 ];
+// The scale fix's "before", several moves a week too.
+const AVERAGED_MULTI = ['longterm', 'future'].map(mode => policy(`${mode}+ (averaged)`, 'engine',
+  { variant: 'averaged', mode, preset: `${mode}+`, picks: MAX_PICKS }));
 // Several moves a week: the roll baseline and each mode, as the planner is used.
 const MULTI = [policy('roll+', 'roll', { picks: MAX_PICKS }),
   ...MODES.map(mode => policy(`${mode}+`, 'engine', { mode, picks: MAX_PICKS }))];
@@ -134,10 +138,12 @@ const MULTI = [policy('roll+', 'roll', { picks: MAX_PICKS }),
 const CEILING_MEAN = policy('ceiling (mean)', 'engine', { variant: 'ceilingMean', mode: 'ceiling' });
 const BASELINES = BASE.map(p => p.name);
 const HEADLINE = [...BASELINES, ...MODES];
-const ALL_POLICIES = [...BASE, ...SINGLE, ...RISK8, ...MULTI, CEILING_MEAN];
+const ALL_POLICIES = [...BASE, ...SINGLE, ...RISK8, ...MULTI, ...AVERAGED_MULTI, CEILING_MEAN];
 const ALL = ALL_POLICIES.map(p => p.name);
-// What --merge re-runs after a change that touches only these (Phase 7b's review): Ceiling's draws, several moves a week.
-const MERGE = new Set(['ceiling', ...MULTI.map(p => p.name)]);
+// What --merge re-runs after a change that touches only these: the solver plan's scale fix (Long term and Future prep,
+// one move and several, as totals and as the averaged presets before it), and the shadow on roll's path.
+const MERGE = new Set(['longterm', 'future', 'longterm+', 'future+', 'longterm (averaged)', 'future (averaged)',
+  ...AVERAGED_MULTI.map(p => p.name)]);
 // The brief's alternative preset for Long term, one move and several (--alt), beside the preset as written.
 const ALT = [policy('longterm (decay)', 'engine', { mode: 'longterm', variant: 'longtermDecay' }),
   policy('longterm+ (decay)', 'engine', { mode: 'longterm', variant: 'longtermDecay', picks: MAX_PICKS })];
@@ -720,7 +726,7 @@ function verdictLines(results, seasons, schedule, rows = MODES, against = ['old'
     const d = paired(results, seasons, schedule, r.name, r.mode);
     return d ? `${r.name} ${ci(d, d.gws)}${verdictOf(d) === 'no clear difference' ? '' : ` **${verdictOf(d)}**`}` : null;
   }).filter(Boolean);
-  if (units.length && rows === MODES) lines.push(`- **Risk 8, each preset in the other unit, less as written:** ${units.join('; ')}.`);
+  if (units.length && rows === MODES) lines.push(`- **Each preset in the other unit, less as it is now** (Long term and Future prep averaged as before the scale fix; Funds and Structure normalised): ${units.join('; ')}.`);
   return [...summary, ...lines].join('\n');
 }
 
@@ -789,6 +795,7 @@ function altSection(alt) {
     `| ${ss.join(' and ')} | several | ${cell(ss, 'longterm+ (decay)', 'longterm+')} | ${cell(ss, 'longterm+ (decay)', 'roll+')} |`]);
   return `## Long term's alternative: decay 0.85 over five GWs
 
+Run before the solver plan's scale fix, on the averaged presets of the time (data/alt.json).
 The brief gives Long term "[1,1,1,0,0] / 3, or decay 0.85"; the preset is the first (Q6). The second, as a per-GW
 average like the first, run on the same squads (points a season):
 
@@ -796,6 +803,35 @@ average like the first, run on the same squads (points a season):
 |---|---|---|---|
 ${rows.join('\n')}
 `;
+}
+
+/**
+ * The scale fix (solver plan Phase 1), after less before: each changed mode as a total less its averaged preset, one
+ * move a week and several, points a season paired, on 2025-26 and both seasons; then every mode's transfers a
+ * season (the four the fix does not touch are the same runs either side).
+ */
+function scaleFixSection(results) {
+  const pairs = [['longterm', 'longterm (averaged)'], ['future', 'future (averaged)'],
+    ['longterm+', 'longterm+ (averaged)'], ['future+', 'future+ (averaged)']];
+  const cell = (ss, a, b) => {
+    const r = paired(results, ss, 'asItStood', a, b);
+    return r ? `${ci(r, r.gws)}${verdictOf(r) === 'no clear difference' ? '' : ` **${verdictOf(r)}**`}` : '-';
+  };
+  const transfers = (season, name) => {
+    const runs = of(results, season, 'asItStood').map(r => r.out[name]).filter(Boolean);
+    return runs.length ? f(mean(runs.map(r => r.gws.reduce((a, g) => a + g.moves, 0)))) : '-';
+  };
+  const before = name => pairs.find(([a]) => a === name)?.[1] ?? name;
+  const rows = [...MODES, ...MODES.map(m => `${m}+`)];
+  return [
+    `After less before (points a season; "worse" only where the interval is wholly below zero):`, '',
+    `| mode | ${HELD_OUT} | ${RUN_SEASONS.join(' and ')} |`, '|---|---|---|',
+    ...pairs.map(([a, b]) => `| ${labelOf(a)} | ${cell([HELD_OUT], a, b)} | ${cell(RUN_SEASONS, a, b)} |`), '',
+    'Transfers a season, before and after (means over the squads):', '',
+    `| mode | ${RUN_SEASONS.map(s => `${s} before | ${s} after`).join(' | ')} |`,
+    `|---|${RUN_SEASONS.map(() => '---|---').join('|')}|`,
+    ...rows.map(m => `| ${labelOf(m)} | ${RUN_SEASONS.map(s => `${transfers(s, before(m))} | ${transfers(s, m)}`).join(' | ')} |`),
+  ].join('\n');
 }
 
 /** data/milp.json laid over data/results.json, task by task: the referee's season beside the others, and its weeks. */
@@ -950,6 +986,7 @@ function tuningSection(tune, tuned, tuneMulti = null) {
     }).join('\n')}`;
   return `## Tuning: chosen on ${TUNE_SEASON}, tested on ${HELD_OUT}
 
+Run before the solver plan's scale fix, on the averaged presets of the time (data/tune.json, data/tune-multi.json).
 Each value below replaced its preset alone on ${TUNE_SEASON}, one move a week and, for the free-transfer value and
 the hit margin, several a week as well (all six modes; one move a week takes a hit only in Funds' chain). The gain
 is the paired season difference against the presets as written, averaged over every policy it touches (each one's
@@ -1043,15 +1080,20 @@ neighbouring weeks), so they are narrower than the truth; the paired season tota
 
 ${moveTable(results, both, 'asItStood', ALL)}
 
-## Risk 8: the mixed weight units
+## The weight units
 
-Long term and Future prep weigh a per-GW average and Funds and Structure a horizon total, yet all four are compared
-against the same free-transfer value and hit (plan risk 8). Each re-run in the other unit, its gates in that unit
-too, while the one-off terms stay as written (the free-transfer value, the hit, and lambda's money terms), less the
-preset as written (points a season). The intervals are wide (about 50-100 points either way), so "no clear
+Every mode now weighs its window as a horizon total (the solver plan's scale fix, its Phase 1): before it, Long term
+and Future prep weighed a per-GW average (÷ 3 and ÷ 4.25) against the same free-transfer value and hit as the
+others (plan risk 8). The fix also moved lambda and Future prep's deferral epsilon by the same sums (Long term
+0.10 to 0.30, Future prep 0.15 to 0.6375 and 0.1 to 0.425), so money and the wait weigh against points as before.
+
+${scaleFixSection(results)}
+
+Funds and Structure in the other unit as well, normalised to sum to 1 (their gates in that unit too, the one-off terms
+as written), less the preset (points a season). The intervals are wide (about 50-100 points either way), so "no clear
 difference" is not "no difference":
 
-${[[HELD_OUT], both].map(ss => `### ${ss.join(' and ')}\n\n| variant | less the preset |\n|---|---|\n${RISK8.map(r => {
+${[[HELD_OUT], both].map(ss => `### ${ss.join(' and ')}\n\n| variant | less the preset |\n|---|---|\n${RISK8.filter(r => r.variant === 'normalised').map(r => {
     const d = paired(results, ss, 'asItStood', r.name, r.mode);
     return `| ${r.name} | ${d ? `${ci(d, d.gws)} ${verdictOf(d) === 'no clear difference' ? '' : `**${verdictOf(d)}**`}` : '-'} |`;
   }).join('\n')}`).join('\n\n')}

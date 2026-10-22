@@ -1308,7 +1308,7 @@ The decision backtest replays 2024-25 and 2025-26. Each policy manages its own s
 
 On 2025-26, the held-out season, no mode clearly beats or trails the old engine. Against the roll rule, which uses the same projections, only Ceiling is clear: it trails by about 107 points a season. Every mode beats making no transfers by 330-430 points a season.
 
-Over both seasons, five modes beat the old engine (Ceiling does not), and none beats the roll rule. So most of the gain over the old engine comes from the projections. No cost of the mixed weight units of plan risk 8 shows up, though the test has little power.
+Over both seasons, five modes beat the old engine (Ceiling does not), and none beats the roll rule. So most of the gain over the old engine comes from the projections. No cost of the mixed weight units of plan risk 8 shows up, though the test has little power. Every mode is now a total over its window (the solver plan's scale fix): Long term and Future prep as totals, with lambda and Future prep's wait threshold scaled in step, are no worse than their averaged versions on the same squads (Long term +22.7, Future prep +3.3 a season over both seasons, neither clear), and Long term moves about 1.5 more times a season.
 
 The one-move policies move almost every week, so their free transfers bank to the cap of five: in 2025-26 they sat there from GW16, where a move costs nothing. Moves picked as the best of noisy estimates gain less than expected, for the engine and the roll rule alike.
 
