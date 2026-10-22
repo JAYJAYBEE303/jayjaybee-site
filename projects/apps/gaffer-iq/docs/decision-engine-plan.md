@@ -979,3 +979,13 @@ Per risk 5; report disagreements, Apache-2.0 attribution.
 - Docs left over from the UI-phase commit, if any, brought in line.
 - Anti-pattern greps: `.price` in budget code paths of `decision.js` / `feasibility.js`; `chanceOfPlayingNext` in decision-engine files other than `projections.js`; numeric literals other than 0 and 1 in the new engine files.
 - `npm test`; `finishing-a-development-branch` to choose how to land on `main` (fast-forward or a merge made on `main`, per the repo's deploy note).
+
+**Final as built**
+- `docs/decision-engine.md`: where the engine lives, the data contract, V_t(S), how a move is scored, the six modes, robustness, the chip hints, the input and output, and every `DECISION_ENGINE` key. `FEATURE_ENGINE.md` §14 now points to it.
+- No docs left over: the old engine's files are named only in §14's "are gone" note and in `docs/superpowers/`, which is marked history.
+- Anti-pattern greps:
+  - `.price` in `decision.js` and `feasibility.js` is read only for a buy (its price); every sale is valued at `sellPriceTenths`.
+  - `chanceOfPlayingNext`: among the decision-engine files only `projections.js` reads it (`channel.js`, `form.js` and `normalise.js` are the kept prediction layer).
+  - Numeric literals other than 0 and 1: none in the twelve engine files this branch added, nor in `prices.js`'s `calcSellPrice`; `prices.js`'s older helpers keep theirs.
+- `npm test`: 511 of 516 pass. The five failures are `channel.test.js`'s, the known baseline outside this work.
+- **Still yours to call:** Ceiling's upper tail or its mean (7b); five-GW weights for Now or Ceiling (Q6, 7b); whether to bring multi-move planning into the engine (Phase 8); how to land the branch.
