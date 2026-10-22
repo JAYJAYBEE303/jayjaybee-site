@@ -19,7 +19,9 @@
  * the values it chose on 2025-26 (data/tuned.json); --tune-multi runs the
  * sweep several moves a week (data/tune-multi.json); --alt runs Long term's
  * alternative preset (data/alt.json); --merge re-runs MERGE's policies into
- * data/results.json. The report includes each once it exists.
+ * data/results.json; --milp runs the MILP referee (Phase 8, data/milp.json;
+ * needs npm install --prefix tools/milp). The report includes each once it
+ * exists.
  *
  * Every week of every season replays the app's own path - normaliseSeason,
  * buildScoreContext, buildProjections, runDecisionEngine - on vaastav as it
@@ -52,6 +54,7 @@ import {
   slopeInterval, squadState,
 } from './lib.js';
 import { pointsModelAt } from '../points/model.js';
+import { loadSolver, milpPolicy, milpProblem, newCounts, orderMoves, solvePlan } from './milp.js';
 
 const RUN_SEASONS = ['2024-25', '2025-26'];
 const HELD_OUT = '2025-26';
@@ -138,6 +141,25 @@ const MERGE = new Set(['ceiling', ...MULTI.map(p => p.name)]);
 // The brief's alternative preset for Long term, one move and several (--alt), beside the preset as written.
 const ALT = [policy('longterm (decay)', 'engine', { mode: 'longterm', variant: 'longtermDecay' }),
   policy('longterm+ (decay)', 'engine', { mode: 'longterm', variant: 'longtermDecay', picks: MAX_PICKS })];
+
+// ─── The MILP referee (Phase 8) ──────────────────────────────────────────────
+
+// Funds' decay over five GWs, as a horizon total: points and hits in one unit. Per position, the 20 best others by
+// weighted points and the 10 best by weighted points a tenth. A solve stops within MILP_TIE points of its bound
+// (closing the rest takes several times as long here), or at its time limit with its best plan, flagged.
+const MILP = { weights: decayWeights, pool: { points: 20, pointsPerTenth: 10 } };
+const MILP_TIE = 0.5;   // points: two plans closer than the solver's tolerance are a tie
+const SOLVER = { time_limit: 10, mip_abs_gap: MILP_TIE };
+// Chip timing over the engine's own chip window (chipHints), every week weighted alike as the hints are.
+const CHIP_MILP = { ...MILP, weights: Array.from({ length: DECISION_ENGINE.horizonGws }, () => 1) };
+const CHIPS = ['benchboost', 'triplecaptain'];
+const HELD = { points: 0, pointsPerTenth: 0 };   // a pool of none: the squad as it stands
+// A solve takes seconds, so the referee reads one week in three of roll's season, and the chips one in six.
+// The referee's measures over those weeks resample them in blocks of BOOT.block entries (fifteen GWs).
+const REFEREE_EVERY = 3;
+const CHIP_EVERY = 6;
+const MILP_POLICIES = [policy('milp', 'milp')];
+const REFEREE_RIVALS = ['roll+', ...MODES.map(m => `${m}+`)];
 
 // ─── Tuning (Phase 7b) ───────────────────────────────────────────────────────
 //
@@ -298,6 +320,7 @@ function forTask(world, variants) {
 const moveOf = m => m && { outId: m.outId, inId: m.inId, chained: moveOf(m.chained) };
 const calls = result => ({
   modes: Object.fromEntries(Object.entries(result.modes).map(([id, m]) => [id, { call: m.call, root: moveOf(m.root) }])),
+  chips: Object.fromEntries(Object.entries(result.chipHints).map(([chip, hint]) => [chip, hint?.gw ?? null])),
 });
 
 /**
@@ -397,12 +420,36 @@ function oldPolicy(old) {
 
 // ─── A task: one squad's season under every policy ───────────────────────────
 
-function policyFor(spec, old) {
+function policyFor(spec, old, solver) {
   if (spec.kind === 'none') return { decide: () => ({ moves: [] }) };
   if (spec.kind === 'roll') return rollPolicy({ ...ROLL, maxBankedFt: DECISION_ENGINE.maxBankedFt, maxPicks: spec.picks });
   if (spec.kind === 'old') return oldPolicy(old);
+  if (spec.kind === 'milp') {
+    if (!solver) throw new Error('run.js: the MILP referee needs HiGHS: npm install --prefix tools/milp');
+    return milpPolicy(solver, MILP);
+  }
   return enginePolicy(spec.mode, ({ t, state, world, locks, bans }) => world.engine(spec.variant, t, state, locks, bans),
     { maxPicks: spec.picks });
+}
+
+/**
+ * A week's moves on roll's squad that week (a week of its run, g), scored on
+ * what happened over the next five GWs (cut at the season's end) against
+ * keeping the squad, less hits; also on that week's projections (V), and on
+ * the players' own projected points.
+ */
+function scoreMoves(world, g, toGw, moves) {
+  const window = Array.from({ length: Math.min(5, toGw - g.t + 1) }, (_, i) => g.t + i);
+  const own = id => sum(world.at(g.t).projections.get(id).gws.slice(0, window.length).map(x => x.xpts));
+  const after = moves.reduce((ids, m) => ids.map(id => (id === m.outId ? m.inId : id)), g.before);
+  const hits = Math.max(0, moves.length - g.ft) * DECISION_ENGINE.hitCost;
+  return {
+    moves: moves.length,
+    realised: sum(window.map(u => world.gwPoints(after, u) - world.gwPoints(g.before, u))) - hits,
+    expected: sum(window.map(u => world.expectedPoints(after, u, g.t) - world.expectedPoints(g.before, u, g.t))) - hits,
+    own: sum(moves.map(m => own(m.inId) - own(m.outId))),
+    key: moves.map(m => `${m.outId}>${m.inId}`).join(','),
+  };
 }
 
 /**
@@ -413,21 +460,8 @@ function policyFor(spec, old) {
  * gain on that week's projections (V) and on its players' own points.
  */
 function shadowOf(world, run, toGw) {
-  const hitCost = DECISION_ENGINE.hitCost;
   return run.gws.map(g => {
-    const window = Array.from({ length: Math.min(5, toGw - g.t + 1) }, (_, i) => g.t + i);
-    const own = id => sum(world.at(g.t).projections.get(id).gws.slice(0, window.length).map(x => x.xpts));
-    const score = moves => {
-      const after = moves.reduce((ids, m) => ids.map(id => (id === m.outId ? m.inId : id)), g.before);
-      const hits = Math.max(0, moves.length - g.ft) * hitCost;
-      return {
-        moves: moves.length,
-        realised: sum(window.map(u => world.gwPoints(after, u) - world.gwPoints(g.before, u))) - hits,
-        expected: sum(window.map(u => world.expectedPoints(after, u, g.t) - world.expectedPoints(g.before, u, g.t))) - hits,
-        own: sum(moves.map(m => own(m.inId) - own(m.outId))),
-        key: moves.map(m => `${m.outId}>${m.inId}`).join(','),
-      };
-    };
+    const score = moves => scoreMoves(world, g, toGw, moves);
     const result = world.engine('asWritten', g.t, { ...g.stateBefore, ft: g.ft }, new Set(), new Set());
     return {
       t: g.t, ft: g.ft, roll: score(g.moves),
@@ -439,7 +473,72 @@ function shadowOf(world, run, toGw) {
   });
 }
 
-function runTask(world, task, old) {
+/**
+ * The MILP referee on the same squads (Phase 8): every REFEREE_EVERY-th week
+ * of the roll baseline's season, on its squad, the first week of the
+ * referee's plan against each several-moves policy's week (roll+ and every
+ * mode+), scored as scoreMoves does, with what that week costs on the
+ * referee's own objective (its best plan with that first week fixed, less its
+ * free plan). Every CHIP_EVERY-th week, the chips: for each, the referee's
+ * best plan with the chip in each GW of the window (so its best week, and
+ * what the engine's chipHints week costs), and the weeks it picks for both
+ * with the squad held as it is.
+ */
+function refereeOf(world, run, toGw, solver) {
+  const counts = newCounts();
+  const engine = ({ t, state, locks, bans }) => world.engine('asWritten', t, state, locks, bans);
+  const rivals = {
+    'roll+': rollPolicy({ ...ROLL, maxBankedFt: DECISION_ENGINE.maxBankedFt, maxPicks: MAX_PICKS }),
+    ...Object.fromEntries(MODES.map(mode => [`${mode}+`, enginePolicy(mode, engine, { maxPicks: MAX_PICKS })])),
+  };
+  // The same sales and the same buys, however they are paired.
+  const setKey = moves => ['outId', 'inId'].map(side => moves.map(m => m[side]).sort((a, b) => a - b).join(',')).join('|');
+  const weeks = run.gws.filter(g => (g.t - START_GW) % REFEREE_EVERY === 0).map(g => {
+    const state = { ...g.stateBefore, ft: g.ft };
+    const stoppedBefore = counts.stopped;
+    const plan = opts => solvePlan(solver, milpProblem(world, g.t, state, opts), counts);
+    // Each chip in each GW of the window in turn: its best week, and what the hint's week costs.
+    const chipCheck = (hints, gws, chip, pool) => {
+      const values = gws.map(gw => plan({ ...CHIP_MILP, pool, chips: { [chip]: true }, fixed: { [chip]: gw } }).objective);
+      const best = Math.max(...values);
+      const hinted = gws.indexOf(hints[chip]);
+      return { week: gws[values.indexOf(best)], cost: hinted < 0 ? null : best - values[hinted] };
+    };
+    const chips = () => {
+      const stoppedAt = counts.stopped;
+      const hints = engine({ t: g.t, state, locks: new Set(), bans: new Set() }).chips;
+      const gws = CHIP_MILP.weights.map((_, k) => g.t + k).filter(gw => gw <= toGw);
+      const out = Object.fromEntries(CHIPS.map(chip => {
+        const withTransfers = chipCheck(hints, gws, chip, CHIP_MILP.pool);
+        const held = chipCheck(hints, gws, chip, HELD);
+        return [chip, { engine: hints[chip], milp: withTransfers.week, cost: withTransfers.cost, held: held.week, heldCost: held.cost }];
+      }));
+      return { ...out, stopped: counts.stopped > stoppedAt };
+    };
+    // Every policy's buys join the referee's pool, so its free plan and each policy's fixed week choose from the same players.
+    const moves = Object.fromEntries(Object.entries(rivals).map(([name, p]) => [name, p.decide({ t: g.t, state, world }).moves]));
+    const include = [...new Set(Object.values(moves).flatMap(ms => ms.map(m => m.inId)))];
+    const free = plan({ ...MILP, include });
+    const mine = orderMoves(state, free.weeks[0].in, free.weeks[0].out, world, g.t);
+    if (mine.length < free.weeks[0].in.length) counts.unordered += 1;
+    const rivalsOut = Object.fromEntries(Object.entries(moves).map(([name, ms]) => {
+      const same = setKey(ms) === setKey(mine);
+      const fixed = { first: { in: ms.map(m => m.inId), out: ms.map(m => m.outId) } };
+      const cost = same ? 0 : free.objective - plan({ ...MILP, include, fixed }).objective;
+      return [name, { ...scoreMoves(world, g, toGw, ms), same, cost }];
+    }));
+    return {
+      t: g.t, ft: g.ft,
+      milp: { ...scoreMoves(world, g, toGw, mine), plan: free.weeks.map(w => w.in.length) },
+      rivals: rivalsOut,
+      stopped: counts.stopped > stoppedBefore,
+      chips: (g.t - START_GW) % CHIP_EVERY === 0 ? chips() : null,
+    };
+  });
+  return { weeks, counts };
+}
+
+function runTask(world, task, old, solver) {
   const started = Date.now();
   const taskWorld = forTask(world, task.variants);
   const start = {
@@ -448,7 +547,7 @@ function runTask(world, task, old) {
     ft: 1,
   };
   const opts = { fromGw: START_GW, toGw: task.toGw, maxBankedFt: DECISION_ENGINE.maxBankedFt, hitCost: DECISION_ENGINE.hitCost };
-  const policies = Object.fromEntries(task.policies.map(spec => [spec.name, policyFor(spec, old)]));
+  const policies = Object.fromEntries(task.policies.map(spec => [spec.name, policyFor(spec, old, solver)]));
   const runs = simulateAll(taskWorld, start, policies, opts);
   const out = {};
   for (const [name, run] of Object.entries(runs)) {
@@ -460,7 +559,8 @@ function runTask(world, task, old) {
     };
   }
   const shadow = task.shadow && runs.roll ? shadowOf(taskWorld, runs.roll, task.toGw) : null;
-  return { season: task.season, schedule: task.schedule, squad: task.squad.index, label: task.squad.label, out, shadow,
+  const referee = task.referee && runs.roll ? refereeOf(taskWorld, runs.roll, task.toGw, solver) : null;
+  return { season: task.season, schedule: task.schedule, squad: task.squad.index, label: task.squad.label, out, shadow, referee,
     ms: Date.now() - started };
 }
 
@@ -469,11 +569,12 @@ function runTask(world, task, old) {
 async function workerMain({ oldDir }) {
   const seasons = await Promise.all(SEASONS.map(n => loadSeason(n)));
   const old = await loadOldEngine(oldDir);
+  const solver = await loadSolver(SOLVER);
   let world = null;
   parentPort.on('message', task => {
     try {
       if (world?.key !== `${task.season}|${task.schedule}`) world = buildWorld(seasons, task.season, task.schedule, old);
-      parentPort.postMessage({ ok: true, result: runTask(world, task, old) });
+      parentPort.postMessage({ ok: true, result: runTask(world, task, old, solver) });
     } catch (err) {
       parentPort.postMessage({ ok: false, error: err.stack ?? String(err) });
     }
@@ -594,7 +695,7 @@ const AGAINST = { roll: 'the roll baseline', 'roll+': 'roll+ (the roll baseline,
   none: 'no transfers' };
 
 /** One line per baseline: each mode's paired season difference and its verdict; then any verdict longer blocks change. */
-const labelOf = name => (name.endsWith('+') ? `${DECISION_ENGINE.modes[name.slice(0, -1)]?.label ?? name}+`
+const labelOf = name => (name.endsWith('+') ? `${DECISION_ENGINE.modes[name.slice(0, -1)]?.label ?? name.slice(0, -1)}+`
   : DECISION_ENGINE.modes[name]?.label ?? name);
 
 /** Each row's paired season difference against each baseline, with a tally and the longer-block check. */
@@ -697,6 +798,137 @@ ${rows.join('\n')}
 `;
 }
 
+/** data/milp.json laid over data/results.json, task by task: the referee's season beside the others, and its weeks. */
+function withMilp(results, milp) {
+  const key = r => `${r.season}|${r.schedule}|${r.squad}`;
+  const byKey = new Map(milp.map(r => [key(r), r]));
+  return results.filter(r => byKey.has(key(r))).map(r => {
+    const m = byKey.get(key(r));
+    // Its roll re-ran the main run's: if they differ, the two files are from different code.
+    if (m.out.roll.total !== r.out.roll.total) throw new Error(`run.js: ${key(r)}: data/milp.json's roll is not data/results.json's`);
+    return { ...r, out: { ...r.out, milp: m.out.milp }, referee: m.referee, ms: m.ms };
+  });
+}
+
+const refereeWeeks = (results, seasons) => seasons.flatMap(s => of(results, s, 'asItStood')).flatMap(r => r.referee?.weeks ?? []);
+const share = (xs, keep) => (xs.length ? `${f((xs.filter(keep).length / xs.length) * PERCENT, 0)}%` : '-');
+
+/**
+ * The referee's first week against each several-moves policy's, on roll's squads (refereeOf): how often they make
+ * the same moves, the weeks it makes two or more, what the policy's week costs on the referee's objective (over the
+ * weeks whose solves all reached the tolerance) and how often that is within it, and the two weeks realised over
+ * five GWs (per week; squads and blocks of referee weeks resampled).
+ */
+function refereeTable(results, seasons) {
+  const weeks = refereeWeeks(results, seasons);
+  if (!weeks.length) return '';
+  const solved = weeks.filter(w => !w.stopped);
+  const lines = REFEREE_RIVALS.map(name => {
+    const strata = seasons.map(season => of(results, season, 'asItStood').filter(r => r.referee)
+      .map(r => r.referee.weeks.map(w => w.milp.realised - w.rivals[name].realised))).filter(m => m.length);
+    const realised = pairedBootstrap(strata, BOOT);
+    const several = weeks.filter(w => w.milp.moves >= 2);
+    return `| ${labelOf(name)} | ${weeks.length} | ${share(weeks, w => w.rivals[name].same)}`
+      + ` | ${f(mean(weeks.map(w => w.milp.moves)), 2)} / ${f(mean(weeks.map(w => w.rivals[name].moves)), 2)}`
+      + ` | ${several.length} (${share(several, w => w.rivals[name].moves >= 2)})`
+      + ` | ${f(mean(solved.map(w => w.rivals[name].cost)), 2)} | ${share(solved, w => w.rivals[name].cost <= MILP_TIE)}`
+      + ` | ${ci(realised, 1, 2)}${verdictOf(realised) === 'no clear difference' ? '' : ` **${verdictOf(realised)}**`}`
+      + ` | ${signed(mean(weeks.map(w => w.milp.expected - w.rivals[name].expected)), 2)} |`;
+  });
+  return [`${solved.length} of the ${weeks.length} weeks had every solve reach the tolerance; the cost columns read those.`, '',
+    '| policy | weeks | same moves as the referee | moves a week (referee / policy) | weeks the referee makes 2+'
+    + ' (the policy too) | the policy\'s week costs the referee\'s plan | within the tolerance | referee\'s week less the'
+    + ' policy\'s, realised over 5 GWs | expected (V) |', '|---|---|---|---|---|---|---|---|---|', ...lines].join('\n');
+}
+
+/**
+ * Bench Boost and Triple Captain (refereeOf's chip weeks whose solves all reached the tolerance): how often the
+ * hint's week is as good as the referee's best, planned with transfers and with the squad held, how far apart they
+ * are, and what the hint's week costs.
+ */
+function chipTable(results, seasons) {
+  const all = refereeWeeks(results, seasons).filter(w => w.chips);
+  const weeks = all.filter(w => !w.chips.stopped);
+  if (!all.length) return '';
+  const lines = CHIPS.map(chip => {
+    const hinted = weeks.map(w => w.chips[chip]).filter(c => c.engine !== null);
+    return `| ${CHIP_LABEL[chip]} | ${hinted.length} | ${share(hinted, c => c.cost <= MILP_TIE)} | ${f(mean(hinted.map(c => c.cost)), 2)}`
+      + ` | ${signed(mean(hinted.map(c => c.milp - c.engine)), 2)} | ${share(hinted, c => c.heldCost <= MILP_TIE)}`
+      + ` | ${f(mean(hinted.map(c => c.heldCost)), 2)} |`;
+  });
+  return [`${weeks.length} of the ${all.length} chip weeks had every solve reach the tolerance; the table reads those.`, '',
+    '| chip | weeks with a hint | with transfers: the hint\'s week as good as the referee\'s | what it costs | the referee\'s'
+    + ' week less the hint\'s, GWs | with the squad held: as good | what it costs |', '|---|---|---|---|---|---|---|', ...lines]
+    .join('\n');
+}
+const CHIP_LABEL = { benchboost: 'Bench Boost', triplecaptain: 'Triple Captain' };
+
+/** The MILP referee (Phase 8): its own season, its plans against the engine's on the same squads, and chip timing. */
+function milpSection(results) {
+  if (!results?.some(r => r.out.milp)) return '';
+  const both = RUN_SEASONS;
+  const cell = (ss, b) => {
+    const r = paired(results, ss, 'asItStood', 'milp', b);
+    return r ? `${ci(r, r.gws)}${verdictOf(r) === 'no clear difference' ? '' : ` **${verdictOf(r)}**`}` : '-';
+  };
+  const rivals = ['roll+', 'old', 'none', ...MODES.map(m => `${m}+`)].filter(b => results[0].out[b]);
+  const counts = results.flatMap(r => [r.out.milp.counts, r.referee?.counts]).filter(Boolean);
+  const total = k => sum(counts.map(c => c[k]));
+  return `## The MILP referee
+
+A mixed-integer program (\`tools/milp/model.js\`, solved by HiGHS, npm \`highs\`, MIT) plans transfers over the next
+${MILP.weights.length} GWs on the engine's own projections: each week's squad (2/5/5/3, three a club), XI, captain and bench
+order, the bank at sell prices, free transfers banked to the cap and hits past them. It maximises the weighted expected
+points of the XI and captain plus the bench at the engine's linear autosub weights, less hits, with Funds' decay
+(${DECISION_ENGINE.decayBase} a GW) as a horizon total, so points and hits share a unit. It sees a chain of moves across
+weeks, which the pairwise engine does not. Its candidates are the owned squad plus, per position, the
+${MILP.pool.points} best others by weighted points and the ${MILP.pool.pointsPerTenth} best by weighted points a tenth.
+The formulation follows the shape of open-fpl-solver (Sertalp B. Cay, Apache-2.0); no code is taken from it. HiGHS
+stops each solve within ${MILP_TIE} points of the best plan, or at ${SOLVER.time_limit} s with the best plan it has found
+(counted below). It is a second opinion, not the truth: it trusts the projections fully, plans the bench linearly and
+knows nothing of 2025-26's free-transfer top-up before it happens (nor does the engine).
+
+### Its own season, several moves a week (${HELD_OUT})
+
+Each week it made the first week of its plan, re-planned the next. On the same squads as the main run:
+
+${seasonTable(results, HELD_OUT, 'asItStood', ['milp', ...rivals])}
+
+The referee less each policy, points a season:
+
+| policy | ${HELD_OUT} | ${both.join(' and ')} |
+|---|---|---|
+${rivals.map(b => `| ${b} | ${cell([HELD_OUT], b)} | ${cell(both, b)} |`).join('\n')}
+
+### Its first week against each policy's, on the same squads
+
+One week in ${REFEREE_EVERY} of the roll baseline's season, on roll's squad, the first week of the referee's plan against the moves each
+several-moves policy made from the same state. "Same moves": the same sales and the same buys. "Costs the referee's
+plan": the referee's best plan with that policy's week fixed, less its free plan, on its own objective (expected
+points; zero where they agree; every policy's buys are in the referee's pool that week, so both plans choose from the
+same players), and how often that is within the solver's tolerance. Realised: both weeks held for five GWs against
+keeping the squad, less hits, per week. Both seasons:
+
+${refereeTable(results, both)}
+
+### Chip timing
+
+One week in ${CHIP_EVERY}, on roll's squads, the engine's Bench Boost and Triple Captain hints (the planning GW's
+\`chipHints\`, for the squad as it stands) against the week the referee picks for each over the same
+${DECISION_ENGINE.horizonGws} GWs, every GW weighted alike as the hints are: its best plan with the chip in each GW in
+turn, with transfers and with the squad held as it is (which separates the model's linear bench from planning
+transfers round the chip). "Costs": the referee's best plan with the chip in the hint's week, less with it in its own
+best week; "as good" is within ${MILP_TIE} points, the solver's tolerance. Both seasons; no chip was played in any
+season above.
+
+${chipTable(results, both)}
+
+${total('solves')} solves, ${f(total('ms') / Math.max(1, total('solves')), 0)} ms each on average; ${total('stopped')} stopped at
+the ${SOLVER.time_limit} s limit with the best plan found. In ${total('unordered')} week${total('unordered') === 1 ? '' : 's'} (its own
+season and the same-squad weeks) some of the referee's moves had no order FPL takes one at a time and were left out.
+`;
+}
+
 /** The tuning sweep (2024-25) and the chosen values' test on the held-out season. */
 function tuningSection(tune, tuned, tuneMulti = null) {
   if (!tune) return '';
@@ -734,7 +966,7 @@ Chosen: ${chosen.length ? chosen.map(c => `${c.param} ${c.value} (${signed(c.gai
 `;
 }
 
-function report(results, squadsBySeason, { tune = null, tuned = null, alt = null, tuneMulti = null } = {}) {
+function report(results, squadsBySeason, { tune = null, tuned = null, alt = null, tuneMulti = null, milp = null } = {}) {
   const both = RUN_SEASONS;
   const other = RUN_SEASONS.filter(s => s !== HELD_OUT);
   const oldCounts = ['asItStood'].flatMap(sch => RUN_SEASONS.flatMap(s => of(results, s, sch))).map(r => r.out.old?.counts).filter(Boolean);
@@ -853,6 +1085,7 @@ ${ceilingLines(results, both)}
 
 ${tuningSection(tune, tuned, tuneMulti)}
 ${altSection(alt)}
+${milpSection(milp)}
 ## Sensitivity: the final schedule
 
 The same runs with vaastav's final schedule, which knows every blank and double from the start (more than a manager
@@ -937,6 +1170,14 @@ async function main() {
       season, schedule: 'asItStood', squad, toGw: SEASON_GWS, variants: VARIANTS, shadow: false,
       policies: [...ALL_POLICIES.filter(p => ['roll', 'roll+', 'longterm', 'longterm+'].includes(p.name)), ...ALT],
     })));
+  } else if (argv.includes('--milp')) {
+    // The referee's own season and, on roll's path, its plans against the engine's: paired at report time with
+    // data/results.json, whose roll it re-runs.
+    stage = 'milp';
+    stageTasks = RUN_SEASONS.flatMap(season => squadsBySeason[season].map(squad => ({
+      season, schedule: 'asItStood', squad, toGw: SEASON_GWS, variants: VARIANTS, shadow: false, referee: true,
+      policies: [...BASE.filter(p => p.name === 'roll'), ...MILP_POLICIES],
+    })));
   } else if (argv.includes('--test-tuned')) {
     const tune = await readStage('tune');
     if (!tune) throw new Error('run.js: run --tune first');
@@ -966,7 +1207,8 @@ async function main() {
     // The report's own code on these few weeks, so a full run cannot die at its end.
     const md = stage === 'results' ? report([result], squadsBySeason)
       : stage === 'alt' ? altSection([result])
-        : tuningSection(stage === 'tune' ? [result] : (await readStage('tune')).results, stage === 'tuned' ? [result] : null);
+        : stage === 'milp' ? milpSection([result])
+          : tuningSection(stage === 'tune' ? [result] : (await readStage('tune')).results, stage === 'tuned' ? [result] : null);
     console.log(stage === 'results' ? md.slice(md.indexOf('## Several moves'), md.indexOf('## Sensitivity')) : md);
     console.log(`${Math.round(result.ms / 1000)}s, rss ${Math.round(process.memoryUsage().rss / 1e6)} MB (main)`);
     return;
@@ -1021,10 +1263,11 @@ async function readPartial(stage) {
 }
 
 async function writeReport(squadsBySeason) {
-  const [main, tune, tuned, alt, tuneMulti] = await Promise.all(['results', 'tune', 'tuned', 'alt', 'tune-multi'].map(readStage));
+  const [main, tune, tuned, alt, tuneMulti, milp] = await Promise.all(['results', 'tune', 'tuned', 'alt', 'tune-multi', 'milp']
+    .map(readStage));
   if (!main) throw new Error('run.js: no data/results.json yet - run the backtest first');
   const md = report(main.results, squadsBySeason, { tune: tune?.results ?? null, tuned: tuned?.results ?? null,
-    alt: alt?.results ?? null, tuneMulti: tuneMulti?.results ?? null });
+    alt: alt?.results ?? null, tuneMulti: tuneMulti?.results ?? null, milp: milp ? withMilp(main.results, milp.results) : null });
   await writeFile(new URL('../../docs/decision-engine-backtest.md', import.meta.url), md);
   console.log(md.slice(0, md.indexOf('## What was run')));
 }

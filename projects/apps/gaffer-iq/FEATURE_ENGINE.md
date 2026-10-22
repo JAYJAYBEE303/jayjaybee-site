@@ -1318,6 +1318,12 @@ Phase 7b added several moves a week, a same-squad comparison of the picks, and a
 - **The tuning sweep** of the free-transfer value, threshold, hit margin, lambda, tau and decay, on 2024-25 (one move a week, and several for the free-transfer value and hit margin), found nothing worth 10 points a season. The presets stand.
 - **Ceiling's upper tail** (§14.4b) costs about 70 points a season against Ceiling on the mean. Over both seasons, its squads' five best weeks are lower too.
 
+### 14.6 The MILP referee (`tools/milp/model.js`, `tools/backtest/milp.js`)
+
+An offline second opinion, never loaded by the app. A mixed-integer program plans transfers over five gameweeks on the engine's own projections: each week's squad, XI, captain and bench, the bank at sell prices, free transfers banked to the cap, and hits. HiGHS (npm `highs`, MIT, installed in `tools/milp/` only) solves it. The formulation follows open-fpl-solver (Apache-2.0); no code is taken from it.
+
+In the backtest (`run.js --milp`), making the first week of its plan each week, it beat the old engine on 2025-26 by about 110 points a season, and over both seasons beat roll+ as well, which no mode did. On the same squads, its week realised 7-12 points more over five GWs than every policy's. It makes about three moves a week, taking a hit in two weeks of five. The pairwise engine, one move at a time with each gated by the free transfer's value or the hit and its margin, leaves points on the table there. The engine's chip hints matched the referee's weeks or came within half a point most of the time (Bench Boost 71%, Triple Captain 93%).
+
 ---
 
 ## 15. Full Season strip (`engine/season.js`)

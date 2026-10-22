@@ -1,0 +1,9 @@
+{
+  "name": "gaffer-iq-milp",
+  "private": true,
+  "description": "Offline MILP referee for the decision engine (docs/decision-engine-plan.md, Phase 8). Never loaded by the app.",
+  "type": "module",
+  "dependencies": {
+    "highs": "1.15.4"
+  }
+}

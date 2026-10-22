@@ -271,7 +271,9 @@ The Planner runs the decision engine (`FEATURE_ENGINE.md` §14,
 (`tests/engine/decision.test.js`, `projections.test.js`, `squad-value.test.js`,
 `minutes.test.js`, `points.test.js`, `team-goals.test.js`, `price-adapter.test.js`,
 `robustness.test.js`), the offline tools (`tests/tools/minutes.test.js`,
-`backtest.test.js`, `backtest-sim.test.js`, `points.test.js`; Ceiling's draws in
+`backtest.test.js`, `backtest-sim.test.js`, `points.test.js`, and the MILP
+referee's `milp.test.js` and `backtest-milp.test.js`, which skip their solved
+cases until `npm install --prefix tools/milp` has run; Ceiling's draws in
 `tests/engine/ceiling.test.js`)
 and the module's pure helpers (`tests/modules/planner.test.js`). The checklist
 below is the in-browser gate after a change to the engine, to `DECISION_ENGINE`
@@ -298,8 +300,11 @@ hour on four cores; `--quick` checks two squads for four weeks). It rewrites
 A run that dies keeps its finished tasks: `--resume` runs the rest, and
 `--report` rewrites the report from the saved results. To retune, `--tune`
 runs the sweep on 2024-25 (about an hour) and `--test-tuned` tries what it
-chose on 2025-26; `--alt` runs Long term's alternative preset. The report
-picks up each once it has run.
+chose on 2025-26; `--alt` runs Long term's alternative preset. `--milp` runs
+the MILP referee (Phase 8: a multi-week transfer plan solved by HiGHS, against
+the engine's moves and chip hints on the same squads); it needs
+`npm install --prefix tools/milp` first, its own dependency, never the app's.
+The report picks up each once it has run.
 
 **Never enter a real FPL team ID for this.** Seed a synthetic squad from the
 console instead:

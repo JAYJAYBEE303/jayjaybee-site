@@ -939,6 +939,38 @@ before the previous one passes. Phases 1, 2, 3 and 5 are strictly sequential.
 
 Per risk 5; report disagreements, Apache-2.0 attribution.
 
+**Design** (my calls, after your "continue")
+- **Node, not Python** (risk 5). open-fpl-solver's formulation is re-written for HiGHS's WebAssembly build, npm `highs` 1.15.4 (MIT), in `tools/milp/` with its own `package.json`: an offline tool, never loaded by the app, so "zero Python" and the app's zero dependencies both hold. The shape follows open-fpl-solver (Sertalp B. Cay, Apache-2.0); no code is taken from it, and the model's header and the report credit it.
+- **The model** (`tools/milp/model.js`, pure: LP-format text in, a decoded plan out). Over the horizon's weeks it chooses each week's buys and sales, the squad (2/5/5/3, three a club), the XI (a legal formation), the captain and the bench order. It maximises each week's weighted expected points of the XI and captain plus the bench at the engine's linear autosub weights (a MILP cannot hold the probability version), less 4 a hit at that week's weight. Money is integer tenths; an owned player sells at his sell price, one bought within the horizon at his price; the bank never goes below zero. Free transfers bank one a week to the cap; transfers past them are hits. Optionally it places Bench Boost and Triple Captain, once each and never in the same GW. Any first week's moves, or a chip's week, can be held fixed, so another plan is priced on its objective.
+- **In the backtest** (`run.js --milp`, both seasons, the schedule as it stood, the same 12 squads):
+  - *Its own season.* A policy that makes the first week of its plan each week, then re-plans, paired against roll+, the old engine, no transfers and every mode+.
+  - *Same squads.* On the roll baseline's path, one week in three: the referee's first week against each several-moves policy's week from the same state. Reported: how often they make the same sales and buys, the weeks the referee makes two moves or more, what the policy's week costs on the referee's objective (its best plan with that week fixed, less its free plan, both choosing from a pool that holds every policy's buys), and both weeks realised over five GWs (as the shadow is).
+  - *Chip timing.* One week in six: for each chip, the referee's best plan with the chip in each GW of the engine's chip window in turn, with transfers and with the squad held (which separates its linear bench from planning transfers round the chip), against `chipHints`: whether the hint's week is as good, and what it costs.
+- **Settings.** Funds' decay (0.85) over five GWs as a horizon total, so points and hits share a unit. Candidates: the owned squad plus, per position, the 20 best others by weighted points and the 10 best by weighted points a tenth. HiGHS stops within half a point of its bound, or at 10 s with its best plan; such weeks are flagged and left out of the costs. A solve with no plan at its limit runs again for four times as long.
+- **Left out.** Wildcard and Free Hit (no chip is played in the backtest); a value for free transfers left at the horizon's end (the plan spends them by then, but only its first week is made before it re-plans); 2025-26's free-transfer top-up before GW16, which the engine does not foresee either.
+
+**8 as built** (`tools/milp/model.js`, `package.json`; `tools/backtest/milp.js`, `run.js --milp`, `lib.js` checkMove; tests `tests/tools/milp.test.js`, `backtest-milp.test.js`; report `docs/decision-engine-backtest.md`, "The MILP referee")
+
+- **Its own season** (several moves a week, points a season, 95% intervals):
+  - 2025-26, held out: better than the old engine (+109 [+18, +199]), Funds+ (+107) and Ceiling+ (+152); against roll+ +57 [-25, +161], and against Now+, Long term+, Future prep+ and Structure+ +45 to +66, none clear.
+  - Both seasons pooled: better than every policy but Now+ and Long term+ (+51 and +58, not clear), including roll+ (+81 [+1, +174]), which no engine mode beat.
+  - It makes 46 transfers a season against 33-43 for the others, and takes 29 points of hits.
+- **Its first week on the same squads** (one week in three of roll's season, 288 weeks, both seasons):
+  - It makes 2.96 moves a week; roll+ 1.96, the engine's modes 0.76-2.26. It makes two or more in 223 weeks and takes a hit in 116; in those 223 weeks the modes make two or more 22-72% of the time.
+  - Same sales and buys as a policy in 3-13% of weeks.
+  - On its own objective, a policy's week costs its plan 1.2-3.0 points on average (174 weeks whose solves all reached the tolerance); within the half-point tolerance 10-34% of the time.
+  - Realised over five GWs, its week beats every policy's by 7.5-12.1 points, each clearly (roll+ +10.2 [+4.5, +18.3]). The gap holds after GW10 (+9.6 a week against roll+), so it is not only early rebuilds of the random squads.
+- **Chip timing** (one week in six; 28 of 144 chip weeks had every solve within tolerance, mostly later-season ones): the engine's Bench Boost hint is as good as the referee's best week 71% of the time with transfers (costing 0.30 points on average) and 89% with the squad held; Triple Captain 93% and 100%. The hints stand.
+- **What it says about the engine.** The pairwise engine's one move at a time, each gated by the free transfer's value or the hit plus its margin, leaves points on the table: a plan that weighs several moves and hits together, on the same projections, does better in these seasons. The referee is not shippable as is (seconds a solve in WebAssembly, linear bench, full trust in the projections), and its edge rests on taking more hits than the engine's `hitMargin` allows. A lower hit margin was tried in Phase 7b's sweep several moves a week (margin 0: +3.7 a season, not material). So the gain is in planning moves together, not in a cheaper hit. For your call: whether to explore multi-move planning in the engine (a later phase), or keep the referee as an offline check.
+- **Review fixes before the full run** (a code review of this phase):
+  - A solve stopped before it had any plan returned an infinite objective that the report read as zero. It now runs again for four times as long, and throws if it still has none; solves stopped with a plan are flagged per week and left out of the cost columns.
+  - The free plan chose from a smaller pool than the fixed plans it was compared with. Every policy's buys now join the pool that week.
+  - "Same moves" compared pairings; it now compares the sales and the buys.
+  - The tolerance is an absolute half point (`mip_abs_gap`), so "as good" means the same on every objective; the held-squad chip weeks are found by the same enumeration as the rest.
+  - The model keeps one chip a gameweek, refuses weights that rise week to week (a hit could then buy a free transfer), and has tests for sell prices and the free-transfer cap that fail when the model breaks them (the old ones read the decoder).
+  - `orderMoves` searched every order and blew up on large rebuilds; it is now greedy, most money freed first. A chip's points sat on a product bounded only from above, so a plan stopped early could leave them out; it is bounded from below as well.
+- **Run** 2 h on four cores across two container restarts (`--resume`); 6,358 solves at 4.1 s on average, 1,357 stopped at the 10 s limit.
+
 ### Final: Verification and docs
 
 > **How this serves the primary goal:** leaves the next reader able to trust and tune the engine.

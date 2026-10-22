@@ -57,6 +57,11 @@ function asBuy(world, id, t) {
   return { id, position, teamId, price: fromTenths(world.priceTenths(id, t)) };
 }
 
+/** Whether FPL takes the move on this state at gameweek t: checkSwap's {ok, reason}. */
+export function checkMove(state, { outId, inId }, world, t) {
+  return checkSwap(squadState(state, world, t), outId, asBuy(world, inId, t));
+}
+
 /**
  * The state after a week's moves, made in order: each sale at his sell
  * price, each buy at his price, recorded as what he was bought for. An

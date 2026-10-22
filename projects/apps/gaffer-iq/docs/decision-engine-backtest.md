@@ -332,6 +332,93 @@ average like the first, run on the same squads (points a season):
 | 2024-25 and 2025-26 | one move | -3.7 [-55.9, +43.9] | +0.8 [-48.5, +54.4] |
 | 2024-25 and 2025-26 | several | -14.8 [-59.0, +26.7] | +8.2 [-43.1, +69.3] |
 
+## The MILP referee
+
+A mixed-integer program (`tools/milp/model.js`, solved by HiGHS, npm `highs`, MIT) plans transfers over the next
+5 GWs on the engine's own projections: each week's squad (2/5/5/3, three a club), XI, captain and bench
+order, the bank at sell prices, free transfers banked to the cap and hits past them. It maximises the weighted expected
+points of the XI and captain plus the bench at the engine's linear autosub weights, less hits, with Funds' decay
+(0.85 a GW) as a horizon total, so points and hits share a unit. It sees a chain of moves across
+weeks, which the pairwise engine does not. Its candidates are the owned squad plus, per position, the
+20 best others by weighted points and the 10 best by weighted points a tenth.
+The formulation follows the shape of open-fpl-solver (Sertalp B. Cay, Apache-2.0); no code is taken from it. HiGHS
+stops each solve within 0.5 points of the best plan, or at 10 s with the best plan it has found
+(counted below). It is a second opinion, not the truth: it trusts the projections fully, plans the bench linearly and
+knows nothing of 2025-26's free-transfer top-up before it happens (nor does the engine).
+
+### Its own season, several moves a week (2025-26)
+
+Each week it made the first week of its plan, re-planned the next. On the same squads as the main run:
+
+| policy | points (net of hits) | transfers | hit points | weeks at the free-transfer cap | free transfers lost |
+|---|---|---|---|---|---|
+| milp | 1968.3 | 46.3 | 29.3 | 1.0 | 0.0 |
+| roll+ | 1911.3 | 38.3 | 0.0 | 1.0 | 0.0 |
+| old | 1859.3 | 35.0 | 0.0 | 23.0 | 0.0 |
+| none | 1487.7 | 0.0 | 0.0 | 31.0 | 30.0 |
+| now+ | 1902.4 | 37.8 | 0.0 | 1.0 | 0.0 |
+| longterm+ | 1913.2 | 34.9 | 0.0 | 1.0 | 0.0 |
+| future+ | 1923.0 | 33.4 | 0.0 | 15.2 | 0.0 |
+| funds+ | 1861.4 | 43.3 | 21.3 | 1.0 | 0.0 |
+| ceiling+ | 1815.9 | 40.3 | 5.0 | 1.0 | 0.0 |
+| structure+ | 1914.2 | 41.1 | 13.0 | 1.0 | 0.0 |
+
+The referee less each policy, points a season:
+
+| policy | 2025-26 | 2024-25 and 2025-26 |
+|---|---|---|
+| roll+ | +56.9 [-25.3, +160.7] | +81.1 [+1.3, +173.5] **better** |
+| old | +109.0 [+17.6, +199.1] **better** | +214.7 [+114.8, +320.9] **better** |
+| none | +480.6 [+310.8, +678.4] **better** | +512.1 [+377.1, +658.2] **better** |
+| now+ | +65.8 [-15.7, +148.2] | +51.1 [-27.6, +128.7] |
+| longterm+ | +55.1 [-16.7, +134.3] | +58.2 [-16.0, +137.9] |
+| future+ | +45.3 [-14.6, +108.9] | +75.6 [+13.1, +147.6] **better** |
+| funds+ | +106.8 [+25.2, +206.9] **better** | +120.0 [+46.2, +206.1] **better** |
+| ceiling+ | +152.3 [+61.1, +250.0] **better** | +151.3 [+74.7, +234.9] **better** |
+| structure+ | +54.1 [-18.7, +135.7] | +84.4 [+17.0, +164.2] **better** |
+
+### Its first week against each policy's, on the same squads
+
+One week in 3 of the roll baseline's season, on roll's squad, the first week of the referee's plan against the moves each
+several-moves policy made from the same state. "Same moves": the same sales and the same buys. "Costs the referee's
+plan": the referee's best plan with that policy's week fixed, less its free plan, on its own objective (expected
+points; zero where they agree; every policy's buys are in the referee's pool that week, so both plans choose from the
+same players), and how often that is within the solver's tolerance. Realised: both weeks held for five GWs against
+keeping the squad, less hits, per week. Both seasons:
+
+174 of the 288 weeks had every solve reach the tolerance; the cost columns read those.
+
+| policy | weeks | same moves as the referee | moves a week (referee / policy) | weeks the referee makes 2+ (the policy too) | the policy's week costs the referee's plan | within the tolerance | referee's week less the policy's, realised over 5 GWs | expected (V) |
+|---|---|---|---|---|---|---|---|---|
+| roll+ | 288 | 7% | 2.96 / 1.96 | 223 (47%) | 2.03 | 18% | +10.18 [+4.45, +18.33] **better** | +5.08 |
+| Now+ | 288 | 10% | 2.96 / 1.61 | 223 (46%) | 1.65 | 29% | +9.77 [+2.67, +18.40] **better** | +7.18 |
+| Long term+ | 288 | 5% | 2.96 / 1.09 | 223 (43%) | 1.82 | 14% | +10.10 [+3.66, +18.43] **better** | +7.21 |
+| Future prep+ | 288 | 4% | 2.96 / 0.76 | 223 (22%) | 2.17 | 10% | +10.88 [+4.00, +20.04] **better** | +8.20 |
+| Funds & flexibility+ | 288 | 9% | 2.96 / 2.26 | 223 (72%) | 1.52 | 21% | +7.53 [+2.10, +14.89] **better** | +2.72 |
+| Ceiling+ | 288 | 3% | 2.96 / 1.97 | 223 (55%) | 3.04 | 12% | +12.06 [+5.93, +19.98] **better** | +7.94 |
+| Structure fix+ | 288 | 13% | 2.96 / 2.16 | 223 (63%) | 1.23 | 34% | +7.48 [+1.44, +15.38] **better** | +2.37 |
+
+### Chip timing
+
+One week in 6, on roll's squads, the engine's Bench Boost and Triple Captain hints (the planning GW's
+`chipHints`, for the squad as it stands) against the week the referee picks for each over the same
+6 GWs, every GW weighted alike as the hints are: its best plan with the chip in each GW in
+turn, with transfers and with the squad held as it is (which separates the model's linear bench from planning
+transfers round the chip). "Costs": the referee's best plan with the chip in the hint's week, less with it in its own
+best week; "as good" is within 0.5 points, the solver's tolerance. Both seasons; no chip was played in any
+season above.
+
+28 of the 144 chip weeks had every solve reach the tolerance; the table reads those.
+
+| chip | weeks with a hint | with transfers: the hint's week as good as the referee's | what it costs | the referee's week less the hint's, GWs | with the squad held: as good | what it costs |
+|---|---|---|---|---|---|---|
+| Bench Boost | 28 | 71% | 0.30 | +1.07 | 89% | 0.13 |
+| Triple Captain | 28 | 93% | 0.10 | -0.57 | 100% | 0.00 |
+
+6358 solves, 4086 ms each on average; 1357 stopped at
+the 10 s limit with the best plan found. In 1 week (its own
+season and the same-squad weeks) some of the referee's moves had no order FPL takes one at a time and were left out.
+
 ## Sensitivity: the final schedule
 
 The same runs with vaastav's final schedule, which knows every blank and double from the start (more than a manager

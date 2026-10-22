@@ -97,6 +97,7 @@ jayjaybee-site/                   ← repo root (not Gaffer IQ's concern)
         ├── tools/
         │   ├── minutes/
         │   ├── backtest/
+        │   ├── milp/
         │   └── points/
         └── js/
             ├── main.js
@@ -173,8 +174,11 @@ gaffer-iq/                          (= projects/gaffer-iq/ in the repo)
 │   ├── backtest/               # vaastav's past seasons (download.js; data/ is gitignored);
 │   │                           #   history.js: each season, and its fixture schedule, as it
 │   │                           #   stood before a planning GW; run.js: the decision backtest
-│   │                           #   (lib.js simulates a season), written to
-│   │                           #   docs/decision-engine-backtest.md.
+│   │                           #   (lib.js simulates a season; milp.js runs the MILP referee
+│   │                           #   in it), written to docs/decision-engine-backtest.md.
+│   ├── milp/                   # The MILP referee's model (model.js: a multi-week transfer
+│   │                           #   plan as an LP-format MILP for HiGHS). Its own package.json
+│   │                           #   (npm "highs"); node_modules/ is gitignored.
 │   └── points/                 # Fits the points model and scores it on a held-out season;
 │                               #   writes REPORT.md (fit.js; model.js builds the model,
 │                               #   lib.js holds the maths).
