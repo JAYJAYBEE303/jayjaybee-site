@@ -191,20 +191,25 @@ export function randomSquad(pool, random, { budgetTenths, minSpendTenths, maxPer
 
 /**
  * A week's moves made a pick at a time: `pick` sees the squad after the moves
- * so far, a free transfer fewer for each, and the players bought this week
- * (never sold again the same week), and returns its next moves (Funds' pick
- * is two) or none. Stops when it has none or after maxPicks picks.
+ * so far, a free transfer fewer for each, the players bought this week
+ * (locks: never sold again the same week) and those sold (bans: never bought
+ * back), and returns its next moves (Funds' pick is two) or none. Stops when
+ * it has none or after maxPicks picks.
  */
 function pickRepeatedly(ctx, maxPicks, pick) {
   const moves = [];
   let state = ctx.state;
   const locks = new Set();
+  const bans = new Set();
   for (let picks = 1; ; picks++) {
-    const next = pick({ ...ctx, state, locks });
+    const next = pick({ ...ctx, state, locks, bans });
     moves.push(...next);
     if (!next.length || picks >= maxPicks) return { moves };
     state = { ...applyMoves(state, next, ctx.world, ctx.t), ft: Math.max(0, state.ft - next.length) };
-    for (const m of next) locks.add(m.inId);
+    for (const m of next) {
+      locks.add(m.inId);
+      bans.add(m.outId);
+    }
   }
 }
 
@@ -218,7 +223,7 @@ function pickRepeatedly(ctx, maxPicks, pick) {
 export function rollPolicy({ gain, horizon, maxBankedFt, maxPicks = 1 }) {
   return {
     decide(ctx) {
-      return pickRepeatedly(ctx, maxPicks, ({ t, state, world, locks }) => {
+      return pickRepeatedly(ctx, maxPicks, ({ t, state, world, locks, bans }) => {
         if (state.ft <= 0) return [];
         const projections = world.projections(t);
         const own = id => sum(projections.get(id)?.gws.slice(0, horizon) ?? [], g => g.xpts);
@@ -228,7 +233,7 @@ export function rollPolicy({ gain, horizon, maxBankedFt, maxPicks = 1 }) {
           if (locks.has(p.playerId)) continue;
           const mine = own(p.playerId);
           for (const q of world.candidates(t)) {
-            if (q.position !== p.position || !checkSwap(current, p.playerId, q).ok) continue;
+            if (q.position !== p.position || bans.has(q.id) || !checkSwap(current, p.playerId, q).ok) continue;
             const g = own(q.id) - mine;
             if (!best || g > best.gain) best = { outId: p.playerId, inId: q.id, gain: g };
           }
@@ -242,7 +247,7 @@ export function rollPolicy({ gain, horizon, maxBankedFt, maxPicks = 1 }) {
 
 /**
  * The new engine in one mode: its root move, and Funds' chained second move
- * after it. `engine({t, state, world, locks})` returns runDecisionEngine's
+ * after it. `engine({t, state, world, locks, bans})` returns runDecisionEngine's
  * result. With maxPicks above one it asks again on the new squad, as the
  * planner is used, until the engine's own costs make it roll.
  */

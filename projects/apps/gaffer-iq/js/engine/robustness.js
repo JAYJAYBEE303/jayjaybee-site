@@ -13,7 +13,7 @@
  */
 
 import { clamp, normalDeviate, seededRandom } from '../util.js';
-import { runDecisionEngine } from './decision.js';
+import { createDecisionCache, runDecisionEngine } from './decision.js';
 
 const logistic = z => 1 / (1 + Math.exp(-z));
 const logit = p => Math.log(p / (1 - p));
@@ -80,11 +80,14 @@ export function robustness(input, config, result) {
   const candidates = (input.candidates ?? []).filter(c => shortlist.has(c.id));
   const points = config.robustnessPoints;
   const totals = {};
+  // One cache for every re-run: V resets with each noisy projections Map, but
+  // Ceiling's draws, keyed by draw spec, which the noise leaves alone, are kept.
+  const cache = createDecisionCache();
   for (let run = 0; run < config.robustnessRuns; run++) {
     const noisy = noisyInput({ ...input, candidates }, config, random);
     // Every admissible move ranks, however far behind, so each run has its top moves.
     const runConfig = { ...noisy.config, alternativesWindow: Infinity, alternativesMax: points.length - 1 };
-    for (const [modeId, mode] of Object.entries(runDecisionEngine(noisy.input, runConfig).modes)) {
+    for (const [modeId, mode] of Object.entries(runDecisionEngine(noisy.input, runConfig, cache).modes)) {
       const tally = totals[modeId] ??= new Map();
       const ranked = mode.root ? [mode.root, ...mode.alternatives] : [];
       ranked.forEach((move, i) => tally.set(moveKey(move), (tally.get(moveKey(move)) ?? 0) + points[i]));

@@ -1286,23 +1286,37 @@ The 90th percentile comes from 500 Monte Carlo draws of the week, built from the
 - his saves, defensive contributions, bonus and cards;
 - whether he plays, and for 60 minutes, from the minutes model.
 
-Teammates share their team's goals, so three attackers from one club rise and fall together and their upside is counted. A defender facing them loses when they score. The draws average each player's projected points (tests check it).
+Teammates share their team's goals, so three attackers from one club rise and fall together and their upside is counted. A defender facing them loses when they score. The draws average each player's projected points (tests check it, including a player whose bonus record runs below his returns).
 
-The draws are seeded by player and by fixture, so every swap is scored on the same draws, and a lock or ban re-runs on them from the cache. Ceiling scores each owned player's ten best swaps by expected points at the peak week. Triple Captain counts the armband three times; Bench Boost counts all fifteen.
+Each draw's bonus uses the mean model's linear form, lifted by whatever the mean model's floor adds to its mean, so the averages agree.
 
-The card says "on its 90th percentile". On the v1 basis there is nothing to draw from, so Ceiling falls back to the mean and says "on expected points". The robustness re-runs leave the draws alone: their noise is on expected points.
+Two simplifications:
+- Teammates' goals are thinned from the team's goals independently. In a draw they can add up to more than the team scored, a slight overstatement of a stack's upside.
+- A double's rotation haircut lowers each fixture's chance of being picked. This keeps the mean, but makes playing at all a little less likely than `pZero` says.
+
+The draws are seeded by player and by fixture, so every swap is scored on the same draws. Ceiling scores each owned player's ten best swaps by expected points at the peak week. Under the tail, Keep reads the draws at the peak week too, so Keep and Out share a basis. Triple Captain counts the armband three times; Bench Boost counts all fifteen.
+
+The cache keeps the draws while a player's draw spec is the same object, so a lock or ban re-runs on them. Lock values stay on expected points at the peak week (the brief's V_t*).
+
+The card says "on its 90th percentile". On the v1 basis there is nothing to draw from, so Ceiling falls back to the mean and says "on expected points".
+
+The robustness re-runs share one cache and leave the draws alone, because their noise is on expected points. So Ceiling's peak-week term does not move with that noise, and the draws are made once.
 
 ### 14.5 How the advice was tested (`tools/backtest/run.js`)
 
 The decision backtest replays 2024-25 and 2025-26. Each policy manages its own squad from GW4 to GW38: no transfers, a naive roll rule, the old engine, and the new engine in each mode. Every week is decided on what was known before its deadline, including the fixture schedule as it stood, and scored on the points actually scored, with FPL's autosubs, hits and sell prices. `docs/decision-engine-backtest.md` holds the results, paired by squad and week with bootstrap intervals.
 
-On 2025-26, the held-out season, no mode clearly beats or trails the old engine or the roll rule. Every mode beats making no transfers by about 400 points a season. Over both seasons, every mode beats the old engine; the roll rule, which uses the same projections, does too, so most of that gain comes from the projections. No cost of the mixed weight units of plan risk 8 shows up, though the test has little power. Every policy moves almost every week, one move at a time, so free transfers bank to the cap of five; in 2025-26 every policy sat there from GW16, where a move costs nothing. Moves picked as the best of noisy estimates gain less than expected, for the engine and the roll rule alike.
+On 2025-26, the held-out season, no mode clearly beats or trails the old engine. Against the roll rule, which uses the same projections, only Ceiling is clear: it trails by about 107 points a season. Every mode beats making no transfers by 330-430 points a season.
+
+Over both seasons, five modes beat the old engine (Ceiling does not), and none beats the roll rule. So most of the gain over the old engine comes from the projections. No cost of the mixed weight units of plan risk 8 shows up, though the test has little power.
+
+The one-move policies move almost every week, so their free transfers bank to the cap of five: in 2025-26 they sat there from GW16, where a move costs nothing. Moves picked as the best of noisy estimates gain less than expected, for the engine and the roll rule alike.
 
 Phase 7b added several moves a week, a same-squad comparison of the picks, and a tuning sweep:
 - **Several moves a week.** Each mode asking again on its new squad until it rolls, as the planner is used. This changes nothing measurable.
-- **On the same squad**, each mode's pick realised no more over five GWs than the roll rule's; Future prep's and Ceiling's realised clearly less.
-- **The tuning sweep** of the free-transfer value, threshold, hit margin, lambda, tau and decay, on 2024-25, found nothing worth 10 points a season, so the presets stand. A cheaper free transfer leans better.
-- **Ceiling's upper tail** (§14.4b) costs about 70 points a season against Ceiling on the mean, and its squads' best weeks are no higher.
+- **On the same squad**, no mode's pick realised clearly more over five GWs than the roll rule's. Future prep's and Ceiling's realised clearly less.
+- **The tuning sweep** of the free-transfer value, threshold, hit margin, lambda, tau and decay, on 2024-25 (one move a week, and several for the free-transfer value and hit margin), found nothing worth 10 points a season. The presets stand.
+- **Ceiling's upper tail** (§14.4b) costs about 70 points a season against Ceiling on the mean. Over both seasons, its squads' five best weeks are lower too.
 
 ---
 

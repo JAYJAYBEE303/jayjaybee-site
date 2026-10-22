@@ -14,6 +14,12 @@
  * from the minutes model (picked, then 60+ or not); saves are Poisson, his
  * defensive contributions, cards and bonus as the mean model reads them.
  * The draws average his projected points (tests/engine/ceiling.test.js).
+ * MODEL: teammates' goals and assists are thinned from their team's goals
+ * independently, so in a draw they can add up to more than it scored (and a
+ * player can score and assist the same goal): a slight overstatement of a
+ * stack's upside. A double's rotation haircut lowers each fixture's chance
+ * of being picked, which keeps the mean but makes playing at all a little
+ * less likely than pZero says (0.979 against 0.990 at a 0.9 chance a game).
  *
  * Every player and every side has its own stream of draws, seeded by name,
  * so every swap is scored on the same draws (common random numbers) and a
@@ -122,8 +128,14 @@ function fixtureDraw(spec, side, j, random, rules) {
   const defcon = random() < t.defcon ? 1 : 0;
   const yellow = random() < t.yellow ? 1 : 0;
   const red = random() < t.red ? 1 : 0;
-  const bonus = Math.max(0, t.bonus + (spec.bonus.goal * goals) + (spec.bonus.assist * assists)
-    + (spec.bonus.cleanSheet * cleanSheet));
+  // Bonus is the mean model's linear form on the draw, lifted by what the mean
+  // model's floor adds to its mean (engine/points.js floors the mean, not each
+  // match), so the draws keep its expectation.
+  const expected = t.bonus + (spec.bonus.goal * side.goalsFor * Math.min(1, t.goal))
+    + (spec.bonus.assist * side.goalsFor * Math.min(1, t.assist))
+    + (full ? spec.bonus.cleanSheet * Math.exp(-side.goalsAgainst * Math.min(1, t.share)) : 0);
+  const bonus = t.bonus + (spec.bonus.goal * goals) + (spec.bonus.assist * assists)
+    + (spec.bonus.cleanSheet * cleanSheet) + Math.max(0, -expected);
   return (full ? rules.appearance.full : rules.appearance.short)
     + (rules.goal[position] * goals) + (rules.assist * assists) + (rules.cleanSheet[position] * cleanSheet)
     + (rules.conceded.positions.includes(position) ? rules.conceded.points * Math.floor(concededOn / rules.conceded.per) : 0)

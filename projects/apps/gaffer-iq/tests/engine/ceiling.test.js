@@ -94,6 +94,20 @@ test('each player\'s draws average his projected points, whatever the model', ()
   }
 });
 
+test('a player whose bonus record runs below his returns draws his projected points too (shipped model)', () => {
+  // Fourteen goals, six assists and no bonus: his bonus residual is far below zero, so a week without returns would floor at 0 if
+  // each draw's bonus were floored; the mean model floors only the mean.
+  const stingy = rawPlayer(7, 1, 'FWD', { minutes: 720, starts: 8, goals_scored: 14, assists: 6, bonus: 0, expected_goals: '5.0',
+    expected_goals_conceded: '8.0' });
+  const season = syntheticSeason({ playedGws: 8, fixtures: [...homeRun(1, 8, true), ...homeRun(9, 14, false)],
+    players: [...PLAYERS, stingy] });
+  const projections = buildProjections(season.players, buildScoreContext(season), { planningGw: PLANNING_GW, horizonGws: 6,
+    gwTable: liveTable([1, 2, 3, 4, 5, 6, 7], PART_TIMER), minutesModel: null, pointsModel: DECISION_ENGINE.pointsModel });
+  const xpts = projections.get(7).gws[0].xpts;
+  const drawn = mean([...drawGameweek(projections, PLANNING_GW, [7], DRAWS).points.get(7)]);
+  assert.ok(Math.abs(drawn - xpts) < 0.01 * xpts + 0.02, `drawn ${drawn} v projected ${xpts}`);
+});
+
 test('a double\'s draws average its projected points, the rotation haircut included', () => {
   const fixtures = [...homeRun(1, 8, true), [9, 1, 2], [9, 3, 1], ...homeRun(10, 14, false)];
   const projections = projectionsFor(POINTS_MODEL, fixtures);

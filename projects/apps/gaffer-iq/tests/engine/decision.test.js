@@ -548,6 +548,28 @@ test('Ceiling\'s upper tail buys the upside: of two forwards, the one a little l
   assert.equal(runDecisionEngine(scenario({ candidates: [{ id: 101, position: 'FWD', xip: 8 }] })).modes.ceiling.tail, null);
 });
 
+test('under its tail Ceiling\'s KeepValue reads the draws at t* too, so Keep and Out share a basis', () => {
+  const input = withDraws(scenario({}));
+  const noTail = { ...DECISION_ENGINE, modes: { ...DECISION_ENGINE.modes, ceiling: { ...DECISION_ENGINE.modes.ceiling, tail: null } } };
+  // Every week alike, so the mean KeepValue is 1.4 x one week's d (weights 1 and four of 0.1). Without forward 14
+  // (always 2), midfielder 12 (always 3) joins the XI: on the draws his place at t* is worth -1.
+  const mean = playerOf(runDecisionEngine(input, noTail), 14).keepValue.ceiling;
+  const tailed = playerOf(runDecisionEngine(input), 14).keepValue.ceiling;
+  close(tailed, (mean * (0.4 / 1.4)) - 1);
+});
+
+test('Ceiling\'s draws are kept while a player\'s draw spec is the same object, whatever projections Map carries it', () => {
+  const input = withDraws(scenario({}), { 13: { goals: 2, share: 1 } });
+  const cache = createDecisionCache();
+  runDecisionEngine(input, DECISION_ENGINE, cache);
+  const first = cache.tail.draws.get(13).points;
+  runDecisionEngine({ ...input, projections: new Map(input.projections) }, DECISION_ENGINE, cache);
+  assert.equal(cache.tail.draws.get(13).points, first);
+  // A new spec (new projections built) is drawn again.
+  runDecisionEngine(withDraws(scenario({}), { 13: { goals: 2, share: 1 } }), DECISION_ENGINE, cache);
+  assert.notEqual(cache.tail.draws.get(13).points, first);
+});
+
 test('Ceiling\'s tail counts the armband three times under a planned Triple Captain', () => {
   // The captain's draws vary: club 13 expects 2 goals and he takes all of them.
   const plain = withDraws(scenario({}), { 13: { goals: 2, share: 1 } });

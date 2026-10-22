@@ -130,7 +130,10 @@ export function runDecisionEngine(input, config = DECISION_ENGINE, cache = creat
     const outScore = {};
     const best = {};
     for (const [modeId, summary] of Object.entries(modes)) {
-      keepValue[modeId] = dot(summary.weights, keepDeltas.get(p.playerId));
+      // Ceiling's tail scores his place at t* on the draws as well, so Keep and Out share a basis.
+      const deltas = keepDeltas.get(p.playerId);
+      keepValue[modeId] = dot(summary.weights, modeId === 'ceiling' && ceiling.tail
+        ? deltas.map((v, k) => (k === ceiling.targetK ? ceiling.tail.keep.get(p.playerId) : v)) : deltas);
       best[modeId] = bestByMode[modeId].get(p.playerId) ?? null;
       outScore[modeId] = best[modeId]?.outScore ?? null;
     }
@@ -185,7 +188,7 @@ function prepare(input, config, cache) {
     overlay.set(ghostId(position), {
       playerId: ghostId(position), position, teamId: null, price: 0,
       gws: reference.gws.map(g => ({ ...g, fixtures: 0, xpts: 0, xptsIfPlays: 0, pZero: 1, pStart: 0,
-        p60: 0, availability: 0 })),
+        p60: 0, availability: 0, draw: null })),
     });
   }
 
@@ -386,7 +389,8 @@ function ceilingTarget(run, pairs) {
  * player has nothing to draw from (the v1 basis): Ceiling then reads the mean.
  * The draws are kept in the cache, so a lock or ban re-runs on them.
  *
- * @returns {{quantile: number, squad: number, delta: Map<object, number>, pP90: Map<number, number>}|null}
+ * @returns {{quantile: number, squad: number, delta: Map<object, number>, keep: Map<number, number>,
+ *   pP90: Map<number, number>}|null}  keep: each owned player's KeepValue term at t*, on the draws
  */
 function upperTail(run, pairs, target, opts) {
   const has = id => Boolean(run.gwOf(id, target.gw)?.draw);
@@ -396,29 +400,37 @@ function upperTail(run, pairs, target, opts) {
     .sort((a, b) => (b.dV[target.k] - a.dV[target.k]) || (a.q.id - b.q.id))
     .slice(0, opts.shortlist));
   const ids = [...new Set([...run.ids, ...shortlisted.map(pair => pair.q.id)])];
-  // Draws are kept per player and scores per squad, so a lock or ban re-runs
-  // on them; a player's draws do not depend on who else is drawn.
+  // Draws are kept per player for as long as his draw spec is the same object
+  // (a lock, a ban, or robustness's noisy re-runs, which leave specs alone),
+  // and scores per squad for as long as the projections are: a lineup is
+  // picked on expected points. A player's draws do not depend on who else is drawn.
   const { projections } = run.input;
   const key = `${target.gw}|${opts.draws}|${opts.seed}|${opts.quantile}`;
-  if (run.cache.tail?.key !== key || run.cache.tail.projections !== projections) {
-    run.cache.tail = { key, projections, points: new Map(), played: new Map(), scores: new Map() };
-  }
+  if (run.cache.tail?.key !== key) run.cache.tail = { key, projections: null, draws: new Map(), scores: new Map() };
   const store = run.cache.tail;
-  const missing = ids.filter(id => !store.points.has(id));
+  if (store.projections !== projections) {
+    store.projections = projections;
+    store.scores = new Map();
+  }
+  const specOf = id => run.gwOf(id, target.gw).draw;
+  const missing = ids.filter(id => store.draws.get(id)?.spec !== specOf(id));
   if (missing.length) {
     const drawn = drawGameweek(projections, target.gw, missing, opts);
     if (!drawn) return null;
-    for (const id of missing) {
-      store.points.set(id, drawn.points.get(id));
-      store.played.set(id, drawn.played.get(id));
-    }
+    for (const id of missing) store.draws.set(id, { spec: specOf(id), points: drawn.points.get(id), played: drawn.played.get(id) });
   }
-  const sample = { points: store.points, played: store.played };
+  // A ghost (KeepValue's empty place) never plays.
+  const ghosts = POSITIONS.map(ghostId);
+  const none = { points: new Float64Array(opts.draws), played: new Uint8Array(opts.draws) };
+  const sample = {
+    points: new Map([...ids.map(id => [id, store.draws.get(id).points]), ...ghosts.map(g => [g, none.points])]),
+    played: new Map([...ids.map(id => [id, store.draws.get(id).played]), ...ghosts.map(g => [g, none.played])]),
+  };
 
   const chip = run.chipAt(target.gw);
   const scoring = { multiplier: chip === 'triplecaptain' ? TRIPLE_CAPTAIN_MULTIPLIER : CAPTAIN_MULTIPLIER,
     benchBoost: chip === 'benchboost' };
-  const positions = new Map(ids.map(id => [id, run.overlay.get(id).position]));
+  const positions = new Map([...ids, ...ghosts].map(id => [id, run.overlay.get(id).position]));
   const tailOf = squad => {
     const k = `${chip ?? ''}|${squad.join(',')}`;
     if (!store.scores.has(k)) {
@@ -429,8 +441,9 @@ function upperTail(run, pairs, target, opts) {
   };
   const squad = tailOf(run.ids);
   const delta = new Map(shortlisted.map(pair => [pair, tailOf(swapIn(run.ids, pair.p.playerId, pair.q.id)) - squad]));
+  const keep = new Map(run.owned.map(p => [p.playerId, squad - tailOf(swapIn(run.ids, p.playerId, ghostId(p.position)))]));
   const pP90 = new Map(run.ids.map(id => [id, quantile(sample.points.get(id), opts.quantile)]));
-  return { quantile: opts.quantile, squad, delta, pP90 };
+  return { quantile: opts.quantile, squad, delta, keep, pP90 };
 }
 
 // ─── Mode 6: uncovered loss, dead slots, holds ───────────────────────────────

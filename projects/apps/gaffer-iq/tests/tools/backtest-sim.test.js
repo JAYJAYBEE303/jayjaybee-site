@@ -265,8 +265,8 @@ test('simulateAll runs every policy a week at a time, each exactly as simulate w
 
 /** A stub engine that sells the lowest unlocked id for the next buy while a free transfer is left, recording what it was asked. */
 function greedyEngine(asked, { buys = [16, 17, 18, 19, 20, 21] } = {}) {
-  return ({ state, locks }) => {
-    asked.push({ ft: state.ft, locks: [...locks].sort((a, b) => a - b) });
+  return ({ state, locks, bans }) => {
+    asked.push({ ft: state.ft, locks: [...locks].sort((a, b) => a - b), bans: [...bans].sort((a, b) => a - b) });
     const owned = new Set(state.squad.map(p => p.id));
     const out = state.squad.map(p => p.id).filter(id => !locks.has(id)).sort((a, b) => a - b)[0];
     const inId = buys.find(id => !owned.has(id));
@@ -279,15 +279,15 @@ test('a multi-move engine policy asks again on the new squad, a free transfer fe
   const policy = enginePolicy('now', greedyEngine(asked), { maxPicks: 5 });
   const moves = policy.decide({ t: 2, state: { ...startState(), ft: 2 }, world: fakeWorld() }).moves;
   assert.deepEqual(moves, [{ outId: 1, inId: 16 }, { outId: 2, inId: 17 }]);
-  // Never sells what it bought this week.
-  assert.deepEqual(asked, [{ ft: 2, locks: [] }, { ft: 1, locks: [16] }, { ft: 0, locks: [16, 17] }]);
+  // Never sells what it bought this week, nor buys back what it sold.
+  assert.deepEqual(asked, [{ ft: 2, locks: [], bans: [] }, { ft: 1, locks: [16], bans: [1] }, { ft: 0, locks: [16, 17], bans: [1, 2] }]);
   // ... and stops at maxPicks.
   const capped = enginePolicy('now', greedyEngine([]), { maxPicks: 3 });
   assert.equal(capped.decide({ t: 2, state: { ...startState(), ft: 5 }, world: fakeWorld() }).moves.length, 3);
   // Single-move (the default) asks once and passes no locks.
   const once = [];
   assert.equal(enginePolicy('now', greedyEngine(once)).decide({ t: 2, state: { ...startState(), ft: 5 }, world: fakeWorld() }).moves.length, 1);
-  assert.deepEqual(once, [{ ft: 5, locks: [] }]);
+  assert.deepEqual(once, [{ ft: 5, locks: [], bans: [] }]);
 });
 
 test('the multi-move roll baseline keeps making free moves past the threshold, never selling what it bought', () => {

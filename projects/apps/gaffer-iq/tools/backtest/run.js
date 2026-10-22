@@ -16,8 +16,10 @@
  * --report rewrites the report from the last runs' data/*.json.
  * --resume finishes a run that died, keeping the tasks it had finished.
  * --tune runs the tuning sweep on 2024-25 (data/tune.json); --test-tuned runs
- * the values it chose on 2025-26 (data/tuned.json); --alt runs Long term's
- * alternative preset (data/alt.json). The report includes each once it exists.
+ * the values it chose on 2025-26 (data/tuned.json); --tune-multi runs the
+ * sweep several moves a week (data/tune-multi.json); --alt runs Long term's
+ * alternative preset (data/alt.json); --merge re-runs MERGE's policies into
+ * data/results.json. The report includes each once it exists.
  *
  * Every week of every season replays the app's own path - normaliseSeason,
  * buildScoreContext, buildProjections, runDecisionEngine - on vaastav as it
@@ -31,7 +33,7 @@
 
 import os from 'node:os';
 import { appendFileSync } from 'node:fs';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
@@ -131,6 +133,8 @@ const BASELINES = BASE.map(p => p.name);
 const HEADLINE = [...BASELINES, ...MODES];
 const ALL_POLICIES = [...BASE, ...SINGLE, ...RISK8, ...MULTI, CEILING_MEAN];
 const ALL = ALL_POLICIES.map(p => p.name);
+// What --merge re-runs after a change that touches only these (Phase 7b's review): Ceiling's draws, several moves a week.
+const MERGE = new Set(['ceiling', ...MULTI.map(p => p.name)]);
 // The brief's alternative preset for Long term, one move and several (--alt), beside the preset as written.
 const ALT = [policy('longterm (decay)', 'engine', { mode: 'longterm', variant: 'longtermDecay' }),
   policy('longterm+ (decay)', 'engine', { mode: 'longterm', variant: 'longtermDecay', picks: MAX_PICKS })];
@@ -144,6 +148,7 @@ const ALT = [policy('longterm (decay)', 'engine', { mode: 'longterm', variant: '
 // weights stay as written (Q6).
 const TUNE_SEASON = '2024-25';
 const TUNE_MATERIAL = 10;
+const TUNE_MULTI = new Set(['free-transfer value', 'hit margin']);
 const LAMBDA_MODES = ['longterm', 'future', 'funds', 'structure'];
 const scaleFt = k => ({
   ftValueFlat: DECISION_ENGINE.ftValueFlat * k,
@@ -160,21 +165,30 @@ const TUNING = [
   } })),
   ...[0.5, 2].map(t => ({ param: 'tau', value: String(t), modes: ['funds'], overrides: everyMode(['funds'], () => ({ tau: t })) })),
   ...[0.7, 1].map(d => ({ param: 'decay', value: String(d), modes: ['funds'], overrides: { decayBase: d } })),
-].map(t => ({ ...t, variant: `${t.param} ${t.value}` }));
+].map(t => ({ ...t, variant: `${t.param} ${t.value}`, multiModes: TUNE_MULTI.has(t.param) ? MODES : [] }));
 const tuningPolicies = () => TUNING.flatMap(t => t.modes.map(mode => policy(`${mode} @ ${t.variant}`, 'engine', { mode, variant: t.variant })));
+// The same sweep, several moves a week (--tune-multi), for the values that act through several moves: the
+// free transfer's value and the hit's margin (one move a week takes a hit only in Funds' chain).
+const tuningMultiPolicies = () => [...MULTI.filter(p => p.kind === 'engine'), ...TUNING.flatMap(t => t.multiModes.map(mode =>
+  policy(`${mode}+ @ ${t.variant}`, 'engine', { mode, variant: t.variant, picks: MAX_PICKS })))];
 
 /** Two overrides objects as one, modes merged. */
 const merged = (a, b) => ({ ...a, ...b, modes: Object.fromEntries([...new Set([...Object.keys(a.modes ?? {}), ...Object.keys(b.modes ?? {})])]
   .map(m => [m, { ...a.modes?.[m], ...b.modes?.[m] }])) });
 
-/** Each sweep value's mean paired gain over the modes it touches, and the choice per parameter. */
-function tuningChoices(tune) {
+/**
+ * Each sweep value's mean paired gain over the policies it touches - its
+ * modes one move a week, and several a week where swept - and the choice per parameter.
+ */
+function tuningChoices(tune, tuneMulti = null) {
+  const gainOf = (results, a, b) => {
+    const r = paired(results, [TUNE_SEASON], 'asItStood', a, b);
+    return r ? r.mean * r.gws : NaN;
+  };
   const rows = TUNING.map(t => {
-    const gains = t.modes.map(mode => {
-      const r = paired(tune, [TUNE_SEASON], 'asItStood', `${mode} @ ${t.variant}`, mode);
-      return r ? r.mean * r.gws : NaN;
-    });
-    return { ...t, gains, gain: mean(gains) };
+    const gains = t.modes.map(mode => gainOf(tune, `${mode} @ ${t.variant}`, mode));
+    const multiGains = tuneMulti ? t.multiModes.map(mode => gainOf(tuneMulti, `${mode}+ @ ${t.variant}`, `${mode}+`)) : [];
+    return { ...t, gains, multiGains, gain: mean([...gains, ...multiGains]) };
   });
   const params = [...new Set(TUNING.map(t => t.param))];
   const chosen = params.map(param => {
@@ -275,9 +289,9 @@ function forTask(world, variants) {
     expectedPoints: memo((ids, gw, t) => squadValue(ids, gw, world.at(t).projections).value,
       (ids, gw, t) => `${t}|${gw}|${idsKey(ids)}`),
     // Only each mode's call and moves are kept: a full result per state would fill memory.
-    engine: memo((variant, t, state, locks) => calls(runDecisionEngine(engineInput(world.at(t), t, state, locks), configs.get(variant),
-      decisionCache(t, state.squad.map(p => p.id)))),
-    (variant, t, state, locks) => `${variant}|${t}|${stateKey(state)}|${idsKey(locks)}`),
+    engine: memo((variant, t, state, locks, bans) => calls(runDecisionEngine(engineInput(world.at(t), t, state, locks, bans),
+      configs.get(variant), decisionCache(t, state.squad.map(p => p.id)))),
+    (variant, t, state, locks, bans) => `${variant}|${t}|${stateKey(state)}|${idsKey(locks)}|${idsKey(bans)}`),
   };
 }
 
@@ -286,8 +300,11 @@ const calls = result => ({
   modes: Object.fromEntries(Object.entries(result.modes).map(([id, m]) => [id, { call: m.call, root: moveOf(m.root) }])),
 });
 
-/** runDecisionEngine's input as the planner builds it (modules/planner.js runEngine), with no chips, bans or price signals. */
-function engineInput({ s, projections }, t, state, locks) {
+/**
+ * runDecisionEngine's input as the planner builds it (modules/planner.js runEngine), with no chips or price
+ * signals; locks and bans only within a week of several moves (lib.js pickRepeatedly).
+ */
+function engineInput({ s, projections }, t, state, locks, bans) {
   return {
     planningGw: t,
     squad: state.squad.map(p => {
@@ -296,7 +313,7 @@ function engineInput({ s, projections }, t, state, locks) {
         priceTenths: toTenths(player.price), purchaseTenths: p.purchaseTenths };
     }),
     bankTenths: state.bankTenths, freeTransfers: state.ft, chipPlan: {}, chipsUsed: [],
-    locks, bans: new Set(), projections, candidates: s.players, priceSignals: null, hoursToDeadline: null,
+    locks, bans, projections, candidates: s.players, priceSignals: null, hoursToDeadline: null,
   };
 }
 
@@ -384,7 +401,8 @@ function policyFor(spec, old) {
   if (spec.kind === 'none') return { decide: () => ({ moves: [] }) };
   if (spec.kind === 'roll') return rollPolicy({ ...ROLL, maxBankedFt: DECISION_ENGINE.maxBankedFt, maxPicks: spec.picks });
   if (spec.kind === 'old') return oldPolicy(old);
-  return enginePolicy(spec.mode, ({ t, state, world, locks }) => world.engine(spec.variant, t, state, locks), { maxPicks: spec.picks });
+  return enginePolicy(spec.mode, ({ t, state, world, locks, bans }) => world.engine(spec.variant, t, state, locks, bans),
+    { maxPicks: spec.picks });
 }
 
 /**
@@ -410,7 +428,7 @@ function shadowOf(world, run, toGw) {
         key: moves.map(m => `${m.outId}>${m.inId}`).join(','),
       };
     };
-    const result = world.engine('asWritten', g.t, { ...g.stateBefore, ft: g.ft }, new Set());
+    const result = world.engine('asWritten', g.t, { ...g.stateBefore, ft: g.ft }, new Set(), new Set());
     return {
       t: g.t, ft: g.ft, roll: score(g.moves),
       modes: Object.fromEntries(MODES.map(mode => {
@@ -560,7 +578,7 @@ function moveTable(results, seasons, schedule, policies) {
     // Before hits: a hit taken off both sides would pull the slope towards 1.
     const fit = slopeInterval(ms.map(m => m.expected[5] + m.hits), ms.map(m => m.realised[5] + m.hits), BOOT);
     const regrets = ms.map(m => m.sellRegret).filter(x => x !== null);
-    const hitWeeks = ms.filter(m => m.free === 0);
+    const hitWeeks = ms.filter(m => m.hit > 0);
     const freeWeeks = ms.filter(m => m.hit === 0);
     return [`| ${p} | ${ms.length} | ${GAIN_WINDOWS.map(k => ci(rtg[k], 1, 2)).join(' | ')} | ${f(mean(ms.map(m => m.expected[5])), 2)}`
       + ` | ${f(fit.slope, 2)} [${f(fit.lo, 2)}, ${f(fit.hi, 2)}] | ${f(mean(regrets), 2)} | ${hitWeeks.length}`
@@ -568,7 +586,7 @@ function moveTable(results, seasons, schedule, policies) {
       + ` | ${f(freeWeeks.reduce((a, m) => a + m.realised[5], 0) / freeWeeks.reduce((a, m) => a + m.free, 0), 2)} |`];
   });
   return ['| policy | weeks with moves | realised gain, 1 GW | 3 GWs | 5 GWs | expected, 5 GWs | slope of realised on expected (5 GWs)'
-    + ' | sell regret | weeks of hits only | hit return per point | points per free transfer |',
+    + ' | sell regret | weeks with a hit | return per hit point | points per free transfer |',
   '|---|---|---|---|---|---|---|---|---|---|---|', ...lines].join('\n');
 }
 
@@ -642,6 +660,13 @@ function shadowTable(results, seasons) {
 
 /** Ceiling on its upper tail less on its mean: season points, and each squad's five best weeks. */
 function ceilingLines(results, seasons) {
+  return [[HELD_OUT], seasons].map(ss => {
+    const lines = ceilingFor(results, ss);
+    return lines ? `${ss.join(' and ')}:\n\n${lines}` : '';
+  }).filter(Boolean).join('\n\n');
+}
+
+function ceilingFor(results, seasons) {
   const season = paired(results, seasons, 'asItStood', 'ceiling', CEILING_MEAN.name);
   const runs = seasons.flatMap(s => of(results, s, 'asItStood')).filter(r => r.out.ceiling && r.out[CEILING_MEAN.name]);
   if (!season || !runs.length) return '';
@@ -660,27 +685,29 @@ function altSection(alt) {
   };
   const rows = [[HELD_OUT], RUN_SEASONS].flatMap(ss => [
     `| ${ss.join(' and ')} | one move | ${cell(ss, 'longterm (decay)', 'longterm')} | ${cell(ss, 'longterm (decay)', 'roll')} |`,
-    `| ${ss.join(' and ')} | several | ${cell(ss, 'longterm+ (decay)', 'longterm+')} | ${cell(ss, 'longterm+ (decay)', 'roll')} |`]);
+    `| ${ss.join(' and ')} | several | ${cell(ss, 'longterm+ (decay)', 'longterm+')} | ${cell(ss, 'longterm+ (decay)', 'roll+')} |`]);
   return `## Long term's alternative: decay 0.85 over five GWs
 
 The brief gives Long term "[1,1,1,0,0] / 3, or decay 0.85"; the preset is the first (Q6). The second, as a per-GW
 average like the first, run on the same squads (points a season):
 
-| seasons | moves a week | less the preset as written | less the roll baseline |
+| seasons | moves a week | less the preset as written | less the roll baseline (roll+ for several) |
 |---|---|---|---|
 ${rows.join('\n')}
 `;
 }
 
 /** The tuning sweep (2024-25) and the chosen values' test on the held-out season. */
-function tuningSection(tune, tuned) {
+function tuningSection(tune, tuned, tuneMulti = null) {
   if (!tune) return '';
-  const { rows, chosen } = tuningChoices(tune);
+  const { rows, chosen } = tuningChoices(tune, tuneMulti);
   const widths = TUNING.flatMap(t => t.modes.map(mode => paired(tune, [TUNE_SEASON], 'asItStood', `${mode} @ ${t.variant}`, mode)))
     .filter(Boolean).map(r => ((r.hi - r.lo) / 2) * r.gws).sort((a, b) => a - b);
   const halfWidth = widths[Math.floor(widths.length / 2)];
-  const sweep = rows.map(r => `| ${r.param} | ${r.value} | ${r.modes.map(labelOf).join(', ')} | ${signed(r.gain)}`
-    + ` | ${r.gains.map(g => signed(g, 0)).join(', ')} |`);
+  const modesOf = r => `${r.modes.length === MODES.length ? 'all six' : r.modes.map(labelOf).join(', ')}`
+    + `${r.multiModes.length && tuneMulti ? `; several a week: ${r.multiModes.length === MODES.length ? 'all six' : r.multiModes.map(labelOf).join(', ')}` : ''}`;
+  const sweep = rows.map(r => `| ${r.param} | ${r.value} | ${modesOf(r)} | ${signed(r.gain)}`
+    + ` | ${r.gains.map(g => signed(g, 0)).join(', ')} | ${r.multiGains.length ? r.multiGains.map(g => signed(g, 0)).join(', ') : '-'} |`);
   const test = !tuned ? '' : `\n\nThe chosen values together, on ${HELD_OUT} (held out), less the presets as written (points a season):\n\n`
     + `| mode | one move a week | several a week |\n|---|---|---|\n${MODES.map(mode => {
       const cell = (a, b) => {
@@ -691,21 +718,23 @@ function tuningSection(tune, tuned) {
     }).join('\n')}`;
   return `## Tuning: chosen on ${TUNE_SEASON}, tested on ${HELD_OUT}
 
-Each value below replaced its preset alone, one move a week, on ${TUNE_SEASON}; the gain is the paired season
-difference against the presets as written, averaged over the modes it touches (each mode's own in the last
-column). A value is chosen if its gain is at least ${TUNE_MATERIAL} points a season. The mode weights are not tuned (Q6).
+Each value below replaced its preset alone on ${TUNE_SEASON}, one move a week and, for the free-transfer value and
+the hit margin, several a week as well (all six modes; one move a week takes a hit only in Funds' chain). The gain
+is the paired season difference against the presets as written, averaged over every policy it touches (each one's
+own in the last two columns, modes in order). A value is chosen if its gain is at least ${TUNE_MATERIAL} points a
+season. The mode weights are not tuned (Q6).
 For scale, one value on one mode carries a 95% interval of about ${f(halfWidth)} points either way (the median over
 the sweep), so the sweep can show only a large effect.
 
-| parameter | value | modes | mean gain | per mode |
-|---|---|---|---|---|
+| parameter | value | modes | mean gain | per mode, one move | per mode, several |
+|---|---|---|---|---|---|
 ${sweep.join('\n')}
 
 Chosen: ${chosen.length ? chosen.map(c => `${c.param} ${c.value} (${signed(c.gain)})`).join('; ') : 'nothing clears the bar; the presets stand'}.${test}
 `;
 }
 
-function report(results, squadsBySeason, { tune = null, tuned = null, alt = null } = {}) {
+function report(results, squadsBySeason, { tune = null, tuned = null, alt = null, tuneMulti = null } = {}) {
   const both = RUN_SEASONS;
   const other = RUN_SEASONS.filter(s => s !== HELD_OUT);
   const oldCounts = ['asItStood'].flatMap(sch => RUN_SEASONS.flatMap(s => of(results, s, sch))).map(r => r.out.old?.counts).filter(Boolean);
@@ -714,7 +743,7 @@ function report(results, squadsBySeason, { tune = null, tuned = null, alt = null
   return `# Decision engine backtest
 
 Generated by \`node tools/backtest/run.js\` (docs/decision-engine-plan.md,
-Phase 7a). Do not edit by hand: change the tool and run it again.
+Phase 7). Do not edit by hand: change the tool and run it again.
 
 ## Verdict
 
@@ -774,8 +803,9 @@ ${[[HELD_OUT], other, both].map(ss => `### ${ss.join(' and ')}\n\n${pairedTable(
 Both seasons. A week's moves against keeping the squad as it was, both held for the window (cut at GW${SEASON_GWS}),
 less that week's hits: realised on actual points; expected on the projections made that week, whose slope against
 the realised gain should be near 1. Sell regret: the most the same buy would have gained over five GWs with any
-other legal sale, less this sale's (weeks with one move). Hit return: the gain before hits per point of hits, in
-weeks whose every move was a hit. Points per free transfer: weeks without a hit. The slope is taken before hits.
+other legal sale, less this sale's (weeks with one move). Return per hit point: the week's gain before hits per point
+of hits, its free moves included (a week always starts with a free transfer). Points per free transfer: weeks
+without a hit. The slope is taken before hits.
 These intervals treat each week's moves as independent, which they are not (the same buys recur across squads and
 neighbouring weeks), so they are narrower than the truth; the paired season totals above are the verdict.
 
@@ -797,7 +827,8 @@ ${[[HELD_OUT], both].map(ss => `### ${ss.join(' and ')}\n\n| variant | less the 
 ## Several moves a week
 
 Each mode, and the roll baseline, made a pick and then asked again on the new squad with one free transfer
-fewer, until it rolled (at most ${MAX_PICKS} a week): the planner's cards used one after another. The engine's own
+fewer, until it rolled (at most ${MAX_PICKS} picks a week; Funds' pick is two moves): the planner's cards used one
+after another, never selling a player bought that week nor buying back one sold. The engine's own
 costs stop it - the free transfer's value, then the hit and its margin - so banked free transfers, and hits, come
 into play (roll+ never takes a hit). Points a season:
 
@@ -816,11 +847,11 @@ ${shadowTable(results, both)}
 ## Ceiling's upper tail
 
 Ceiling now scores a swap at its target GW by the change to the squad's 90th-percentile score over Monte Carlo draws
-of the points model's parts (engine/ceiling.js), not by its expected points. Less Ceiling on the mean, both seasons:
+of the points model's parts (engine/ceiling.js), not by its expected points. Less Ceiling on the mean:
 
 ${ceilingLines(results, both)}
 
-${tuningSection(tune, tuned)}
+${tuningSection(tune, tuned, tuneMulti)}
 ${altSection(alt)}
 ## Sensitivity: the final schedule
 
@@ -844,10 +875,10 @@ were computed as its planner did, though no chip was played.
   and both engines miss injury news a manager had.
 - No price signals: vaastav's weekly transfer counts are recorded after the deadline. PriceTerm is zero for every move.
 - No chips, for anyone.
-- Every policy makes at most one move a week (Funds two, with its chained move), so free transfers banked past one go
-  unused: in ${HELD_OUT}, after the AFCON top-up, every policy sits at the cap of five from GW16, where a move costs
-  nothing and a threshold of zero is all it must clear. With one free transfer always in hand, no policy can take a
-  hit except Funds' second move.
+- The one-move policies make at most one move a week (Funds two, with its chained move), so free transfers banked past
+  one go unused: in ${HELD_OUT}, after the AFCON top-up, every one of them sits at the cap of five from GW16, where a
+  move costs nothing and a threshold of zero is all it must clear; with one free transfer always in hand, none can
+  take a hit except Funds' second move. The several-moves policies (names ending +) use the banked transfers and can.
 - A player whose club has no fixture in a week has no vaastav row for it, so his price that week is his last one.
 
 Worker time: ${f(sum(results.map(r => r.ms)) / 60000)} minutes over ${results.length} tasks.
@@ -890,17 +921,29 @@ async function main() {
       season: TUNE_SEASON, schedule: 'asItStood', squad, toGw: SEASON_GWS, variants, shadow: false,
       policies: [...SINGLE, ...tuningPolicies()],
     }));
+  } else if (argv.includes('--tune-multi')) {
+    const variants = { ...VARIANTS, ...Object.fromEntries(TUNING.map(t => [t.variant, t.overrides])) };
+    stage = 'tune-multi';
+    stageTasks = squadsBySeason[TUNE_SEASON].map(squad => ({
+      season: TUNE_SEASON, schedule: 'asItStood', squad, toGw: SEASON_GWS, variants, shadow: false, policies: tuningMultiPolicies(),
+    }));
+  } else if (argv.includes('--merge')) {
+    // Re-runs only MERGE's policies (and the shadow, on roll's path) and lays them over data/results.json.
+    stage = 'merge';
+    stageTasks = tasks.map(t => ({ ...t, policies: t.policies.filter(p => MERGE.has(p.name) || (t.shadow && p.name === 'roll')) }));
   } else if (argv.includes('--alt')) {
     stage = 'alt';
     stageTasks = RUN_SEASONS.flatMap(season => squadsBySeason[season].map(squad => ({
       season, schedule: 'asItStood', squad, toGw: SEASON_GWS, variants: VARIANTS, shadow: false,
-      policies: [...BASE.filter(p => p.name === 'roll'), ...ALL_POLICIES.filter(p => p.name === 'longterm' || p.name === 'longterm+'), ...ALT],
+      policies: [...ALL_POLICIES.filter(p => ['roll', 'roll+', 'longterm', 'longterm+'].includes(p.name)), ...ALT],
     })));
   } else if (argv.includes('--test-tuned')) {
     const tune = await readStage('tune');
     if (!tune) throw new Error('run.js: run --tune first');
-    const { overrides, chosen } = tuningChoices(tune.results);
+    const { overrides, chosen } = tuningChoices(tune.results, (await readStage('tune-multi'))?.results ?? null);
     if (!chosen.length) {
+      // An earlier test of an earlier choice must not stay in the report.
+      await rm(stageFile('tuned'), { force: true });
       console.log('run.js: the sweep chose nothing, so the tuned presets are the presets as written: nothing to test');
       return;
     }
@@ -929,6 +972,7 @@ async function main() {
     return;
   }
   await runStage(stage, stageTasks, oldDir, argv);
+  if (stage === 'merge') await mergeIntoResults();
   await writeReport(squadsBySeason);
 }
 
@@ -949,6 +993,18 @@ async function runStage(stage, tasks, oldDir, argv) {
 }
 
 const stageFile = stage => new URL(`./data/${stage}.json`, import.meta.url);
+
+/** Lays data/merge.json's policies (and shadows) over data/results.json, task by task. */
+async function mergeIntoResults() {
+  const [main, merge] = await Promise.all([readStage('results'), readStage('merge')]);
+  const key = r => `${r.season}|${r.schedule}|${r.squad}`;
+  const fresh = new Map(merge.results.map(r => [key(r), r]));
+  const results = main.results.map(r => {
+    const m = fresh.get(key(r));
+    return m ? { ...r, out: { ...r.out, ...m.out }, shadow: m.shadow ?? r.shadow } : r;
+  });
+  await writeFile(stageFile('results'), JSON.stringify({ results }));
+}
 const partialOf = stage => new URL(`./data/${stage}-partial.jsonl`, import.meta.url);
 const readStage = async stage => JSON.parse(await readFile(stageFile(stage), 'utf8').catch(() => 'null'));
 
@@ -965,10 +1021,10 @@ async function readPartial(stage) {
 }
 
 async function writeReport(squadsBySeason) {
-  const [main, tune, tuned, alt] = await Promise.all(['results', 'tune', 'tuned', 'alt'].map(readStage));
+  const [main, tune, tuned, alt, tuneMulti] = await Promise.all(['results', 'tune', 'tuned', 'alt', 'tune-multi'].map(readStage));
   if (!main) throw new Error('run.js: no data/results.json yet - run the backtest first');
-  const md = report(main.results, squadsBySeason,
-    { tune: tune?.results ?? null, tuned: tuned?.results ?? null, alt: alt?.results ?? null });
+  const md = report(main.results, squadsBySeason, { tune: tune?.results ?? null, tuned: tuned?.results ?? null,
+    alt: alt?.results ?? null, tuneMulti: tuneMulti?.results ?? null });
   await writeFile(new URL('../../docs/decision-engine-backtest.md', import.meta.url), md);
   console.log(md.slice(0, md.indexOf('## What was run')));
 }
