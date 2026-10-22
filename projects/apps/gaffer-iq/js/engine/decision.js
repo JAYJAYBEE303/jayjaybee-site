@@ -376,7 +376,8 @@ function ceilingTarget(run, pairs) {
   }
   const protectedIds = new Set(run.owned.map(p => p.playerId)
     .filter(id => lockValues.get(id) !== null && lockValues.get(id) >= mode.lockThreshold));
-  const tail = target && mode.tail ? upperTail(run, pairs, target, mode.tail) : null;
+  const trigger = target && mode.tail ? bigWeek(run, pairs, target, mode.tail) : null;
+  const tail = trigger ? upperTail(run, pairs, target, mode.tail, trigger) : null;
   return { targetGw: target?.gw ?? null, targetK: target?.k ?? null, weights, lockValues, protectedIds, replacements, tail };
 }
 
@@ -392,13 +393,10 @@ function ceilingTarget(run, pairs) {
  * @returns {{quantile: number, squad: number, delta: Map<object, number>, keep: Map<number, number>,
  *   pP90: Map<number, number>}|null}  keep: each owned player's KeepValue term at t*, on the draws
  */
-function upperTail(run, pairs, target, opts) {
+function upperTail(run, pairs, target, opts, trigger) {
   const has = id => Boolean(run.gwOf(id, target.gw)?.draw);
   if (!run.ids.every(has)) return null;
-  const shortlisted = run.owned.flatMap(p => pairs
-    .filter(pair => pair.p === p && !run.bans.has(pair.q.id) && has(pair.q.id))
-    .sort((a, b) => (b.dV[target.k] - a.dV[target.k]) || (a.q.id - b.q.id))
-    .slice(0, opts.shortlist));
+  const shortlisted = tailShortlist(run, pairs, target, opts);
   const ids = [...new Set([...run.ids, ...shortlisted.map(pair => pair.q.id)])];
   // Draws are kept per player for as long as his draw spec is the same object
   // (a lock, a ban, or robustness's noisy re-runs, which leave specs alone),
@@ -443,7 +441,35 @@ function upperTail(run, pairs, target, opts) {
   const delta = new Map(shortlisted.map(pair => [pair, tailOf(swapIn(run.ids, pair.p.playerId, pair.q.id)) - squad]));
   const keep = new Map(run.owned.map(p => [p.playerId, squad - tailOf(swapIn(run.ids, p.playerId, ghostId(p.position)))]));
   const pP90 = new Map(run.ids.map(id => [id, quantile(sample.points.get(id), opts.quantile)]));
-  return { quantile: opts.quantile, squad, delta, keep, pP90 };
+  return { quantile: opts.quantile, trigger, squad, delta, keep, pP90 };
+}
+
+/**
+ * The swaps Ceiling's tail weighs: each owned player's `shortlist` best by
+ * expected points at t*, among buys that are not banned and have draws.
+ */
+function tailShortlist(run, pairs, target, opts) {
+  const has = id => Boolean(run.gwOf(id, target.gw)?.draw);
+  return run.owned.flatMap(p => pairs
+    .filter(pair => pair.p === p && !run.bans.has(pair.q.id) && has(pair.q.id))
+    .sort((a, b) => (b.dV[target.k] - a.dV[target.k]) || (a.q.id - b.q.id))
+    .slice(0, opts.shortlist));
+}
+
+/**
+ * Whether t* is a big week for this squad, the only weeks Ceiling reads its
+ * upper tail (the solver plan's Phase 2): Bench Boost or Triple Captain
+ * planned for it, or a double for a squad player or one of the replacements
+ * the tail would weigh - not merely some club playing twice. Otherwise it
+ * reads expected points, as the other modes do.
+ *
+ * @returns {'benchboost'|'triplecaptain'|'double'|null}
+ */
+function bigWeek(run, pairs, target, opts) {
+  const chip = run.chipAt(target.gw);
+  if (chip) return chip;
+  const ids = [...run.ids, ...tailShortlist(run, pairs, target, opts).map(pair => pair.q.id)];
+  return ids.some(id => (run.gwOf(id, target.gw)?.fixtures ?? 0) > 1) ? 'double' : null;
 }
 
 // ─── Mode 6: uncovered loss, dead slots, holds ───────────────────────────────
@@ -582,7 +608,7 @@ function scoreMode(run, { modeId, mode, raw, weights, share, pairs, ceiling, str
   };
   if (modeId === 'ceiling') {
     summary.targetGw = ceiling.targetGw;
-    summary.tail = ceiling.tail && { quantile: ceiling.tail.quantile, squad: ceiling.tail.squad };
+    summary.tail = ceiling.tail && { quantile: ceiling.tail.quantile, trigger: ceiling.tail.trigger, squad: ceiling.tail.squad };
   }
   const top = records.slice(0, config.robustnessShortlist)
     .flatMap(r => (r.chained ? [r.pair.q.id, r.chained.inId] : [r.pair.q.id]));
@@ -743,6 +769,11 @@ function buildMove(run, modeId, weights, record, freeTransfers = run.input.freeT
     transferCost: cost,
     deadSlotTerm: record.deadSlotTerm,
     outScore: record.outScore,
+    // Its squad gain over the next five GWs at full weight, less its cost, and the GWs that counts: shown on Now's
+    // and Ceiling's cards, whose own figures weigh one GW above the rest (the solver plan's Phase 2). Expected points,
+    // the upper tail aside; a GW a planned Free Hit or Wildcard covers, or past the season's end, is left out. Funds'
+    // chained move has no swap of its own here: null.
+    overFiveGws: record.pair.dV ? overGws(run, record.pair.dV, cost) : null,
     efficiency: record.efficiency,
     tentativeFromGw: first + 1,
     minutesRisk: { out: minutesRisk(config, pGw), in: minutesRisk(config, qGw) },
@@ -750,6 +781,12 @@ function buildMove(run, modeId, weights, record, freeTransfers = run.input.freeT
     tags,
     why: explain(run, weights, record, freeTransfers, tags),
   };
+}
+
+/** A swap's gain over the mode GWs this squad plays, at full weight, less its cost; and those GWs. */
+function overGws(run, dV, cost) {
+  const counted = run.modeGws.map((gw, k) => k).filter(k => !run.zeroed(run.modeGws[k]));
+  return { points: sum(counted.map(k => dV[k])) - cost, gws: counted.map(k => run.modeGws[k]) };
 }
 
 /** 'blank' with no fixture (his pZero of 1 is no minutes risk), else by pZero. */

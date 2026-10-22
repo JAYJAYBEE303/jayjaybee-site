@@ -17,7 +17,7 @@ import { squadValue } from '../../js/engine/squad-value.js';
 import { DECISION_ENGINE, SEASON_GWS } from '../../js/config.js';
 
 import {
-  GW, MODES, BASE, close, scenario, playerOf, allBest,
+  GW, MODES, BASE, close, scenario, playerOf, allBest, projectionOf,
 } from './decision-fixtures.js';
 
 // ─── Transfer cost (plan §5.2) ───────────────────────────────────────────────
@@ -85,7 +85,7 @@ test('every owned player carries KeepValue, OutScore and his best move for all s
     { id: 101, position: 'GKP', xip: 4.5, price: 45 }, { id: 102, position: 'DEF', xip: 5.2, price: 45 },
     { id: 103, position: 'MID', xip: 8.2, price: 45 }, { id: 104, position: 'FWD', xip: 9.2, price: 45 }] }));
   const components = ['outId', 'inId', 'deltaEv', 'perGw', 'fundsTerm', 'priceTerm', 'transferCost',
-    'deadSlotTerm', 'outScore', 'tentativeFromGw', 'minutesRisk', 'chained', 'tags', 'why'];
+    'deadSlotTerm', 'outScore', 'overFiveGws', 'tentativeFromGw', 'minutesRisk', 'chained', 'tags', 'why'];
   assert.equal(result.players.length, 15);
   for (const player of result.players) {
     for (const mode of MODES) {
@@ -542,10 +542,66 @@ function withDraws(input, scoring = {}) {
   return { ...input, projections };
 }
 
+/**
+ * The input with player `id` playing twice in the planning GW (k = 0) - his points unchanged, so only the fixture
+ * count moves: with every GW otherwise alike, that GW stays t* (a tie goes to the GW with more doubles). An `id`
+ * outside the squad and the candidates gets a projection of his own, at a club nobody else plays for.
+ */
+function doubleAt(input, id, k = 0) {
+  const projections = new Map(input.projections);
+  const p = projections.get(id) ?? projectionOf({ id, position: 'MID', team: id, price: 50, xip: 1 }, input.planningGw);
+  projections.set(id, { ...p, gws: p.gws.map((g, i) => (i === k ? { ...g, fixtures: 2, draw: g.draw } : g)) });
+  return { ...input, projections };
+}
+
+// 101 projects 8 and always scores 2; 102 projects 7.9 but takes half of his club's 3 expected goals.
+const UPSIDE = () => withDraws(scenario({ candidates: [
+  { id: 101, position: 'FWD', xip: 8 }, { id: 102, position: 'FWD', xip: 7.9 }] }), { 102: { goals: 3, share: 0.5 } });
+
+test('Now\'s and Ceiling\'s moves carry the 5-GW figure: the squad gain over the next five GWs at full weight, less the transfer\'s cost', () => {
+  // Keeper 101 is 1 better every GW: 5 over five GWs, less the free transfer's 1.5.
+  const result = runDecisionEngine(scenario({ candidates: [{ id: 101, position: 'GKP', xip: 5 }] }));
+  for (const mode of ['now', 'ceiling']) {
+    close(playerOf(result, 1).best[mode].overFiveGws.points, 5 - 1.5, mode);
+    assert.deepEqual(playerOf(result, 1).best[mode].overFiveGws.gws, [GW, GW + 1, GW + 2, GW + 3, GW + 4]);
+  }
+  // Now's own figure counts the planning GW alone: the five-GW view is what it gives up, or gains, beyond it.
+  close(playerOf(result, 1).best.now.outScore, 1 - 1.5);
+  // A Wildcard planned two GWs on leaves two GWs for this squad, and the figure says which.
+  const wildcard = runDecisionEngine(scenario({ candidates: [{ id: 101, position: 'GKP', xip: 5 }], chipPlan: { [GW + 2]: 'wildcard' } }));
+  close(playerOf(wildcard, 1).best.now.overFiveGws.points, 2 - 1.5);
+  assert.deepEqual(playerOf(wildcard, 1).best.now.overFiveGws.gws, [GW, GW + 1]);
+  // So does the season's end.
+  const late = runDecisionEngine(scenario({ candidates: [{ id: 101, position: 'GKP', xip: 5 }], planningGw: SEASON_GWS - 1 }));
+  assert.deepEqual(playerOf(late, 1).best.now.overFiveGws.gws, [SEASON_GWS - 1, SEASON_GWS]);
+});
+
+test('Ceiling reads expected points unless its target GW is a big week for the players it would weigh', () => {
+  // No double for anyone and no chip planned: the mean, and the forward who projects more.
+  const plain = runDecisionEngine(UPSIDE()).modes.ceiling;
+  assert.equal(plain.tail, null);
+  assert.equal(plain.root.inId, 101);
+  // A double for a squad player (defender 3) at t*: the upper tail, and the forward with the upside.
+  const squadDouble = runDecisionEngine(doubleAt(UPSIDE(), 3)).modes.ceiling;
+  assert.deepEqual([squadDouble.tail.quantile, squadDouble.tail.trigger, squadDouble.root.inId], [0.9, 'double', 102]);
+  // A double for one of the replacements it shortlists (forward 102).
+  assert.equal(runDecisionEngine(doubleAt(UPSIDE(), 102)).modes.ceiling.tail.trigger, 'double');
+  // A double only at a club neither the squad nor the shortlist involves: not a big week for this squad.
+  const elsewhere = runDecisionEngine(doubleAt(UPSIDE(), 999)).modes.ceiling;
+  assert.equal(elsewhere.targetGw, GW);
+  assert.equal(elsewhere.tail, null);
+  // Nor a banned player's double: he is no replacement.
+  const banned = runDecisionEngine({ ...doubleAt(UPSIDE(), 102), bans: new Set([102]) }).modes.ceiling;
+  assert.equal(banned.tail, null);
+  // A planned Bench Boost or Triple Captain at t* is a big week by itself.
+  for (const chip of ['benchboost', 'triplecaptain']) {
+    assert.equal(runDecisionEngine({ ...UPSIDE(), chipPlan: { [GW]: chip } }).modes.ceiling.tail.trigger, chip, chip);
+  }
+  assert.ok(DECISION_ENGINE.modes.ceiling.tail, 'the tail stays configured; the big week switches it on');
+});
+
 test('Ceiling\'s upper tail buys the upside: of two forwards, the one a little lower on expected points but far higher at its 90th percentile', () => {
-  // 101 projects 8 and always scores 2; 102 projects 7.9 but takes half of his club's 3 expected goals.
-  const input = withDraws(scenario({ candidates: [
-    { id: 101, position: 'FWD', xip: 8 }, { id: 102, position: 'FWD', xip: 7.9 }] }), { 102: { goals: 3, share: 0.5 } });
+  const input = doubleAt(UPSIDE(), 3);
   const tailed = runDecisionEngine(input);
   assert.equal(tailed.modes.ceiling.call, 'move');
   assert.equal(tailed.modes.ceiling.root.inId, 102);
@@ -564,7 +620,7 @@ test('Ceiling\'s upper tail buys the upside: of two forwards, the one a little l
 });
 
 test('under its tail Ceiling\'s KeepValue reads the draws at t* too, so Keep and Out share a basis', () => {
-  const input = withDraws(scenario({}));
+  const input = doubleAt(withDraws(scenario({})), 3);
   const noTail = { ...DECISION_ENGINE, modes: { ...DECISION_ENGINE.modes, ceiling: { ...DECISION_ENGINE.modes.ceiling, tail: null } } };
   // Every week alike, so the mean KeepValue is 1.4 x one week's d (weights 1 and four of 0.1). Without forward 14
   // (always 2), midfielder 12 (always 3) joins the XI: on the draws his place at t* is worth -1.
@@ -574,20 +630,20 @@ test('under its tail Ceiling\'s KeepValue reads the draws at t* too, so Keep and
 });
 
 test('Ceiling\'s draws are kept while a player\'s draw spec is the same object, whatever projections Map carries it', () => {
-  const input = withDraws(scenario({}), { 13: { goals: 2, share: 1 } });
+  const input = doubleAt(withDraws(scenario({}), { 13: { goals: 2, share: 1 } }), 3);
   const cache = createDecisionCache();
   runDecisionEngine(input, DECISION_ENGINE, cache);
   const first = cache.tail.draws.get(13).points;
   runDecisionEngine({ ...input, projections: new Map(input.projections) }, DECISION_ENGINE, cache);
   assert.equal(cache.tail.draws.get(13).points, first);
   // A new spec (new projections built) is drawn again.
-  runDecisionEngine(withDraws(scenario({}), { 13: { goals: 2, share: 1 } }), DECISION_ENGINE, cache);
+  runDecisionEngine(doubleAt(withDraws(scenario({}), { 13: { goals: 2, share: 1 } }), 3), DECISION_ENGINE, cache);
   assert.notEqual(cache.tail.draws.get(13).points, first);
 });
 
 test('Ceiling\'s tail counts the armband three times under a planned Triple Captain', () => {
   // The captain's draws vary: club 13 expects 2 goals and he takes all of them.
-  const plain = withDraws(scenario({}), { 13: { goals: 2, share: 1 } });
+  const plain = doubleAt(withDraws(scenario({}), { 13: { goals: 2, share: 1 } }), 3);
   const tc = runDecisionEngine({ ...plain, chipPlan: { [GW]: 'triplecaptain' } }).modes.ceiling.tail.squad;
   const normal = runDecisionEngine(plain).modes.ceiling.tail.squad;
   assert.ok(tc > normal, `${tc} under Triple Captain v ${normal}`);

@@ -1,7 +1,7 @@
 # Solver-led decision engine: plan (Phase 0)
 
 Date: 2026-10-22. Status: **approved with conditions** (your reply of
-22 Oct, items 1-10, folded in below). Phase 1 done, awaiting your review.
+22 Oct, items 1-10, folded in below). Phases 1 and 2 done; Phase 2 awaiting your check of the cards.
 Source: "Gaffer IQ engine: recommended changes" (22 Oct 2026, Josh Bailey),
 its Build scope, Mode scale fix, Solver feasibility check and Phases table.
 Branch: `Refactor/gaffer-IQ-transfer-suggestion-engine-redesign`; `main` is
@@ -274,7 +274,7 @@ fallback):
 
 ## Phases
 
-### Phase 1: the mode scale fix (done, awaiting your review)
+### Phase 1: the mode scale fix (done, approved)
 
 **Change.** Long term [1, 1, 1, 0, 0] (no ÷ 3) and Future prep
 [0.5, 0.75, 1, 1, 1] (no ÷ 4.25). The free-transfer schedule, the hit cost
@@ -344,7 +344,7 @@ and the margin stay.
     clearly worse (it was -1.81 [-3.41, -0.30]). Long term's gap is -0.32 [-1.94, +1.34].
   - The tuning sweep and Long term's alternative ran before the fix, and the report says so.
 
-### Phase 2: cards and Ceiling's default
+### Phase 2: cards and Ceiling's default (done, awaiting your check)
 
 - **Ceiling defaults to expected points.** The tail applies only when either
   of these holds:
@@ -367,6 +367,64 @@ and the margin stay.
   browser.
 
 **Stop:** you check the cards.
+
+**Phase 2 as built** (`js/engine/decision.js` `tailShortlist`, `bigWeek`, `overGws`; `js/modules/planner.js` the mode
+card; tests in `tests/engine/decision.test.js`)
+
+- **The trigger.**
+  - `bigWeek` returns `benchboost` or `triplecaptain` when either is planned for t\*. Otherwise it returns `double`
+    when a squad player, or a replacement the tail shortlists (`tailShortlist`, the same list the tail draws), plays
+    twice at t\*; otherwise null.
+  - Only then does `upperTail` run, and `tail.trigger` says why.
+  - `modes.ceiling.tail` stays configured; the big week switches it on.
+- **Tests.** One test covers six cases:
+  - a squad player's double;
+  - a shortlisted replacement's double;
+  - a double only at an uninvolved club (tail off);
+  - a banned player's double (tail off);
+  - each chip;
+  - the default.
+
+  The five existing tail tests now run on a real big week. Four mutants were all caught: tail always on, squad
+  only, chips ignored, bans not excluded.
+- **The 5-GW figure.** Every move carries `overFiveGws: { points, gws }`: the swap's expected-points gain over the
+  mode GWs the squad plays, at full weight, less its transfer's cost.
+  - GWs a planned Free Hit or Wildcard covers, or past GW38, are left out and named. At GW36 it reads "Over
+    GW36–38".
+  - Tested with a plain week, a Wildcard and the season's end.
+- **The card.**
+  - Now's and Ceiling's move cards show "Over GW10–14: +x pts vs rolling" under the headline figure. It is a
+    `p.mc__sum` with `pts()` in `b.num`, as the card's other figures are; no new CSS.
+  - Ceiling's header reads "on its 90th percentile (a double GW / Bench Boost / Triple Captain)" or "on expected
+    points".
+  - `ui-consistency:adjusting`: one region, about 10 files and 14 searches with the checkers.
+  - Checked by a separate agent after a calibration whose planted difference (raw `toFixed`, no `.num`) it found.
+    One fix came of it: a fallback for an unknown trigger.
+- **In the browser** (headless Chromium, 2025-26 as it stood before GW36, the most-owned squad, 1280 and 360 px):
+  - Now: "+1.4 pts vs rolling", then "Over GW36–38: +0.4".
+  - Ceiling: "Peak GW36 · on its 90th percentile (a double GW)", "+2.3", "Over GW36–38: −0.4". With Bench Boost
+    planned there: "(Bench Boost)".
+  - No horizontal scroll at either width.
+  - The only console errors are files the main site serves (`back-to-jayjaybee`) and the harness's blocked FPL
+    calls.
+- **The backtest** (`--merge`, Ceiling one move and several, both seasons and schedules, 19 minutes):
+
+  | Ceiling | 2024-25 before / after | 2025-26 before / after |
+  |---|---|---|
+  | One move a week, points | 2002.4 / 2060.8 | 1815.8 / 1866.2 |
+  | One move a week, transfers | 34.8 / 33.7 | 35.0 / 34.6 |
+  | Several a week, points | 2010.7 / 2045.3 | 1815.9 / 1886.8 |
+  | Several a week, transfers | 37.4 / 35.8 | 40.3 / 38.3 |
+
+  - Against the roll rule on 2025-26 it is now −56.8 [−134.9, +22.3], no longer clearly worse (was −107.2).
+  - Both seasons pooled, against the old engine, +113.5 [+37.8, +200.7], now clearly better (was +59.2), so all six
+    modes beat it there.
+  - Same-squad picks: −0.61 a week against roll's [−2.17, +1.09], no longer clearly worse (was −2.72).
+  - The tail itself, read in big weeks only, against Ceiling on the mean every week:
+    - −16.5 [−43.9, +1.0] on 2025-26 and −15.7 [−38.1, +3.6] pooled, neither clear;
+    - its squads' five best weeks −7.0 and −4.8, both worse.
+
+    With no chips played here, the tail buys no upside even in big weeks.
 
 ### Phase 3: solver integration
 

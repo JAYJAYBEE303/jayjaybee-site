@@ -140,10 +140,9 @@ const BASELINES = BASE.map(p => p.name);
 const HEADLINE = [...BASELINES, ...MODES];
 const ALL_POLICIES = [...BASE, ...SINGLE, ...RISK8, ...MULTI, ...AVERAGED_MULTI, CEILING_MEAN];
 const ALL = ALL_POLICIES.map(p => p.name);
-// What --merge re-runs after a change that touches only these: the solver plan's scale fix (Long term and Future prep,
-// one move and several, as totals and as the averaged presets before it), and the shadow on roll's path.
-const MERGE = new Set(['longterm', 'future', 'longterm+', 'future+', 'longterm (averaged)', 'future (averaged)',
-  ...AVERAGED_MULTI.map(p => p.name)]);
+// What --merge re-runs after a change that touches only these: the solver plan's Phase 2 (Ceiling reads its upper tail
+// only in a big week), one move and several, and the shadow on roll's path. Phase 1's scale fix was merged the same way.
+const MERGE = new Set(['ceiling', 'ceiling+']);
 // The brief's alternative preset for Long term, one move and several (--alt), beside the preset as written.
 const ALT = [policy('longterm (decay)', 'engine', { mode: 'longterm', variant: 'longtermDecay' }),
   policy('longterm+ (decay)', 'engine', { mode: 'longterm', variant: 'longtermDecay', picks: MAX_PICKS })];
@@ -1120,8 +1119,11 @@ ${shadowTable(results, both)}
 
 ## Ceiling's upper tail
 
-Ceiling now scores a swap at its target GW by the change to the squad's 90th-percentile score over Monte Carlo draws
-of the points model's parts (engine/ceiling.js), not by its expected points. Less Ceiling on the mean:
+In a big week - its target GW a double for a squad player or a replacement its tail shortlists, or Bench Boost or
+Triple Captain planned there (none is, here) - Ceiling scores a swap at that GW by the change to the squad's
+90th-percentile score over Monte Carlo draws of the points model's parts (engine/ceiling.js); in every other week by
+its expected points (the solver plan's Phase 2; before it, the tail ran every week). Less Ceiling on the mean every
+week:
 
 ${ceilingLines(results, both)}
 

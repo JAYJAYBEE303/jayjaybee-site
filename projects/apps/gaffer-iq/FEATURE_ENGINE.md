@@ -1277,7 +1277,13 @@ The re-runs buy only from a shortlist: each mode's ten best moves, Funds' chaine
 
 ### 14.4b Ceiling's upper tail (`engine/ceiling.js`)
 
-Ceiling aims at one week, the peak GW, and wants the squad that could score big there, not the one that scores most on average. So it scores a swap at that week by the change it makes to the squad's 90th-percentile score (`modes.ceiling.tail`), and elsewhere, at a tenth of the weight, by expected points as before.
+Ceiling aims at one week, the peak GW. In a big week it wants the squad that could score big there, not the one that scores most on average, so it scores a swap at that week by the change it makes to the squad's 90th-percentile score (`modes.ceiling.tail`), and elsewhere, at a tenth of the weight, by expected points.
+
+A big week is one of these:
+- the peak GW is a double for a squad player or one of the replacements the tail would weigh;
+- Bench Boost or Triple Captain is planned for it.
+
+It is not just any club playing twice. In every other week Ceiling reads expected points, as the other modes do. On expected points it scored about 70 points a season more over the two backtest seasons, which play no chips (the solver plan's Phase 2).
 
 The 90th percentile comes from 500 Monte Carlo draws of the week, built from the same parts the points model averages:
 - each fixture's goals for each side, as Poisson counts at the side's expected goals;
@@ -1298,7 +1304,7 @@ The draws are seeded by player and by fixture, so every swap is scored on the sa
 
 The cache keeps the draws while a player's draw spec is the same object, so a lock or ban re-runs on them. Lock values stay on expected points at the peak week (the brief's V_t*).
 
-The card says "on its 90th percentile". On the v1 basis there is nothing to draw from, so Ceiling falls back to the mean and says "on expected points".
+The card says "on its 90th percentile" and why (a double GW, Bench Boost or Triple Captain), or "on expected points". On the v1 basis there is nothing to draw from, so Ceiling stays on the mean. Now's and Ceiling's cards also show the move over the next five GWs at full weight against rolling ("Over GW10–14"), since their own figures weigh one GW above the rest.
 
 The robustness re-runs share one cache and leave the draws alone, because their noise is on expected points. So Ceiling's peak-week term does not move with that noise, and the draws are made once.
 
@@ -1306,17 +1312,17 @@ The robustness re-runs share one cache and leave the draws alone, because their 
 
 The decision backtest replays 2024-25 and 2025-26. Each policy manages its own squad from GW4 to GW38: no transfers, a naive roll rule, the old engine, and the new engine in each mode. Every week is decided on what was known before its deadline, including the fixture schedule as it stood, and scored on the points actually scored, with FPL's autosubs, hits and sell prices. `docs/decision-engine-backtest.md` holds the results, paired by squad and week with bootstrap intervals.
 
-On 2025-26, the held-out season, no mode clearly beats or trails the old engine. Against the roll rule, which uses the same projections, only Ceiling is clear: it trails by about 107 points a season. Every mode beats making no transfers by 330-430 points a season.
+On 2025-26, the held-out season, no mode clearly beats or trails the old engine, or the roll rule, which uses the same projections. Every mode beats making no transfers by 330-430 points a season. (Before the solver plan's Phase 2, Ceiling read its upper tail every week and trailed the roll rule by about 107 points a season; reading it only in a big week, it trails by 57, not clearly.)
 
-Over both seasons, five modes beat the old engine (Ceiling does not), and none beats the roll rule. So most of the gain over the old engine comes from the projections. No cost of the mixed weight units of plan risk 8 shows up, though the test has little power. Every mode is now a total over its window (the solver plan's scale fix): Long term and Future prep as totals, with lambda and Future prep's wait threshold scaled in step, are no worse than their averaged versions on the same squads (Long term +22.7, Future prep +3.3 a season over both seasons, neither clear), and Long term moves about 1.5 more times a season.
+Over both seasons, all six modes beat the old engine (+100 to +163 a season), and none beats the roll rule. So most of the gain over the old engine comes from the projections. No cost of the mixed weight units of plan risk 8 shows up, though the test has little power. Every mode is now a total over its window (the solver plan's scale fix): Long term and Future prep as totals, with lambda and Future prep's wait threshold scaled in step, are no worse than their averaged versions on the same squads (Long term +22.7, Future prep +3.3 a season over both seasons, neither clear), and Long term moves about 1.5 more times a season.
 
 The one-move policies move almost every week, so their free transfers bank to the cap of five: in 2025-26 they sat there from GW16, where a move costs nothing. Moves picked as the best of noisy estimates gain less than expected, for the engine and the roll rule alike.
 
 Phase 7b added several moves a week, a same-squad comparison of the picks, and a tuning sweep:
 - **Several moves a week.** Each mode asking again on its new squad until it rolls, as the planner is used. This changes nothing measurable.
-- **On the same squad**, no mode's pick realised clearly more over five GWs than the roll rule's. Future prep's and Ceiling's realised clearly less.
+- **On the same squad**, no mode's pick realised clearly more over five GWs than the roll rule's. Before the solver plan's Phases 1 and 2, Future prep's and Ceiling's realised clearly less; as totals, and with Ceiling's tail kept for big weeks, neither does (-1.25 and -0.61 a week, not clear).
 - **The tuning sweep** of the free-transfer value, threshold, hit margin, lambda, tau and decay, on 2024-25 (one move a week, and several for the free-transfer value and hit margin), found nothing worth 10 points a season. The presets stand.
-- **Ceiling's upper tail** (§14.4b) costs about 70 points a season against Ceiling on the mean. Over both seasons, its squads' five best weeks are lower too.
+- **Ceiling's upper tail** (§14.4b), read every week, cost about 70 points a season against Ceiling on the mean, and its squads' five best weeks were lower too. Read only in a big week, it costs 16 (not clear), and the five best weeks are still a little lower (-4.8 over both seasons): in these seasons, with no chips played, the tail buys no upside even there.
 
 ### 14.6 The MILP referee (`tools/milp/model.js`, `tools/backtest/milp.js`)
 

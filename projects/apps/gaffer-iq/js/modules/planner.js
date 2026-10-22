@@ -846,11 +846,16 @@ function playerRowHTML(role, move, sellTenths, estimated) {
     + `${riskHTML(move.minutesRisk[role === 'sell' ? 'out' : 'in'])}${action}</div>`;
 }
 
+// Why Ceiling reads its upper tail at the peak week (decision.js bigWeek): a double, else the chip planned there.
+const TAIL_TRIGGER = { double: 'a double GW' };
+const FIVE_GW_MODES = new Set(['now', 'ceiling']);
+
 function modeCardHTML(mode, i, settings, planningGw) {
   const counted = countedGws(mode.weights, planningGw);
   const span = mode.modeId === 'ceiling'
     ? (mode.targetGw ? `Peak GW${mode.targetGw} · ${mode.tail
-      ? `on its ${Math.round(mode.tail.quantile * PERCENT)}th percentile` : 'on expected points'}` : 'No peak week')
+      ? `on its ${Math.round(mode.tail.quantile * PERCENT)}th percentile (${TAIL_TRIGGER[mode.tail.trigger] ?? CHIP_LABELS[mode.tail.trigger] ?? 'a big week'})`
+      : 'on expected points'}` : 'No peak week')
     : gwSpan(counted);
   const head = `<header class="mc__hd"><h3>${esc(mode.label)}</h3><span class="mc__span">${esc(span)}</span></header>`
     + `<p class="mc__blurb">${esc(MODE_BLURB[mode.modeId] ?? '')}</p>`;
@@ -902,10 +907,13 @@ function modeCardHTML(mode, i, settings, planningGw) {
       + players + (root.why.price ? `<p class="mc__note">Waiting has a price. ${esc(root.why.price)}</p>` : '') + '</li>';
   }
 
+  // Now and Ceiling weigh one GW above the rest, so their cards also show the move over five GWs at full weight.
+  const five = FIVE_GW_MODES.has(mode.modeId) && root.overFiveGws?.gws.length
+    ? `<p class="mc__sum">Over ${gwSpan(root.overFiveGws.gws)}: <b class="num">${pts(root.overFiveGws.points)}</b> pts vs rolling</p>` : '';
   return `<li class="mc" data-mode="${mode.modeId}" data-call="move" tabindex="-1" ${delay}>${head}`
     + players
     + `<p class="mc__ev"><b class="num">${pts(root.outScore)}</b><span>pts vs rolling</span>${robust}</p>`
-    + perGw + `<ul class="mc__why">${why}</ul>` + notes + alts + '</li>';
+    + five + perGw + `<ul class="mc__why">${why}</ul>` + notes + alts + '</li>';
 }
 
 const ROBUST_TITLE = `How often this move came out on top when the projections, chances of playing, free-transfer value `
