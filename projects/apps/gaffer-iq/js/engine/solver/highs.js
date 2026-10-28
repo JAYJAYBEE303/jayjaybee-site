@@ -20,7 +20,7 @@ export const SOLVE_DEFAULTS = { output_flag: false };
  * own when it takes the instance, rejects instead of leaving the load waiting.
  * @param {object} source
  * @param {ArrayBuffer|ArrayBufferView} source.wasmBinary
- * @returns {Promise<{solve: (lp: string, options?: object) => object}>}
+ * @returns {Promise<{constants: object, createModel: Function, solve: (lp: string, options?: object) => object}>}
  */
 export async function loadHighs({ wasmBinary }) {
   const { default: Module } = await import(HIGHS);
@@ -34,22 +34,46 @@ export async function loadHighs({ wasmBinary }) {
 }
 
 /**
- * The problem solved. `options` are HiGHS's own (time_limit, mip_abs_gap, ...).
+ * The problem solved, by HiGHS's Model API so that a solve stopped at its limit still reports how far from the best any
+ * plan could be. `options` are HiGHS's own (time_limit, mip_abs_gap, ...).
  * - Optimal, or stopped at the time limit with a plan in hand: the decoded plan; `stopped` says which.
  * - Stopped at the limit before any plan (its objective is not finite), or infeasible: no plan, so the caller keeps the
  *   engine's move.
  * - Any other status: a throw.
- * @param {{solve: (lp: string, options?: object) => object}} highs  from loadHighs
+ * `bound` is HiGHS's dual bound: the model maximises, so no plan could score more. `gap` is that bound less the plan's
+ * own objective, in points: at most the solve's absolute gap when optimal, and what is still unproven when stopped. A
+ * bound HiGHS has not reached (it is infinite) is null, and a gap needs both a plan and a bound.
+ * @param {{constants: object, createModel: Function}} highs  from loadHighs
  * @param {object} problem  the model's input (buildPlan)
  * @param {object} options
- * @returns {{plan: object|null, stopped: boolean, ms: number}}
+ * @returns {{plan: object|null, stopped: boolean, ms: number, bound: number|null, gap: number|null}}
  */
 export function solveProblem(highs, problem, options) {
   const { lp, decode } = buildPlan(problem);
+  const { optimal, timeLimit, infeasible } = highs.constants.modelStatus;
   const started = Date.now();
-  const result = highs.solve(lp, { ...SOLVE_DEFAULTS, ...options });
-  const ms = Date.now() - started;
-  if (result.Status === 'Infeasible') return { plan: null, stopped: false, ms };
-  if (!USABLE.has(result.Status)) throw new Error(`solveProblem: HiGHS returned "${result.Status}"`);
-  return { plan: Number.isFinite(result.ObjectiveValue) ? decode(result) : null, stopped: result.Status !== 'Optimal', ms };
+  const model = highs.createModel({ format: 'lp', data: lp });
+  try {
+    model.options.set({ ...SOLVE_DEFAULTS, ...options });
+    const { modelStatus } = model.run();
+    const ms = Date.now() - started;
+    if (modelStatus === infeasible) return { plan: null, stopped: false, ms, bound: null, gap: null };
+    if (modelStatus !== optimal && modelStatus !== timeLimit) {
+      const name = Object.keys(highs.constants.modelStatus).find(key => highs.constants.modelStatus[key] === modelStatus);
+      throw new Error(`solveProblem: HiGHS returned "${name ?? modelStatus}"`);
+    }
+    const objective = model.info.get('objective_function_value');
+    const dual = model.info.get('mip_dual_bound');
+    const bound = Number.isFinite(dual) ? dual : null;
+    let plan = null;
+    if (Number.isFinite(objective)) {
+      // The legacy solve's result, as decode reads it: each column's primal value under its name.
+      const Columns = {};
+      model.getSolution().colValue.forEach((Primal, index) => { Columns[model.getColName(index)] = { Primal }; });
+      plan = decode({ ObjectiveValue: objective, Columns });
+    }
+    return { plan, stopped: modelStatus !== optimal, ms, bound, gap: plan && bound !== null ? bound - plan.objective : null };
+  } finally {
+    model.dispose();
+  }
 }

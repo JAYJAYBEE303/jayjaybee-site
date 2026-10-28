@@ -22,6 +22,10 @@
  * data/results.json; --milp runs the MILP referee (Phase 8, data/milp.json);
  * --solver-repro runs the app's own solver path set as that referee was
  * (solver plan Phase 3, data/solver-repro.json). The report includes each once it exists.
+ * --solver-eval --margin <0|2> runs each of the app's six modes as the app decides it (solver plan Phase 4,
+ * data/solver-eval-m<margin>.json), the solver's hit margin set to that. The report's section for them
+ * (solverEvalSection, figures from eval.js) says "not run yet" for a margin whose file is missing.
+ * Importing this file runs nothing: only `node run.js` and its workers do.
  *
  * Every week of every season replays the app's own path - normaliseSeason,
  * buildScoreContext, buildProjections, runDecisionEngine - on vaastav as it
@@ -34,10 +38,10 @@
  */
 
 import os from 'node:os';
-import { appendFileSync } from 'node:fs';
+import { appendFileSync, realpathSync } from 'node:fs';
 import { readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
 
 import { DECISION_ENGINE, PERCENT, SEASON_GWS } from '../../js/config.js';
@@ -55,7 +59,10 @@ import {
 } from './lib.js';
 import { pointsModelAt } from '../points/model.js';
 import { RETRY_TIME, loadSolver, milpPolicy, milpProblem, newCounts, orderMoves, solvePlan } from './milp.js';
-import { REPRO, agrees, solverPolicy } from './solver.js';
+import { REPRO, agrees, modePolicy, solverPolicy } from './solver.js';
+import {
+  BUCKETS, GAIN_WINDOW, bucketGap, bucketMoves, defaultMargin, evalMode, evalName, guardTotals, passLine, robustMoves, robustnessPasses, withEval,
+} from './eval.js';
 
 const RUN_SEASONS = ['2024-25', '2025-26'];
 const HELD_OUT = '2025-26';
@@ -168,6 +175,12 @@ const MILP_POLICIES = [policy('milp', 'milp')];
 // The app's solver path set as the referee was (solver.js), on the same squads, to be paired with data/milp.json.
 const SOLVER_REPRO = 'solver-repro';
 const REPRO_POLICIES = [policy(SOLVER_REPRO, 'solver')];
+// The app's six modes as the app decides them (solver.js modePolicy), one hit margin a run, on the same squads. A pick's
+// robustness is read every third week.
+const SOLVER_EVAL = 'solver-eval';
+const EVAL_MARGINS = [0, 2];
+const EVAL_ROBUST_EVERY = 3;
+const evalPolicies = margin => MODES.map(mode => policy(`solver:${mode}`, 'mode-solver', { mode, hitMargin: margin }));
 const REFEREE_RIVALS = ['roll+', ...MODES.map(m => `${m}+`)];
 
 // ─── Tuning (Phase 7b) ───────────────────────────────────────────────────────
@@ -418,6 +431,11 @@ function policyFor(spec, old, solver) {
   if (spec.kind === 'old') return oldPolicy(old);
   if (spec.kind === 'milp') return milpPolicy(solver, MILP);
   if (spec.kind === 'solver') return solverPolicy(solver.highs, REPRO);
+  if (spec.kind === 'mode-solver') {
+    return modePolicy(solver.highs, {
+      modeId: spec.mode, hitMargin: spec.hitMargin, config: DECISION_ENGINE, robustnessEvery: EVAL_ROBUST_EVERY,
+    });
+  }
   return enginePolicy(spec.mode, ({ t, state, world, locks, bans }) => world.engine(spec.variant, t, state, locks, bans),
     { maxPicks: spec.picks });
 }
@@ -684,11 +702,12 @@ function moveTable(results, seasons, schedule, policies) {
 }
 
 const AGAINST = { roll: 'the roll baseline', 'roll+': 'roll+ (the roll baseline, several moves a week)', old: 'the old engine',
-  none: 'no transfers' };
+  none: 'no transfers', longterm: 'Long term', 'longterm+': 'Long term+ (Long term, several moves a week)' };
 
 /** One line per baseline: each mode's paired season difference and its verdict; then any verdict longer blocks change. */
-const labelOf = name => (name.endsWith('+') ? `${DECISION_ENGINE.modes[name.slice(0, -1)]?.label ?? name.slice(0, -1)}+`
-  : DECISION_ENGINE.modes[name]?.label ?? name);
+const labelOf = name => (evalMode(name) ? `${labelOf(evalMode(name))} solver`
+  : name.endsWith('+') ? `${DECISION_ENGINE.modes[name.slice(0, -1)]?.label ?? name.slice(0, -1)}+`
+    : DECISION_ENGINE.modes[name]?.label ?? name);
 
 /** Each row's paired season difference against each baseline, with a tally and the longer-block check. */
 function verdictLines(results, seasons, schedule, rows = MODES, against = ['old', 'roll', 'none']) {
@@ -1048,6 +1067,184 @@ ${listed.join('\n')}
 `;
 }
 
+// ─── The solver in each mode (solver plan, Phase 4) ──────────────────────────
+
+const EVAL_RIVALS = ['old', 'roll+', 'longterm', 'longterm+'];
+const MARGIN_NAMES = margin => MODES.map(mode => evalName(mode, margin));
+const hasMargin = (rows, margin) => rows.some(r => MARGIN_NAMES(margin).some(name => r.out[name]));
+const notRun = margin => `Not run yet: \`node tools/backtest/run.js --solver-eval --margin ${margin} --old <worktree>/projects/apps/gaffer-iq\``
+  + ` writes data/solver-eval-m${margin}.json.`;
+const pct = (n, d) => (d ? `${f((n / d) * PERCENT, 0)}%` : '-');
+const verdictCell = r => (r ? `${ci(r, r.gws)}${verdictOf(r) === 'no clear difference' ? '' : ` **${verdictOf(r)}**`}` : '-');
+/** The mean, over a season's squads that ran the policy, of a measure of its run. */
+const seasonMean = (rows, season, name, measure) => mean(of(rows, season, 'asItStood').filter(r => r.out[name]).map(r => measure(r.out[name])));
+const transfersOf = run => sum(run.gws.map(g => g.moves));
+const hitsOf = run => sum(run.gws.map(g => g.hits));
+
+/** One margin's headline: the season totals, each mode's pass line, and the paired verdicts against the rivals. */
+function evalHeadline(rows, margin) {
+  const heading = `### Headline: hit margin ${margin}`;
+  if (!hasMargin(rows, margin)) return `${heading}\n\n${notRun(margin)}\n`;
+  const names = MARGIN_NAMES(margin);
+  const totals = [...EVAL_RIVALS, ...names].map(name => `| ${labelOf(name)} | ${RUN_SEASONS.map(s => f(seasonMean(rows, s, name, r => r.total))).join(' | ')} |`);
+  const passes = names.map(name => {
+    const [vsOld, vsLongterm] = ['old', 'longterm'].map(rival => paired(rows, [HELD_OUT], 'asItStood', name, rival));
+    return `| ${labelOf(name)} | ${verdictCell(vsOld)} | ${verdictCell(vsLongterm)} | ${passLine(vsOld, vsLongterm).pass ? 'pass' : 'does not pass'} |`;
+  });
+  return `${heading}
+
+Points a season, net of hits, averaged over each season's squads (${RUN_SEASONS.map(s => of(rows, s, 'asItStood').length).join(' and ')}):
+
+| policy | ${RUN_SEASONS.join(' | ')} |
+|---|${RUN_SEASONS.map(() => '---').join('|')}|
+${totals.join('\n')}
+
+The pass line, on ${HELD_OUT} (held out): a mode passes if it beats the old engine, its interval above zero, and is not
+clearly worse than Long term, its interval not wholly below zero. Each mode's solver less each (paired as above):
+
+| mode | less the old engine | less Long term | the pass line |
+|---|---|---|---|
+${passes.join('\n')}
+
+Each mode's solver against each rival, ${HELD_OUT}:
+
+${verdictLines(rows, [HELD_OUT], 'asItStood', names, EVAL_RIVALS)}
+
+Both seasons (${RUN_SEASONS.join(' and ')}):
+
+${verdictLines(rows, RUN_SEASONS, 'asItStood', names, EVAL_RIVALS)}
+`;
+}
+
+/** Each mode's 2024-25 total at each margin, the default (the higher; a tie is the lower margin), and 2025-26 for it. */
+function evalHitMargin(rows) {
+  const heading = '### Hit margin';
+  const missing = EVAL_MARGINS.filter(margin => !hasMargin(rows, margin));
+  if (missing.length) return `${heading}\n\nIt compares the margins, so it needs them all.\n\n${missing.map(notRun).join('\n\n')}\n`;
+  const lines = MODES.map(mode => {
+    const ran = rows.filter(r => EVAL_MARGINS.every(margin => r.out[evalName(mode, margin)]));
+    const total = (season, margin) => seasonMean(ran, season, evalName(mode, margin), r => r.total);
+    const chosen = defaultMargin(Object.fromEntries(EVAL_MARGINS.map(margin => [margin, total(TUNE_SEASON, margin)])), EVAL_MARGINS);
+    return `| ${labelOf(mode)} | ${EVAL_MARGINS.map(margin => f(total(TUNE_SEASON, margin))).join(' | ')} | ${chosen} | ${f(total(HELD_OUT, chosen))} |`;
+  });
+  return `${heading}
+
+The solver's hit margin (points a hit must clear beyond the ${DECISION_ENGINE.hitCost} points it costs), each mode run at ${EVAL_MARGINS.join(' and ')}. The default
+is chosen on ${TUNE_SEASON} alone: the margin with the higher total there, and the lowest on a tie. ${HELD_OUT} is reported
+for the default only, as held out. Points a season, averaged over the squads, net of hits:
+
+| mode | ${EVAL_MARGINS.map(margin => `${TUNE_SEASON} at margin ${margin}`).join(' | ')} | default | ${HELD_OUT} at the default |
+|---|${EVAL_MARGINS.map(() => '---').join('|')}|---|---|
+${lines.join('\n')}
+`;
+}
+
+/** At margin 0, the solver's settled first moves with a robustness figure, by bucket and season, and high less low. */
+function evalRobustness(rows) {
+  const heading = '### Robustness';
+  const margin = Math.min(...EVAL_MARGINS);
+  if (!hasMargin(rows, margin)) return `${heading}\n\n${notRun(margin)}\n`;
+  const names = MARGIN_NAMES(margin);
+  const moves = RUN_SEASONS.flatMap(season => of(rows, season, 'asItStood').flatMap(r => robustMoves(r, names.filter(name => r.out[name]))
+    .map(move => ({ ...move, season, squad: r.squad }))));
+  const { rule, cuts, atThresholds, moves: placed } = bucketMoves(moves);
+  const intro = `The robustness figure (the share of noisy copies of the week's input in which the pick beats its alternatives, the
+engine's move and rolling) is read one week in ${EVAL_ROBUST_EVERY}. Here, every settled first move that carries one, in
+all six modes at margin ${margin}, with the gain it realised over ${GAIN_WINDOW} GWs against keeping the squad, the week's hits
+off (\`moveMetrics\`). A move is high from ${BUCKETS.high}%, low up to ${BUCKETS.low}%, middle between (the figure as a whole percent, as the card shows it), and if
+any bucket holds under ${BUCKETS.min} moves the buckets are cut at terciles of the figures instead.`;
+  if (!placed.length) return `${heading}\n\n${intro}\n\nNo settled first move carries a robustness figure.\n`;
+  const cut = rule === 'thresholds'
+    ? `Cut at the thresholds: every bucket holds at least ${BUCKETS.min} moves.`
+    : `Cut at terciles, not the thresholds: a bucket held under ${BUCKETS.min} moves cut at ${BUCKETS.high}% and ${BUCKETS.low}% `
+      + `(high ${atThresholds.high}, middle ${atThresholds.middle}, low ${atThresholds.low}). High is from `
+      + `${cuts.high}% up, low is up to ${cuts.low}%, middle between.`;
+  const buckets = ['high', 'middle', 'low'];
+  const table = buckets.flatMap(bucket => [...RUN_SEASONS, 'both'].map(season => {
+    const gains = placed.filter(m => m.bucket === bucket && (season === 'both' || m.season === season)).map(m => m.gain);
+    return `| ${bucket} | ${season} | ${gains.length} | ${gains.length ? signed(mean(gains), 2) : '-'} |`;
+  }));
+  const strata = RUN_SEASONS.map(season => of(rows, season, 'asItStood').map(r => placed.filter(m => m.season === season && m.squad === r.squad)));
+  const gap = bucketGap(strata, BOOT);
+  const line = Number.isFinite(gap.mean)
+    ? `High less low, both seasons: ${ci(gap, 1, 2)} points over ${GAIN_WINDOW} GWs per move (${BOOT.draws} draws resampling each season's squads whole, pooling their moves).`
+      + ` The pass line, high's mean above low's with the interval not wholly below zero: **${robustnessPasses(gap) ? 'pass' : 'does not pass'}**.`
+    : 'High less low: undefined, a bucket holds no moves.';
+  return `${heading}
+
+${intro}
+
+${cut}
+
+| bucket | season | moves | mean gain over rolling, ${GAIN_WINDOW} GWs |
+|---|---|---|---|
+${table.join('\n')}
+
+${line}
+`;
+}
+
+/** Per margin, what the guard did in each mode; then transfers and hits a season beside the engine's own and Long term+. */
+function evalGuard(rows) {
+  const heading = '### The guard and the transfers';
+  const guards = EVAL_MARGINS.map(margin => {
+    if (!hasMargin(rows, margin)) return `#### Hit margin ${margin}\n\n${notRun(margin)}\n`;
+    const lines = MODES.map(mode => {
+      const t = guardTotals(RUN_SEASONS.flatMap(s => of(rows, s, 'asItStood')).filter(r => r.out[evalName(mode, margin)])
+        .map(r => r.out[evalName(mode, margin)]));
+      return `| ${labelOf(mode)} | ${t.weeks} | ${[t.trusted, t.resolved, t.fallback, t.noSolve, t.ties, t.kept].map(n => pct(n, t.weeks)).join(' | ')}`
+        + ` | ${pct(t.stopped, t.solves)} | ${t.solves ? f(t.ms / t.solves, 0) : '-'} |`;
+    });
+    return `#### Hit margin ${margin}
+
+| mode | weeks | trusted | solved again and trusted | the engine's move after a solve | no solve | a tie with rolling | a wait that sold a kept player | solves stopped at the limit | ms a solve |
+|---|---|---|---|---|---|---|---|---|---|
+${lines.join('\n')}
+`;
+  });
+  const ran = EVAL_MARGINS.filter(margin => hasMargin(rows, margin));
+  const policies = [['longterm+'], ...MODES.map(mode => [mode, `${labelOf(mode)} (the engine, one move a week)`]),
+    ...ran.flatMap(margin => MODES.map(mode => [evalName(mode, margin), `${labelOf(evalName(mode, margin))}, margin ${margin}`]))];
+  const transfers = policies.map(([name, label = labelOf(name)]) => `| ${label} | ${RUN_SEASONS.map(s => `${f(seasonMean(rows, s, name, transfersOf))}`
+    + ` | ${f(seasonMean(rows, s, name, hitsOf))}`).join(' | ')} |`);
+  return `${heading}
+
+Over every week of every squad and both seasons, per mode: the share of weeks the first solve was trusted, a longer solve
+was (the pick stopped short of its proven bound at the first limit), the engine's own move was kept after a solve (no
+trusted plan, no rolling twin, or no legal order), and no solve was made (no weeks to weigh, or Ceiling in a big week);
+and the weeks that settled to a roll as a tie with rolling or a wait that sold a kept player (inside the first two).
+
+${guards.join('\n')}${!ran.length ? '' : `
+Transfers and hit points a season (averaged over the squads), the solver beside the engine's single-move policy and Long term+:
+
+| policy | ${RUN_SEASONS.map(s => `transfers ${s} | hit points ${s}`).join(' | ')} |
+|---|${RUN_SEASONS.map(() => '---|---').join('|')}|
+${transfers.join('\n')}
+`}`;
+}
+
+/**
+ * The solver's six modes as the app decides them, at each hit margin (solver.js modePolicy; rows are data/results.json's
+ * tasks with the eval files laid over, withEval): the headline against the previous engine and the baselines, the
+ * default hit margin, the robustness buckets and the guard. A margin not run says so; nothing here is typed in.
+ */
+export function solverEvalSection(rows) {
+  return `## The solver, mode by mode
+
+Phase 4 of the solver plan (docs/decision-engine-solver-phase4-plan.md). Each of the app's six modes is run as the app
+decides it (\`tools/backtest/solver.js\`'s \`modePolicy\`, which calls the Planner's own guard and settle rules): the
+engine on the squad, the mode's problem solved at the app's time limit and again at a longer one if the plan is short of
+its proven bound, the engine's move if that is still not trusted; a move priced against its rolling twin, and a tie with
+rolling, or a wait that sells a kept player, a roll. The solver's hit margin is set to ${EVAL_MARGINS.join(' and ')}, a run each, on the
+same squads as the main run (the schedule as it stood), and each mode is paired with the old engine, roll+, Long term and
+Long term+ squad by squad and week by week, as in the verdict above.
+
+${EVAL_MARGINS.map(margin => evalHeadline(rows, margin)).join('\n')}
+${evalHitMargin(rows)}
+${evalRobustness(rows)}
+${evalGuard(rows)}`;
+}
+
 /** The tuning sweep (2024-25) and the chosen values' test on the held-out season. */
 function tuningSection(tune, tuned, tuneMulti = null) {
   if (!tune) return '';
@@ -1087,13 +1284,14 @@ Chosen: ${chosen.length ? chosen.map(c => `${c.param} ${c.value} (${signed(c.gai
 }
 
 function report(results, squadsBySeason,
-  { tune = null, tuned = null, alt = null, tuneMulti = null, milp = null, solverRepro = null } = {}) {
+  { tune = null, tuned = null, alt = null, tuneMulti = null, milp = null, solverRepro = null, solverEval = [] } = {}) {
   const both = RUN_SEASONS;
   const other = RUN_SEASONS.filter(s => s !== HELD_OUT);
   const oldCounts = ['asItStood'].flatMap(sch => RUN_SEASONS.flatMap(s => of(results, s, sch))).map(r => r.out.old?.counts).filter(Boolean);
   const sumCount = key => oldCounts.reduce((a, c) => a + c[key], 0);
   const gwsLabel = `GW${START_GW}-${SEASON_GWS}`;
   const reproMd = solverReproSection(solverRepro);
+  const evalMd = solverEvalSection(solverEval);
   return `# Decision engine backtest
 
 Generated by \`node tools/backtest/run.js\` (docs/decision-engine-plan.md,
@@ -1216,6 +1414,7 @@ ${ceilingLines(results, both)}
 ${tuningSection(tune, tuned, tuneMulti)}
 ${altSection(alt)}
 ${milpSection(milp)}${reproMd && `\n${reproMd}`}
+${evalMd}
 ## Sensitivity: the final schedule
 
 The same runs with vaastav's final schedule, which knows every blank and double from the start (more than a manager
@@ -1316,6 +1515,14 @@ async function main() {
       season, schedule: 'asItStood', squad, toGw: SEASON_GWS, variants: VARIANTS, shadow: false,
       policies: [...BASE.filter(p => p.name === 'roll'), ...REPRO_POLICIES],
     })));
+  } else if (argv.includes('--solver-eval')) {
+    // The six modes of a squad run inside one task, so a resumed run never splits a squad.
+    const margin = Number(argv[argv.indexOf('--margin') + 1]);
+    if (!EVAL_MARGINS.includes(margin)) throw new Error(`run.js: --solver-eval needs --margin ${EVAL_MARGINS.join(' or ')}`);
+    stage = `${SOLVER_EVAL}-m${margin}`;
+    stageTasks = RUN_SEASONS.flatMap(season => squadsBySeason[season].map(squad => ({
+      season, schedule: 'asItStood', squad, toGw: SEASON_GWS, variants: VARIANTS, shadow: false, policies: evalPolicies(margin),
+    })));
   } else if (argv.includes('--test-tuned')) {
     const tune = await readStage('tune');
     if (!tune) throw new Error('run.js: run --tune first');
@@ -1348,7 +1555,11 @@ async function main() {
         : stage === 'milp' ? milpSection([result])
           // No data/milp.json for a few weeks: the section's own code is run with roll in the planner's place.
           : stage === 'solver-repro' ? solverReproSection([{ ...result, out: { ...result.out, milp: result.out.roll } }])
-            : tuningSection(stage === 'tune' ? [result] : (await readStage('tune')).results, stage === 'tuned' ? [result] : null);
+            // No data/results.json for a few weeks: the section's own code is run with this run's first mode in the rivals' place.
+            : stage.startsWith(SOLVER_EVAL) ? solverEvalSection(withEval(
+              [{ ...result, out: Object.fromEntries([...EVAL_RIVALS, ...MODES].map(name => [name, result.out[`solver:${MODES[0]}`]])) }],
+              { [Number(stage.split('-m')[1])]: [result] }))
+              : tuningSection(stage === 'tune' ? [result] : (await readStage('tune')).results, stage === 'tuned' ? [result] : null);
     console.log(stage === 'results' ? md.slice(md.indexOf('## Several moves'), md.indexOf('## Sensitivity')) : md);
     console.log(`${Math.round(result.ms / 1000)}s, rss ${Math.round(process.memoryUsage().rss / 1e6)} MB (main)`);
     return;
@@ -1403,15 +1614,17 @@ async function readPartial(stage) {
 }
 
 async function writeReport(squadsBySeason) {
-  const [main, tune, tuned, alt, tuneMulti, milp, repro] = await Promise.all(['results', 'tune', 'tuned', 'alt', 'tune-multi', 'milp',
-    SOLVER_REPRO].map(readStage));
+  const [main, tune, tuned, alt, tuneMulti, milp, repro, ...evals] = await Promise.all(['results', 'tune', 'tuned', 'alt', 'tune-multi', 'milp',
+    SOLVER_REPRO, ...EVAL_MARGINS.map(margin => `${SOLVER_EVAL}-m${margin}`)].map(readStage));
   if (!main) throw new Error('run.js: no data/results.json yet - run the backtest first');
   const md = report(main.results, squadsBySeason, { tune: tune?.results ?? null, tuned: tuned?.results ?? null,
     alt: alt?.results ?? null, tuneMulti: tuneMulti?.results ?? null, milp: milp ? withMilp(main.results, milp.results) : null,
-    solverRepro: milp && repro ? withSolverRepro(milp.results, repro.results) : null });
+    solverRepro: milp && repro ? withSolverRepro(milp.results, repro.results) : null,
+    solverEval: withEval(main.results, Object.fromEntries(EVAL_MARGINS.map((margin, i) => [margin, evals[i]?.results ?? null]))) });
   await writeFile(new URL('../../docs/decision-engine-backtest.md', import.meta.url), md);
   console.log(md.slice(0, md.indexOf('## What was run')));
 }
 
-if (isMainThread) await main();
-else await workerMain(workerData);
+// The entry point only: a script that imports this file for the report's code does not start a run.
+if (!isMainThread) await workerMain(workerData);
+else if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) await main();

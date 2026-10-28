@@ -129,7 +129,7 @@ test('exportSnapshots returns every snapshot and gameweek table', async () => {
 // ─── the decision log ────────────────────────────────────────────────────────
 
 const ENTRY = {
-  gw: 8, at: 1000, mode: 'now', source: 'solver', call: 'move', stopped: false,
+  gw: 8, at: 1000, mode: 'now', source: 'solver', call: 'move', stopped: false, guard: 'trusted', gap: 0.1,
   moves: [{ outId: 5, inId: 9 }, { outId: 2, inId: 7 }],
   gain: 3.4, robustness: null,
   engineFirst: [{ outId: 5, inId: 9 }], agrees: false,
@@ -147,7 +147,7 @@ test('a settled card is logged with every field', async () => {
 test('a figure landing later updates the same entry', async () => {
   const db = memoryDb();
   await logDecision(db, ENTRY, { max: DECISION_ENGINE.solver.logMax });
-  const landed = { ...ENTRY, at: 2000, gain: 4.1, robustness: 0.7,
+  const landed = { ...ENTRY, at: 2000, gain: 4.1, robustness: 0.7, guard: 'resolved', gap: 0.25,
     // A different pairing of the same sales and buys is the same move set.
     moves: [{ outId: 5, inId: 7 }, { outId: 2, inId: 9 }] };
   await logDecision(db, landed, { max: DECISION_ENGINE.solver.logMax });
@@ -156,6 +156,8 @@ test('a figure landing later updates the same entry', async () => {
   assert.equal(held[0].gain, 4.1);
   assert.equal(held[0].robustness, 0.7);
   assert.equal(held[0].at, 2000);
+  // The latest run's guard and gap describe the plan now shown, as its stopped flag does.
+  assert.deepEqual([held[0].guard, held[0].gap], ['resolved', 0.25]);
   // The rest of the entry is the first sighting's.
   assert.deepEqual(held[0].moves, ENTRY.moves);
 

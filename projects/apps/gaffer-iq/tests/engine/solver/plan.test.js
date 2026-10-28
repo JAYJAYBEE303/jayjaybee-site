@@ -13,8 +13,8 @@ import assert from 'node:assert/strict';
 import { createDecisionCache, describePlan, runDecisionEngine, transferCost } from '../../../js/engine/decision.js';
 import { solveProblem } from '../../../js/engine/solver/highs.js';
 import {
-  alternativesOf, callOf, checkProtected, gainOverRolling, moveSetKey, orderMoves, pairMoves, rollingProblem, solverCard,
-  withFigure,
+  alternativesOf, alternativesSync, callOf, checkProtected, gainOverRolling, moveSetKey, orderMoves, pairMoves, rollingProblem, settlePick,
+  solverCard, trusted, withFigure,
 } from '../../../js/engine/solver/plan.js';
 import { modeSetting, solverProblem } from '../../../js/engine/solver/problem.js';
 import { squadValue } from '../../../js/engine/squad-value.js';
@@ -156,6 +156,81 @@ test('callOf: move, wait, roll', () => {
   assert.equal(callOf({ weeks: [week([], []), week([101], [15])] }), 'wait');
   assert.equal(callOf({ weeks: [week([], []), week([], []), week([101], [15])] }), 'roll', 'two weeks out is still a roll');
   assert.equal(callOf({ weeks: [week([], [])] }), 'roll', 'a one-week plan has no next week');
+});
+
+// ─── The guard and the settle rules ──────────────────────────────────────────
+
+test('trusted: optimal, stopped within absGap, stopped short, stopped with no bound, no plan', () => {
+  const { absGap } = CONFIG.solver;
+  const found = { objective: 5, weeks: [] };
+  // An optimal solve is shown whatever gap it reports; a stopped one only when the bound proves it within absGap.
+  assert.equal(trusted({ plan: found, stopped: false, gap: 0 }, CONFIG), true, 'optimal');
+  assert.equal(trusted({ plan: found, stopped: true, gap: absGap }, CONFIG), true, 'stopped exactly absGap short');
+  assert.equal(trusted({ plan: found, stopped: true, gap: 0 }, CONFIG), true, 'stopped, but proven optimal');
+  assert.equal(trusted({ plan: found, stopped: true, gap: absGap + 0.01 }, CONFIG), false, 'stopped short');
+  // HiGHS had a plan but no finite bound yet (Task 1 reports that gap as null): nothing proves it, and null <= absGap is true.
+  assert.equal(trusted({ plan: found, stopped: true, gap: null }, CONFIG), false, 'stopped with a plan but no bound');
+  assert.equal(trusted({ plan: null, stopped: false, gap: null }, CONFIG), false, 'no plan');
+  assert.equal(trusted({ plan: null, stopped: true, gap: null }, CONFIG), false, 'stopped with no plan');
+});
+
+const weekOf = (gw, out = [], ins = []) => ({ gw, out, in: ins, hits: 0, ft: 1 });
+const planOf = (objective, ...weeks) => ({ objective, weeks });
+
+/** settlePick on the engine's run of a scenario, the way the runner and the backtest call it. */
+function settleOn(engine, modeId, plan, rolling = null) {
+  return settlePick({ modeId, plan, rolling, result: engine.result, input: engine.input, config: CONFIG });
+}
+
+test('settlePick reproduces today\'s pickFlow decisions: a move, a tie, a wait, a wait whose sale is kept, a roll', () => {
+  const { absGap } = CONFIG.solver;
+  const engine = engineOf(scenario({ candidates: [{ id: 101, position: 'FWD', xip: 12 }] }));
+  const move = planOf(10, weekOf(GW, [15], [101]), weekOf(GW + 1));
+  // A move that beats rolling by more than absGap stays a move, its sale paired with his buy.
+  assert.deepEqual(settleOn(engine, 'now', move, planOf(10 - absGap - 0.01)), { call: 'move', moves: [{ outId: 15, inId: 101 }], rolled: null });
+  // One that gains exactly absGap, less, or nothing is within the solve's own noise: a roll, the tie named.
+  for (const gain of [absGap, 0.1, 0, -1]) {
+    assert.deepEqual(settleOn(engine, 'now', move, planOf(10 - gain)), { call: 'roll', moves: [], rolled: 'tie' }, `gain ${gain}`);
+  }
+
+  // A wait is its own rolling twin (none is passed), and its card is next week's move.
+  const wait = planOf(5, weekOf(GW), weekOf(GW + 1, [15], [101]), weekOf(GW + 2));
+  assert.deepEqual(settleOn(engine, 'longterm', wait), { call: 'wait', moves: [{ outId: 15, inId: 101 }], rolled: null });
+  // A plan that moves nothing for the weeks that matter rolls on its own, and is no tie.
+  assert.deepEqual(settleOn(engine, 'now', planOf(5, weekOf(GW), weekOf(GW + 1))), { call: 'roll', moves: [], rolled: null });
+
+  // A locked player is the model's to keep this week only: sold in the week a wait waits for, the wait is a roll, kept.
+  const locked = engineOf(scenario({ locks: new Set([15]), candidates: [{ id: 101, position: 'FWD', xip: 12 }] }));
+  for (const modeId of MODES) {
+    assert.deepEqual(settleOn(locked, modeId, wait), { call: 'roll', moves: [], rolled: 'kept' }, modeId);
+  }
+});
+
+test('settlePick throws where the card must stay the engine\'s: a protected sale this week, a first week with no legal order', () => {
+  const locked = engineOf(scenario({ locks: new Set([15]), candidates: [{ id: 101, position: 'FWD', xip: 12 }] }));
+  const move = planOf(10, weekOf(GW, [15], [101]), weekOf(GW + 1));
+  assert.throws(() => settleOn(locked, 'now', move, planOf(0)), /solver: now sold protected player 15 in its first week/);
+  // 101 is £6.0m against 15's £5.0m, with no bank: the sale cannot be made one move at a time.
+  const broke = engineOf(scenario({ candidates: [{ id: 101, position: 'FWD', xip: 12, price: 60 }] }));
+  assert.throws(() => settleOn(broke, 'now', move, planOf(0)), { message: /this week's moves have no legal order/, unordered: true });
+  // A wait's next week is ordered too.
+  const wait = planOf(5, weekOf(GW), weekOf(GW + 1, [15], [101]));
+  assert.throws(() => settleOn(broke, 'longterm', wait), { message: /next week's moves have no legal order/, unordered: true });
+});
+
+test('settlePick keeps a wait only from a protected sale: any other error in its week is a bug, rethrown', () => {
+  const engine = engineOf(scenario({ candidates: [{ id: 101, position: 'FWD', xip: 12 }] }));
+  // A next week whose sales cannot be read is not a lock to wait out.
+  const broken = planOf(5, weekOf(GW), { ...weekOf(GW + 1), out: { length: 1 } });
+  assert.throws(() => settleOn(engine, 'longterm', broken), TypeError);
+});
+
+test('settlePick names the mistake of a move with no rolling solve', () => {
+  const engine = engineOf(scenario({ candidates: [{ id: 101, position: 'FWD', xip: 12 }] }));
+  const move = planOf(10, weekOf(GW, [15], [101]), weekOf(GW + 1));
+  assert.throws(() => settleOn(engine, 'now', move, null), /settlePick: a move needs its rolling solve/);
+  // A wait and a roll are their own rolling twins: none is needed.
+  assert.equal(settleOn(engine, 'now', planOf(5, weekOf(GW), weekOf(GW + 1))).call, 'roll');
 });
 
 // ─── The engine's explanation of a move set ──────────────────────────────────
@@ -474,4 +549,13 @@ test('alternatives stop when a re-solve finds no plan, and wait on a solve that 
   const rolling = solve(rollingProblem(problem));
   const [first] = await alternativesOf(problem, rolling, solve, { ...CONFIG, alternativesWindow: Infinity });
   assert.ok(first.moves.length > 0);
+});
+
+test('alternativesSync is alternativesOf for a solve that answers at once', async () => {
+  const { problem, plan } = closeCall();
+  const config = { ...CONFIG, alternativesWindow: Infinity };
+  const found = alternativesSync(problem, plan, solve, config);
+  assert.equal(found.length, CONFIG.alternativesMax);
+  assert.deepEqual(found, await alternativesOf(problem, plan, solve, config));
+  assert.deepEqual(alternativesSync(problem, plan, () => null, CONFIG), []);
 });

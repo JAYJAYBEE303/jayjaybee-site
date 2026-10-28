@@ -203,26 +203,39 @@ input. A newer input drops everything still queued for an older one.
   `phone.minMemoryGb` of device memory) gets one, and solves the cards that came into view, in the order viewed.
 - **The queue.** Every solve a card's move waits on (its pick and, for a move, its rolling twin) before any follow-up
   (alternatives, then robustness), so a card's move never waits on another card's figures.
+- **The guard.** A pick is shown only if `trusted`: it has a plan, and the solve either finished or stopped at `timeLimitS`
+  with the plan proven within `absGap` of its bound (a stopped plan with no finite bound yet proves nothing). A pick that
+  is not trusted is not shown: its card stays the engine's move, marked Refining, while the same problem is solved once
+  more at `resolveTimeLimitS`, queued after every first pick and before the background figures. A trusted re-solve goes on
+  exactly as a trusted pick does (its rolling twin solved at the same limit); one that is still short, has no plan, fails
+  or times out settles the engine's move, marked "Engine move". A newer input drops the re-solve like any other solve.
+  The log entry says which it was: `guard` is `trusted`, `resolved` or `engine`, and `gap` is the shown plan's.
 - **A move must beat rolling.** A pick that moves settles only once its rolling twin has landed. If its gain over rolling is
   not above `absGap` it is within the solve's own noise (a sideways swap that frees £0.1m, say), and the card is a roll:
   source `solver`, call `roll`, the plan's later weeks kept as its tentative list, the engine's move named as replaced.
-  A wait or a roll pick is its own rolling twin and needs no second solve.
-- **Limits.** A solve stops at `timeLimitS` or within `absGap` points of its bound. The page gives up on it
-  `timeoutMarginS` later and replaces the worker, since a synchronous solve cannot be interrupted. A worker that has not
-  loaded HiGHS by `initTimeoutS` turns the solver off for the session.
-- **Falling back.** No plan inside the cap, an error, a stuck or failed worker, a changed `highs.wasm` (its hash is
-  pinned in `solver.vendor` and checked by the fetch), a protected sale, a plan with no legal order, a rolling solve that
-  fails or no `Worker`: the card keeps the engine's move, marked as the engine's, and nothing throws into the page.
+  A wait or a roll pick is its own rolling twin: the twin still runs, in the background, for the gain figure, but the
+  card does not wait for it. The settle rules (a protected sale refused, a wait's kept players, the order of the moves,
+  the tie) are one function, `settlePick` in `engine/solver/plan.js`, so the backtest can settle a pick as the runner
+  does; the reproduction check runs without it and without the guard, as Phase 8's planner did.
+- **Limits.** A solve stops at `timeLimitS` (`resolveTimeLimitS` for a re-solve) or within `absGap` points of its bound.
+  The page gives up on it `timeoutMarginS` later and replaces the worker, since a synchronous solve cannot be
+  interrupted. A worker that has not loaded HiGHS by `initTimeoutS` turns the solver off for the session.
+- **Falling back.** No plan inside the cap or one still short of its bound after the re-solve, an error, a stuck or
+  failed worker, a changed `highs.wasm` (its hash is pinned in `solver.vendor` and checked by the fetch), a protected
+  sale, a plan with no legal order, a rolling solve that fails or no `Worker`: the card keeps the engine's move, marked
+  as the engine's, and nothing throws into the page.
 
 ### The decision log
 
 Every card the Planner settles is logged, one entry per gameweek, mode, call, move set and source (key
 `gw|mode|call|moveSetKey|source`, so a wait of a move set is not a move of it, and a roll has the empty set):
-`{ gw, at, mode, source, call, stopped, moves, gain, robustness, engineFirst, agrees }`. It lives in the `decisions` store
-of the snapshot database (`js/snapshots.js`, version 2), is updated in place as the gain and robustness land, drops the
-oldest past `solver.logMax`, and is in "Export snapshots" as `decisions`.
+`{ gw, at, mode, source, call, stopped, guard, gap, moves, gain, robustness, engineFirst, agrees }`. It lives in the
+`decisions` store of the snapshot database (`js/snapshots.js`, version 2), is updated in place as the gain and
+robustness land, drops the oldest past `solver.logMax`, and is in "Export snapshots" as `decisions`.
 - `call` is `move`, `wait` or `roll`; `stopped` says the solve that made the card (its pick) stopped at its time limit,
   false for an engine card.
+- `guard` says how the plan came to be shown (`trusted` at once, `resolved` after the longer re-solve) and `gap` is that
+  plan's distance from its proven bound; an engine card is `engine` with a null gap.
 - `gain` is the gain over rolling that landed on a solver card (null until then); for an engine card it is its root's
   `outScore`, and null for an engine roll.
 - `engineFirst` is the engine's whole move set (its root and, for Funds, the second move it chains), and `agrees` says
@@ -313,6 +326,7 @@ files hold no other numbers but 0 and 1.
 | `lpLineTerms` | 8 | terms per line of the model's LP text, which stays readable |
 | `workers`, `phone` | 3; { maxWidthPx 639, minCores 4, minMemoryGb 4 } | solver workers at most, and what counts as a phone (one worker) |
 | `timeLimitS`, `absGap` | 3, 0.5 | a solve stops at the limit or within `absGap` points of its bound |
+| `resolveTimeLimitS` | 10 | the limit of the one re-solve of a pick that stopped more than `absGap` short of its bound |
 | `timeoutMarginS`, `initTimeoutS` | 2, 20 | the page's wait past a solve's limit, and for a worker to load HiGHS |
 | `pool` | { points 20, pointsPerTenth 10 } | the others a problem may buy, per position |
 | `showRobustness` | false | robustness stays off every card until Phase 4's check passes |

@@ -17,8 +17,9 @@ import { endFtValueOf } from './problem.js';
  * The share of the noisy copies in which the pick scores at least as well as every other candidate. A candidate's
  * score is the mode's weights times the squad value of each week with its moves made, less its hits, plus what the
  * free transfers it leaves banked are worth at the horizon's end (the solver's own terms for them, so a hit and a
- * rolled transfer are priced as the plan priced them). A hit costs hitCost flat, whatever the week weighs, as the
- * engine's transferCost and the solver's flatHits do; the mode's hit margin is not re-scored.
+ * rolled transfer are priced as the plan priced them). A hit costs hitCost plus the mode's solver hit margin
+ * (solver.modes[modeId].hitMargin, not the engine's own hitMargin) flat, whatever the week weighs, as the engine's
+ * transferCost and the solver's flatHits do, so a margin that kept a hit out of the plan keeps it out of the re-score.
  *
  * MODEL: the copies move the players' points and chances of no minutes and the free transfer's value; the weights stay
  * the mode's own, so the decay is not moved. Only the engine's squad value and the transfer terms are re-scored, not
@@ -38,18 +39,19 @@ export function pickBeatsAlternatives(input, config, modeId, weights, candidates
   if (!distinct.some(c => c.key === pickKey)) {
     throw new Error(`pickBeatsAlternatives: the ${modeId} pick (${pickKey}) is not among its candidates`);
   }
+  const hitPoints = config.hitCost + config.solver.modes[modeId].hitMargin;
   const random = seededRandom(config.robustnessSeed);
   let wins = 0;
   for (let run = 0; run < config.robustnessRuns; run++) {
     const copy = noisyInput(input, config, random);
-    const scores = new Map(distinct.map(c => [c.key, scoreOf(copy, config, weights, c.moves)]));
+    const scores = new Map(distinct.map(c => [c.key, scoreOf(copy, config, weights, hitPoints, c.moves)]));
     if (distinct.every(c => scores.get(pickKey) >= scores.get(c.key))) wins++;
   }
   return wins / config.robustnessRuns;
 }
 
 /** One candidate's score on one noisy copy: `config` is the engine's, `copy` its noisy input and config. */
-function scoreOf({ input, config: noisy }, config, weights, moves) {
+function scoreOf({ input, config: noisy }, config, weights, hitPoints, moves) {
   const swapped = new Map(moves.map(m => [m.outId, m.inId]));
   const squad = input.squad.map(s => swapped.get(s.playerId) ?? s.playerId);
   // A chip the engine does not price in V (Free Hit, Wildcard) leaves squadValue as it was, and its weeks weigh 0.
@@ -61,7 +63,7 @@ function scoreOf({ input, config: noisy }, config, weights, moves) {
     });
     return total + (w * value);
   }, 0);
-  const hits = config.hitCost * Math.max(0, moves.length - input.freeTransfers);
+  const hits = hitPoints * Math.max(0, moves.length - input.freeTransfers);
   const banked = Math.min(config.maxBankedFt, Math.max(0, input.freeTransfers - moves.length) + 1);
   // The schedule starts at the second transfer banked: the first is the one every week starts with.
   const kept = Object.entries(endFtValueOf(noisy)).filter(([count]) => Number(count) <= banked)

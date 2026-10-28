@@ -112,9 +112,12 @@ export async function captureGwTables(db, events, fetchLive, now) {
  *
  * @param {object} db  store adapter
  * @param {{ gw: number, at: number, mode: string, source: string, call: 'move'|'wait'|'roll',
- *   stopped: boolean, moves: Array<{outId: number, inId: number}>, gain: number|null,
+ *   stopped: boolean, guard: 'trusted'|'resolved'|'engine', gap: number|null,
+ *   moves: Array<{outId: number, inId: number}>, gain: number|null,
  *   robustness: number|null, engineFirst: Array<{outId: number, inId: number}>,
- *   agrees: boolean }} entry  stopped: the solve that made the card stopped at its limit (false for an engine card)
+ *   agrees: boolean }} entry  stopped: the solve that made the card stopped at its limit (false for an engine card);
+ *   guard: its plan was trusted at once, only after a longer re-solve, or the card is the engine's; gap: that plan's
+ *   distance from its proven bound (null for an engine card)
  * @param {{ max: number }} limits  DECISION_ENGINE.solver.logMax
  */
 export async function logDecision(db, entry, { max }) {
@@ -122,8 +125,8 @@ export async function logDecision(db, entry, { max }) {
   const held = await db.get('decisions', key);
   if (held) {
     // The engine's own move can change between runs without changing the key, so the entry describes the latest run.
-    const { gain, robustness, at, engineFirst, agrees, stopped } = entry;
-    await db.put('decisions', { ...held, gain, robustness, at, engineFirst, agrees, stopped });
+    const { gain, robustness, at, engineFirst, agrees, stopped, guard, gap } = entry;
+    await db.put('decisions', { ...held, gain, robustness, at, engineFirst, agrees, stopped, guard, gap });
     return;
   }
   await db.put('decisions', { ...entry, key });

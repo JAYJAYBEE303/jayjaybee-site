@@ -17,6 +17,7 @@ import { GW, MODES, projectionOf, scenario, withDraws } from '../engine/decision
 
 const CONFIG = { ...DECISION_ENGINE, solver: { ...DECISION_ENGINE.solver, enabled: true } };
 const MODE_IDS = Object.keys(CONFIG.modes);
+const { timeLimitS, resolveTimeLimitS, absGap } = CONFIG.solver;
 
 // ─── The engine's side: inputs, results and plans ────────────────────────────
 
@@ -48,11 +49,13 @@ const kindOf = problem => (problem.fixed?.first ? 'rolling' : problem.exclude?.l
 const NEVER = new Promise(() => {});
 
 /**
- * Workers that answer from a script. `solve({ modeId, kind, n, problem, worker })` returns a plan, null (no plan inside
- * the cap), a promise of either, or throws (an `ok: false` answer); `init(worker)` and `rescore(message)` likewise.
+ * Workers that answer from a script. `solve({ modeId, kind, n, limit, problem, worker })` returns a plan, null (no plan
+ * inside the cap), a promise of either, or throws (an `ok: false` answer); `init(worker)` and `rescore(message)` likewise.
+ * `limit` is the time limit the page asked the solve for. `stopped(ask)` and `gap(ask)` say whether the solve stopped
+ * at its limit and how far its plan was from the bound it proved (0 unless told, as an optimal solve's is).
  * `afterAnswer(ask)` runs the moment a solve's answer has been handed to the page, before anything the page does next.
  */
-function world({ solve = () => null, init = () => ({ ok: true }), rescore = () => 0.75, afterAnswer = () => {}, stopped = () => false, engine, makeFails = null } = {}) {
+function world({ solve = () => null, init = () => ({ ok: true }), rescore = () => 0.75, afterAnswer = () => {}, stopped = () => false, gap = () => 0, engine, makeFails = null } = {}) {
   const modeIdOf = engine ? modeOf(engine) : () => undefined;
   const made = [];
   const rescorers = [];
@@ -73,10 +76,10 @@ function world({ solve = () => null, init = () => ({ ok: true }), rescore = () =
         worker.seen.push(message);
         if (message.kind === 'init') return reply(worker, message, Promise.resolve(init(worker)).then(a => a && { id: message.id, ...a }));
         const { problem } = message;
-        const ask = { modeId: modeIdOf(problem), kind: kindOf(problem), n: problem.exclude?.length ?? 0, problem, worker };
+        const ask = { modeId: modeIdOf(problem), kind: kindOf(problem), n: problem.exclude?.length ?? 0, limit: message.options.time_limit, problem, worker };
         asked.push(ask);
         return reply(worker, message, Promise.resolve().then(() => solve(ask))
-          .then(plan => ({ id: message.id, ok: true, plan, stopped: stopped(ask), ms: 1 })), () => afterAnswer(ask));
+          .then(plan => ({ id: message.id, ok: true, plan, stopped: stopped(ask), ms: 1, gap: plan ? gap(ask) : null })), () => afterAnswer(ask));
       },
     });
     made.push(worker);
@@ -347,7 +350,8 @@ test('no plan inside the cap leaves the engine\'s move, marked engine', async t 
   const card = h.of('longterm').at(-1);
   assert.deepEqual([card.source, card.state, card.root], ['engine', 'ready', h.engine.result.modes.longterm.root]);
   assert.equal(h.of('longterm').length, 2, 'refining, then the fallback: nothing after');
-  assert.equal(h.asked.filter(a => a.modeId === 'longterm').length, 1, 'no follow-up solves for a card with no plan');
+  // No plan is not a trusted one: it is asked for once more at the longer limit, and nothing after that.
+  assert.deepEqual(h.asked.filter(a => a.modeId === 'longterm').map(a => [a.kind, a.limit]), [['pick', timeLimitS], ['pick', resolveTimeLimitS]]);
   assert.equal(h.of('now').at(-1).source, 'solver', 'the other modes are unaffected');
 });
 
@@ -443,7 +447,7 @@ test('a wait that sells a locked player the week after is a roll: warned, not an
   assert.deepEqual(card.later, [{ gw: GW + 2, moves: [{ outId: 14, inId: 102 }] }], 'the weeks after the wait stay, tentative');
   const sells15 = c => c.source === 'solver' && (c.moves.some(m => m.outId === 15) || c.later.some(w => w.moves.some(m => m.outId === 15)));
   assert.ok(!h.of('longterm').some(sells15), 'no solver card sells him, now or later');
-  assert.ok(warn.mock.calls.some(c => /longterm.*protected player 15.*the week it waits for/.test(c.arguments.join())), 'warned');
+  assert.ok(warn.mock.calls.some(c => /longterm.*protected player.*the card rolls/.test(c.arguments.join())), 'warned');
   assert.ok(!error.mock.calls.some(c => /longterm sold protected player 15/.test(c.arguments.join())), 'and not an error: it is not a model bug');
   assert.ok(!h.asked.some(a => a.modeId === 'longterm' && a.kind !== 'pick'), 'no follow-ups for a roll');
   const logged = h.logs.filter(e => e.mode === 'longterm');
@@ -493,7 +497,8 @@ test('a pick whose moves can only be made in part, one at a time, is not shown b
     assert.ok(h.of(modeId).every(c => c.source !== 'solver'), `${modeId}: a part of the plan was shown`);
   }
   assert.ok(warn.mock.calls.some(c => /legal order/.test(c.arguments.join())));
-  assert.equal(h.asked.filter(a => a.kind !== 'pick').length, 0, 'no follow-up solves for a plan that is not shown');
+  // The rolling twin is asked for before the order is checked (settlePick checks it with the tie); nothing after it is.
+  assert.equal(h.asked.filter(a => a.kind !== 'pick' && a.kind !== 'rolling').length, 0, 'no follow-up solves for a plan that is not shown');
 });
 
 test('an alternative that cannot be made one move at a time is left out, and not re-scored', async t => {
@@ -649,7 +654,7 @@ test('a pick that gains no more than the solver\'s tolerance over rolling is a r
   assert.equal(h.of('future').at(-1).call, h.engine.result.modes.future.call, 'a clear gain elsewhere is unaffected');
 });
 
-test('a pick just above the tolerance is the move, and a pick that waits is not asked for its rolling solve', async t => {
+test('a pick just above the tolerance is the move, and a pick that waits does not wait for its rolling twin, which runs in the background', async t => {
   const { absGap } = CONFIG.solver;
   const h = harness(t, { solve: ({ kind, modeId, n }) => {
     if (kind === 'pick' && modeId === 'now') return sells(10, [15], [101]);
@@ -663,7 +668,8 @@ test('a pick just above the tolerance is the move, and a pick that waits is not 
   const now = h.of('now').at(-1);
   assert.deepEqual([now.call, now.moves.length], ['move', 1]);
   assert.ok(Math.abs(now.gain.value - (absGap + 0.01)) < 1e-9);
-  // Its first week is rolling already: the rolling twin of a wait is the wait, so its card does not wait for one.
+  // Its first week is rolling already: the rolling twin of a wait is the wait, so its card does not wait for the twin
+  // (asked in the background, and here never answered).
   const wait = h.of('longterm').at(-1);
   assert.deepEqual([wait.source, wait.state, wait.call], ['solver', 'ready', 'wait']);
 });
@@ -816,6 +822,168 @@ test('a refresh ends a rescore still waiting, so a fast sequence does not queue 
   assert.equal(h.rescorers.length, 2, 'a fresh one, made when it is next needed');
 });
 
+// ─── The guard ───────────────────────────────────────────────────────────────
+
+/** Now's first pick, asked for at the first limit. */
+const firstNow = ask => ask.kind === 'pick' && ask.modeId === 'now' && ask.limit === timeLimitS;
+
+test('a pick short of its bound keeps the engine\'s card refining, then shows the longer solve\'s move', async t => {
+  const gate = Promise.withResolvers();
+  // The 3 s plan sells 14 for 102 and is 5 points short of its bound; the 10 s one is optimal and sells 15 for 101.
+  const h = harness(t, { stopped: firstNow, gap: ask => (firstNow(ask) ? 5 : 0), solve: ask => {
+    if (ask.kind === 'pick' && ask.modeId === 'now') return firstNow(ask) ? sells(10, [14], [102]) : gate.promise.then(() => sells(10, [15], [101]));
+    return agree(ask);
+  } });
+  h.refresh();
+  await flush();
+  // Every other mode has settled; Now's short plan has landed and is not shown: the engine's card, still refining.
+  assert.deepEqual(h.of('now').map(c => [c.source, c.state]), [['engine', 'refining']]);
+  assert.ok(h.logs.every(e => e.mode !== 'now'), 'and nothing is logged for it');
+  const nowPicks = h.asked.filter(a => a.kind === 'pick' && a.modeId === 'now');
+  assert.deepEqual(nowPicks.map(a => a.limit), [timeLimitS, resolveTimeLimitS], 'one re-solve of the same problem, at the longer limit');
+  assert.deepEqual(nowPicks[1].problem, nowPicks[0].problem);
+  // It is queued a tier after every first pick, and before any follow-up (alternatives, gain, robustness).
+  const at = ask => h.asked.indexOf(ask);
+  const firsts = h.asked.filter(a => a.kind === 'pick' && a.limit === timeLimitS);
+  assert.equal(firsts.length, MODE_IDS.length);
+  assert.ok(firsts.every(a => at(a) < at(nowPicks[1])), 'after every first pick');
+  assert.ok(h.asked.filter(a => a.kind === 'alt').every(a => at(a) > at(nowPicks[1])), 'before the alternatives');
+
+  gate.resolve();
+  await flush();
+  const now = h.of('now');
+  assert.deepEqual(now.slice(0, 2).map(c => [c.source, c.state]), [['engine', 'refining'], ['solver', 'ready']]);
+  assert.ok(now.every(c => !String(c.key).startsWith('14>102')), 'the short plan\'s move is never shown');
+  assert.equal(now[1].key, '15>101|1');
+  assert.deepEqual(now[1].moves.map(m => [m.outId, m.inId]), [[15, 101]]);
+  // The rolling twin of the plan that is shown is solved at the same limit as that plan.
+  assert.deepEqual(h.asked.filter(a => a.kind === 'rolling' && a.modeId === 'now').map(a => a.limit), [resolveTimeLimitS]);
+  assert.equal(h.of('now').filter(c => c.state === 'refining').length, 1);
+});
+
+test('a pick proven within absGap is shown at once; one more than absGap short is not shown until a longer solve proves it', async t => {
+  for (const gap of [0, absGap, absGap + 0.01]) {
+    const h = harness(t, { stopped: firstNow, gap: ask => (firstNow(ask) ? gap : 0), solve: ({ kind, modeId, n, limit }) => (
+      kind === 'pick' && modeId === 'now' ? sells(10, [15], [101]) : agree({ kind, n, limit })) });
+    h.refresh();
+    await flush();
+    const picks = h.asked.filter(a => a.kind === 'pick' && a.modeId === 'now');
+    const now = h.of('now');
+    if (gap <= absGap) {
+      assert.deepEqual(picks.map(a => a.limit), [timeLimitS], `gap ${gap}: no second solve`);
+      assert.deepEqual([now[1].source, now[1].guard, now[1].gap], ['solver', 'trusted', gap]);
+    } else {
+      assert.deepEqual(picks.map(a => a.limit), [timeLimitS, resolveTimeLimitS], `gap ${gap}: re-solved`);
+      assert.deepEqual([now[1].source, now[1].guard, now[1].gap], ['solver', 'resolved', 0]);
+    }
+  }
+});
+
+test('a re-solve still short, failing or timing out ends on the engine\'s card, not refining', async t => {
+  quiet();
+  const config = { ...CONFIG, solver: { ...CONFIG.solver, resolveTimeLimitS: 0.01, timeoutMarginS: 0.02 } };
+  const resolves = {
+    'still short': () => sells(10, [15], [101]),
+    'no plan': () => null,
+    'an error': () => { throw new Error('HiGHS returned "Infeasible"'); },
+    'no answer in time': () => NEVER,
+  };
+  for (const [name, resolve] of Object.entries(resolves)) {
+    // Now's pick stops short of its bound at both limits (when it answers at all).
+    const h = harness(t, { config, stopped: ask => ask.kind === 'pick' && ask.modeId === 'now', gap: ask => (ask.kind === 'pick' && ask.modeId === 'now' ? 5 : 0),
+      solve: ask => (ask.kind === 'pick' && ask.modeId === 'now' ? (ask.limit === timeLimitS ? sells(10, [14], [102]) : resolve()) : agree(ask)) });
+    h.refresh();
+    await new Promise(resolve => setTimeout(resolve, 80));
+    await flush();
+    const now = h.of('now');
+    assert.deepEqual(now.map(c => [c.source, c.state]), [['engine', 'refining'], ['engine', 'ready']], name);
+    assert.equal(now.at(-1).root, h.engine.result.modes.now.root, name);
+    assert.equal(h.asked.filter(a => a.kind === 'pick' && a.modeId === 'now').length, 2, `${name}: one re-solve, no more`);
+    assert.ok(!h.asked.some(a => a.modeId === 'now' && a.kind !== 'pick'), `${name}: no follow-ups for a card kept as the engine's`);
+    assert.deepEqual(h.logs.filter(e => e.mode === 'now').map(e => [e.source, e.guard, e.gap]), [['engine', 'engine', null]], name);
+    assert.equal(h.of('longterm').at(-1).source, 'solver', `${name}: the other modes are unaffected`);
+  }
+});
+
+test('a re-solve answer for a superseded input is ignored, and asks for nothing more', async t => {
+  const gate = Promise.withResolvers();
+  const first = engineOf(scenario({ candidates: CANDIDATES }));
+  const second = engineOf(scenario({ candidates: CANDIDATES, bankTenths: 5 }));
+  const v1 = ask => ask.problem.bankTenths === 0;
+  const h = harness(t, { engine: first, stopped: ask => v1(ask) && firstNow(ask), gap: ask => (v1(ask) && firstNow(ask) ? 5 : 0), solve: ask => {
+    if (ask.kind !== 'pick' || ask.modeId !== 'now') return agree(ask);
+    if (!v1(ask)) return sells(10, [15], [101]);
+    return firstNow(ask) ? sells(10, [14], [102]) : gate.promise.then(() => sells(10, [14], [102]));
+  } });
+  h.refresh(first, 1);
+  await flush();
+  assert.deepEqual(h.of('now').map(c => c.state), ['refining'], 'v1\'s re-solve is on its way');
+  const before = h.cards.length;
+  h.refresh(second, 2);
+  gate.resolve();
+  await flush();
+  // v1's answer arrives for a run that is over: no card, no log, and no rolling twin or alternatives asked for.
+  for (const { card } of h.cards.slice(before)) assert.ok(!String(card.key).endsWith('|1'), `key ${card.key}`);
+  assert.ok(!h.asked.some(a => v1(a) && a.modeId === 'now' && a.kind !== 'pick'));
+  const now = h.of('now').at(-1);
+  assert.deepEqual([now.source, now.state, now.key], ['solver', 'ready', '15>101|2']);
+});
+
+test('figures land only on the shown move after a re-solve', async t => {
+  // The 3 s plan (sell 14 for 102) is short of its bound; the re-solve's (sell 15 for 101) is the card.
+  const h = harness(t, { stopped: firstNow, gap: ask => (firstNow(ask) ? 5 : 0), solve: ask => {
+    if (ask.kind === 'pick' && ask.modeId === 'now') return firstNow(ask) ? sells(10, [14], [102]) : sells(10, [15], [101]);
+    return agree(ask);
+  } });
+  h.refresh();
+  await flush();
+  const now = h.of('now');
+  // Every figure on every Now card is the one computed for that card's own move set.
+  for (const card of now) {
+    for (const name of ['gain', 'alternatives', 'robustness']) {
+      if (card[name]) assert.equal(card[name].key, card.key, `${name} on ${card.key}`);
+    }
+  }
+  const last = now.at(-1);
+  assert.equal(last.key, '15>101|1');
+  assert.deepEqual([last.gain.value, last.alternatives.value.length, last.robustness.value], [6, 1, 0.75]);
+  // Its alternatives were found by excluding the shown plan's first week, and it was re-scored as the pick.
+  const alts = h.asked.filter(a => a.kind === 'alt' && a.modeId === 'now');
+  assert.deepEqual(alts[0].problem.exclude, [{ in: [101], out: [15] }]);
+  const rescored = h.posted.filter(m => m.modeId === 'now');
+  assert.deepEqual(rescored.map(m => [m.key, m.pickKey]), [['now|15>101|1', '15>101']]);
+  assert.ok(!rescored.some(m => m.candidates.some(c => c.key === '14>102')), 'the short plan is not a candidate');
+  // The short plan had no card, so a share that arrives for its key has nothing to land on.
+  h.rescorers[0].onmessage({ data: { kind: 'rescore', key: 'now|14>102|1', share: 0.9 } });
+  await flush();
+  assert.ok(h.cards.every(c => c.card.robustness?.value !== 0.9));
+});
+
+test('the log says trusted, resolved or engine, with the gap of the plan shown', async t => {
+  quiet();
+  const stoppedAt = { now: 'first', longterm: 'always', future: 'always' };
+  const stopped = ask => ask.kind === 'pick' && (stoppedAt[ask.modeId] === 'always' || (stoppedAt[ask.modeId] === 'first' && ask.limit === timeLimitS));
+  const gapOf = ask => {
+    if (ask.kind !== 'pick') return 0;
+    // Now: short at 3 s, 0.25 from its bound at 10 s. Long term: 0.4 from its bound at 3 s (within absGap). Future: short always.
+    return { now: ask.limit === timeLimitS ? 5 : 0.25, longterm: 0.4, future: 5 }[ask.modeId] ?? 0;
+  };
+  const h = harness(t, { stopped, gap: gapOf, solve: agree });
+  h.refresh();
+  await flush();
+  const entries = mode => h.logs.filter(e => e.mode === mode);
+  assert.deepEqual(entries('now').map(e => [e.source, e.guard, e.gap]).at(0), ['solver', 'resolved', 0.25]);
+  assert.deepEqual(entries('longterm').map(e => [e.source, e.guard, e.gap]).at(0), ['solver', 'trusted', 0.4]);
+  assert.deepEqual(entries('future').map(e => [e.source, e.guard, e.gap]), [['engine', 'engine', null]]);
+  assert.deepEqual(entries('funds').map(e => [e.source, e.guard, e.gap]).at(0), ['solver', 'trusted', 0], 'an optimal solve is trusted');
+  // Every entry, as its figures land, keeps the guard of its card; an engine card, whatever its source, is the engine's.
+  for (const e of h.logs) {
+    if (e.source === 'solver') assert.ok(['trusted', 'resolved'].includes(e.guard), `${e.mode}: ${e.guard}`);
+    else assert.deepEqual([e.guard, e.gap], ['engine', null], e.mode);
+  }
+  assert.ok(entries('now').every(e => e.guard === 'resolved'));
+});
+
 // ─── The log ─────────────────────────────────────────────────────────────────
 
 test('every settled card is logged with its fields, and a figure landing later logs again', async t => {
@@ -826,7 +994,7 @@ test('every settled card is logged with its fields, and a figure landing later l
   // Settled with its gain over rolling, then the robustness landed.
   assert.deepEqual(now.map(e => [e.gain, e.robustness]), [[6, null], [6, 0.75]]);
   const entry = now[0];
-  assert.deepEqual(Object.keys(entry).sort(), ['agrees', 'at', 'call', 'engineFirst', 'gain', 'gw', 'mode', 'moves', 'robustness', 'source', 'stopped'].sort());
+  assert.deepEqual(Object.keys(entry).sort(), ['agrees', 'at', 'call', 'engineFirst', 'gain', 'gap', 'guard', 'gw', 'mode', 'moves', 'robustness', 'source', 'stopped'].sort());
   assert.deepEqual([entry.gw, entry.mode, entry.source, entry.call, entry.stopped], [GW, 'now', 'solver', 'move', false]);
   assert.deepEqual(entry.moves, [{ outId: 14, inId: 102 }]);
   assert.deepEqual(entry.engineFirst, [{ outId: 15, inId: 101 }]);

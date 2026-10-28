@@ -9,9 +9,13 @@
  *
  * A card goes engine's move (refining) -> the solver's move (ready) -> its figures as they land, or, when the solver
  * has no plan inside its cap, errors, times out or cannot start, the engine's move (ready), marked as the engine's.
+ * A pick that stopped at its time limit more than the solver's tolerance (absGap) short of its proven bound is not
+ * shown (engine/solver/plan.js: trusted): the card stays the engine's move, refining, while the same problem is solved
+ * once more at the longer limit, and shows that plan only if it is trusted too, else the engine's move.
  * A pick that moves settles only once its rolling solve has landed: a move that gains no more over rolling than the
- * solver's tolerance (absGap) is within the solve's own noise, and the card is a roll (money alone, or nothing, is not
- * a reason to move). Where the rolling solve fails, the card is the engine's.
+ * solver's tolerance is within the solve's own noise, and the card is a roll (money alone, or nothing, is not a reason
+ * to move). Where the rolling solve fails, the card is the engine's. (settlePick holds these rules; a wait or roll
+ * pick is its own rolling twin, which still runs, in the background: its card does not wait for it.)
  * Every figure on a solver card is keyed to the card it was computed for (engine/solver/plan.js: withFigure), so one
  * for another move set or an older input is dropped, and the run itself is dropped the moment a newer one starts.
  */
@@ -19,7 +23,8 @@
 import { createDecisionCache, describePlan, moveSetKey } from '../engine/decision.js';
 import { modeSetting, solverProblem } from '../engine/solver/problem.js';
 import {
-  alternativesOf, callOf, checkProtected, gainOverRolling, orderMoves, rollingProblem, solverCard, withFigure,
+  alternativesOf, callOf, checkProtected, gainOverRolling, orderMoves, rollingProblem, settlePick, solverCard, trusted,
+  withFigure,
 } from '../engine/solver/plan.js';
 
 /** Seconds to ms: the config states every wait in seconds. */
@@ -30,10 +35,12 @@ const STALE = Symbol('stale');
 
 /**
  * The queue's tiers: every solve a card's move waits on (its pick, and its rolling twin when it moves) before any
- * follow-up, so a card's move is never waiting on another card's figures.
+ * follow-up, so a card's move is never waiting on another card's figures. A re-solve of a pick that was not trusted
+ * comes after every first pick: it only replaces the engine's move that is already on the card.
  */
 const PICK = 0;
-const BACKGROUND = 1;
+const RESOLVE = 1;
+const BACKGROUND = 2;
 
 /** A message to a worker and its answer, matched by id; a worker that dies or ends rejects what it still owed. */
 function connect(make) {
@@ -99,8 +106,8 @@ export function createSolverRunner({
 }) {
   const { solver } = config;
   const wasm = { wasmUrl: new URL(`../../${solver.vendor.dir}highs.wasm`, import.meta.url).href, integrity: `sha256-${solver.vendor.wasm}` };
-  const options = { time_limit: solver.timeLimitS, mip_abs_gap: solver.absGap };
-  const solveMs = (solver.timeLimitS + solver.timeoutMarginS) * MS_PER_S;
+  const optionsFor = limitS => ({ time_limit: limitS, mip_abs_gap: solver.absGap });
+  const solveMs = limitS => (limitS + solver.timeoutMarginS) * MS_PER_S;
   const initMs = solver.initTimeoutS * MS_PER_S;
   const modeIds = ['now', ...Object.keys(config.modes).filter(id => id !== 'now')];
 
@@ -109,7 +116,7 @@ export function createSolverRunner({
   let off = null;            // why the solver is off for the session, once it is
   let slots = null;          // the solver workers, once made: { worker, ready, busy }
   let rescorer = null;       // the robustness worker, once made: { worker, waiting }
-  const queue = [];          // solves waiting for a worker: { tier, problem, resolve, reject }
+  const queue = [];          // solves waiting for a worker: { tier, problem, limitS, resolve, reject }
   const viewed = new Set();  // the cards a phone has shown, in the order they were
 
   // ─── The pool ──────────────────────────────────────────────────────────────
@@ -173,9 +180,9 @@ export function createSolverRunner({
   function dispatch(slot, task) {
     const { worker } = slot;
     slot.busy = true;
-    within(worker.call({ kind: 'solve', problem: task.problem, options }), solveMs, 'the solver').then(answer => {
+    within(worker.call({ kind: 'solve', problem: task.problem, options: optionsFor(task.limitS) }), solveMs(task.limitS), 'the solver').then(answer => {
       slot.busy = false;
-      if (answer.ok) task.resolve({ plan: answer.plan, stopped: Boolean(answer.stopped) });
+      if (answer.ok) task.resolve({ plan: answer.plan, stopped: Boolean(answer.stopped), gap: answer.gap ?? null });
       else task.reject(new Error(answer.error));
       pump();
     }, error => {
@@ -191,16 +198,18 @@ export function createSolverRunner({
   /**
    * A solve for a run's own flow: nothing is queued, dispatched or pooled for a run that a newer refresh (or stop) has
    * replaced, wherever in its flow it asks.
-   * @returns {Promise<{plan: object|null, stopped: boolean}|symbol>} the plan (null when there is none inside the cap) and
-   *   whether the solve stopped at its limit, or STALE when the run is over
+   * @param {number} [limitS]  the solve's time limit, seconds
+   * @returns {Promise<{plan: object|null, stopped: boolean, gap: number|null}|symbol>} the plan (null when there is none
+   *   inside the cap), whether the solve stopped at its limit and the plan's gap to the bound it proved (null without
+   *   either), or STALE when the run is over
    */
-  function solve(mine, problem, tier) {
+  function solve(mine, problem, tier, limitS = solver.timeLimitS) {
     return new Promise((resolve, reject) => {
       if (mine !== run) return resolve(STALE);
       if (off) return reject(off);
       ensurePool();
       if (off) return reject(off);
-      queue.push({ tier, problem, resolve, reject });
+      queue.push({ tier, problem, limitS, resolve, reject });
       pump();
     });
   }
@@ -262,7 +271,8 @@ export function createSolverRunner({
     try {
       onLog({
         gw: mine.input.planningGw, at: Date.now(), mode: modeId, source: card.source, call: card.call,
-        stopped: card.stopped === true, moves,
+        stopped: card.stopped === true, guard: card.source === 'solver' ? card.guard : 'engine',
+        gap: card.source === 'solver' ? card.gap : null, moves,
         gain: card.source === 'solver' ? card.gain?.value ?? null : card.root?.outScore ?? null,
         robustness: card.robustness?.value ?? null, engineFirst,
         agrees: card.call === engine.call && moveSetKey(moves) === moveSetKey(engineFirst),
@@ -297,16 +307,11 @@ export function createSolverRunner({
   };
 
   /**
-   * The card a solved plan makes: marked updated, naming the engine's move, when it is not the engine's move. `rolled`:
-   * the plan's move gains no more than the tolerance over rolling, so the card rolls and keeps the plan's later weeks.
+   * The card a solved plan makes, as settlePick settled it: marked updated, naming the engine's move, when it is not the
+   * engine's move. A settled roll keeps the plan's later weeks, tentative.
    */
-  function pickCard(mine, modeId, plan, rolled = false) {
+  function pickCard(mine, modeId, plan, { call, moves }) {
     const engine = mine.result.modes[modeId];
-    const call = rolled ? 'roll' : callOf(plan);
-    const { moves, unordered } = rolled ? { moves: [], unordered: false }
-      : orderMoves(mine.input, mine.result, call === 'wait' ? plan.weeks[1] : plan.weeks[0]);
-    // The plan's figures are for all its moves: a part of it, the moves that happen to be legal one at a time, is not it.
-    if (unordered) throw new Error(`${call === 'wait' ? 'next week\'s' : 'this week\'s'} moves have no legal order, one at a time`);
     const describe = describePlan(mine.input, config, mine.cache, modeId, moves);
     const solved = solverCard(engine, { plan, moves, describe, inputVersion: mine.version, positionOf: positionOf(mine), call });
     const same = solved.call === engine.call && moveSetKey(moves) === moveSetKey(engineMovesOf(engine));
@@ -320,86 +325,75 @@ export function createSolverRunner({
 
   async function pickFlow(mine, modeId) {
     const problem = solverProblem(mine.input, mine.result, mine.modes[modeId].setting, config);
+    // The pick, and once more at the longer limit if its plan is not trusted: the card is the engine's, refining, meanwhile.
+    let guard = 'trusted';
     let answer;
     try {
       answer = await solve(mine, problem, PICK);
+      if (answer !== STALE && !trusted(answer, config)) {
+        guard = 'resolved';
+        answer = await solve(mine, problem, RESOLVE, solver.resolveTimeLimitS);
+      }
     } catch (error) {
       if (error !== off) console.warn(`[planner] solver: ${modeId} keeps the engine's move:`, error.message);
       return settleEngine(mine, modeId);
     }
     if (answer === STALE || mine !== run) return;
-    const { plan, stopped } = answer;
-    if (!plan) return settleEngine(mine, modeId);   // no plan inside the cap
-
-    let card;
-    try {
-      checkProtected(modeId, plan.weeks[0], mine.result);
-    } catch (error) {
-      console.error(`[planner] ${error.message}`);
-      return settleEngine(mine, modeId);
-    }
-    // The lock, protection or hold is the first week's by spec, so a wait is checked in the week it is made: a plan that
-    // sells a locked player next week is not a model bug, but not a wait to show either. It rolls, keeping its later weeks.
-    let rolled = false;
-    if (callOf(plan) === 'wait') {
-      try {
-        checkProtected(modeId, plan.weeks[1], mine.result, 'the week it waits for');
-      } catch (error) {
-        console.warn(`[planner] ${error.message}: the card rolls`);
-        rolled = true;
-      }
-    }
-    try {
-      card = { ...pickCard(mine, modeId, plan, rolled), stopped };
-    } catch (error) {
-      console.warn(`[planner] solver: ${modeId} keeps the engine's move:`, error.message);
-      return settleEngine(mine, modeId);
-    }
-    if (rolled) {
-      emit(mine, modeId, card);
-      return log(mine, modeId, card);
-    }
-
-    // A wait or a roll has no move this week, so it is its own rolling twin.
-    if (callOf(plan) !== 'move') {
-      emit(mine, modeId, card);
-      log(mine, modeId, card);
-      return Promise.all([gainFlow(mine, modeId, problem, plan, card), alternativesFlow(mine, modeId, problem, plan, card)]);
-    }
+    if (!trusted(answer, config)) return settleEngine(mine, modeId);   // no plan, or one short of its bound, inside the cap
+    const { plan, stopped, gap } = answer;
+    // The rolling twin is solved as long as the plan it is priced against.
+    const limitS = guard === 'resolved' ? solver.resolveTimeLimitS : solver.timeLimitS;
 
     // A move is worth making only if it beats rolling by more than the solve's own tolerance, so its card waits for the
     // rolling twin: the gain lands with the card.
-    let rolling;
-    try {
-      rolling = await solve(mine, rollingProblem(problem), PICK);
-    } catch (error) {
-      if (error !== off) console.warn(`[planner] solver: ${modeId} keeps the engine's move: gain over rolling not computed:`, error.message);
-      return settleEngine(mine, modeId);
-    }
-    if (rolling === STALE || mine !== run) return;
-    if (!rolling.plan) return settleEngine(mine, modeId);
-    const gain = gainOverRolling(plan, rolling.plan);
-    if (!(gain > solver.absGap)) {
+    let rolling = null;
+    if (callOf(plan) === 'move') {
       try {
-        card = { ...pickCard(mine, modeId, plan, true), stopped };
+        rolling = await solve(mine, rollingProblem(problem), guard === 'resolved' ? RESOLVE : PICK, limitS);
       } catch (error) {
-        console.warn(`[planner] solver: ${modeId} keeps the engine's move:`, error.message);
+        if (error !== off) console.warn(`[planner] solver: ${modeId} keeps the engine's move: gain over rolling not computed:`, error.message);
         return settleEngine(mine, modeId);
       }
+      if (rolling === STALE || mine !== run) return;
+      if (!rolling.plan) return settleEngine(mine, modeId);
+    }
+
+    // The lock, protection or hold is the first week's by spec, so a wait is checked in the week it is made: a plan that
+    // sells a locked player next week is not a model bug, but not a wait to show either. It rolls, keeping its later weeks.
+    let settled;
+    let card;
+    try {
+      settled = settlePick({ modeId, plan, rolling: rolling?.plan ?? null, result: mine.result, input: mine.input, config });
+      card = { ...pickCard(mine, modeId, plan, settled), stopped, guard, gap };
+    } catch (error) {
+      // A protected sale is a bug in the model or the problem; the rest is a plan the app cannot show.
+      if (error.protectedSale) console.error(`[planner] ${error.message}`);
+      else console.warn(`[planner] solver: ${modeId} keeps the engine's move:`, error.message);
+      return settleEngine(mine, modeId);
+    }
+    if (settled.rolled) {
+      if (settled.rolled === 'kept') console.warn(`[planner] solver: ${modeId} waits for a sale of a protected player: the card rolls`);
       emit(mine, modeId, card);
       return log(mine, modeId, card);
     }
-    card = withFigure(card, 'gain', card.key, gain);
+
+    // A wait or a roll has no move this week, so it is its own rolling twin: its card does not wait for the twin.
+    if (card.call !== 'move') {
+      emit(mine, modeId, card);
+      log(mine, modeId, card);
+      return Promise.all([gainFlow(mine, modeId, problem, plan, card, limitS), alternativesFlow(mine, modeId, problem, plan, card)]);
+    }
+    card = withFigure(card, 'gain', card.key, gainOverRolling(plan, rolling.plan));
     emit(mine, modeId, card);
     log(mine, modeId, card);
     return alternativesFlow(mine, modeId, problem, plan, card);
   }
 
   /** The gain over rolling of a pick that does not move this week: the pick less the same problem with that week held to no moves. */
-  async function gainFlow(mine, modeId, problem, plan, card) {
+  async function gainFlow(mine, modeId, problem, plan, card, limitS) {
     let value = null;
     try {
-      const rolling = await solve(mine, rollingProblem(problem), BACKGROUND);
+      const rolling = await solve(mine, rollingProblem(problem), BACKGROUND, limitS);
       if (rolling === STALE) return;
       if (rolling.plan) value = gainOverRolling(plan, rolling.plan);
     } catch (error) {

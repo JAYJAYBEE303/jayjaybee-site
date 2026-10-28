@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 
 import { DECISION_ENGINE } from '../../../js/config.js';
-import { WASM, problemOf } from './fixtures.js';
+import { WASM, fakeHighs, loadVendored, problemOf } from './fixtures.js';
 
 const { vendor, timeLimitS, absGap } = DECISION_ENGINE.solver;
 const INTEGRITY = `sha256-${vendor.wasm}`;
@@ -42,14 +42,17 @@ test('the worker answers a solve with the decoded plan', async () => {
   assert.deepEqual([answer.id, answer.ok, answer.stopped], [2, true, false]);
   assert.deepEqual([answer.plan.weeks[0].in, answer.plan.weeks[0].out], [[101], [15]]);
   assert.ok(answer.ms >= 0);
+  // The proven bound travels with the plan: an optimal solve is within the tolerance of it.
+  assert.ok(Number.isFinite(answer.bound) && answer.gap >= -1e-9 && answer.gap <= absGap, `${answer.bound} ${answer.gap}`);
+  assert.ok(Math.abs(answer.gap - (answer.bound - answer.plan.objective)) < 1e-9);
 });
 
 test('a solve that ends with no plan answers plan: null', async () => {
   const handle = await freshWorker();
-  const load = async () => ({ solve: () => ({ Status: 'Time limit reached', ObjectiveValue: Infinity }) });
-  await handle(init, { fetch: bytes, load });
+  const { highs } = fakeHighs(await loadVendored(), { status: 'timeLimit', objective: Infinity, bound: 12.5 });
+  await handle(init, { fetch: bytes, load: async () => highs });
   const answer = await handle({ id: 2, kind: 'solve', problem: problemOf(), options: SOLVE });
-  assert.deepEqual([answer.id, answer.ok, answer.plan, answer.stopped], [2, true, null, true]);
+  assert.deepEqual([answer.id, answer.ok, answer.plan, answer.stopped, answer.bound, answer.gap], [2, true, null, true, 12.5, null]);
 });
 
 test('a fetch that fails, a response that is not ok, and a build that will not load each answer ok: false', async () => {

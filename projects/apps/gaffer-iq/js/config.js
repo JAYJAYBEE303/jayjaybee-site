@@ -1657,6 +1657,9 @@ export const DECISION_ENGINE = {
     // A solve stops at this many seconds, or within absGap points of its bound, whichever comes first.
     timeLimitS: 3,
     absGap: 0.5,
+    // A plan that stops more than absGap short of its proven bound is not shown (the engine's move stays); the same
+    // problem is solved once more for this many seconds, and shown only if that plan is proven within absGap.
+    resolveTimeLimitS: 10,
     // The page gives up on a worker's solve this many seconds after the limit: a stopped solve answers a little past it
     // (3.03 to 3.09 s measured for 3), and a synchronous solve cannot be interrupted, so that worker is ended and
     // replaced. A worker that has not loaded HiGHS by initTimeoutS seconds turns the solver off for the session.

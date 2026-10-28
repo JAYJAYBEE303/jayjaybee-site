@@ -23,8 +23,8 @@ import { fromTenths, seededRandom, toTenths } from '../../js/util.js';
 
 const OUTFIELD = ['DEF', 'MID', 'FWD'];
 export const GAIN_WINDOWS = [1, 3, 5];
-const LOWER_TAIL = 0.025;
-const UPPER_TAIL = 0.975;
+export const LOWER_TAIL = 0.025;
+export const UPPER_TAIL = 0.975;
 // A random squad's players are drawn with weight price^this, so it spends near
 // the budget rather than at a random pool's average.
 const RANDOM_PRICE_POWER = 2;

@@ -78,7 +78,7 @@ export function pairMoves(week, positionOf) {
 /**
  * Throws if a plan's first week sells a player the mode must not sell (the engine's flags): a Ceiling-protected one in
  * Now, Long term, Future prep and Funds, a locked one in every mode, one Structure holds in Structure. That is a bug in
- * the model or the problem, never a recommendation.
+ * the model or the problem, never a recommendation (the error says so: `protectedSale`).
  *
  * A wait is checked too, in the week it waits for: the model keeps a player in the first week only, so a plan may
  * sell a locked one the week after, which the card would then recommend against the lock on its own button.
@@ -94,9 +94,62 @@ export function checkProtected(modeId, firstWeek, result, when = 'its first week
     const flags = flagsOf.get(id) ?? [];
     if (flags.includes('locked') || (LOCK_PROTECTED_MODES.has(modeId) && flags.includes('protected'))
         || (modeId === 'structure' && flags.includes('hold'))) {
-      throw new Error(`solver: ${modeId} sold protected player ${id} in ${when}`);
+      throw Object.assign(new Error(`solver: ${modeId} sold protected player ${id} in ${when}`), { protectedSale: true });
     }
   }
+}
+
+/**
+ * Whether a solve's plan may be shown: there is one, and the solve either finished or stopped at its time limit with the
+ * plan proven within `absGap` of the best any plan could score. A plan short of that is not shown: the engine's move
+ * stays until a longer solve proves one. A stopped plan with no finite bound yet (gap null) proves nothing.
+ *
+ * @param {{plan: object|null, stopped: boolean, gap: number|null}} answer  a solve's answer (highs.js: solveProblem)
+ * @param {{solver: {absGap: number}}} config
+ * @returns {boolean}
+ */
+export const trusted = (answer, config) => answer.plan !== null
+  && (!answer.stopped || (answer.gap !== null && answer.gap <= config.solver.absGap));
+
+/**
+ * What a trusted pick settles to, the rules the runner and the backtest share: the first week's moves ordered for FPL
+ * (a wait's next week's), a protected sale refused, and a pick that does not earn its move turned into a roll.
+ * - A sale of a protected player in the first week throws (`protectedSale`: a bug in the model or the problem).
+ * - A wait that sells such a player in the week it waits for is a roll: `rolled: 'kept'`.
+ * - Moves with no legal order, one at a time, throw (`unordered`): the caller keeps the engine's card.
+ * - A move with no `rolling` solve throws: it has nothing to be priced against (the caller's bug).
+ * - A move that gains no more than `absGap` over rolling is within the solve's own noise: a roll, `rolled: 'tie'`.
+ *
+ * @param {object} p
+ * @param {string} p.modeId
+ * @param {{objective: number, weeks: Array<{in: number[], out: number[]}>}} p.plan  the trusted pick
+ * @param {{objective: number}|null} p.rolling  the solve of rollingProblem(its problem); null for a wait or a roll,
+ *   whose first week is rolling already
+ * @param {object} p.result  runDecisionEngine's
+ * @param {object} p.input   the engine's input
+ * @param {{solver: {absGap: number}}} p.config
+ * @returns {{call: 'move'|'wait'|'roll', moves: Array<{outId: number, inId: number}>, rolled: 'kept'|'tie'|null}}
+ */
+export function settlePick({ modeId, plan, rolling, result, input, config }) {
+  checkProtected(modeId, plan.weeks[0], result);
+  const call = callOf(plan);
+  if (call === 'move' && !rolling) throw new Error('settlePick: a move needs its rolling solve');
+  if (call === 'wait') {
+    try {
+      checkProtected(modeId, plan.weeks[1], result, 'the week it waits for');
+    } catch (error) {
+      if (!error.protectedSale) throw error;
+      return { call: 'roll', moves: [], rolled: 'kept' };
+    }
+  }
+  const { moves, unordered } = orderMoves(input, result, call === 'wait' ? plan.weeks[1] : plan.weeks[0]);
+  // The plan's figures are for all its moves: a part of it, the moves that happen to be legal one at a time, is not it.
+  if (unordered) {
+    const message = `${call === 'wait' ? 'next week\'s' : 'this week\'s'} moves have no legal order, one at a time`;
+    throw Object.assign(new Error(message), { unordered: true });
+  }
+  if (call === 'move' && !(gainOverRolling(plan, rolling) > config.solver.absGap)) return { call: 'roll', moves: [], rolled: 'tie' };
+  return { call, moves, rolled: null };
 }
 
 /**
@@ -195,6 +248,24 @@ export function rollingProblem(problem) {
 export const gainOverRolling = (plan, rollingPlan) => plan.objective - rollingPlan.objective;
 
 /**
+ * The alternatives' search, one re-solve at a time: yields each problem to solve (the pick's, with the first weeks found
+ * so far excluded) and is handed that solve's plan back, or null when there is none. Returns what it found.
+ */
+function* alternativeSteps(problem, plan, config) {
+  const positions = new Map(problem.players.map(q => [q.id, q.position]));
+  const firstOf = ({ in: ins, out }) => ({ in: ins, out });
+  let exclude = [...(problem.exclude ?? []), firstOf(plan.weeks[0])];
+  const found = [];
+  while (found.length < config.alternativesMax) {
+    const alt = yield { ...problem, exclude };
+    if (!alt || plan.objective - alt.objective > config.alternativesWindow) break;
+    found.push({ moves: pairMoves(alt.weeks[0], id => positions.get(id)), gain: alt.objective - plan.objective });
+    exclude = [...exclude, firstOf(alt.weeks[0])];
+  }
+  return found;
+}
+
+/**
  * The plan's alternatives: up to `alternativesMax` re-solves of its problem, each with the first weeks found so far
  * excluded (no-good cuts), kept while the plan's objective less theirs is within `alternativesWindow`. Best first.
  *
@@ -206,15 +277,16 @@ export const gainOverRolling = (plan, rollingPlan) => plan.objective - rollingPl
  *   pick's (no more than 0 when the pick is optimal); `moves` are paired, not ordered (pairMoves)
  */
 export async function alternativesOf(problem, plan, solveFn, config) {
-  const positions = new Map(problem.players.map(q => [q.id, q.position]));
-  const firstOf = ({ in: ins, out }) => ({ in: ins, out });
-  let exclude = [...(problem.exclude ?? []), firstOf(plan.weeks[0])];
-  const found = [];
-  while (found.length < config.alternativesMax) {
-    const alt = await solveFn({ ...problem, exclude });
-    if (!alt || plan.objective - alt.objective > config.alternativesWindow) break;
-    found.push({ moves: pairMoves(alt.weeks[0], id => positions.get(id)), gain: alt.objective - plan.objective });
-    exclude = [...exclude, firstOf(alt.weeks[0])];
-  }
-  return found;
+  const steps = alternativeSteps(problem, plan, config);
+  let step = steps.next();
+  while (!step.done) step = steps.next(await solveFn(step.value));
+  return step.value;
+}
+
+/** alternativesOf for a solve that answers at once: the backtest's policies decide a week without waiting. */
+export function alternativesSync(problem, plan, solveFn, config) {
+  const steps = alternativeSteps(problem, plan, config);
+  let step = steps.next();
+  while (!step.done) step = steps.next(solveFn(step.value));
+  return step.value;
 }

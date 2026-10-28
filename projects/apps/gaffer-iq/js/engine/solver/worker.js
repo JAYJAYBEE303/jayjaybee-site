@@ -3,11 +3,11 @@
  * Layer: engine (module worker entry). Solves the multi-week model off the page's main thread. Messages in, answers
  * out, each carrying the caller's `id`:
  *   { id, kind: 'init', wasmUrl, integrity }  ->  { id, ok: true }
- *   { id, kind: 'solve', problem, options }   ->  { id, ok: true, plan, stopped, ms }
+ *   { id, kind: 'solve', problem, options }   ->  { id, ok: true, plan, stopped, ms, bound, gap }
  * `init` fetches highs.wasm against `integrity` (a changed file is refused) and loads HiGHS from the bytes; `solve`
- * answers the decoded plan, or `plan: null` when HiGHS had none inside the limit (highs.js). Anything that goes wrong -
- * the fetch, the hash, the load, the model refusing a problem - is `{ id, ok: false, error }`, never a throw: the page
- * then keeps the engine's move.
+ * answers the decoded plan, or `plan: null` when HiGHS had none inside the limit, with the bound HiGHS proved and the
+ * plan's gap to it (highs.js). Anything that goes wrong - the fetch, the hash, the load, the model refusing a problem -
+ * is `{ id, ok: false, error }`, never a throw: the page then keeps the engine's move.
  */
 
 import { loadHighs, solveProblem } from './highs.js';

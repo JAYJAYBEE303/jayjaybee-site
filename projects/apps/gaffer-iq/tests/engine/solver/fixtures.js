@@ -27,3 +27,24 @@ export function problemOf(modeId = 'longterm') {
   const result = runDecisionEngine(input, CONFIG);
   return solverProblem(input, result, modeSetting(input, result, modeId, CONFIG), CONFIG);
 }
+
+/**
+ * HiGHS's Model API answering as told, for the endings a real solve will not reach on demand, and counting what is
+ * done to it. `real` is the vendored build, which supplies its status codes. `status` is a name in
+ * `constants.modelStatus`; `columns` are the primal values by column name; `onRun` is called as the model runs.
+ * @returns {{highs: object, seen: {options: object|null, disposed: number}}}
+ */
+export function fakeHighs(real, { status, objective = Infinity, bound = Infinity, columns = {}, onRun = () => {} }) {
+  const seen = { options: null, disposed: 0 };
+  const names = Object.keys(columns);
+  const info = { objective_function_value: objective, mip_dual_bound: bound };
+  const model = {
+    options: { set: options => { seen.options = options; } },
+    run: () => { onRun(); return { modelStatus: real.constants.modelStatus[status] }; },
+    info: { get: name => { if (!(name in info)) throw new Error(`no info "${name}"`); return info[name]; } },
+    getSolution: () => ({ colValue: Float64Array.from(names, name => columns[name]) }),
+    getColName: index => names[index],
+    dispose: () => { seen.disposed += 1; },
+  };
+  return { highs: { constants: real.constants, createModel: () => model }, seen };
+}

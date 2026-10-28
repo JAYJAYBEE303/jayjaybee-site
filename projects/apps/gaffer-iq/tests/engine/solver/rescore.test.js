@@ -74,6 +74,21 @@ test('a second move past the free transfer must earn its hit', () => {
   assert.equal(run(1.5), 0);
 });
 
+test('a hit costs hitCost plus the mode\'s hitMargin, as the solver prices it', () => {
+  // The same pair as above: the second move gains 3 x 1.5 = 4.5 over Long term's three GWs, so it clears the 4-point hit.
+  const input = scenario({ candidates: [{ id: 101, position: 'GKP', xip: 10 }, { id: 103, position: 'DEF', xip: 4.5 }] });
+  const one = swap(1, 101);
+  const moves = [...one.moves, { outId: 6, inId: 103 }];
+  const both = { key: moveSetKey(moves), moves };
+  const marginOf = (modeId, hitMargin) => ({
+    ...STILL, solver: { ...STILL.solver, modes: { ...STILL.solver.modes, [modeId]: { hitMargin } } } });
+  assert.equal(share(input, 'longterm', [one, both], one, marginOf('longterm', 0)), 0, 'a margin of 0 leaves the hit at hitCost');
+  // A margin of 1 makes the hit 5 points: 4.5 no longer clears it. The mode's margin, not the engine's own hitMargin.
+  assert.equal(share(input, 'longterm', [one, both], one, marginOf('longterm', 1)), 1);
+  assert.notEqual(STILL.hitMargin, 0, 'the engine\'s hitMargin is its own rule and is not what is added');
+  assert.equal(share(input, 'longterm', [one, both], one, marginOf('now', 1)), 0, 'another mode\'s margin does not reach this one');
+});
+
 test('rolling banks a free transfer, which a single move gives up', () => {
   // Now weighs only this GW. A move gaining 1.2 does not make up the 1.5 a second banked transfer is worth; 1.8 does.
   const run = (gain, config) => {
