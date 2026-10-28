@@ -548,6 +548,208 @@ bought):
 | Structure fix | 2024-25 | template | 7 | 328>177, 3>422, 58>82, 18>355, 327>136, 83>9, 69>351 | 110>447 |
 | Structure fix | 2024-25 | template | 8 | 9>230, 177>398 | 9>230 |
 
+## The solver, mode by mode
+
+Phase 4 of the solver plan (docs/decision-engine-solver-phase4-plan.md). Each of the app's six modes is run as the app
+decides it (`tools/backtest/solver.js`'s `modePolicy`, which calls the Planner's own guard and settle rules): the
+engine on the squad, the mode's problem solved at the app's time limit and again at a longer one if the plan is short of
+its proven bound, the engine's move if that is still not trusted; a move priced against its rolling twin, and a tie with
+rolling, or a wait that sells a kept player, a roll. The solver's hit margin is set to 0 and 2, a run each, on the
+same squads as the main run (the schedule as it stood), and each mode is paired with the old engine, roll+, Long term and
+Long term+ squad by squad and week by week, as in the verdict above.
+
+### Headline: hit margin 0
+
+Points a season, net of hits, averaged over each season's squads (12 and 12):
+
+| policy | 2024-25 | 2025-26 |
+|---|---|---|
+| old | 1840.6 | 1859.3 |
+| roll+ | 2055.7 | 1911.3 |
+| Long term | 2107.3 | 1918.8 |
+| Long term+ | 2088.3 | 1913.9 |
+| Now solver | 2161.2 | 1926.8 |
+| Long term solver | 2170.7 | 2008.1 |
+| Future prep solver | 2150.2 | 1959.6 |
+| Funds & flexibility solver | 2171.8 | 1965.8 |
+| Ceiling solver | 2167.5 | 1932.6 |
+| Structure fix solver | 2196.0 | 1961.3 |
+
+The pass line, on 2025-26 (held out): a mode passes if it beats the old engine, its interval above zero, and is not
+clearly worse than Long term, its interval not wholly below zero. Each mode's solver less each (paired as above):
+
+| mode | less the old engine | less Long term | the pass line |
+|---|---|---|---|
+| Now solver | +67.6 [-31.3, +168.8] | +8.1 [-90.4, +105.8] | does not pass |
+| Long term solver | +148.8 [+45.5, +247.7] **better** | +89.3 [+34.3, +149.8] **better** | pass |
+| Future prep solver | +100.3 [+1.0, +196.7] **better** | +40.8 [-21.5, +118.0] | pass |
+| Funds & flexibility solver | +106.6 [+14.3, +200.0] **better** | +47.1 [-18.3, +118.7] | pass |
+| Ceiling solver | +73.3 [-18.2, +163.8] | +13.8 [-47.3, +78.9] | does not pass |
+| Structure fix solver | +102.1 [+10.1, +197.7] **better** | +42.6 [-16.8, +106.4] | pass |
+
+Each mode's solver against each rival, 2025-26:
+
+In short: against the old engine 4 of 6 modes better and 0 worse; against roll+ (the roll baseline, several moves a week) 1 of 6 modes better and 0 worse; against Long term 1 of 6 modes better and 0 worse; against Long term+ (Long term, several moves a week) 1 of 6 modes better and 0 worse.
+
+- **Against the old engine:** Now solver +67.6 [-31.3, +168.8]; Long term solver +148.8 [+45.5, +247.7] **better**; Future prep solver +100.3 [+1.0, +196.7] **better**; Funds & flexibility solver +106.6 [+14.3, +200.0] **better**; Ceiling solver +73.3 [-18.2, +163.8]; Structure fix solver +102.1 [+10.1, +197.7] **better**.
+- **Against roll+ (the roll baseline, several moves a week):** Now solver +15.5 [-111.3, +149.0]; Long term solver +96.8 [+25.3, +180.3] **better**; Future prep solver +48.3 [-40.1, +146.4]; Funds & flexibility solver +54.5 [-18.0, +147.8]; Ceiling solver +21.3 [-64.1, +113.1]; Structure fix solver +50.0 [-27.4, +146.4].
+- **Against Long term:** Now solver +8.1 [-90.4, +105.8]; Long term solver +89.3 [+34.3, +149.8] **better**; Future prep solver +40.8 [-21.5, +118.0]; Funds & flexibility solver +47.1 [-18.3, +118.7]; Ceiling solver +13.8 [-47.3, +78.9]; Structure fix solver +42.6 [-16.8, +106.4].
+- **Against Long term+ (Long term, several moves a week):** Now solver +12.9 [-80.8, +103.9]; Long term solver +94.2 [+33.8, +155.8] **better**; Future prep solver +45.7 [-20.3, +117.3]; Funds & flexibility solver +51.9 [-17.9, +124.1]; Ceiling solver +18.7 [-38.8, +75.6]; Structure fix solver +47.4 [-18.8, +109.5].
+- With 10-week blocks every verdict stands.
+
+Both seasons (2024-25 and 2025-26):
+
+In short: against the old engine 6 of 6 modes better and 0 worse; against roll+ (the roll baseline, several moves a week) 3 of 6 modes better and 0 worse; against Long term 2 of 6 modes better and 0 worse; against Long term+ (Long term, several moves a week) 2 of 6 modes better and 0 worse.
+
+- **Against the old engine:** Now solver +194.1 [+90.0, +312.3] **better**; Long term solver +239.5 [+144.1, +355.0] **better**; Future prep solver +205.0 [+107.2, +309.6] **better**; Funds & flexibility solver +218.9 [+118.0, +329.3] **better**; Ceiling solver +200.1 [+91.6, +326.0] **better**; Structure fix solver +228.8 [+126.9, +348.1] **better**.
+- **Against roll+ (the roll baseline, several moves a week):** Now solver +60.5 [-36.7, +164.6]; Long term solver +105.9 [+33.3, +189.5] **better**; Future prep solver +71.4 [-10.3, +165.7]; Funds & flexibility solver +85.3 [+9.8, +169.3] **better**; Ceiling solver +66.5 [-19.5, +162.7]; Structure fix solver +95.2 [+13.7, +189.3] **better**.
+- **Against Long term:** Now solver +31.0 [-45.6, +110.4]; Long term solver +76.3 [+17.5, +148.1] **better**; Future prep solver +41.8 [-23.2, +122.8]; Funds & flexibility solver +55.8 [-4.8, +125.4]; Ceiling solver +37.0 [-32.6, +119.2]; Structure fix solver +65.6 [+3.8, +144.5] **better**.
+- **Against Long term+ (Long term, several moves a week):** Now solver +42.9 [-30.5, +120.0]; Long term solver +88.3 [+20.4, +167.5] **better**; Future prep solver +53.8 [-16.1, +140.6]; Funds & flexibility solver +67.7 [-2.0, +140.4]; Ceiling solver +48.9 [-21.2, +131.2]; Structure fix solver +77.5 [+7.5, +162.5] **better**.
+- With 10-week blocks these verdicts change: Structure fix solver against Long term (no clear difference).
+
+### Headline: hit margin 2
+
+Points a season, net of hits, averaged over each season's squads (12 and 12):
+
+| policy | 2024-25 | 2025-26 |
+|---|---|---|
+| old | 1840.6 | 1859.3 |
+| roll+ | 2055.7 | 1911.3 |
+| Long term | 2107.3 | 1918.8 |
+| Long term+ | 2088.3 | 1913.9 |
+| Now solver | 2176.6 | 1936.3 |
+| Long term solver | 2178.9 | 1969.9 |
+| Future prep solver | 2139.1 | 1987.9 |
+| Funds & flexibility solver | 2142.3 | 1951.1 |
+| Ceiling solver | 2161.9 | 1947.5 |
+| Structure fix solver | 2140.4 | 1944.8 |
+
+The pass line, on 2025-26 (held out): a mode passes if it beats the old engine, its interval above zero, and is not
+clearly worse than Long term, its interval not wholly below zero. Each mode's solver less each (paired as above):
+
+| mode | less the old engine | less Long term | the pass line |
+|---|---|---|---|
+| Now solver | +77.0 [-12.6, +168.4] | +17.5 [-62.2, +100.8] | does not pass |
+| Long term solver | +110.7 [+18.3, +194.9] **better** | +51.2 [-2.3, +116.3] | pass |
+| Future prep solver | +128.7 [+29.1, +230.5] **better** | +69.2 [-1.3, +141.4] | pass |
+| Funds & flexibility solver | +91.8 [+8.7, +176.6] **better** | +32.3 [-24.7, +98.1] | pass |
+| Ceiling solver | +88.3 [-8.2, +180.5] | +28.8 [-43.4, +105.3] | does not pass |
+| Structure fix solver | +85.6 [-1.8, +170.8] | +26.1 [-31.2, +86.1] | does not pass |
+
+Each mode's solver against each rival, 2025-26:
+
+In short: against the old engine 3 of 6 modes better and 0 worse; against roll+ (the roll baseline, several moves a week) 0 of 6 modes better and 0 worse; against Long term 0 of 6 modes better and 0 worse; against Long term+ (Long term, several moves a week) 1 of 6 modes better and 0 worse.
+
+- **Against the old engine:** Now solver +77.0 [-12.6, +168.4]; Long term solver +110.7 [+18.3, +194.9] **better**; Future prep solver +128.7 [+29.1, +230.5] **better**; Funds & flexibility solver +91.8 [+8.7, +176.6] **better**; Ceiling solver +88.3 [-8.2, +180.5]; Structure fix solver +85.6 [-1.8, +170.8].
+- **Against roll+ (the roll baseline, several moves a week):** Now solver +24.9 [-88.8, +144.2]; Long term solver +58.6 [-24.5, +153.3]; Future prep solver +76.6 [-15.2, +177.0]; Funds & flexibility solver +39.8 [-45.6, +130.3]; Ceiling solver +36.2 [-47.9, +119.5]; Structure fix solver +33.5 [-41.8, +122.9].
+- **Against Long term:** Now solver +17.5 [-62.2, +100.8]; Long term solver +51.2 [-2.3, +116.3]; Future prep solver +69.2 [-1.3, +141.4]; Funds & flexibility solver +32.3 [-24.7, +98.1]; Ceiling solver +28.8 [-43.4, +105.3]; Structure fix solver +26.1 [-31.2, +86.1].
+- **Against Long term+ (Long term, several moves a week):** Now solver +22.3 [-62.3, +105.8]; Long term solver +56.0 [-13.5, +128.6]; Future prep solver +74.0 [+0.8, +141.2] **better**; Funds & flexibility solver +37.2 [-33.2, +103.7]; Ceiling solver +33.6 [-46.2, +110.0]; Structure fix solver +30.9 [-35.1, +95.0].
+- With 10-week blocks these verdicts change: Structure fix solver against the old engine (better); Long term solver against Long term (better); Future prep solver against Long term (better).
+
+Both seasons (2024-25 and 2025-26):
+
+In short: against the old engine 6 of 6 modes better and 0 worse; against roll+ (the roll baseline, several moves a week) 2 of 6 modes better and 0 worse; against Long term 1 of 6 modes better and 0 worse; against Long term+ (Long term, several moves a week) 1 of 6 modes better and 0 worse.
+
+- **Against the old engine:** Now solver +206.5 [+111.8, +312.1] **better**; Long term solver +224.5 [+132.5, +325.2] **better**; Future prep solver +213.6 [+117.0, +327.7] **better**; Funds & flexibility solver +196.8 [+102.4, +306.0] **better**; Ceiling solver +204.8 [+99.0, +325.3] **better**; Structure fix solver +192.7 [+101.8, +295.1] **better**.
+- **Against roll+ (the roll baseline, several moves a week):** Now solver +72.9 [-15.0, +168.7]; Long term solver +90.9 [+19.8, +170.3] **better**; Future prep solver +80.0 [+6.5, +167.4] **better**; Funds & flexibility solver +63.2 [-7.2, +146.0]; Ceiling solver +71.2 [-18.5, +169.0]; Structure fix solver +59.1 [-10.3, +142.4].
+- **Against Long term:** Now solver +43.4 [-19.8, +111.2]; Long term solver +61.4 [+6.4, +121.7] **better**; Future prep solver +50.5 [-9.5, +120.4]; Funds & flexibility solver +33.7 [-24.8, +101.5]; Ceiling solver +41.7 [-31.2, +124.3]; Structure fix solver +29.6 [-19.7, +91.3].
+- **Against Long term+ (Long term, several moves a week):** Now solver +55.3 [-9.3, +123.2]; Long term solver +73.3 [+11.7, +139.5] **better**; Future prep solver +62.4 [-2.9, +134.3]; Funds & flexibility solver +45.6 [-16.9, +118.7]; Ceiling solver +53.6 [-27.9, +143.3]; Structure fix solver +41.5 [-15.0, +107.6].
+- With 10-week blocks every verdict stands.
+
+### Hit margin
+
+The solver's hit margin (points a hit must clear beyond the 4 points it costs), each mode run at 0 and 2. The default
+is chosen on 2024-25 alone: the margin with the higher total there, and the lowest on a tie. 2025-26 is reported
+for the default only, as held out, with the pass line at the default (the headline's, on 2025-26): the verdict that
+counts, since choosing the margin by its 2025-26 pass line would choose it on the held-out season. Points a season,
+averaged over the squads, net of hits:
+
+| mode | 2024-25 at margin 0 | 2024-25 at margin 2 | default | 2025-26 at the default | less the old engine | less Long term | the pass line |
+|---|---|---|---|---|---|---|---|
+| Now | 2161.2 | 2176.6 | 2 | 1936.3 | +77.0 [-12.6, +168.4] | +17.5 [-62.2, +100.8] | does not pass |
+| Long term | 2170.7 | 2178.9 | 2 | 1969.9 | +110.7 [+18.3, +194.9] **better** | +51.2 [-2.3, +116.3] | pass |
+| Future prep | 2150.2 | 2139.1 | 0 | 1959.6 | +100.3 [+1.0, +196.7] **better** | +40.8 [-21.5, +118.0] | pass |
+| Funds & flexibility | 2171.8 | 2142.3 | 0 | 1965.8 | +106.6 [+14.3, +200.0] **better** | +47.1 [-18.3, +118.7] | pass |
+| Ceiling | 2167.5 | 2161.9 | 0 | 1932.6 | +73.3 [-18.2, +163.8] | +13.8 [-47.3, +78.9] | does not pass |
+| Structure fix | 2196.0 | 2140.4 | 0 | 1961.3 | +102.1 [+10.1, +197.7] **better** | +42.6 [-16.8, +106.4] | pass |
+
+### Robustness
+
+The robustness figure (the share of noisy copies of the week's input in which the pick beats its alternatives, the
+engine's move and rolling) is read one week in 3. Here, every settled first move that carries one, in
+all six modes at margin 0, with the gain it realised over 5 GWs against keeping the squad, the week's hits
+off (`moveMetrics`). A move is high from 67%, low up to 33%, middle between (the figure as a whole percent, as the card shows it), and if
+any bucket holds under 30 moves the buckets are cut at terciles of the figures instead.
+
+Cut at the thresholds: every bucket holds at least 30 moves.
+
+| bucket | season | moves | mean gain over rolling, 5 GWs |
+|---|---|---|---|
+| high | 2024-25 | 103 | +5.41 |
+| high | 2025-26 | 74 | +2.99 |
+| high | both | 177 | +4.40 |
+| middle | 2024-25 | 258 | +3.72 |
+| middle | 2025-26 | 261 | +1.48 |
+| middle | both | 519 | +2.59 |
+| low | 2024-25 | 169 | +1.40 |
+| low | 2025-26 | 227 | +2.31 |
+| low | both | 396 | +1.92 |
+
+High less low, both seasons: +2.48 [+0.42, +4.49] points over 5 GWs per move (2000 draws resampling each season's squads whole, pooling their moves). The pass line, high's mean above low's with the interval not wholly below zero: **pass**.
+
+### The guard and the transfers
+
+Over every week of every squad and both seasons, per mode: the share of weeks the first solve was trusted, a longer solve
+was (the pick stopped short of its proven bound at the first limit), the engine's own move was kept after a solve (no
+trusted plan, no rolling twin, or no legal order), and no solve was made (no weeks to weigh, or Ceiling in a big week);
+and the weeks that settled to a roll as a tie with rolling or a wait that sold a kept player (inside the first two).
+
+#### Hit margin 0
+
+| mode | weeks | trusted | solved again and trusted | the engine's move after a solve | no solve | a tie with rolling | a wait that sold a kept player | first pick short of its bound, so solved again (of the weeks with a solve) | solves of every kind (picks, re-solves, twins, robustness) stopped at the limit | ms a solve |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Now | 840 | 100% | 0% | 0% | 0% | 20% | 0% | 0% | 0% | 65 |
+| Long term | 840 | 96% | 3% | 0% | 0% | 16% | 0% | 3% | 6% | 815 |
+| Future prep | 840 | 68% | 25% | 7% | 0% | 27% | 0% | 32% | 27% | 2265 |
+| Funds & flexibility | 840 | 56% | 32% | 11% | 0% | 9% | 0% | 43% | 37% | 2846 |
+| Ceiling | 840 | 67% | 22% | 1% | 10% | 19% | 0% | 25% | 21% | 1849 |
+| Structure fix | 840 | 57% | 31% | 12% | 0% | 12% | 0% | 43% | 38% | 2840 |
+
+#### Hit margin 2
+
+| mode | weeks | trusted | solved again and trusted | the engine's move after a solve | no solve | a tie with rolling | a wait that sold a kept player | first pick short of its bound, so solved again (of the weeks with a solve) | solves of every kind (picks, re-solves, twins, robustness) stopped at the limit | ms a solve |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Now | 840 | 100% | 0% | 0% | 0% | 19% | 0% | 0% | 0% | 61 |
+| Long term | 840 | 96% | 4% | 0% | 0% | 14% | 0% | 4% | 6% | 804 |
+| Future prep | 840 | 69% | 24% | 7% | 0% | 28% | 0% | 31% | 27% | 2310 |
+| Funds & flexibility | 840 | 57% | 31% | 11% | 0% | 8% | 0% | 42% | 37% | 2834 |
+| Ceiling | 840 | 70% | 19% | 1% | 10% | 20% | 0% | 21% | 19% | 1734 |
+| Structure fix | 840 | 55% | 30% | 15% | 0% | 8% | 0% | 45% | 40% | 3041 |
+
+Transfers and hit points a season (averaged over the squads), the solver beside the engine's single-move policy and Long term+:
+
+| policy | transfers 2024-25 | hit points 2024-25 | transfers 2025-26 | hit points 2025-26 |
+|---|---|---|---|---|
+| Long term+ | 37.1 | 11.0 | 40.8 | 11.0 |
+| Now (the engine, one move a week) | 33.6 | 0.0 | 34.1 | 0.0 |
+| Long term (the engine, one move a week) | 33.6 | 0.0 | 34.8 | 0.0 |
+| Future prep (the engine, one move a week) | 31.0 | 0.0 | 32.9 | 0.0 |
+| Funds & flexibility (the engine, one move a week) | 39.6 | 21.7 | 39.4 | 8.3 |
+| Ceiling (the engine, one move a week) | 33.7 | 0.0 | 34.6 | 0.0 |
+| Structure fix (the engine, one move a week) | 33.8 | 0.0 | 35.0 | 0.0 |
+| Now solver, margin 0 | 40.3 | 24.7 | 42.7 | 19.3 |
+| Long term solver, margin 0 | 41.4 | 28.0 | 43.8 | 23.7 |
+| Future prep solver, margin 0 | 35.8 | 13.0 | 40.6 | 12.3 |
+| Funds & flexibility solver, margin 0 | 41.4 | 28.7 | 43.9 | 24.0 |
+| Ceiling solver, margin 0 | 35.3 | 4.0 | 41.3 | 13.3 |
+| Structure fix solver, margin 0 | 39.2 | 19.3 | 44.1 | 25.0 |
+| Now solver, margin 2 | 34.9 | 2.3 | 37.7 | 0.7 |
+| Long term solver, margin 2 | 36.7 | 8.3 | 40.7 | 10.7 |
+| Future prep solver, margin 2 | 33.5 | 4.3 | 39.4 | 7.3 |
+| Funds & flexibility solver, margin 2 | 37.3 | 12.0 | 40.6 | 11.0 |
+| Ceiling solver, margin 2 | 34.2 | 0.0 | 38.2 | 1.0 |
+| Structure fix solver, margin 2 | 36.1 | 6.7 | 40.2 | 9.3 |
+
 ## Sensitivity: the final schedule
 
 The same runs with vaastav's final schedule, which knows every blank and double from the start (more than a manager

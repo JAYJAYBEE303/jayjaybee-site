@@ -16,7 +16,9 @@ import { scenario } from '../decision-fixtures.js';
 export const WASM = readFileSync(new URL(`../../../${DECISION_ENGINE.solver.vendor.dir}highs.wasm`, import.meta.url));
 export const loadVendored = () => loadHighs({ wasmBinary: WASM });
 
-export const CONFIG = { ...DECISION_ENGINE, solver: { ...DECISION_ENGINE.solver, enabled: true } };
+// The tests price a hit at margin 0 in every mode; the shipped per-mode margins are the backtest's choice.
+export const CONFIG = { ...DECISION_ENGINE, solver: { ...DECISION_ENGINE.solver, enabled: true,
+  modes: Object.fromEntries(Object.keys(DECISION_ENGINE.solver.modes).map(id => [id, { hitMargin: 0 }])) } };
 
 /**
  * Forward 101 is worth 12 a week against the bench forward 15's 2.2, so Long term's plan sells 15 for him in the first

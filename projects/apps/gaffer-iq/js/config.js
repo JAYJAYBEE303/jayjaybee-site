@@ -1674,10 +1674,12 @@ export const DECISION_ENGINE = {
     logMax: 5000,
     // The vendored HiGHS build: its folder and the sha256 (base64) each file must match to be loaded.
     vendor: { dir: 'assets/vendor/highs/1.15.4/', mjs: '8r39Bx0Zw3RXVqCHAmWJ6SQPMp44MVqG9iaCOueKQDY=', wasm: '8TE04+M157rZhP8Sq+tB6G4O7rF1KuioUyLMaDnfis0=' },
-    // Per mode: points added to the cost of every hit (on top of hitCost) in the solver's objective.
+    // Per mode: points added to the cost of every hit (on top of hitCost) in the solver's objective. Each is the margin
+    // (0 or 2) with the higher 2024-25 total in the Phase 4 backtest, a tie going to 0 (docs/decision-engine-backtest.md,
+    // "Hit margin").
     modes: {
-      now: { hitMargin: 0 },
-      longterm: { hitMargin: 0 },
+      now: { hitMargin: 2 },
+      longterm: { hitMargin: 2 },
       future: { hitMargin: 0 },
       funds: { hitMargin: 0 },
       ceiling: { hitMargin: 0 },

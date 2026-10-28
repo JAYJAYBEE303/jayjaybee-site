@@ -629,7 +629,7 @@ against the offline planner"; reference `docs/decision-engine.md`, "The solver")
   Phase 8 agreement as measured, and the decision log notes that an older tab blocking the IndexedDB upgrade leaves that visit
   with no snapshots, no log and the Planner on season totals.
 
-### Phase 4: evaluation
+### Phase 4: evaluation (done, awaiting your decision)
 
 Each mode's solver policy runs against the previous engine, roll+ and Long
 term+, on 2025-26 alone and both seasons. The run is about 5,000 solves per
@@ -659,6 +659,49 @@ hit margin, roughly an hour each on four cores, and resumable.
    problems.
 
 **Stop:** you decide whether to switch it on.
+
+**Phase 4 as built** (`js/engine/solver/highs.js`, `plan.js`, `rescore.js`, `js/modules/planner-solver.js`,
+`js/snapshots.js`, `js/config.js` `solver`, `tools/backtest/solver.js`, `eval.js`, `run.js`; tests in
+`tests/engine/solver/`, `tests/modules/` and `tests/tools/`; plan `docs/decision-engine-solver-phase4-plan.md`; report
+`docs/decision-engine-backtest.md`, "The solver, mode by mode")
+
+- **The guard (the condition you approved at the Phase 3 stop).** Every solve reports its proven bound and its gap to
+  the plan found. A plan is shown only if it was solved to the tolerance, or stopped within 0.5 points of its bound.
+  Otherwise the card keeps the engine's move, marked Refining, while the same problem is solved once more at 10 s
+  (`solver.resolveTimeLimitS`); a plan proven within the tolerance then replaces it, and anything else (still short, no
+  plan, an error, a timeout, a newer input) settles the engine's move. The log records which (`guard`: trusted,
+  resolved or engine) and the gap of the plan shown.
+- **One settle rule.** The rules that turn a plan into a card (legal order, protected sales, a wait's own move, a tie
+  with rolling is a roll) are one function, `settlePick`, which the Planner and the backtest both call. A parity test
+  drives the real runner and the backtest's policy with the same solve answers and checks they make the same moves.
+- **Hit margin defaults** (pass check 2, chosen on 2024-25 alone): Now and Long term 2, the other four 0. Rescore prices
+  a hit at the cost plus the mode's margin, as the solver does.
+- **The runs.** All six modes, at margin 0 and at margin 2, on the 24 squads of both seasons with the schedule as it
+  stood: about 12,300 solves a margin (picks, re-solves, rolling twins and robustness), 2 h 20 min a margin on four cores. The machine restarted three times
+  during the runs; each resumed from its saved squads, so no squad was run twice or split. The rivals (the previous
+  engine, roll+, Long term, Long term+) are the main run's, `data/results.json` of 2026-10-22, on the same squads.
+
+**Pass checks, as run:**
+
+1. **Headline**, on 2025-26 at each mode's chosen margin: Long term, Future prep, Funds & flexibility and Structure fix
+   pass (each beats the previous engine with the interval above zero, none is clearly worse than Long term); Now and
+   Ceiling do not pass, their intervals against the previous engine reaching below zero. No mode is clearly worse than
+   Long term at either margin. Over both seasons at margin 0 every mode beats the previous engine. The best, Long term
+   at margin 0, is +149 [+46, +248] on 2025-26 against the previous engine (the offline planner scored +109 [+18,
+   +199]); at its chosen margin of 2 it is +111 [+18, +195].
+2. **Hit margin:** both margins run and reported; the defaults above; 2025-26 reported for them as held out.
+3. **Robustness: passes.** At margin 0, 1,092 first moves carry a figure (177 high, 519 middle, 396 low, so no terciles).
+   High realised +4.40 points over 5 GWs, low +1.92; high less low +2.48 [+0.42, +4.49]. The 10 background re-solves are
+   not needed. `solver.showRobustness` stays false until you choose to show it.
+4. **Browsers: not yet measured.** The benchmark page (twelve of the app's problems, HiGHS 1.15.4, results saved with
+   the page) has no Safari, Firefox or phone run yet. Headless Chromium on this machine, under load, took a median 3.0 s
+   with 10 of 12 solves stopped at the 3 s cap; with the guard, such a card shows the engine's move until the 10 s
+   re-solve lands.
+
+- **What the guard costs.** In the four heavy modes (Future prep, Funds & flexibility, Ceiling, Structure fix) the first
+  pick is short of its bound in 21% to 45% of the weeks with a solve, and the engine's move is kept
+  after the longer solve in 1% to 15% of weeks. Now and Long term almost never need it.
+- **`DECISION_ENGINE.solver.enabled` is still false.** Switching it on is your decision.
 
 ## Files
 
