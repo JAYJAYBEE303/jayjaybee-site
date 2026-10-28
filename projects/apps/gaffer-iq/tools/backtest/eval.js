@@ -90,8 +90,9 @@ export function robustMoves(row, names) {
  * Each move with its bucket ('high' | 'middle' | 'low'), on its robustness as a whole percent (`percentOf`, the card's), cut
  * at BUCKETS' thresholds; if any bucket holds fewer than BUCKETS.min moves, at terciles of the percents instead (low: up to
  * the lowest third's top figure, high: from the highest third's bottom, so equal figures are never split). `rule` says
- * which; `cuts` are the percents a move is low at or below, and high at or above; `atThresholds` (terciles only) is the
- * count in each bucket at the thresholds that sent it there.
+ * which ('tied' when so many figures share one value that both tercile cuts land on it, and the thresholds stand);
+ * `cuts` are the percents a move is low at or below, and high at or above; `atThresholds` (terciles or tied) is the count
+ * in each bucket at the thresholds that sent it there.
  */
 export function bucketMoves(moves) {
   const place = cuts => moves.map(m => {
@@ -107,6 +108,8 @@ export function bucketMoves(moves) {
   const sorted = moves.map(m => percentOf(m.robustness)).sort((a, b) => a - b);
   const third = Math.ceil(sorted.length / 3);
   const cuts = { low: sorted[third - 1], high: sorted[sorted.length - third] };
+  // Over a third of the figures on one value puts both cuts on it, so terciles cannot split them: the thresholds stand.
+  if (cuts.low >= cuts.high) return { rule: 'tied', cuts: { low: BUCKETS.low, high: BUCKETS.high }, atThresholds, moves: thresholds };
   return { rule: 'terciles', cuts, atThresholds, moves: place(cuts) };
 }
 
@@ -146,8 +149,9 @@ export const robustnessPasses = gap => gap.mean > 0 && !(gap.hi < 0);
  * What the guard did over some runs ({log, counts}, modePolicy's): their weeks split into those the first solve was
  * trusted (`trusted`), a longer solve was (`resolved`), the engine's move was kept after a solve (`fallback`) and those
  * with no solve at all (`noSolve`: no weeks to weigh, or Ceiling in a big week); and the weeks that settled to a roll as
- * a tie with rolling (`ties`) or a wait that sold a kept player (`kept`), the solves, those that `stopped` at their
- * limit, and the `ms` they took.
+ * a tie with rolling (`ties`) or a wait that sold a kept player (`kept`), the first picks that were short of their
+ * bound and so solved again (`reSolved`), the solves of every kind, those that `stopped` at their limit, and the `ms` they
+ * took.
  */
 export function guardTotals(runs) {
   const weeks = runs.flatMap(run => run.log);
@@ -161,6 +165,7 @@ export function guardTotals(runs) {
     noSolve: weeks.filter(w => w.guard === 'engine').length - fallback,
     ties: counted('ties'),
     kept: counted('kept'),
+    reSolved: counted('resolved'),
     solves: counted('solves'),
     stopped: counted('stopped'),
     ms: counted('ms'),

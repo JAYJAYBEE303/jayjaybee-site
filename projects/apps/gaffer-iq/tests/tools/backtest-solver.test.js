@@ -483,6 +483,15 @@ test('a bucket under the minimum moves the cut to terciles of the figures themse
   assert.deepEqual(bucketMoves([]), { rule: 'thresholds', moves: [] });
 });
 
+test('when over a third of the figures share one value, terciles cannot split them and the thresholds stand', () => {
+  // 100 picks at Robust 100% and 44 at 50%: low is empty at the thresholds, and both tercile cuts would land on 100.
+  const tied = bucketMoves([...manyAt(1, 100), ...manyAt(0.5, 44)]);
+  assert.equal(tied.rule, 'tied');
+  assert.deepEqual(tied.cuts, { low: BUCKETS.low, high: BUCKETS.high });
+  assert.deepEqual(tied.atThresholds, { high: 100, middle: 44, low: 0 });
+  assert.deepEqual(bucketCounts(tied), { high: 100, middle: 44, low: 0 });
+});
+
 /** `n` squads of each of `seasons` seasons, each with the moves `of(squad)` gives. */
 const strataOf = (of, n = 6, seasons = 2) => Array.from({ length: seasons }, () => Array.from({ length: n }, (_, i) => of(i)));
 const gapOf = (strata, extra = {}) => bucketGap(strata, { ...BOOT, ...extra });
@@ -543,10 +552,10 @@ test('the gain is moveMetrics\' longest window, and a week without one throws, n
 
 test('the guard\'s weeks split into trusted, resolved, engine fallback and no solve, with the ties, kept and the solves', () => {
   const runs = [0, 1, 2].map(squad => fakeSolverRun(50, squad));
-  assert.deepEqual(guardTotals(runs), { weeks: 12, trusted: 3, resolved: 3, fallback: 3, noSolve: 3, ties: 3, kept: 0, solves: 24,
-    stopped: 6, ms: 2400 });
-  assert.deepEqual(guardTotals([]), { weeks: 0, trusted: 0, resolved: 0, fallback: 0, noSolve: 0, ties: 0, kept: 0, solves: 0,
-    stopped: 0, ms: 0 });
+  assert.deepEqual(guardTotals(runs), { weeks: 12, trusted: 3, resolved: 3, fallback: 3, noSolve: 3, ties: 3, kept: 0, reSolved: 3,
+    solves: 24, stopped: 6, ms: 2400 });
+  assert.deepEqual(guardTotals([]), { weeks: 0, trusted: 0, resolved: 0, fallback: 0, noSolve: 0, ties: 0, kept: 0, reSolved: 0,
+    solves: 0, stopped: 0, ms: 0 });
 });
 
 // The section's figures all come from the rows it is given.
@@ -595,8 +604,15 @@ test('the hit margin section picks the margin with the higher 2024-25 total, and
   const md = solverEvalSection(bothMargins());
   const section = md.slice(md.indexOf('### Hit margin'), md.indexOf('### Robustness'));
   const cells = label => linesOf(section).find(l => l.startsWith(`| ${label} |`)).split('|').map(c => c.trim()).filter(Boolean);
-  assert.deepEqual(cells('Now'), ['Now', meanTotal(58).toFixed(1), meanTotal(60).toFixed(1), '2', meanTotal(60).toFixed(1)]);
-  assert.deepEqual(cells('Long term'), ['Long term', meanTotal(56).toFixed(1), meanTotal(56).toFixed(1), '0', meanTotal(56).toFixed(1)]);
+  assert.deepEqual(cells('Now').slice(0, 5), ['Now', meanTotal(58).toFixed(1), meanTotal(60).toFixed(1), '2', meanTotal(60).toFixed(1)]);
+  assert.deepEqual(cells('Long term').slice(0, 5), ['Long term', meanTotal(56).toFixed(1), meanTotal(56).toFixed(1), '0', meanTotal(56).toFixed(1)]);
+  // The pass line at the chosen default is the headline's at that margin, on 2025-26.
+  const headline = margin => md.slice(md.indexOf(`### Headline: hit margin ${margin}`));
+  // A mode's second row in its headline is the pass-line table's (the first is the season totals').
+  const passRow = (margin, label) => linesOf(headline(margin)).filter(l => l.startsWith(`| ${label} solver |`))[1]
+    .split('|').map(c => c.trim()).filter(Boolean).slice(1);
+  assert.deepEqual(cells('Now').slice(5), passRow(2, 'Now'));
+  assert.deepEqual(cells('Long term').slice(5), passRow(0, 'Long term'));
 });
 
 test('the robustness section cuts at the thresholds, or at terciles and says so; its pass line follows the gap', () => {
@@ -625,8 +641,9 @@ test('the guard section gives each mode\'s shares of weeks, and transfers and hi
   const md = solverEvalSection(bothMargins());
   const section = md.slice(md.indexOf('### The guard'));
   const cells = (label, from = 0) => linesOf(section).filter(l => l.startsWith(`| ${label} |`))[from].split('|').map(c => c.trim()).filter(Boolean);
-  // Per run, four weeks: one trusted, one resolved, one engine fallback, one with no solve; 2 of 8 solves stopped, 100 ms each.
-  assert.deepEqual(cells('Now'), ['Now', '24', '25%', '25%', '25%', '25%', '25%', '0%', '25%', '100']);
+  // Per run, four weeks: one trusted, one resolved, one engine fallback, one with no solve; one first pick of the three
+  // weeks with a solve solved again; 2 of 8 solves stopped, 100 ms each.
+  assert.deepEqual(cells('Now'), ['Now', '24', '25%', '25%', '25%', '25%', '25%', '0%', '33%', '25%', '100']);
   // Transfers a week 1 for four weeks (4), the first week's 2 hit points; the engine's own policy and Long term+ the same.
   assert.ok(linesOf(section).some(l => /^\| Long term\+ \| 4\.0 \| 2\.0 \| 4\.0 \| 2\.0 \|$/.test(l)));
 });

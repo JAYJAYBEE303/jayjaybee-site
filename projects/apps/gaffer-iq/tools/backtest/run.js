@@ -1125,16 +1125,20 @@ function evalHitMargin(rows) {
     const ran = rows.filter(r => EVAL_MARGINS.every(margin => r.out[evalName(mode, margin)]));
     const total = (season, margin) => seasonMean(ran, season, evalName(mode, margin), r => r.total);
     const chosen = defaultMargin(Object.fromEntries(EVAL_MARGINS.map(margin => [margin, total(TUNE_SEASON, margin)])), EVAL_MARGINS);
-    return `| ${labelOf(mode)} | ${EVAL_MARGINS.map(margin => f(total(TUNE_SEASON, margin))).join(' | ')} | ${chosen} | ${f(total(HELD_OUT, chosen))} |`;
+    const [vsOld, vsLongterm] = ['old', 'longterm'].map(rival => paired(rows, [HELD_OUT], 'asItStood', evalName(mode, chosen), rival));
+    return `| ${labelOf(mode)} | ${EVAL_MARGINS.map(margin => f(total(TUNE_SEASON, margin))).join(' | ')} | ${chosen} | ${f(total(HELD_OUT, chosen))}`
+      + ` | ${verdictCell(vsOld)} | ${verdictCell(vsLongterm)} | ${passLine(vsOld, vsLongterm).pass ? 'pass' : 'does not pass'} |`;
   });
   return `${heading}
 
 The solver's hit margin (points a hit must clear beyond the ${DECISION_ENGINE.hitCost} points it costs), each mode run at ${EVAL_MARGINS.join(' and ')}. The default
 is chosen on ${TUNE_SEASON} alone: the margin with the higher total there, and the lowest on a tie. ${HELD_OUT} is reported
-for the default only, as held out. Points a season, averaged over the squads, net of hits:
+for the default only, as held out, with the pass line at the default (the headline's, on ${HELD_OUT}): the verdict that
+counts, since choosing the margin by its ${HELD_OUT} pass line would choose it on the held-out season. Points a season,
+averaged over the squads, net of hits:
 
-| mode | ${EVAL_MARGINS.map(margin => `${TUNE_SEASON} at margin ${margin}`).join(' | ')} | default | ${HELD_OUT} at the default |
-|---|${EVAL_MARGINS.map(() => '---').join('|')}|---|---|
+| mode | ${EVAL_MARGINS.map(margin => `${TUNE_SEASON} at margin ${margin}`).join(' | ')} | default | ${HELD_OUT} at the default | less the old engine | less Long term | the pass line |
+|---|${EVAL_MARGINS.map(() => '---').join('|')}|---|---|---|---|---|
 ${lines.join('\n')}
 `;
 }
@@ -1156,6 +1160,9 @@ any bucket holds under ${BUCKETS.min} moves the buckets are cut at terciles of t
   if (!placed.length) return `${heading}\n\n${intro}\n\nNo settled first move carries a robustness figure.\n`;
   const cut = rule === 'thresholds'
     ? `Cut at the thresholds: every bucket holds at least ${BUCKETS.min} moves.`
+    : rule === 'tied'
+    ? `Cut at the thresholds although a bucket held under ${BUCKETS.min} moves there (high ${atThresholds.high}, middle `
+      + `${atThresholds.middle}, low ${atThresholds.low}): over a third of the figures share one value, so terciles cannot split them.`
     : `Cut at terciles, not the thresholds: a bucket held under ${BUCKETS.min} moves cut at ${BUCKETS.high}% and ${BUCKETS.low}% `
       + `(high ${atThresholds.high}, middle ${atThresholds.middle}, low ${atThresholds.low}). High is from `
       + `${cuts.high}% up, low is up to ${cuts.low}%, middle between.`;
@@ -1193,12 +1200,12 @@ function evalGuard(rows) {
       const t = guardTotals(RUN_SEASONS.flatMap(s => of(rows, s, 'asItStood')).filter(r => r.out[evalName(mode, margin)])
         .map(r => r.out[evalName(mode, margin)]));
       return `| ${labelOf(mode)} | ${t.weeks} | ${[t.trusted, t.resolved, t.fallback, t.noSolve, t.ties, t.kept].map(n => pct(n, t.weeks)).join(' | ')}`
-        + ` | ${pct(t.stopped, t.solves)} | ${t.solves ? f(t.ms / t.solves, 0) : '-'} |`;
+        + ` | ${pct(t.reSolved, t.weeks - t.noSolve)} | ${pct(t.stopped, t.solves)} | ${t.solves ? f(t.ms / t.solves, 0) : '-'} |`;
     });
     return `#### Hit margin ${margin}
 
-| mode | weeks | trusted | solved again and trusted | the engine's move after a solve | no solve | a tie with rolling | a wait that sold a kept player | solves stopped at the limit | ms a solve |
-|---|---|---|---|---|---|---|---|---|---|
+| mode | weeks | trusted | solved again and trusted | the engine's move after a solve | no solve | a tie with rolling | a wait that sold a kept player | first pick short of its bound, so solved again (of the weeks with a solve) | solves of every kind (picks, re-solves, twins, robustness) stopped at the limit | ms a solve |
+|---|---|---|---|---|---|---|---|---|---|---|
 ${lines.join('\n')}
 `;
   });
