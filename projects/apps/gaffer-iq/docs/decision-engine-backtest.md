@@ -370,7 +370,7 @@ average like the first, run on the same squads (points a season):
 
 ## The MILP referee
 
-A mixed-integer program (`tools/milp/model.js`, solved by HiGHS, npm `highs`, MIT) plans transfers over the next
+A mixed-integer program (`js/engine/solver/model.js`, solved by HiGHS, npm `highs`, MIT) plans transfers over the next
 5 GWs on the engine's own projections: each week's squad (2/5/5/3, three a club), XI, captain and bench
 order, the bank at sell prices, free transfers banked to the cap and hits past them. It maximises the weighted expected
 points of the XI and captain plus the bench at the engine's linear autosub weights, less hits, with Funds' decay
@@ -454,6 +454,99 @@ season above.
 6358 solves, 4086 ms each on average; 1357 stopped at
 the 10 s limit with the best plan found. In 1 week (its own
 season and the same-squad weeks) some of the referee's moves had no order FPL takes one at a time and were left out.
+
+## The app's solver against the offline planner
+
+The reproduction check (solver plan, Phase 3). The app's solver path - `js/engine/solver/`'s problem, HiGHS and
+ordering, through `tools/backtest/solver.js` - is run as the app runs it, but set as Phase 8's offline planner was:
+Funds' decay (0.85 a GW) over 5 GWs as a horizon total, cut at the season's end;
+hits at 4; no value on the free transfers or the bank at the horizon's end, no hit margin, no
+kept players, dead slots, sale points or chips; a pool of 20 others a position by weighted
+points and 10 by weighted points a tenth. Each week it takes the engine's result, solves,
+and makes the plan's first week one move at a time. It plays the same squads as data/milp.json and is paired with its
+`milp` policy, squad by squad.
+
+It differs from that planner in two ways. HiGHS stops at 3 s, the app's limit, against
+10 s (the app's within 0.5 points of the bound, the planner's within
+0.5). And a solve that stops before it has any plan is solved again by the planner at 4 times
+its limit, and the run stops if there is still none; the app's path, which keeps the engine's card when there is no plan,
+makes no move that week and counts it under "no plan" below. In the rest it is the planner's: the pool is the planner's
+alone (the buys the engine itself makes, which the app adds to it, are left out here), and a first week some of whose moves
+have no legal order one at a time (FPL takes them one at a time) makes the legal ones, as the planner did, and is counted
+below.
+
+### The gap, points a season
+
+The app's solver less the offline planner (paired, squads and blocks of weeks resampled; no clear difference unless the
+interval excludes zero):
+
+| season | squads | offline planner | app's solver | the app's solver less the planner |
+|---|---|---|---|---|
+| 2024-25 | 12 | 2161.0 | 2119.8 | -41.3 [-111.0, +24.6] |
+| 2025-26 | 12 | 1968.3 | 1950.3 | -17.9 [-71.9, +37.2] |
+| both | 24 | 2064.6 | 2035.0 | -29.6 [-72.0, +13.5] |
+
+The gap's explanation (the 3 s limit against the planner's 10 s, a run of the widest squads alone at each, and
+the run-to-run noise in a squad's season) is in docs/decision-engine-solver-plan.md, "Phase 3 as built".
+
+### Solves
+
+| season | solves | ms each | stopped at the limit | no plan | some moves with no legal order |
+|---|---|---|---|---|---|
+| 2024-25 | 420 | 2578 | 288 | 8 | 0 |
+| 2025-26 | 420 | 2408 | 244 | 2 | 2 |
+| both | 840 | 2493 | 532 | 10 | 2 |
+
+### Its first week against each mode's move
+
+The share of weeks (every squad, every week, 2024-25 and 2025-26) in which the solver's first week is the same sales
+and the same buys as the mode's move (nothing for a mode that rolls), however they are paired or ordered. A mode's move is
+its root and, for Funds & flexibility, the second move the root pays for when it has one.
+
+| mode | weeks | same as the solver's first week |
+|---|---|---|
+| Now | 840 | 22% |
+| Long term | 840 | 33% |
+| Future prep | 840 | 23% |
+| Funds & flexibility | 840 | 19% |
+| Ceiling | 840 | 25% |
+| Structure fix | 840 | 31% |
+
+For each mode, the first 5 weeks where its move differs from the solver's first week (player ids, sold >
+bought):
+
+| mode | season | squad | GW | the solver's moves | the mode's moves |
+|---|---|---|---|---|---|
+| Now | 2024-25 | template | 4 | 351>110, 309>83, 442>199, 174>327 | 475>558 |
+| Now | 2024-25 | template | 5 | 350>36, 401>58, 475>311 | 18>311 |
+| Now | 2024-25 | template | 6 | 15>146, 495>3 | 182>17 |
+| Now | 2024-25 | template | 7 | 328>177, 3>422, 58>82, 18>355, 327>136, 83>9, 69>351 | 182>17 |
+| Now | 2024-25 | template | 8 | 9>230, 177>398 | 9>230 |
+| Long term | 2024-25 | template | 4 | 351>110, 309>83, 442>199, 174>327 | 475>598 |
+| Long term | 2024-25 | template | 5 | 350>36, 401>58, 475>311 | 475>3 |
+| Long term | 2024-25 | template | 6 | 15>146, 495>3 | 182>17 |
+| Long term | 2024-25 | template | 7 | 328>177, 3>422, 58>82, 18>355, 327>136, 83>9, 69>351 | 110>220 |
+| Long term | 2024-25 | template | 8 | 9>230, 177>398 | 9>230 |
+| Future prep | 2024-25 | template | 4 | 351>110, 309>83, 442>199, 174>327 | 475>228 |
+| Future prep | 2024-25 | template | 5 | 350>36, 401>58, 475>311 | 475>3 |
+| Future prep | 2024-25 | template | 6 | 15>146, 495>3 | 18>3 |
+| Future prep | 2024-25 | template | 7 | 328>177, 3>422, 58>82, 18>355, 327>136, 83>9, 69>351 | 110>447 |
+| Future prep | 2024-25 | template | 8 | 9>230, 177>398 | 9>230 |
+| Funds & flexibility | 2024-25 | template | 4 | 351>110, 309>83, 442>199, 174>327 | 182>327, 174>199 |
+| Funds & flexibility | 2024-25 | template | 5 | 350>36, 401>58, 475>311 | 401>220, 475>311 |
+| Funds & flexibility | 2024-25 | template | 6 | 15>146, 495>3 | 182>99, 461>3 |
+| Funds & flexibility | 2024-25 | template | 7 | 328>177, 3>422, 58>82, 18>355, 327>136, 83>9, 69>351 | 110>148 |
+| Funds & flexibility | 2024-25 | template | 8 | 9>230, 177>398 | 9>230 |
+| Ceiling | 2024-25 | template | 4 | 351>110, 309>83, 442>199, 174>327 | 475>598 |
+| Ceiling | 2024-25 | template | 5 | 350>36, 401>58, 475>311 | 475>3 |
+| Ceiling | 2024-25 | template | 6 | 15>146, 495>3 | 18>3 |
+| Ceiling | 2024-25 | template | 7 | 328>177, 3>422, 58>82, 18>355, 327>136, 83>9, 69>351 | 182>17 |
+| Ceiling | 2024-25 | template | 8 | 9>230, 177>398 | 9>230 |
+| Structure fix | 2024-25 | template | 4 | 351>110, 309>83, 442>199, 174>327 | 475>228 |
+| Structure fix | 2024-25 | template | 5 | 350>36, 401>58, 475>311 | 475>3 |
+| Structure fix | 2024-25 | template | 6 | 15>146, 495>3 | 18>3 |
+| Structure fix | 2024-25 | template | 7 | 328>177, 3>422, 58>82, 18>355, 327>136, 83>9, 69>351 | 110>447 |
+| Structure fix | 2024-25 | template | 8 | 9>230, 177>398 | 9>230 |
 
 ## Sensitivity: the final schedule
 

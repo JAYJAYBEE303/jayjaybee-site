@@ -97,7 +97,6 @@ jayjaybee-site/                   ← repo root (not Gaffer IQ's concern)
         ├── tools/
         │   ├── minutes/
         │   ├── backtest/
-        │   ├── milp/
         │   └── points/
         └── js/
             ├── main.js
@@ -128,14 +127,22 @@ jayjaybee-site/                   ← repo root (not Gaffer IQ's concern)
             │   ├── squad-value.js
             │   ├── decision.js
             │   ├── robustness.js
-            │   └── robustness-worker.js
+            │   ├── robustness-worker.js
+            │   └── solver/
+            │       ├── model.js
+            │       ├── problem.js
+            │       ├── plan.js
+            │       ├── rescore.js
+            │       ├── highs.js
+            │       └── worker.js
             └── modules/
                 ├── landing.js
                 ├── matchup.js
                 ├── fixtures.js
                 ├── ranker.js
                 ├── dashboard.js
-                └── planner.js
+                ├── planner.js
+                └── planner-solver.js
 ```
 
 ### Authoritative file layout (from Vercel's perspective)
@@ -168,6 +175,10 @@ gaffer-iq/                          (= projects/gaffer-iq/ in the repo)
 │   ├── dashboard.css           # GW Dashboard only, every rule nested under `.db`.
 │   └── planner.css             # Transfer Planner only, every rule nested under `.pl`.
 │
+├── assets/
+│   ├── fonts/, fonts.css       # The self-hosted display fonts.
+│   └── vendor/highs/1.15.4/    # HiGHS as WebAssembly, for the Planner's solver (§4); hashes pinned.
+│
 ├── tools/                      # Offline Node scripts. Never loaded by the app.
 │   ├── minutes/                # Fits the minutes model and writes REPORT.md (download.js,
 │   │                           #   fit.js; lib.js holds the maths). data/ is gitignored.
@@ -175,10 +186,8 @@ gaffer-iq/                          (= projects/gaffer-iq/ in the repo)
 │   │                           #   history.js: each season, and its fixture schedule, as it
 │   │                           #   stood before a planning GW; run.js: the decision backtest
 │   │                           #   (lib.js simulates a season; milp.js runs the MILP referee
-│   │                           #   in it), written to docs/decision-engine-backtest.md.
-│   ├── milp/                   # The MILP referee's model (model.js: a multi-week transfer
-│   │                           #   plan as an LP-format MILP for HiGHS). Its own package.json
-│   │                           #   (npm "highs"); node_modules/ is gitignored.
+│   │                           #   in it; solver.js the app's own solver path), written to
+│   │                           #   docs/decision-engine-backtest.md.
 │   └── points/                 # Fits the points model and scores it on a held-out season;
 │                               #   writes REPORT.md (fit.js; model.js builds the model,
 │                               #   lib.js holds the maths).
@@ -194,7 +203,8 @@ gaffer-iq/                          (= projects/gaffer-iq/ in the repo)
     ├── squadImport.js          # Squad import shared by Dashboard and Planner: picks (the week
     │                           #   before, in a Free Hit week), bank, purchase-price ledger.
     ├── snapshots.js            # Point-in-time archive in IndexedDB: a bootstrap record per
-    │                           #   fresh fetch + a minutes/points table per played GW.
+    │                           #   fresh fetch + a minutes/points table per played GW, and the
+    │                           #   solver's decision log (what each Planner card advised).
     │
     ├── engine/                 # The analytical brain. Pure functions. No DOM.
     │   ├── normalise.js        # Builds clean internal models from raw FPL payloads.
@@ -228,7 +238,19 @@ gaffer-iq/                          (= projects/gaffer-iq/ in the repo)
     │   │                       #   presets: one move, roll or wait per mode, KeepValue/OutScore per player.
     │   ├── robustness.js       # How often each mode's moves come out best when the engine re-runs on
     │   │                       #   seeded noisy inputs (3/2/1 for each run's top three).
-    │   ├── robustness-worker.js # Module worker entry: runs robustness.js off the page's main thread.
+    │   ├── robustness-worker.js # Module worker entry: runs robustness.js off the page's main thread
+    │   │                       #   (and the solver's re-scoring of a pick, rescore.js).
+    │   ├── solver/             # The Planner's multi-week solver (docs/decision-engine.md, "The solver").
+    │   │   ├── model.js        # The MILP: a multi-week transfer plan as an LP-format model for HiGHS,
+    │   │   │                   #   and a solution read back. Pure.
+    │   │   ├── problem.js      # A mode as a setting (weights, kept players, pool, end values), and
+    │   │   │                   #   that setting as the model's input. Pure.
+    │   │   ├── plan.js         # A solved plan as ordered moves and a card; the protected-sale check;
+    │   │   │                   #   gain over rolling; alternatives. Pure.
+    │   │   ├── rescore.js      # Robustness of the pick: re-scoring under the engine's noisy inputs.
+    │   │   ├── highs.js        # Loads the vendored HiGHS from bytes and solves a problem.
+    │   │   └── worker.js       # Module worker entry: fetches highs.wasm against its pinned hash,
+    │   │                       #   answers init and solve messages.
     │   └── season.js           # Whole-season model for the Full Season strip: per-GW matchups,
     │                           #   postponement inference, chip windows (FEATURE_ENGINE §15).
     │
@@ -246,8 +268,10 @@ gaffer-iq/                          (= projects/gaffer-iq/ in the repo)
         │                       #   paged ranked list, filters drawer.
         ├── dashboard.js        # GW Decision Dashboard: squad board / team sheet, captain,
         │                       #   breakdown and risk panels.
-        └── planner.js          # Transfer Planner: settings bar, chip plan, one card per mode,
-                                #   captain and XI, sell/hold table, squad drawer, import.
+        ├── planner.js          # Transfer Planner: settings bar, chip plan, one card per mode,
+        │                       #   captain and XI, sell/hold table, squad drawer, import.
+        └── planner-solver.js   # The Planner's solver runner: module workers, queue and the card each
+                                #   mode shows as the solver answers (no DOM; planner.js paints).
 ```
 
 **`pickStartingXI` (`engine/lineup.js`) is shared between the Dashboard and the decision engine** - it used to be defined only inside `modules/dashboard.js` and was lifted out so the app has one rule for "your starting XI". The decision engine's squad value (`engine/squad-value.js`) passes a gameweek's `xpts` as the optional value accessor in place of `expectedPoints`, and the Planner's captain and XI panel and drawer markers show that engine's pick (`DecisionResult.lineup`), so one screen never shows two XIs. See `FEATURE_ENGINE.md` §14.1.
@@ -270,6 +294,10 @@ Because there is no build step, modules are loaded as **native ES modules**, and
 - This works on Vercel and locally with any static file server. It does **not** work from `file://` (ESM + CORS), so local dev uses `npx serve` or `vercel dev` (documented in README).
 
 **One external runtime import: GSAP (landing only).** `js/modules/landing.js` loads GSAP 3.12.5 with a dynamic `import()` from jsDelivr for the landing page's intro and exit timelines - the design it was built from depends on it. Dynamic, not static, so it never enters `main.js`'s graph: a blocked or slow CDN costs only the intro (the module waits at most 1.5s, then runs without it), and nothing outside the landing depends on it. Self-hosted assets live in `assets/` (the Anton display font, declared in `base.css`).
+
+**One self-hosted WebAssembly build: HiGHS, the Planner's multi-week solver.** `assets/vendor/highs/1.15.4/` holds `highs.mjs`, `highs.wasm`, the MIT `LICENSE` and a `README` naming the source package and how to update. Nothing loads it at start-up: the solver worker (`js/engine/solver/worker.js`) is created on first use. It fetches `highs.wasm` with the file's SHA-256 as the fetch's `integrity` (both hashes are pinned in `DECISION_ENGINE.solver.vendor`, and `tests/engine/solver/vendor.test.js` checks the shipped files against them), so a changed file fails to load and the Planner stays on the single-move engine. `worker.js` is the one file under `engine/` that fetches, and what it fetches is a same-origin static file, not data: data still goes through `api.js` alone.
+
+**CSP.** No Content-Security-Policy is set today, by this project's `vercel.json` or by the main site's (checked), so the WebAssembly and the module worker need nothing. If a policy is ever added, its `script-src` needs `'wasm-unsafe-eval'` (WebAssembly will not compile without it), its `worker-src` `'self'`, and its `connect-src` `'self'` for the wasm fetch.
 
 > **Phase 0 scaffolding note:** `main.js` is the very first JS file to create, before any module. It is listed at the top of the `js/` tree in §3. Nothing renders until it exists, because it is the only thing `index.html` loads.
 
@@ -325,7 +353,7 @@ Keep these patterns in a single `ALLOWED_PATTERNS` array at the top of `api/fpl.
 Configures:
 - The function runtime (Node).
 - A rewrite so `/api/fpl` maps to `api/fpl.js` (Vercel does this by convention, but pin it explicitly).
-- Static caching headers for `css/` and `js/` assets.
+- Static caching headers for `css/` and `js/` assets, and a year-long `immutable` one for the versioned `assets/vendor/highs/1.15.4/` folder (a new HiGHS version goes in a new folder with its own header).
 
 ---
 

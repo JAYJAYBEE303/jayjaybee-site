@@ -10,19 +10,20 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  captureSnapshot, captureGwTables, exportSnapshots, openSnapshotDb,
+  captureSnapshot, captureGwTables, logDecision, exportSnapshots, openSnapshotDb,
 } from '../../js/snapshots.js';
-import { SNAPSHOT_MIN_INTERVAL_MS } from '../../js/config.js';
+import { SNAPSHOT_MIN_INTERVAL_MS, DECISION_ENGINE } from '../../js/config.js';
 
-/** Test utility: the adapter contract (get / put / getAll / getLast), in memory. */
+/** Test utility: the adapter contract (get / put / getAll / getLast / delete), in memory. */
 function memoryDb() {
-  const stores = { snapshots: new Map(), gwTables: new Map() };
-  const keyOf = { snapshots: r => r.capturedAt, gwTables: r => r.gw };
+  const stores = { snapshots: new Map(), gwTables: new Map(), decisions: new Map() };
+  const keyOf = { snapshots: r => r.capturedAt, gwTables: r => r.gw, decisions: r => r.key };
   const sortedKeys = name => [...stores[name].keys()].sort((a, b) => a - b);
   return {
     get: async (name, key) => stores[name].get(key) ?? null,
     put: async (name, value) => { stores[name].set(keyOf[name](value), structuredClone(value)); },
-    getAll: async name => sortedKeys(name).map(k => stores[name].get(k)),
+    delete: async (name, key) => { stores[name].delete(key); },
+    getAll: async name => (name === 'decisions' ? [...stores[name].values()] : sortedKeys(name).map(k => stores[name].get(k))),
     getLast: async name => {
       const keys = sortedKeys(name);
       return keys.length ? stores[name].get(keys.at(-1)) : null;
@@ -123,6 +124,137 @@ test('exportSnapshots returns every snapshot and gameweek table', async () => {
   const exported = await exportSnapshots(db);
   assert.deepEqual(exported.snapshots.map(r => r.capturedAt), [1000]);
   assert.deepEqual(exported.gwTables.map(r => r.gw), [1, 2]);
+});
+
+// ─── the decision log ────────────────────────────────────────────────────────
+
+const ENTRY = {
+  gw: 8, at: 1000, mode: 'now', source: 'solver', call: 'move', stopped: false,
+  moves: [{ outId: 5, inId: 9 }, { outId: 2, inId: 7 }],
+  gain: 3.4, robustness: null,
+  engineFirst: [{ outId: 5, inId: 9 }], agrees: false,
+};
+
+test('a settled card is logged with every field', async () => {
+  const db = memoryDb();
+  await logDecision(db, ENTRY, { max: DECISION_ENGINE.solver.logMax });
+  const [held, ...rest] = await db.getAll('decisions');
+  assert.equal(rest.length, 0);
+  // Keyed by gameweek, mode, call, the move set (sales then buys, each sorted) and source.
+  assert.deepEqual(held, { ...ENTRY, key: '8|now|move|2,5>7,9|solver' });
+});
+
+test('a figure landing later updates the same entry', async () => {
+  const db = memoryDb();
+  await logDecision(db, ENTRY, { max: DECISION_ENGINE.solver.logMax });
+  const landed = { ...ENTRY, at: 2000, gain: 4.1, robustness: 0.7,
+    // A different pairing of the same sales and buys is the same move set.
+    moves: [{ outId: 5, inId: 7 }, { outId: 2, inId: 9 }] };
+  await logDecision(db, landed, { max: DECISION_ENGINE.solver.logMax });
+  const held = await db.getAll('decisions');
+  assert.equal(held.length, 1);
+  assert.equal(held[0].gain, 4.1);
+  assert.equal(held[0].robustness, 0.7);
+  assert.equal(held[0].at, 2000);
+  // The rest of the entry is the first sighting's.
+  assert.deepEqual(held[0].moves, ENTRY.moves);
+
+  // Another source, mode or gameweek is another entry.
+  await logDecision(db, { ...ENTRY, source: 'engine' }, { max: DECISION_ENGINE.solver.logMax });
+  await logDecision(db, { ...ENTRY, mode: 'future' }, { max: DECISION_ENGINE.solver.logMax });
+  await logDecision(db, { ...ENTRY, gw: 9 }, { max: DECISION_ENGINE.solver.logMax });
+  assert.equal((await db.getAll('decisions')).length, 4);
+});
+
+test('a wait and a move of the same set are two entries, and a roll has an empty move set', async () => {
+  const db = memoryDb();
+  const max = DECISION_ENGINE.solver.logMax;
+  await logDecision(db, ENTRY, { max });
+  await logDecision(db, { ...ENTRY, call: 'wait' }, { max });
+  await logDecision(db, { ...ENTRY, call: 'roll', moves: [], gain: null }, { max });
+  // The same wait again is the same entry; a roll with the same key too.
+  await logDecision(db, { ...ENTRY, call: 'wait', at: 3000 }, { max });
+  await logDecision(db, { ...ENTRY, call: 'roll', moves: [], gain: null, at: 3000 }, { max });
+  const held = await db.getAll('decisions');
+  assert.deepEqual(held.map(e => e.key).sort(), ['8|now|move|2,5>7,9|solver', '8|now|roll||solver', '8|now|wait|2,5>7,9|solver']);
+});
+
+test('the log keeps at most logMax entries, oldest first out', async () => {
+  const db = memoryDb();
+  const max = 3;
+  for (let i = 1; i <= max + 2; i++) {
+    await logDecision(db, { ...ENTRY, gw: i, at: i * 1000 }, { max });
+  }
+  const held = await db.getAll('decisions');
+  assert.deepEqual(held.map(e => e.gw).sort((a, b) => a - b), [3, 4, 5]);
+
+  // An update never counts twice, and the oldest goes by `at`, not by arrival.
+  await logDecision(db, { ...ENTRY, gw: 3, at: 9000, gain: 1 }, { max });
+  await logDecision(db, { ...ENTRY, gw: 6, at: 500 }, { max });
+  assert.deepEqual((await db.getAll('decisions')).map(e => e.gw).sort((a, b) => a - b), [3, 4, 5]);
+});
+
+test('a repeat key takes the new sighting\'s engineFirst and agrees as well, so an entry describes one run', async () => {
+  const db = memoryDb();
+  await logDecision(db, ENTRY, { max: DECISION_ENGINE.solver.logMax });
+  // A bank tweak moves the engine's root onto the solver's pick: same key, a different story.
+  const rerun = { ...ENTRY, at: 2000, engineFirst: ENTRY.moves, agrees: true, stopped: true };
+  await logDecision(db, rerun, { max: DECISION_ENGINE.solver.logMax });
+  const [held, ...rest] = await db.getAll('decisions');
+  assert.equal(rest.length, 0);
+  assert.equal(held.agrees, true);
+  assert.equal(held.stopped, true, 'whether the solve stopped at its limit is of the latest run too');
+  assert.deepEqual(held.engineFirst, ENTRY.moves);
+});
+
+test('the export includes the log', async () => {
+  const db = memoryDb();
+  await logDecision(db, ENTRY, { max: DECISION_ENGINE.solver.logMax });
+  const exported = await exportSnapshots(db);
+  assert.deepEqual(exported.decisions.map(e => e.key), ['8|now|move|2,5>7,9|solver']);
+  assert.deepEqual(exported.snapshots, []);
+  assert.deepEqual(exported.gwTables, []);
+});
+
+test('NO_STORE still never throws', async () => {
+  const db = await openSnapshotDb();
+  await logDecision(db, ENTRY, { max: DECISION_ENGINE.solver.logMax });
+  assert.deepEqual(await db.getAll('decisions'), []);
+  await db.delete('decisions', 'anything');
+  assert.deepEqual((await exportSnapshots(db)).decisions, []);
+});
+
+/** Test utility: a stand-in indexedDB whose one open request the test drives by hand. */
+function fakeIndexedDb(t) {
+  const original = Object.getOwnPropertyDescriptor(globalThis, 'indexedDB');
+  const request = { result: { onversionchange: null, closed: false, close() { this.closed = true; } } };
+  Object.defineProperty(globalThis, 'indexedDB', { configurable: true, value: { open: () => request } });
+  t.after(() => {
+    if (original) Object.defineProperty(globalThis, 'indexedDB', original);
+    else delete globalThis.indexedDB;
+  });
+  return request;
+}
+
+test('openSnapshotDb resolves to a store that keeps nothing when an older tab blocks the upgrade', async t => {
+  // Without this the open stays pending for as long as the older tab is open, and everything waiting on the archive hangs.
+  const warn = t.mock.method(console, 'warn', () => {});
+  const request = fakeIndexedDb(t);
+  const opening = openSnapshotDb();
+  request.onblocked();
+  const db = await opening;
+  assert.deepEqual(await db.getAll('snapshots'), []);
+  assert.equal(warn.mock.callCount(), 1);
+});
+
+test('an open archive closes when a newer tab upgrades it', async t => {
+  const request = fakeIndexedDb(t);
+  const opening = openSnapshotDb();
+  request.onsuccess();
+  await opening;
+  assert.equal(request.result.closed, false);
+  request.result.onversionchange();
+  assert.equal(request.result.closed, true);
 });
 
 test('openSnapshotDb degrades to a store that keeps nothing when IndexedDB is unavailable', async () => {

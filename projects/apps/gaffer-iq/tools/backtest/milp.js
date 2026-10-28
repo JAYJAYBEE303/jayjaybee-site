@@ -1,10 +1,10 @@
 /**
  * tools/backtest/milp.js
  * The MILP referee in the decision backtest (docs/decision-engine-plan.md,
- * Phase 8): a week's state as tools/milp/model.js's problem, on the same
+ * Phase 8): a week's state as js/engine/solver/model.js's problem, on the same
  * projections the engine reads; the plan's first week as moves FPL takes one
- * at a time; and the referee as a policy that makes them. HiGHS comes from
- * tools/milp's own install (npm install --prefix tools/milp), never the app's.
+ * at a time; and the referee as a policy that makes them. HiGHS is the build
+ * vendored for the app (assets/vendor/highs/), loaded as the app's worker does.
  *
  * The candidates are the owned squad plus, per position, the best others by
  * weighted points and by weighted points a tenth: the whole pool is too big
@@ -12,30 +12,28 @@
  * an optimal plan.
  */
 
-import { existsSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { readFile } from 'node:fs/promises';
 
 import { DECISION_ENGINE, MAX_PER_CLUB, SEASON_GWS, SQUAD_LIMITS, XI_FORMATION_MIN } from '../../js/config.js';
-import { buildPlan } from '../milp/model.js';
-import { checkMove, applyMoves, squadState } from './lib.js';
+import { SOLVE_DEFAULTS, USABLE, loadHighs } from '../../js/engine/solver/highs.js';
+import { buildPlan } from '../../js/engine/solver/model.js';
+import { orderMoves as orderFirstWeek } from '../../js/engine/solver/plan.js';
+import { fromTenths } from '../../js/util.js';
+import { squadState } from './lib.js';
 
-const HIGHS = new URL('../milp/node_modules/highs/build/highs.js', import.meta.url);
-// A solve that stops at its time limit has the best plan found so far, if it found one.
-const USABLE = new Set(['Optimal', 'Time limit reached']);
-const RETRY_TIME = 4;   // a solve stopped before any plan runs again with this many times the limit
+const WASM = new URL(`../../${DECISION_ENGINE.solver.vendor.dir}highs.wasm`, import.meta.url);
+export const RETRY_TIME = 4;   // a solve stopped before any plan runs again with this many times the limit
 
 const sum = xs => xs.reduce((a, x) => a + x, 0);
 
 /**
- * HiGHS (npm "highs", MIT), or null when tools/milp's dependency is not
- * installed. `options` are HiGHS's own (time_limit, mip_abs_gap, ...); a
- * solve can override them.
- * @returns {Promise<{options: object, solve: (lp: string, extra?: object) => object}|null>}
+ * The vendored HiGHS (npm "highs", MIT), itself as `highs` (for the app's solveProblem) and as `solve`, which sets
+ * `options`: HiGHS's own (time_limit, mip_abs_gap, ...); a solve can override them.
+ * @returns {Promise<{highs: object, options: object, solve: (lp: string, extra?: object) => object}>}
  */
 export async function loadSolver(options = {}) {
-  if (!existsSync(fileURLToPath(HIGHS))) return null;
-  const highs = await (await import(HIGHS.href)).default();
-  return { options, solve: (lp, extra = {}) => highs.solve(lp, { output_flag: false, ...options, ...extra }) };
+  const highs = await loadHighs({ wasmBinary: await readFile(WASM) });
+  return { highs, options, solve: (lp, extra = {}) => highs.solve(lp, { ...SOLVE_DEFAULTS, ...options, ...extra }) };
 }
 
 /**
@@ -72,6 +70,7 @@ export function milpProblem(world, t, state, {
   return {
     gws, weights: weights.slice(0, gws.length), players, bankTenths: state.bankTenths, ft: state.ft, maxBankedFt, hitCost,
     benchWeights, maxPerClub: MAX_PER_CLUB, squadLimits: SQUAD_LIMITS, xiMin: XI_FORMATION_MIN, chips, fixed,
+    lineTerms: DECISION_ENGINE.solver.lpLineTerms,
   };
 }
 
@@ -103,29 +102,17 @@ export function solvePlan(solver, problem, counts) {
 export const newCounts = () => ({ solves: 0, ms: 0, stopped: 0, unordered: 0 });
 
 /**
- * The first week's sales and buys as moves FPL takes one at a time - each
- * sale paired with a buy of his position, in an order that keeps the bank
- * and the club limit legal after every move (FPL checks the week's set as a
- * whole; the simulator, move by move). Greedy: each step makes the legal
- * pair that frees the most money. If it gets stuck, the moves made so far.
+ * The first week's sales and buys as moves FPL takes one at a time, on a backtest state: the app's ordering
+ * (js/engine/solver/plan.js) on the same squad and prices, which the world gives at gameweek t.
  */
 export function orderMoves(state, ins, outs, world, t) {
-  const moves = [];
-  let s = state;
-  let left = { ins, outs };
-  const position = id => world.player(id, t).position;
-  const freed = ({ outId, inId }) => squadState(s, world, t).players.find(p => p.playerId === outId).sellPriceTenths
-    - world.priceTenths(inId, t);
-  while (left.outs.length) {
-    const legal = left.outs.flatMap(outId => left.ins.filter(inId => position(inId) === position(outId)).map(inId => ({ outId, inId })))
-      .filter(m => checkMove(s, m, world, t).ok);
-    if (!legal.length) break;
-    const move = legal.reduce((a, b) => (freed(b) > freed(a) ? b : a));
-    moves.push(move);
-    s = applyMoves(s, [move], world, t);
-    left = { outs: left.outs.filter(id => id !== move.outId), ins: left.ins.filter(id => id !== move.inId) };
-  }
-  return moves;
+  const squad = squadState(state, world, t);
+  const candidates = ins.map(id => {
+    const { position, teamId } = world.player(id, t);
+    return { id, position, teamId, price: fromTenths(world.priceTenths(id, t)) };
+  });
+  const input = { bankTenths: squad.bankTenths, squad: squad.players, candidates };
+  return orderFirstWeek(input, { players: squad.players }, { in: ins, out: outs }).moves;
 }
 
 /**

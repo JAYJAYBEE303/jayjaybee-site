@@ -10,6 +10,8 @@
  * transfers, squad, snapshot export), the live-round note, the chip plan, one
  * card per mode, the captain and XI, and the sell / hold table with lock
  * buttons. Lock and ban re-run the engine on cached projections and V values.
+ * With DECISION_ENGINE.solver.enabled the cards also take the multi-week solver's answers (planner-solver.js): each
+ * card shows the engine's move at once and is repainted in place as the solver's plan and its figures land.
  *
  * Subscriptions: data:ready, route:changed, squad:updated, squadPicks:updated
  * Renders only while on screen: data:ready does the cheap bookkeeping
@@ -25,15 +27,16 @@ import {
 import { buildScoreContext } from '../engine/composite.js';
 import { scoreWildcardTiming, scoreFreeHitTiming } from '../engine/chips.js';
 import { buildProjections } from '../engine/projections.js';
-import { runDecisionEngine, createDecisionCache } from '../engine/decision.js';
+import { runDecisionEngine, createDecisionCache, moveSetKey } from '../engine/decision.js';
 import { priceSignals } from '../engine/price-adapter.js';
 import { withRobustness } from '../engine/robustness.js';
 import { deriveFreeTransfers } from '../engine/ledger.js';
 import {
   fetchAndMapSquad, loadSavedTeamId, saveTeamId, resolveImportGw, loadLedger,
 } from '../squadImport.js';
-import { exportSnapshots, downloadSnapshots } from '../snapshots.js';
+import { exportSnapshots, downloadSnapshots, logDecision } from '../snapshots.js';
 import { toTenths, fromTenths } from '../util.js';
+import { createSolverRunner } from './planner-solver.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -120,6 +123,15 @@ let _cache = createDecisionCache();
 let _result = null;
 /** The module worker re-running the engine for the last result's robustness. */
 let _robustWorker = null;
+/** Bumped by every engine run: a solver answer for an older one is never painted (planner-solver.js). */
+let _inputVersion = 0;
+/** The solver's runner, made on the first run with the solver on; and each mode's card from it, as it now stands. */
+let _runner = null;
+let _cards = {};
+/** True while the runner is handing back the engine's cards for a run: the render that follows paints them. */
+let _refreshing = false;
+/** Phone only: tells the runner which cards have come into view. */
+let _viewObserver = null;
 /** Why there is no result: 'loading' | 'empty' | 'short' | 'over' | 'settling'
  *  | 'computing' | 'failed' | 'ready'. */
 let _state = 'loading';
@@ -140,6 +152,7 @@ let _bans = new Set();
 
 let _tableMode = 'longterm';
 let _openAlts = new Set();   // modes whose alternatives are expanded
+let _openPlans = new Set();  // modes whose later weeks are expanded
 let _sort = { key: 'out', desc: true };
 let _animate = false;        // the next ready render plays the entrance
 let _heroHtml = '';          // what the hero shows now
@@ -625,15 +638,66 @@ function runEngine() {
     priceSignals: _priceSignals,
     hoursToDeadline: hoursToDeadline(planningGw),
   };
+  _inputVersion++;
+  _cards = {};
   try {
     _result = runDecisionEngine(input, DECISION_ENGINE, _cache);
     _state = 'ready';
-    startRobustness(input);
+    if (DECISION_ENGINE.solver.enabled) refreshSolver(input);
+    else startRobustness(input);
   } catch (err) {
     console.warn('[planner] decision engine failed:', err?.message ?? err);
     _result = null;
     _state = 'failed';
   }
+}
+
+/**
+ * Spec §1: a phone is a coarse pointer on a narrow screen, or under minCores logical cores, or under minMemoryGb of
+ * device memory. A value the browser does not give counts as not a phone.
+ * @param {object} [env]  the window, or a stand-in for a test
+ */
+export function isPhone(env = globalThis, phone = DECISION_ENGINE.solver.phone) {
+  const coarse = env.matchMedia?.('(pointer: coarse)')?.matches ?? false;
+  const { hardwareConcurrency, deviceMemory } = env.navigator ?? {};
+  return (coarse && (env.innerWidth ?? Infinity) <= phone.maxWidthPx)
+    || hardwareConcurrency < phone.minCores || deviceMemory < phone.minMemoryGb;
+}
+
+/** A settled card into the decision log, off the render path: a failed write is a warning, never an error in the page. */
+function logSolverDecision(entry) {
+  (_snapshotDb ?? Promise.resolve(null))
+    .then(db => db && logDecision(db, entry, { max: DECISION_ENGINE.solver.logMax }))
+    .catch(err => console.warn('[planner] decision not logged:', err?.message ?? err));
+}
+
+/**
+ * The solver takes over the cards' moves for this run of the engine. It hands back the engine's move for each mode
+ * at once and the solver's as it lands; the workers behind it are made on the first run, never at page load.
+ */
+function refreshSolver(input) {
+  _runner ??= createSolverRunner({
+    config: DECISION_ENGINE,
+    makeWorker: () => new Worker(new URL('../engine/solver/worker.js', import.meta.url), { type: 'module' }),
+    makeRescoreWorker: () => new Worker(new URL('../engine/robustness-worker.js', import.meta.url), { type: 'module' }),
+    isPhone,
+    onCard: onSolverCard,
+    onLog: logSolverDecision,
+  });
+  _refreshing = true;
+  try {
+    _runner.refresh(input, _result, _inputVersion, _cache);
+  } catch (err) {
+    console.warn('[planner] solver not started:', err?.message ?? err);
+    _cards = {};
+  } finally {
+    _refreshing = false;
+  }
+}
+
+function onSolverCard(modeId, card) {
+  _cards[modeId] = card;
+  if (!_refreshing) paintCard(modeId);
 }
 
 /**
@@ -831,15 +895,15 @@ function rollReason(mode, counted, settings) {
   return `No move beats rolling the free transfer, worth ${mode.rollValue.toFixed(1)} points.`;
 }
 
-function playerRowHTML(role, move, sellTenths, estimated) {
+function playerRowHTML(role, move, sellTenths, estimated, { locks, bans }) {
   const id = role === 'sell' ? move.outId : move.inId;
   const player = store.getPlayer(id);
   const team = store.getTeam(player?.teamId);
   const price = role === 'sell' ? fromTenths(sellTenths) : (player?.price ?? 0);
   const name = esc(player?.name ?? '?');
   const action = role === 'sell'
-    ? `<button type="button" class="tog tog--sm" data-lock="${id}" aria-pressed="${_locks.has(id)}" aria-label="Don't sell ${name}">Don’t sell</button>`
-    : `<button type="button" class="tog tog--sm" data-ban="${id}" aria-pressed="${_bans.has(id)}" aria-label="Don't buy ${name}">Don’t buy</button>`;
+    ? `<button type="button" class="tog tog--sm" data-lock="${id}" aria-pressed="${locks.has(id)}" aria-label="Don't sell ${name}">Don’t sell</button>`
+    : `<button type="button" class="tog tog--sm" data-ban="${id}" aria-pressed="${bans.has(id)}" aria-label="Don't buy ${name}">Don’t buy</button>`;
   return `<div class="mc__pl"><span class="lbl">${role === 'sell' ? 'Sell' : 'Buy'}</span>`
     + `<span class="mc__nm"><b class="ell">${name}</b><small>${esc(team?.shortName ?? '-')} · ${money(price)}`
     + `${estimated ? ' <abbr title="No purchase price on record: sold at his current price">est.</abbr>' : ''}</small></span>`
@@ -850,7 +914,102 @@ function playerRowHTML(role, move, sellTenths, estimated) {
 const TAIL_TRIGGER = { double: 'a double GW' };
 const FIVE_GW_MODES = new Set(['now', 'ceiling']);
 
-function modeCardHTML(mode, i, settings, planningGw) {
+/** What a card is drawn from besides its mode: the page's state, which a test passes in instead. */
+const cardView = () => ({
+  players: _result?.players, locks: _locks, bans: _bans, openAlts: _openAlts, openPlans: _openPlans,
+  showRobustness: DECISION_ENGINE.solver.showRobustness,
+});
+
+// The cards of the solver's runner (planner-solver.js) carry a `source`; the engine's own summaries do not, and render
+// exactly as they did before the solver.
+const SOURCE_TAG = { solver: 'Solver plan', engine: 'Engine move', 'engine-tail': 'Engine move · upper tail' };
+const TENTATIVE_TITLE = 'Tentative: projections, team news and prices can change before this week';
+
+/** Refining while its solve runs, and where its move comes from. */
+function tagsHTML(card) {
+  return `<div class="mc__tags">${[card.state === 'refining' ? 'Refining' : null, SOURCE_TAG[card.source]].filter(Boolean)
+    .map(label => `<p class="mc__tag">${label}</p>`).join('')}</div>`;
+}
+
+/** The figures on a solver card's move that no solve has landed yet (null: not computed; { value: null }: it could not be). */
+function pendingFigures(card, showRobustness) {
+  if (card.source !== 'solver' || card.call !== 'move') return [];
+  return ['gain', 'alternatives', ...(showRobustness ? ['robustness'] : [])].filter(name => card[name] === null);
+}
+
+/** "Sell A, B → buy C, D", as an alternative with several moves reads. */
+const movesHTML = moves => `Sell ${moves.map(m => `<b>${esc(nameOf(m.outId))}</b>`).join(', ')} → buy ${moves.map(m => `<b>${esc(nameOf(m.inId))}</b>`).join(', ')}`;
+
+/** "2 transfers · one −4 hit", "2 transfers · two −4 hits" or "2 transfers, all free". */
+function transfersHTML(count, hits) {
+  const hit = Math.round(hits / DECISION_ENGINE.hitCost);
+  return `<p class="mc__sum">${count} transfers${hit
+    ? ` · ${numberWord(hit).toLowerCase()} −${DECISION_ENGINE.hitCost} hit${hit === 1 ? '' : 's'}` : ', all free'}</p>`;
+}
+
+/** The points a solver card's move adds over rolling: a skeleton until its rolling solve lands, nothing if it could not be had. */
+function solverEvHTML(card, showRobustness) {
+  const { gain, robustness } = card;
+  if (gain !== null && gain.value === null) return '';
+  const chip = !showRobustness ? ''
+    : robustness === null
+      ? `${gain === null ? '' : '<span>Still calculating</span>'}<span class="mc__rb skeleton" aria-hidden="true">Robust 00%</span>`
+      : robustHTML(robustness.value, 'mc__rb');
+  return gain === null
+    ? `<p class="mc__ev"><b class="num skeleton" aria-hidden="true">+0.0</b><span>Still calculating</span>${chip}</p>`
+    : `<p class="mc__ev"><b class="num">${pts(gain.value)}</b><span>pts vs rolling</span>${chip}</p>`;
+}
+
+/** A solver card's alternatives: their moves, and their points over rolling (the pick's, less how far behind it they are). */
+function solverAltsHTML(card, view) {
+  const { alternatives, gain } = card;
+  // Built as the gain's row is: the skeleton, and the words in the same muted label span.
+  if (alternatives === null) return '<p class="mc__ev"><span class="skeleton" aria-hidden="true">2 alternatives</span><span>Still calculating</span></p>';
+  const list = alternatives.value ?? [];
+  if (!list.length) return '';
+  const cell = alt => {
+    if (gain === null) return '<span class="mc__an"><b class="num skeleton" aria-hidden="true">+0.0</b></span>';
+    return gain.value === null ? '' : `<span class="mc__an"><b class="num">${pts(gain.value + alt.gain)}</b></span>`;
+  };
+  return `<details class="mc__alts" data-alts="${card.modeId}"${view.openAlts.has(card.modeId) ? ' open' : ''}><summary>${list.length} alternative${list.length === 1 ? '' : 's'}</summary><ol>`
+    + list.map(alt => `<li><span>${alt.moves.length ? movesHTML(alt.moves) : '<b>Roll</b>'}</span>${cell(alt)}</li>`).join('')
+    + '</ol></details>';
+}
+
+/** The weeks after the card's own, tentative: the plan goes on, but these moves can change before they are made. */
+function laterHTML(card, view) {
+  if (!card.later.length) return '';
+  return `<details class="mc__alts" data-plan="${card.modeId}"${view.openPlans.has(card.modeId) ? ' open' : ''}>`
+    + `<summary>Plan for ${gwSpan(card.later.map(week => week.gw))} · tentative</summary><ol>`
+    + card.later.map(week => `<li class="is-tent" title="${TENTATIVE_TITLE}"><span>GW${week.gw}: `
+      + `${week.moves.map(m => `sell <b>${esc(nameOf(m.outId))}</b> → buy <b>${esc(nameOf(m.inId))}</b>`).join(', ')}</span>`
+      + '<span class="sr"> tentative</span></li>').join('')
+    + '</ol></details>';
+}
+
+/**
+ * One mode's card.
+ * @param {object} mode  the engine's summary of it, or the solver runner's card for it
+ * @param {number} i     its place among the cards
+ * @param {object} settings
+ * @param {number} planningGw
+ * @param {object} [state]  players (the engine's, for sell prices), locks, bans, openAlts, openPlans and showRobustness:
+ *   the page's own by default
+ */
+export function modeCardHTML(mode, i, settings, planningGw, state = {}) {
+  const view = { ...cardView(), ...state };
+  const solver = mode.source !== undefined;
+  const ours = mode.source === 'solver';
+  const busy = mode.state === 'refining' || pendingFigures(mode, view.showRobustness).length > 0;
+  const tags = solver ? tagsHTML(mode) : '';
+  const replaced = mode.replaced ? [mode.replaced, mode.replaced.chained].filter(Boolean) : [];
+  // The engine would have waited for this very move: it is the card's own, not one the solver replaced.
+  const nowNotLater = mode.engineCall === 'wait' && mode.call === 'move' && moveSetKey(replaced) === moveSetKey(mode.moves ?? []);
+  const updated = ours && mode.updated
+    ? `<p class="mc__note">Updated: ${nowNotLater ? 'the solver’s plan makes now the move the engine would wait for'
+      : `the solver’s plan replaced the engine’s move (${esc(replaced.length
+        ? replaced.map(move => `sell ${nameOf(move.outId)} → buy ${nameOf(move.inId)}`).join(', ') : 'roll')})`}.</p>` : '';
+  const later = ours ? laterHTML(mode, view) : '';
   const counted = countedGws(mode.weights, planningGw);
   const span = mode.modeId === 'ceiling'
     ? (mode.targetGw ? `Peak GW${mode.targetGw} · ${mode.tail
@@ -860,60 +1019,68 @@ function modeCardHTML(mode, i, settings, planningGw) {
   const head = `<header class="mc__hd"><h3>${esc(mode.label)}</h3><span class="mc__span">${esc(span)}</span></header>`
     + `<p class="mc__blurb">${esc(MODE_BLURB[mode.modeId] ?? '')}</p>`;
   const delay = `style="--d:${Math.min(i, 6) * 50}ms"`;
+  const open = call => `<li class="mc" data-mode="${mode.modeId}" data-call="${call}" tabindex="-1"${busy ? ' aria-busy="true"' : ''} ${delay}>${head}${tags}`;
   const root = mode.root;
   if (mode.call === 'roll' || !root) {
-    return `<li class="mc" data-mode="${mode.modeId}" data-call="roll" tabindex="-1" ${delay}>${head}`
-      + '<p class="mc__call">Roll</p>'
-      + `<p class="mc__sum">${esc(rollReason(mode, counted, settings))}</p></li>`;
+    return `${open('roll')}<p class="mc__call">Roll</p>`
+      + `<p class="mc__sum">${esc(rollReason(mode, counted, settings))}</p>${updated}${later}</li>`;
   }
 
-  const seller = _result.players.find(p => p.playerId === root.outId);
   const perGw = counted.length > 1
     ? `<ol class="pgw" aria-label="Weighted gain by gameweek" title="Each week's gain times the mode's weight for it">${root.perGw.map((v, k) => {
       const gw = planningGw + k;
       if (!counted.includes(gw)) return '';
       const tentative = gw >= root.tentativeFromGw;
-      return `<li${tentative ? ' class="is-tent" title="Tentative: projections, team news and prices can change before this week"' : ''}>`
+      return `<li${tentative ? ` class="is-tent" title="${TENTATIVE_TITLE}"` : ''}>`
         + `<span>GW${gw}</span><b class="num">${pts(v)}</b>${tentative ? '<span class="sr"> tentative</span>' : ''}</li>`;
     }).join('')}</ol>`
     : '';
   const why = [root.why.squad, root.why.funds, root.why.price, root.why.cost].filter(Boolean)
     .map(line => `<li>${esc(line)}</li>`).join('');
-  const notes = (root.tags.includes('blankGwOneWeek') ? `<p class="mc__tag">Blank GW · one-week view</p>` : '')
+  const moves = ours ? mode.moves : [root];
+  const tagsOfMoves = moves.flatMap(move => move.tags);
+  const notes = (tagsOfMoves.includes('blankGwOneWeek') ? `<p class="mc__tag">Blank GW · one-week view</p>` : '')
     + (mode.waitForNews
       ? '<p class="mc__note">Wait for team news: a flagged player is in this move, the press conferences are still to come, and no price change is due before them.</p>'
-      : root.tags.includes('pendingNews')
+      : tagsOfMoves.includes('pendingNews')
         ? '<p class="mc__note">Team news pending: a flagged player is in this move, so the press conferences may change it.</p>'
         : '');
-  const alts = mode.alternatives.length
-    ? `<details class="mc__alts" data-alts="${mode.modeId}"${_openAlts.has(mode.modeId) ? ' open' : ''}><summary>${mode.alternatives.length} alternative${mode.alternatives.length === 1 ? '' : 's'}</summary><ol>`
-      + mode.alternatives.map(a => `<li><span>Sell <b>${esc(nameOf(a.outId))}</b> → buy <b>${esc(nameOf(a.inId))}</b></span>`
-        + `<span class="mc__an"><b class="num">${pts(a.outScore)}</b>${robustHTML(a.robustness, 'mc__ar')}</span></li>`).join('')
-      + '</ol></details>'
-    : '';
-  const robust = robustHTML(mode.robustness, 'mc__rb');
-  const players = `<div class="mc__mv">${playerRowHTML('sell', root, seller?.sellPriceTenths ?? toTenths(store.getPlayer(root.outId)?.price ?? 0),
-    root.tags.includes('sellPriceEstimated'))}${playerRowHTML('buy', root)}</div>`;
+  // The robustness of the engine's own cards stays off, with the solver's, until showRobustness is set.
+  const robustOf = (share, cls) => (solver && !view.showRobustness ? '' : robustHTML(share, cls));
+  const alts = ours ? solverAltsHTML(mode, view)
+    : mode.alternatives.length
+      ? `<details class="mc__alts" data-alts="${mode.modeId}"${view.openAlts.has(mode.modeId) ? ' open' : ''}><summary>${mode.alternatives.length} alternative${mode.alternatives.length === 1 ? '' : 's'}</summary><ol>`
+        + mode.alternatives.map(a => `<li><span>Sell <b>${esc(nameOf(a.outId))}</b> → buy <b>${esc(nameOf(a.inId))}</b></span>`
+          + `<span class="mc__an"><b class="num">${pts(a.outScore)}</b>${robustOf(a.robustness, 'mc__ar')}</span></li>`).join('')
+        + '</ol></details>'
+      : '';
+  const players = moves.map(move => {
+    const seller = view.players.find(p => p.playerId === move.outId);
+    return `<div class="mc__mv">${playerRowHTML('sell', move, seller?.sellPriceTenths ?? toTenths(store.getPlayer(move.outId)?.price ?? 0),
+      move.tags.includes('sellPriceEstimated'), view)}${playerRowHTML('buy', move, undefined, undefined, view)}</div>`;
+  }).join('');
 
   if (mode.call === 'wait') {
     const { gw, laterScore } = mode.deferral;
     const decide = settings.freeTransfers > 0
       ? 'roll the free transfer and decide then.'
       : 'make it then on a free transfer, not a hit now.';
-    return `<li class="mc" data-mode="${mode.modeId}" data-call="wait" tabindex="-1" ${delay}>${head}`
-      + '<p class="mc__call">Wait</p>'
-      + `<p class="mc__sum">Made for GW${gw} instead, this move scores ${pts(laterScore)} against ${pts(root.outScore)} now: `
-      + `${decide}</p>`
-      + players + (root.why.price ? `<p class="mc__note">Waiting has a price. ${esc(root.why.price)}</p>` : '') + '</li>';
+    // The solver's wait has no score for next week's move to set against this week's: it asks for no choice but the wait.
+    // Not even where the move is the engine's own and the card keeps its explanation: those scores are the engine's.
+    const scored = !ours && laterScore !== undefined;
+    return `${open('wait')}<p class="mc__call">Wait</p>`
+      + `<p class="mc__sum">Made for GW${gw} instead${scored
+        ? `, this move scores ${pts(laterScore)} against ${pts(root.outScore)} now:` : ':'} ${decide}</p>`
+      + players + (root.why.price ? `<p class="mc__note">Waiting has a price. ${esc(root.why.price)}</p>` : '') + `${updated}${later}</li>`;
   }
 
   // Now and Ceiling weigh one GW above the rest, so their cards also show the move over five GWs at full weight.
   const five = FIVE_GW_MODES.has(mode.modeId) && root.overFiveGws?.gws.length
     ? `<p class="mc__sum">Over ${gwSpan(root.overFiveGws.gws)}: <b class="num">${pts(root.overFiveGws.points)}</b> pts vs rolling</p>` : '';
-  return `<li class="mc" data-mode="${mode.modeId}" data-call="move" tabindex="-1" ${delay}>${head}`
-    + players
-    + `<p class="mc__ev"><b class="num">${pts(root.outScore)}</b><span>pts vs rolling</span>${robust}</p>`
-    + five + perGw + `<ul class="mc__why">${why}</ul>` + notes + alts + '</li>';
+  const ev = ours ? solverEvHTML(mode, view.showRobustness)
+    : `<p class="mc__ev"><b class="num">${pts(root.outScore)}</b><span>pts vs rolling</span>${robustOf(mode.robustness, 'mc__rb')}</p>`;
+  return `${open('move')}${players}${moves.length > 1 ? transfersHTML(moves.length, mode.hits) : ''}`
+    + ev + five + perGw + `<ul class="mc__why">${why}</ul>` + notes + updated + alts + later + '</li>';
 }
 
 const ROBUST_TITLE = `How often this move came out on top when the projections, chances of playing, free-transfer value `
@@ -941,6 +1108,38 @@ function paintRobustness() {
       cell.insertAdjacentHTML('beforeend', robustHTML(mode.alternatives[i]?.robustness, 'mc__ar'));
     });
   }
+}
+
+/**
+ * Write one card in place when the solver changes it, so the page, the reader's place and the other cards stay as they
+ * are. The card keeps keyboard focus on the control that had it (or on itself), and the entrance does not replay.
+ */
+function paintCard(modeId) {
+  const old = _root?.querySelector(`#pl-modes .mc[data-mode="${modeId}"]`);
+  if (!old || _state !== 'ready' || !_result?.modes[modeId]) return;
+  const held = old.contains(document.activeElement) ? document.activeElement : null;
+  const control = held && ['data-lock', 'data-ban'].find(attr => held.hasAttribute(attr));
+  const summary = held?.closest('summary')?.parentElement;
+  const refocus = control ? `[${control}="${held.getAttribute(control)}"]`
+    : summary ? `[${summary.hasAttribute('data-plan') ? 'data-plan' : 'data-alts'}="${modeId}"] summary` : null;
+  const settings = currentSettings();
+  const { planningGw } = getPlanningTiming();
+  _body.removeAttribute('data-anim');
+  old.outerHTML = modeCardHTML(_cards[modeId] ?? _result.modes[modeId], Object.keys(_result.modes).indexOf(modeId), settings, planningGw);
+  const card = _root.querySelector(`#pl-modes .mc[data-mode="${modeId}"]`);
+  // As keepFocus does after a lock: the same control, else the first in the card, else the card.
+  if (held) (refocus && card?.querySelector(refocus) || refocus && card?.querySelector('button') || card)?.focus();
+  watchCards();
+}
+
+/** On a phone: the runner solves a card when it comes into view, not all six at once. */
+function watchCards() {
+  if (!_runner || !isPhone() || !globalThis.IntersectionObserver) return;
+  _viewObserver ??= new IntersectionObserver(entries => {
+    for (const entry of entries) if (entry.isIntersecting) _runner.view(entry.target.dataset.mode);
+  });
+  _viewObserver.disconnect();
+  _root.querySelectorAll('#pl-modes .mc[data-mode]').forEach(card => _viewObserver.observe(card));
 }
 
 function modesNote(settings, planningGw) {
@@ -988,7 +1187,8 @@ function renderModes() {
   box.setAttribute('aria-busy', 'false');
   setText(note, modesNote(settings, planningGw));
   box.innerHTML = `<ol class="mcs">${Object.values(_result.modes)
-    .map((mode, i) => modeCardHTML(mode, i, settings, planningGw)).join('')}</ol>`;
+    .map((mode, i) => modeCardHTML(_cards[mode.modeId] ?? mode, i, settings, planningGw)).join('')}</ol>`;
+  watchCards();
 }
 
 // ─── Render: captain and XI ──────────────────────────────────────────────────
@@ -1350,8 +1550,8 @@ function onClick(e) {
   if (hit('#pl-export')) {
     return void (_snapshotDb ?? Promise.resolve(null))
       .then(async db => {
-        const held = db ? await exportSnapshots(db) : { snapshots: [], gwTables: [] };
-        if (!held.snapshots.length && !held.gwTables.length) return toast('Nothing archived on this device yet');
+        const held = db ? await exportSnapshots(db) : { snapshots: [], gwTables: [], decisions: [] };
+        if (!held.snapshots.length && !held.gwTables.length && !held.decisions.length) return toast('Nothing archived on this device yet');
         await downloadSnapshots(db);
         return toast('Snapshots exported');
       })
@@ -1578,10 +1778,11 @@ function wireDom() {
   // An expanded "alternatives" list stays expanded across re-runs. 'toggle'
   // does not bubble, hence the capture.
   _root.addEventListener('toggle', e => {
-    const mode = e.target.dataset?.alts;
+    const open = e.target.dataset?.plan ? _openPlans : _openAlts;
+    const mode = e.target.dataset?.alts ?? e.target.dataset?.plan;
     if (!mode) return;
-    if (e.target.open) _openAlts.add(mode);
-    else _openAlts.delete(mode);
+    if (e.target.open) open.add(mode);
+    else open.delete(mode);
   }, true);
   _root.addEventListener('submit', onSubmit);
   _root.addEventListener('input', onInput);

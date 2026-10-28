@@ -166,6 +166,7 @@
   .mc__why { display: grid; gap: 4px; font-size: 12px; color: var(--color-muted); }
   .mc__why li { text-wrap: pretty; }
   .mc__tag { justify-self: start; padding: 0 6px; border: 1px solid var(--color-border); border-radius: 3px; font: 700 10px/18px var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: var(--color-muted); }
+  .mc__tags { display: flex; flex-wrap: wrap; gap: 4px 6px; }
   .mc__note { padding: 8px 10px; border: 1px dashed var(--color-estimated); font-size: 12px; color: var(--color-muted); text-wrap: pretty; }
   .mc__alts summary { display: flex; align-items: center; gap: 6px; min-height: var(--tap-sm); font: 700 11px/1.2 var(--font-sans); letter-spacing: .1em; text-transform: uppercase; color: var(--color-muted); cursor: pointer; }
   .mc__alts summary::before { content: "+"; width: 1ch; font-size: 14px; }
@@ -176,6 +177,8 @@
   .mc__an { display: flex; align-items: baseline; gap: 6px; }
   .mc__ar { cursor: help; }
   .mc__alts li b { color: var(--color-text); }
+  /* A skeleton's text must stay hidden where the card colours the same element (.mc__alts li b, .mc__ev .mc__rb). */
+  .mc .skeleton { color: transparent; }
 
   .mr { display: inline-flex; align-items: center; height: 20px; padding: 0 6px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); font: 700 10px/1 var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: var(--color-muted); white-space: nowrap; }
   .mr[data-risk=medium] { border-color: var(--band-orange); color: var(--band-orange); }

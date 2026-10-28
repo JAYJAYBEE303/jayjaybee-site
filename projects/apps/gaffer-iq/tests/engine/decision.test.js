@@ -17,7 +17,7 @@ import { squadValue } from '../../js/engine/squad-value.js';
 import { DECISION_ENGINE, SEASON_GWS } from '../../js/config.js';
 
 import {
-  GW, MODES, BASE, close, scenario, playerOf, allBest, projectionOf,
+  GW, MODES, BASE, close, scenario, playerOf, allBest, projectionOf, withDraws,
 } from './decision-fixtures.js';
 
 // ─── Transfer cost (plan §5.2) ───────────────────────────────────────────────
@@ -312,6 +312,13 @@ test('money freed counts only for the share of a mode\'s weight a planned chip l
   const result = runDecisionEngine(scenario({
     candidates: [{ id: 101, position: 'GKP', xip: 5, price: 30 }], chipPlan: { [GW + 1]: 'wildcard' } }));
   close(playerOf(result, 1).best.longterm.fundsTerm, 0.30 * 2.0 / 3);
+  // The share is on the mode's summary, for the solver's money terms: a third here, whole where no chip covers a week.
+  close(result.modes.longterm.share, 1 / 3);
+  close(result.modes.now.share, 1);
+  for (const mode of MODES) close(runDecisionEngine(scenario()).modes[mode].share, 1, mode);
+  // Every week covered: nothing is left to weigh.
+  const covered = runDecisionEngine(scenario({ chipPlan: { [GW]: 'wildcard' } }));
+  for (const mode of MODES) assert.equal(covered.modes[mode].share, 0, mode);
 });
 
 test('the dead-slot penalty shrinks with the share of Structure\'s weight a planned chip leaves', () => {
@@ -523,26 +530,6 @@ test('Ceiling counts the bench in full when Bench Boost is planned for the targe
 });
 
 /**
- * Every projection given a draw spec (engine/ceiling.js): each player always
- * plays 60+ in a fixture of his own, nobody scores and nobody concedes, so his
- * draws are a fixed 2 (6 for a keeper or defender, 3 for a midfielder) -
- * unless `scoring` gives his club goals and him a share of them.
- */
-function withDraws(input, scoring = {}) {
-  const terms = goal => ({ share: 1, goal, assist: 0, defcon: 0, yellow: 0, red: 0, bonus: 0 });
-  const projections = new Map([...input.projections].map(([id, p]) => [id, { ...p, gws: p.gws.map(g => ({
-    ...g,
-    draw: {
-      position: p.position, availability: 1, appear: 1, p60: 1, savesPerXga: 0,
-      bonus: { goal: 0, assist: 0, cleanSheet: 0 },
-      full: terms(scoring[id]?.share ?? 0), short: terms(0),
-      sides: [{ fixtureId: id, teamId: id, opponentId: -id, goalsFor: scoring[id]?.goals ?? 0, goalsAgainst: 0, lambdaAgainst: 0 }],
-    },
-  })) }]));
-  return { ...input, projections };
-}
-
-/**
  * The input with player `id` playing twice in the planning GW (k = 0) - his points unchanged, so only the fixture
  * count moves: with every GW otherwise alike, that GW stays t* (a tie goes to the GW with more doubles). An `id`
  * outside the squad and the candidates gets a projection of his own, at a club nobody else plays for.
@@ -580,10 +567,14 @@ test('Ceiling reads expected points unless its target GW is a big week for the p
   // No double for anyone and no chip planned: the mean, and the forward who projects more.
   const plain = runDecisionEngine(UPSIDE()).modes.ceiling;
   assert.equal(plain.tail, null);
+  assert.equal(plain.bigWeek, false);
   assert.equal(plain.root.inId, 101);
   // A double for a squad player (defender 3) at t*: the upper tail, and the forward with the upside.
-  const squadDouble = runDecisionEngine(doubleAt(UPSIDE(), 3)).modes.ceiling;
+  const doubled = runDecisionEngine(doubleAt(UPSIDE(), 3)).modes;
+  const squadDouble = doubled.ceiling;
   assert.deepEqual([squadDouble.tail.quantile, squadDouble.tail.trigger, squadDouble.root.inId], [0.9, 'double', 102]);
+  // Only Ceiling in a big week says so: the solver leaves that card to the engine.
+  assert.deepEqual(MODES.filter(m => doubled[m].bigWeek), ['ceiling']);
   // A double for one of the replacements it shortlists (forward 102).
   assert.equal(runDecisionEngine(doubleAt(UPSIDE(), 102)).modes.ceiling.tail.trigger, 'double');
   // A double only at a club neither the squad nor the shortlist involves: not a big week for this squad.
@@ -742,18 +733,23 @@ test('a likely fall that lowers his sell price makes selling now worth lambda x 
   // Bought at £5.0m, now £5.2m: he sells for £5.1m, and for £5.0m after a fall.
   const changes = [{ id: 1, price: 52, purchase: 50 }];
   const candidates = [{ id: 101, position: 'GKP', xip: 6 }];
-  const without = playerOf(runDecisionEngine(scenario({ changes, candidates })), 1).best.longterm;
+  const calm = playerOf(runDecisionEngine(scenario({ changes, candidates })), 1);
+  const without = calm.best.longterm;
   const falling = playerOf(runDecisionEngine(scenario({ changes, candidates, priceSignals: { 1: signal(1) } })), 1);
   close(falling.best.longterm.priceTerm, -0.3 * 0.1);
   close(falling.best.longterm.outScore, without.outScore + 0.03);
   assert.match(falling.best.longterm.why.price, /fall/);
   assert.ok(falling.flags.includes('priceFall'));
+  // The player carries the change itself, in tenths: the fall to £5.0m from £5.1m.
+  assert.equal(falling.saleTenths, -1);
+  assert.equal(calm.saleTenths, 0, 'no signal, no expected change');
   close(falling.best.now.priceTerm, 0, 'Now puts no value on money');
   // At £5.3m a rise to £5.4m lifts his sell price from £5.1m to £5.2m.
   const rising = playerOf(runDecisionEngine(scenario({ changes: [{ id: 1, price: 53, purchase: 50 }], candidates,
     priceSignals: { 1: signal(0, 1) } })), 1);
   close(rising.best.longterm.priceTerm, 0.3 * 0.1);
   assert.ok(rising.flags.includes('priceRise'));
+  assert.equal(rising.saleTenths, 1);
 });
 
 test('Structure does not hold a recovering player whose sell price is likely to fall first', () => {

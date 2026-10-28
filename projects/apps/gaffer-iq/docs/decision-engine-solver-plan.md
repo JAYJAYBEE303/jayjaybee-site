@@ -1,7 +1,8 @@
 # Solver-led decision engine: plan (Phase 0)
 
 Date: 2026-10-22. Status: **approved with conditions** (your reply of
-22 Oct, items 1-10, folded in below). Phases 1 and 2 done; Phase 2 awaiting your check of the cards.
+22 Oct, items 1-10, folded in below). Phases 1, 2 and 3 done; Phase 2 awaiting your check of the cards, Phase 3 your
+review of the gap and the disagreement log. The solver ships off (`solver.enabled: false`) until you switch it on after Phase 4.
 Source: "Gaffer IQ engine: recommended changes" (22 Oct 2026, Josh Bailey),
 its Build scope, Mode scale fix, Solver feasibility check and Phases table.
 Branch: `Refactor/gaffer-IQ-transfer-suggestion-engine-redesign`; `main` is
@@ -10,7 +11,8 @@ not touched.
 ## What this pass builds
 
 - **The solver picks the moves.** Each of the six modes becomes a setting of
-  the multi-week planner built as Phase 8's referee (`tools/milp/model.js`):
+  the multi-week planner built as Phase 8's referee (`tools/milp/model.js`, now
+  `js/engine/solver/model.js`):
   its horizon and weights, free-transfer value, bank value, hit margin and
   constraints. It may plan several moves in a week and take hits.
 - **The engine stays** for sell and keep values, explanations, the
@@ -211,8 +213,8 @@ ends at its last non-zero weight.
 ### Model work (your item 7), Phase 3, tests first
 
 - **The exact free-transfer count, first.**
-  - Today a hit can buy next week's free transfer whenever weights rise, so
-    the model refuses rising weights. Future prep's and Ceiling's rise.
+  - Before Phase 3 a hit could buy next week's free transfer whenever weights
+    rise, so the model refused rising weights. Future prep's and Ceiling's rise.
   - One binary a week, "every free transfer used", makes the count exact:
     unused = max(0, free − transfers), hits = transfers − free + unused, and
     next week's = min(5, unused + 1).
@@ -259,6 +261,8 @@ fallback):
 - the GW and the time;
 - the mode;
 - `source`;
+- `call` (move, wait or roll) and `stopped` (the pick's solve stopped at its
+  limit);
 - the move set;
 - the expected gain over rolling (or null while uncomputed, updated when it
   lands);
@@ -426,7 +430,7 @@ card; tests in `tests/engine/decision.test.js`)
 
     With no chips played here, the tail buys no upside even in big weeks.
 
-### Phase 3: solver integration
+### Phase 3: solver integration (done, awaiting your review)
 
 - **Order of work:**
   1. The model fix and its tests (§2).
@@ -448,6 +452,182 @@ card; tests in `tests/engine/decision.test.js`)
   - The disagreement log from that run comes with it.
 
 **Stop:** you review the gap and the log.
+
+**Phase 3 as built** (`js/engine/solver/`, `js/modules/planner-solver.js`, `js/modules/planner.js`, `js/snapshots.js`,
+`js/engine/decision.js`, `js/config.js` `solver`, `assets/vendor/highs/1.15.4/`, `tools/backtest/solver.js`; tests in
+`tests/engine/solver/`, `tests/modules/` and `tests/tools/`; report `docs/decision-engine-backtest.md`, "The app's solver
+against the offline planner"; reference `docs/decision-engine.md`, "The solver")
+
+- **The switch.** `DECISION_ENGINE.solver.enabled` ships `false`: the single-move engine advises, nothing loads HiGHS,
+  and the Planner's markup is byte for byte what it was (a snapshot test pins it). Every test of the solver path passes
+  the config with `enabled: true` itself, so switching it on turns no test red.
+- **The model** (`engine/solver/model.js`, moved from `tools/milp/model.js` with its test).
+  - Free transfers are counted as FPL counts them: per week an integer count of those unused and a binary "every free
+    transfer used", so a hit buys none and weights may rise from one week to the next. The rising-weights guard is gone.
+  - On weights that do not rise it is Phase 8's model: of the 56 Phase 8 problems, 52 agree to 1e-6 at the backtest's
+    tolerance (a gap of 0.5), the four long-horizon ones differing by 0.03 to 0.1 where the old and new builds stopped at
+    different points inside that gap, and all 56 agree to 1e-11 solved to zero gap. A test pins the LP text of one of them
+    by its digest.
+  - It takes, each off unless given: the value of the free transfers and the bank at the horizon's end, a margin on every
+    hit, players kept in the first week, Free Hit weeks with no transfers at all, dead slots, sale points, and first weeks
+    to exclude (the alternatives). The terms per line of its text are `solver.lpLineTerms`, so the file holds no number.
+- **A mode as a problem** (`engine/solver/problem.js`).
+  - `modeSetting` reads everything from the engine's result: the weights as it masked them, cut at the mode's last
+    weighted GW (so the horizon ends before a planned Wildcard); a Free Hit week frozen; the kept players from the
+    engine's flags (locks, Ceiling's protected players in Now, Long term, Future prep and Funds, Structure's holds); bans;
+    Now's `pZeroGate` as a test of who may be bought in the first GW; a planned Bench Boost or Triple Captain; the
+    end-of-horizon free-transfer values (the engine's schedule, or its flat value); Structure's dead slots (the engine's
+    own test, `isDeadSlot`); `solver.modes.<id>.hitMargin`, 0 for all six.
+  - Money follows the engine. The bank at the horizon's end is worth the mode's own lambda per £1m (Now's and Ceiling's
+    is 0), and the bank, the sale points for a likely price fall and the dead-slot penalty are scaled by the engine's
+    `share`: the part of the mode's weight no planned chip covers. A Wildcard cuts its weeks from the horizon but not from
+    the share.
+  - Ceiling in a big week returns `engine-tail`: no solve, the engine's tail-scored move, recorded as the engine's.
+  - `solverProblem` builds the owned 15 at the engine's sell prices and the pool: per position the `pool.points` (20) best
+    others by weighted points and the `pool.pointsPerTenth` (10) best by weighted points a tenth among those the mode
+    can buy, plus the buys the engine itself made in any mode. A setting flag, `engineBuys: false`, drops the last
+    (the reproduction check uses it to hold Phase 8's pool).
+- **A plan as moves and a card** (`engine/solver/plan.js`; `describePlan` and `moveSetKey` in `engine/decision.js`).
+  - `orderMoves` pairs the first week's sales and buys into moves FPL takes one at a time, greedily by the legal pair that
+    frees most money, on the engine's squad by `checkSwap`; moves with no legal order are left out and the week is called
+    unordered. The backtest's `orderMoves` is an adapter onto it, so the app and the referee order alike.
+  - `checkProtected` throws when a first week sells a player the mode must not sell. The runner then keeps the engine's
+    card and logs the error.
+  - `describePlan` is the engine's explanation of any move set: the mode's masked weights times the change the set makes
+    to V in each GW, its five-GW figure, each move's minutes risk and tags, Now's wait-for-team-news flag, and the words.
+    For one move its figures equal the engine's own for that swap.
+  - A card's call is a move, a wait (no move now, one next week, shown tentative) or a roll. Its hits are counted from its
+    moves by FPL's rule, never from the plan's own count.
+  - A move set is keyed by its sorted sales and its sorted buys (`out,out>in,in`; one move is `out>in`), not by how they
+    are paired: `orderMoves` and `pairMoves` can pair one squad change two ways, and a figure keyed to one pairing never
+    landed on the other. `solverCard` throws on what it cannot render: no `positionOf`, a `describe` for other moves, a
+    move or wait with no legal order.
+- **HiGHS** (`assets/vendor/highs/1.15.4/`, `engine/solver/highs.js`, `engine/solver/worker.js`).
+  - The npm `highs` 1.15.4 build (HiGHS 1.15.1) byte for byte, with its MIT licence and a README on how to update. The
+    SHA-256 of `highs.mjs` and `highs.wasm` is pinned in `solver.vendor`; `vendor.test.js` checks the shipped files.
+  - The module worker fetches `highs.wasm` with the hash as the fetch's `integrity`, so a changed file is refused, and
+    loads HiGHS from the bytes. An init with no readable hash fetches nothing, a failed init does not replace a runtime
+    already loaded, and every failure is an `ok: false` answer, never a throw.
+  - `tools/milp/package.json` and its lockfile are gone: the solved model tests and the backtest load the vendored build
+    through the same loader and no longer skip. `package.json` `engines.node` is `>=22` (the quoted test glob needs 21).
+  - `vercel.json` serves the versioned folder with `Cache-Control: public, max-age=31536000, immutable`, so the 3.5 MB wasm
+    is not revalidated at every worker start; a new HiGHS version goes in a new folder and its own header.
+- **The runner** (`modules/planner-solver.js`; the Planner hands it every engine run).
+  - **Workers.** A pool of module workers made on the first solve, `min(workers, cores - 1)` and at least one. A phone
+    gets one, and solves only the cards that came into view, in the order viewed. A queue runs every pick and every rolling
+    twin before any follow-up (alternatives, robustness), so a card's move never waits on another card's figures.
+  - **Limits.** Each solve stops at `timeLimitS` (3) or within `absGap` (0.5) of its bound. The page gives up on a worker
+    `timeoutMarginS` (2) seconds after that limit, since a solve cannot be interrupted: that worker is ended and replaced.
+    A worker that has not loaded HiGHS in `initTimeoutS` (20) turns the solver off for the session.
+  - **Stale answers.** Each run carries the input's version. A newer refresh, or `stop()`, drops what the older run queued,
+    and an answer for an older run is ignored. The runner owns its robustness worker and ends a re-score still running for
+    a card that is gone.
+  - **Falling back.** No plan inside the cap, an error, a stuck or failed worker, a protected sale, a pick with no legal
+    order, or no `Worker` (Node, old browsers): the card keeps the engine's move, marked as the engine's, and nothing
+    throws into the page.
+- **The cards** (`modules/planner.js`, `css/planner.css`: three lines).
+  - A card paints the engine's move at once, marked Refining; when the solver lands it is repainted in place. It carries a
+    source tag (Solver plan, Engine move, Engine move · upper tail), several moves with their transfers line, the later
+    weeks as a tentative plan, and an "Updated" note naming the engine's move it replaced when the two differ.
+  - The engine's recommendation is its whole move set (its root and, for Funds, the second move the root pays for), both
+    when the runner compares it and when it logs it.
+  - The gain over rolling, the alternatives and the robustness each land keyed to the card's move set and input. One whose
+    key is not the card's is dropped, and the skeleton with "Still calculating" stands in its place. A pick that can only be
+    had in part, one move at a time, is never shown beside figures computed for the whole plan.
+  - With the solver on, no robustness shows on any card (`solver.showRobustness: false`), the engine's own included.
+- **Robustness** (`engine/solver/rescore.js`). `pickBeatsAlternatives` re-scores the pick, its alternatives, the engine's
+  move and rolling on each of the engine's 30 seeded noisy copies of its input (the mode's weights times the squad value
+  after the moves, less the hits, plus the free transfers left banked) and answers the share of copies in which the pick is
+  best. It is what the pick beats, not how often a fresh solve would choose it. The robustness worker takes it as a second
+  message kind (`{ kind: 'rescore' }`); the existing message is unchanged. It is logged, not shown.
+- **The decision log** (`js/snapshots.js`).
+  - The snapshot database is at version 2 with a `decisions` store keyed by gameweek, mode, call, move set and source. A repeat of
+    a key updates the gain, robustness, time and what the engine would have done in place (an entry describes one run); a
+    new key adds an entry, and the oldest go past `solver.logMax` (5000).
+  - `exportSnapshots` carries `decisions`. The Planner writes each settled card, off the render path, and counts it in the
+    "Nothing archived" check. An upgrade blocked by an older tab answers with the keep-nothing store and one warning.
+- **The backtest** (`tools/backtest/solver.js`, `run.js --solver-repro`).
+  - `solverPolicy` runs the app's own path - the engine's result, `solverProblem`, HiGHS through `solveProblem`,
+    `orderMoves` - set as Phase 8's planner was (`REPRO`): decay 0.85 over five GWs as a total, cut at the season's end,
+    no end-of-horizon values, hits at 4, no margin, no kept players, dead slots, sale points or chips, Phase 8's pool. Its
+    time limit and tolerance are the app's, read from the config. No plan, or no legal order, makes no move that week.
+  - It plays the same 24 squads as `--milp`, resumable, into `data/solver-repro.json`, and each mode's engine move is logged
+    beside the solver's first week. `engineInput` moved from `run.js` to `lib.js`, since importing `run.js` runs the CLI.
+- **Tests.** `npm test`: 692, of which 687 pass, 173 more than the 519 before this phase. The 5 failures are the baseline
+  ones in `tests/engine/channel.test.js`, red before this branch existed:
+  - `buildChannelProfile no longer nulls a thin profile - it scales it`;
+  - `buildChannelProfile reports maturity 1 at or above the full-evidence bar`;
+  - `buildChannelProfile scores a thin profile instead of nulling it`;
+  - `buildChannelProfile clamps maturity to 1, never above`;
+  - `buildChannelProfilesByTeamId keeps thin profiles now that they score`.
+
+  The tests of the solver path cover each Review Focus risk: a figure beside another move's, a protected or locked sale, a
+  zero-weight week bought for nothing, a solver that fails or is slow, and a stale answer after a quick sequence of changes.
+  `js/engine/solver/*.js` and the new code in `engine/decision.js` and `engine/robustness-worker.js` hold no number but 0
+  and 1: the grep for them finds none outside comments.
+
+**The reproduction** (`--solver-repro`: 12 squads in each season, the schedule as it stood).
+- **The gap**, the app's solver less Phase 8's planner, points a season (95% intervals):
+
+  | Season | Planner | App's solver | Gap |
+  |---|---|---|---|
+  | 2024-25 | 2161.0 | 2119.8 | -41.3 [-111.0, +24.6] |
+  | 2025-26 | 1968.3 | 1950.3 | -17.9 [-71.9, +37.2] |
+  | Both | 2064.6 | 2035.0 | -29.6 [-72.0, +13.5] |
+
+  No interval excludes zero. The gap is over 20 in 2024-25 and over both seasons, so it is explained below.
+- **The solves:** 840, 2.5 s each; 532 stopped at the 3 s limit (the run's workers shared four cores, so each had less than 3
+  s of CPU); 10 found no plan (8 in 2024-25, 2 in 2025-26); in 2 weeks some of the plan's moves had no legal order.
+- **The disagreement log.** The solver's first week is the same sales and buys as each mode's move in 22% of weeks for Now,
+  33% Long term, 23% Future prep, 19% Funds & flexibility, 25% Ceiling and 31% Structure fix (840 weeks each; a mode's move
+  is its root and, for Funds, the second move the root pays for). The report lists the first five weeks each mode differs.
+- **The gap is the 3 s limit, not the model.** On the two 2024-25 squads with the widest gaps (random 8, -162; random 9, -106),
+  run alone with nothing else on the machine, the app's path at 10 s gives the planner's objective and first-week moves in
+  all 70 weeks. At 3 s, 47 of those 70 solves stop at the limit: 31 within the 0.5-point tolerance, 15 short of it by 34
+  horizon points on average (at most 116), and one with no plan. A short plan can be a poor one: random 8's 3 s plan at GW32
+  makes 12 moves for 2 and loses 92 points that week, which is most of its 162. Season totals also follow their path: a
+  first week tied inside the tolerance sends a squad's season elsewhere, so one squad's difference carries about 100 points
+  of run-to-run noise (random 9: the planner 2197 in its loaded run and 2072 alone; the app at 3 s 1918, 2072 and 2091 on
+  three runs). The full run's workers shared four cores, so its 3 s solves had less than 3 s of CPU each, and 532 of 840
+  stopped.
+- **Left for Phase 4, not built.** A 3 s solve that stops with a poor incumbent is shown as the solver's move: your
+  condition 1 covers only "no plan". A candidate guard is to treat a stopped solve whose incumbent is more than the tolerance short of
+  its bound as no plan, and/or to re-solve longer in the background. Phase 4's margin runs should use the app's 3 s cap,
+  measured on a quiet machine.
+
+**In the browser** (headless Chromium, 4 cores, a scratch copy of the app with the switch on):
+- HiGHS initialises in about 100 ms.
+- At 1280 px, all six picks land in 1.4-1.5 s and all the figures (gain, alternatives, robustness) in 2.9-3.4 s.
+- At 360 px, one worker: the picks in 1.7-2.3 s and the figures in 5.2-6.0 s.
+- Safari, Firefox and a phone are Phase 4's checks.
+
+**Decisions this phase settled** (the plan left them open):
+- A move set is keyed by its sales and buys, not their pairing (`out,out>in,in`).
+- The money terms follow the engine's share, and the bank is worth each mode's lambda.
+- `engineBuys` lets a setting drop the engine's buys from the pool; the reproduction uses it.
+- The page waits `timeoutMarginS` (2) past the solve limit, and `initTimeoutS` (20) for HiGHS to load.
+- `solverCard` throws on what it cannot render, and the runner then keeps the engine's card.
+- The runner owns its rescore worker, and ends one still running for a card that is gone.
+- With the solver on, no robustness shows on any card, the engine's included, until Phase 4's check passes.
+
+**After the whole-branch review** (rulings R44-R47):
+- **R44, hits cost the same in every week.** The model's `flatHits` prices a hit at `hitCost` plus the margin whatever its week
+  weighs, as the engine's `transferCost` does; on for every app mode, off in the reproduction, so its LP is unchanged. Before it,
+  Ceiling's 0.1-weight weeks made a hit cost 0.4 and the plan bought two players on one free transfer.
+- **R45, a move must beat rolling.** A pick that moves settles its card only once its rolling solve has landed (Refining until
+  then, the gain landing with the card). A gain over rolling not above `absGap` makes the card a roll (source `solver`, the
+  plan's later weeks kept, logged as a roll), where the solver had moved for money alone or for nothing the engine rolled on;
+  if the rolling solve fails the mode keeps the engine's card. A wait is its own rolling twin and needs no second solve.
+- **R46, a wait cannot sell a kept player.** `checkProtected` also runs on a wait card's own move week (week 1); on a throw the
+  card is a roll that keeps the weeks after the wait as its tentative list, warned and not an error (the lock is the first
+  week's by spec, so this is not a model bug). A locked player is no longer offered for sale as "Wait ... Sell".
+- **R47, the log tells a wait from a move.** An entry carries `call` and `stopped` (the pick's solve stopped at its limit; false
+  for an engine card), the key is `gw|mode|call|moveSetKey|source`, and an engine card logs its root's `outScore` as the gain
+  (null for an engine roll). The dispatch carries `stopped` from the worker's answer to the card, as a field that is not shown.
+- **R48, small fixes.** A solver wait shows none of the engine's scores, and the Updated note says so when the engine would have
+  waited for this very move. The report generator carries no findings (they are in this section), this section states the
+  Phase 8 agreement as measured, and the decision log notes that an older tab blocking the IndexedDB upgrade leaves that visit
+  with no snapshots, no log and the Planner on season totals.
 
 ### Phase 4: evaluation
 

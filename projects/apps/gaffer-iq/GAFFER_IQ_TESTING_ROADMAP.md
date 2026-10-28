@@ -272,12 +272,16 @@ The Planner runs the decision engine (`FEATURE_ENGINE.md` §14,
 `minutes.test.js`, `points.test.js`, `team-goals.test.js`, `price-adapter.test.js`,
 `robustness.test.js`), the offline tools (`tests/tools/minutes.test.js`,
 `backtest.test.js`, `backtest-sim.test.js`, `points.test.js`, and the MILP
-referee's `milp.test.js` and `backtest-milp.test.js`, which skip their solved
-cases until `npm install --prefix tools/milp` has run; Ceiling's draws in
-`tests/engine/ceiling.test.js`)
-and the module's pure helpers (`tests/modules/planner.test.js`). The checklist
-below is the in-browser gate after a change to the engine, to `DECISION_ENGINE`
-in `config.js`, or to `modules/planner.js`.
+referee's `backtest-milp.test.js` and the solver reproduction's
+`backtest-solver.test.js`; Ceiling's draws in `tests/engine/ceiling.test.js`),
+the multi-week solver (`tests/engine/solver/`: the model, a mode's problem,
+plans, re-scoring, the worker and the vendored files' hashes; the solved cases
+run on the vendored HiGHS in `assets/vendor/highs/`, so nothing skips and
+nothing is installed) and the module's pure helpers
+(`tests/modules/planner.test.js`, `planner-cards.test.js`; the solver's runner
+in `planner-solver.test.js`; the decision log in `snapshots.test.js`). The
+checklist below is the in-browser gate after a change to the engine, to
+`DECISION_ENGINE` in `config.js`, or to `modules/planner.js`.
 
 A change to `DECISION_ENGINE.minutesFeatures` or to `engine/minutes.js` needs a
 refit as well: `node tools/minutes/download.js && node tools/minutes/fit.js`
@@ -302,9 +306,21 @@ A run that dies keeps its finished tasks: `--resume` runs the rest, and
 runs the sweep on 2024-25 (about an hour) and `--test-tuned` tries what it
 chose on 2025-26; `--alt` runs Long term's alternative preset. `--milp` runs
 the MILP referee (Phase 8: a multi-week transfer plan solved by HiGHS, against
-the engine's moves and chip hints on the same squads); it needs
-`npm install --prefix tools/milp` first, its own dependency, never the app's.
-The report picks up each once it has run.
+the engine's moves and chip hints on the same squads); HiGHS is the vendored
+build in `assets/vendor/highs/`, so nothing needs installing. `--solver-repro`
+runs the app's own solver path (`js/engine/solver/`, through
+`tools/backtest/solver.js`) set exactly as that referee was, on the same 24
+squads, into `data/solver-repro.json`, and the report pairs it with
+`data/milp.json`: run `--milp` first. It reports the gap in points a season,
+the solves (how many stopped at the app's 3 s limit, how many found no plan or
+had moves with no legal order) and, for each mode, where the solver's first
+week and the mode's move differ. It takes `--resume` like the others. Its
+solves are wall-clock limited, so run it on a quiet machine: workers sharing
+cores leave each 3 s solve less than 3 s of CPU (the last run's gap, -29.6
+[-72.0, +13.5] over both seasons, is the one to read a new run against). Run it
+after any change to `js/engine/solver/`, to the solver's limits or pool in
+`config.js`, or to the vendored HiGHS. The report picks up each once it has
+run.
 
 **Never enter a real FPL team ID for this.** Seed a synthetic squad from the
 console instead:
@@ -356,6 +372,31 @@ s.setSquad([].concat(pick('GKP', 2), pick('DEF', 5), pick('MID', 5), pick('FWD',
 - [ ] `window.__engine.buildProjections` and `runDecisionEngine` are there for
       spot checks. Once every finished GW's minutes table is archived, a player
       with a record projects `p60Approx: false` (the minutes model ran).
+
+With the solver on (`DECISION_ENGINE.solver.enabled: true` in a local copy; the
+tracked config ships it `false` until you switch it on), also:
+
+- [ ] Each card paints at once with the engine's move, marked Refining, and is
+      repainted in place when the solver lands: no layout jump, the page stays
+      responsive (the solves are in workers) and the other cards stay put.
+- [ ] A card whose solver move differs from the engine's carries "Updated" and
+      names the engine's move it replaced; one that matches carries no note.
+      Each card says whose move it is (Solver plan, Engine move, or Engine
+      move · upper tail for Ceiling in a big week).
+- [ ] A plan of several moves shows each move and a transfers line naming any
+      hit; later weeks sit under "Plan for GWa-b · tentative".
+- [ ] The gain over rolling and the alternatives read "Still calculating" until
+      computed for the move on the card. A lock, ban, bank or free-transfer
+      change drops them with the old move: a figure never sits beside a move it
+      was not computed for. No robustness % shows on any card.
+- [ ] Block `assets/vendor/highs/` (or change `highs.wasm`): every card stays on
+      the engine's move, marked Engine move, with one `[planner] solver off`
+      warning and nothing thrown into the page.
+- [ ] A locked player is sold by no card, and Ceiling's protected players by
+      none of Now, Long term, Future prep and Funds.
+- [ ] At 360 px with a coarse pointer, one worker solves, and only the cards
+      that come into view, in the order viewed.
+- [ ] "Export snapshots" carries `decisions`, one entry per settled card.
 
 ## End of Season Review
 

@@ -19,9 +19,9 @@
  * the values it chose on 2025-26 (data/tuned.json); --tune-multi runs the
  * sweep several moves a week (data/tune-multi.json); --alt runs Long term's
  * alternative preset (data/alt.json); --merge re-runs MERGE's policies into
- * data/results.json; --milp runs the MILP referee (Phase 8, data/milp.json;
- * needs npm install --prefix tools/milp). The report includes each once it
- * exists.
+ * data/results.json; --milp runs the MILP referee (Phase 8, data/milp.json);
+ * --solver-repro runs the app's own solver path set as that referee was
+ * (solver plan Phase 3, data/solver-repro.json). The report includes each once it exists.
  *
  * Every week of every season replays the app's own path - normaliseSeason,
  * buildScoreContext, buildProjections, runDecisionEngine - on vaastav as it
@@ -50,11 +50,12 @@ import { checkSwap } from '../../js/engine/feasibility.js';
 import { fromTenths, seededRandom, toTenths } from '../../js/util.js';
 import { SEASONS, gwTablesBefore, loadSeason, rawSeasonAt, totalsBefore } from './history.js';
 import {
-  GAIN_WINDOWS, enginePolicy, moveMetrics, pairedBootstrap, pickSquad, randomSquad, rollPolicy, scoreGameweek, simulateAll,
-  slopeInterval, squadState,
+  GAIN_WINDOWS, engineInput, enginePolicy, moveMetrics, pairedBootstrap, pickSquad, randomSquad, rollPolicy, scoreGameweek,
+  simulateAll, slopeInterval, squadState,
 } from './lib.js';
 import { pointsModelAt } from '../points/model.js';
-import { loadSolver, milpPolicy, milpProblem, newCounts, orderMoves, solvePlan } from './milp.js';
+import { RETRY_TIME, loadSolver, milpPolicy, milpProblem, newCounts, orderMoves, solvePlan } from './milp.js';
+import { REPRO, agrees, solverPolicy } from './solver.js';
 
 const RUN_SEASONS = ['2024-25', '2025-26'];
 const HELD_OUT = '2025-26';
@@ -164,6 +165,9 @@ const HELD = { points: 0, pointsPerTenth: 0 };   // a pool of none: the squad as
 const REFEREE_EVERY = 3;
 const CHIP_EVERY = 6;
 const MILP_POLICIES = [policy('milp', 'milp')];
+// The app's solver path set as the referee was (solver.js), on the same squads, to be paired with data/milp.json.
+const SOLVER_REPRO = 'solver-repro';
+const REPRO_POLICIES = [policy(SOLVER_REPRO, 'solver')];
 const REFEREE_RIVALS = ['roll+', ...MODES.map(m => `${m}+`)];
 
 // ─── Tuning (Phase 7b) ───────────────────────────────────────────────────────
@@ -328,23 +332,6 @@ const calls = result => ({
   chips: Object.fromEntries(Object.entries(result.chipHints).map(([chip, hint]) => [chip, hint?.gw ?? null])),
 });
 
-/**
- * runDecisionEngine's input as the planner builds it (modules/planner.js runEngine), with no chips or price
- * signals; locks and bans only within a week of several moves (lib.js pickRepeatedly).
- */
-function engineInput({ s, projections }, t, state, locks, bans) {
-  return {
-    planningGw: t,
-    squad: state.squad.map(p => {
-      const player = s.playersById[p.id];
-      return { playerId: p.id, name: player.name, position: player.position, teamId: player.teamId,
-        priceTenths: toTenths(player.price), purchaseTenths: p.purchaseTenths };
-    }),
-    bankTenths: state.bankTenths, freeTransfers: state.ft, chipPlan: {}, chipsUsed: [],
-    locks, bans, projections, candidates: s.players, priceSignals: null, hoursToDeadline: null,
-  };
-}
-
 // ─── The old engine, from its commit ─────────────────────────────────────────
 
 async function loadOldEngine(dir) {
@@ -429,10 +416,8 @@ function policyFor(spec, old, solver) {
   if (spec.kind === 'none') return { decide: () => ({ moves: [] }) };
   if (spec.kind === 'roll') return rollPolicy({ ...ROLL, maxBankedFt: DECISION_ENGINE.maxBankedFt, maxPicks: spec.picks });
   if (spec.kind === 'old') return oldPolicy(old);
-  if (spec.kind === 'milp') {
-    if (!solver) throw new Error('run.js: the MILP referee needs HiGHS: npm install --prefix tools/milp');
-    return milpPolicy(solver, MILP);
-  }
+  if (spec.kind === 'milp') return milpPolicy(solver, MILP);
+  if (spec.kind === 'solver') return solverPolicy(solver.highs, REPRO);
   return enginePolicy(spec.mode, ({ t, state, world, locks, bans }) => world.engine(spec.variant, t, state, locks, bans),
     { maxPicks: spec.picks });
 }
@@ -478,6 +463,9 @@ function shadowOf(world, run, toGw) {
   });
 }
 
+/** The same sales and the same buys, however they are paired. */
+const setKey = moves => ['outId', 'inId'].map(side => moves.map(m => m[side]).sort((a, b) => a - b).join(',')).join('|');
+
 /**
  * The MILP referee on the same squads (Phase 8): every REFEREE_EVERY-th week
  * of the roll baseline's season, on its squad, the first week of the
@@ -496,8 +484,6 @@ function refereeOf(world, run, toGw, solver) {
     'roll+': rollPolicy({ ...ROLL, maxBankedFt: DECISION_ENGINE.maxBankedFt, maxPicks: MAX_PICKS }),
     ...Object.fromEntries(MODES.map(mode => [`${mode}+`, enginePolicy(mode, engine, { maxPicks: MAX_PICKS })])),
   };
-  // The same sales and the same buys, however they are paired.
-  const setKey = moves => ['outId', 'inId'].map(side => moves.map(m => m[side]).sort((a, b) => a - b).join(',')).join('|');
   const weeks = run.gws.filter(g => (g.t - START_GW) % REFEREE_EVERY === 0).map(g => {
     const state = { ...g.stateBefore, ft: g.ft };
     const stoppedBefore = counts.stopped;
@@ -561,6 +547,7 @@ function runTask(world, task, old, solver) {
       gws: run.gws.map(g => ({ t: g.t, points: g.points, hits: g.hits, ft: g.ft, moves: g.moves.length, lostFt: g.lostFt })),
       metrics: moveMetrics(run, taskWorld, opts).map(m => ({ ...m, moves: m.moves.length })),
       counts: policies[name].counts ?? null,
+      log: policies[name].log ?? null,
     };
   }
   const shadow = task.shadow && runs.roll ? shadowOf(taskWorld, runs.roll, task.toGw) : null;
@@ -911,7 +898,7 @@ function milpSection(results) {
   const total = k => sum(counts.map(c => c[k]));
   return `## The MILP referee
 
-A mixed-integer program (\`tools/milp/model.js\`, solved by HiGHS, npm \`highs\`, MIT) plans transfers over the next
+A mixed-integer program (\`js/engine/solver/model.js\`, solved by HiGHS, npm \`highs\`, MIT) plans transfers over the next
 ${MILP.weights.length} GWs on the engine's own projections: each week's squad (2/5/5/3, three a club), XI, captain and bench
 order, the bank at sell prices, free transfers banked to the cap and hits past them. It maximises the weighted expected
 points of the XI and captain plus the bench at the engine's linear autosub weights, less hits, with Funds' decay
@@ -964,6 +951,103 @@ season and the same-squad weeks) some of the referee's moves had no order FPL ta
 `;
 }
 
+/** data/milp.json's tasks with data/solver-repro.json's policy laid over, task by task: the same squads, so the same roll. */
+function withSolverRepro(milp, repro) {
+  const key = r => `${r.season}|${r.schedule}|${r.squad}`;
+  const byKey = new Map(repro.map(r => [key(r), r]));
+  return milp.filter(r => byKey.has(key(r))).map(r => {
+    const x = byKey.get(key(r));
+    if (x.out.roll.total !== r.out.roll.total) throw new Error(`run.js: ${key(r)}: data/solver-repro.json's roll is not data/milp.json's`);
+    return { ...r, out: { ...r.out, [SOLVER_REPRO]: x.out[SOLVER_REPRO] } };
+  });
+}
+
+const movesText = moves => (moves.length ? moves.map(m => `${m.outId}>${m.inId}`).join(', ') : 'none');
+const DIFFERING_WEEKS = 5;   // weeks listed, for each mode, where its root differs from the solver's first week
+
+/**
+ * The app's solver path against the offline planner (solver.js; rows are data/milp.json's tasks with the policy laid over,
+ * withSolverRepro): the paired season gap, the solves, and where the solver's first week and the modes' moves differ.
+ */
+function solverReproSection(rows) {
+  if (!rows) return '';
+  const seasons = RUN_SEASONS.filter(s => of(rows, s, 'asItStood').some(r => r.out[SOLVER_REPRO]));
+  if (!seasons.length) return '';
+  const tasks = ss => ss.flatMap(s => of(rows, s, 'asItStood')).filter(r => r.out[SOLVER_REPRO]);
+  const gap = ss => {
+    const r = paired(rows, ss, 'asItStood', SOLVER_REPRO, 'milp');
+    return `${ci(r, r.gws)}${verdictOf(r) === 'no clear difference' ? '' : ` **${verdictOf(r)}**`}`;
+  };
+  const seasonRow = (label, ss) => `| ${label} | ${tasks(ss).length} | ${f(mean(tasks(ss).map(r => r.out.milp.total)))}`
+    + ` | ${f(mean(tasks(ss).map(r => r.out[SOLVER_REPRO].total)))} | ${gap(ss)} |`;
+  const countsRow = (label, ss) => {
+    const counts = tasks(ss).map(r => r.out[SOLVER_REPRO].counts);
+    const total = k => sum(counts.map(c => c[k]));
+    return `| ${label} | ${total('solves')} | ${f(total('ms') / Math.max(1, total('solves')), 0)} | ${total('stopped')}`
+      + ` | ${total('noPlan')} | ${total('unordered')} |`;
+  };
+  const weeks = tasks(seasons).flatMap(r => r.out[SOLVER_REPRO].log.map(w => ({ ...w, season: r.season, squad: r.label })));
+  const agreement = MODES.map(mode => `| ${labelOf(mode)} | ${weeks.length} | ${share(weeks, w => agrees(w, mode))} |`);
+  const listed = MODES.flatMap(mode => weeks.filter(w => !agrees(w, mode)).slice(0, DIFFERING_WEEKS)
+    .map(w => `| ${labelOf(mode)} | ${w.season} | ${w.squad} | ${w.t} | ${movesText(w.first)} | ${movesText(w.engine[mode])} |`));
+  const names = seasons.length > 1 ? [...seasons.map(s => [s, [s]]), ['both', seasons]] : [[seasons[0], seasons]];
+  return `## The app's solver against the offline planner
+
+The reproduction check (solver plan, Phase 3). The app's solver path - \`js/engine/solver/\`'s problem, HiGHS and
+ordering, through \`tools/backtest/solver.js\` - is run as the app runs it, but set as Phase 8's offline planner was:
+Funds' decay (${DECISION_ENGINE.decayBase} a GW) over ${MILP.weights.length} GWs as a horizon total, cut at the season's end;
+hits at ${DECISION_ENGINE.hitCost}; no value on the free transfers or the bank at the horizon's end, no hit margin, no
+kept players, dead slots, sale points or chips; a pool of ${REPRO.config.solver.pool.points} others a position by weighted
+points and ${REPRO.config.solver.pool.pointsPerTenth} by weighted points a tenth. Each week it takes the engine's result, solves,
+and makes the plan's first week one move at a time. It plays the same squads as data/milp.json and is paired with its
+\`milp\` policy, squad by squad.
+
+It differs from that planner in two ways. HiGHS stops at ${REPRO.options.time_limit} s, the app's limit, against
+${SOLVER.time_limit} s (the app's within ${REPRO.options.mip_abs_gap} points of the bound, the planner's within
+${SOLVER.mip_abs_gap}). And a solve that stops before it has any plan is solved again by the planner at ${RETRY_TIME} times
+its limit, and the run stops if there is still none; the app's path, which keeps the engine's card when there is no plan,
+makes no move that week and counts it under "no plan" below. In the rest it is the planner's: the pool is the planner's
+alone (the buys the engine itself makes, which the app adds to it, are left out here), and a first week some of whose moves
+have no legal order one at a time (FPL takes them one at a time) makes the legal ones, as the planner did, and is counted
+below.
+
+### The gap, points a season
+
+The app's solver less the offline planner (paired, squads and blocks of weeks resampled; no clear difference unless the
+interval excludes zero):
+
+| season | squads | offline planner | app's solver | the app's solver less the planner |
+|---|---|---|---|---|
+${names.map(([label, ss]) => seasonRow(label, ss)).join('\n')}
+
+The gap's explanation (the ${REPRO.options.time_limit} s limit against the planner's ${SOLVER.time_limit} s, a run of the widest squads alone at each, and
+the run-to-run noise in a squad's season) is in docs/decision-engine-solver-plan.md, "Phase 3 as built".
+
+### Solves
+
+| season | solves | ms each | stopped at the limit | no plan | some moves with no legal order |
+|---|---|---|---|---|---|
+${names.map(([label, ss]) => countsRow(label, ss)).join('\n')}
+
+### Its first week against each mode's move
+
+The share of weeks (every squad, every week, ${seasons.join(' and ')}) in which the solver's first week is the same sales
+and the same buys as the mode's move (nothing for a mode that rolls), however they are paired or ordered. A mode's move is
+its root and, for Funds & flexibility, the second move the root pays for when it has one.
+
+| mode | weeks | same as the solver's first week |
+|---|---|---|
+${agreement.join('\n')}
+
+For each mode, the first ${DIFFERING_WEEKS} weeks where its move differs from the solver's first week (player ids, sold >
+bought):
+
+| mode | season | squad | GW | the solver's moves | the mode's moves |
+|---|---|---|---|---|---|
+${listed.join('\n')}
+`;
+}
+
 /** The tuning sweep (2024-25) and the chosen values' test on the held-out season. */
 function tuningSection(tune, tuned, tuneMulti = null) {
   if (!tune) return '';
@@ -1002,12 +1086,14 @@ Chosen: ${chosen.length ? chosen.map(c => `${c.param} ${c.value} (${signed(c.gai
 `;
 }
 
-function report(results, squadsBySeason, { tune = null, tuned = null, alt = null, tuneMulti = null, milp = null } = {}) {
+function report(results, squadsBySeason,
+  { tune = null, tuned = null, alt = null, tuneMulti = null, milp = null, solverRepro = null } = {}) {
   const both = RUN_SEASONS;
   const other = RUN_SEASONS.filter(s => s !== HELD_OUT);
   const oldCounts = ['asItStood'].flatMap(sch => RUN_SEASONS.flatMap(s => of(results, s, sch))).map(r => r.out.old?.counts).filter(Boolean);
   const sumCount = key => oldCounts.reduce((a, c) => a + c[key], 0);
   const gwsLabel = `GW${START_GW}-${SEASON_GWS}`;
+  const reproMd = solverReproSection(solverRepro);
   return `# Decision engine backtest
 
 Generated by \`node tools/backtest/run.js\` (docs/decision-engine-plan.md,
@@ -1129,7 +1215,7 @@ ${ceilingLines(results, both)}
 
 ${tuningSection(tune, tuned, tuneMulti)}
 ${altSection(alt)}
-${milpSection(milp)}
+${milpSection(milp)}${reproMd && `\n${reproMd}`}
 ## Sensitivity: the final schedule
 
 The same runs with vaastav's final schedule, which knows every blank and double from the start (more than a manager
@@ -1222,6 +1308,14 @@ async function main() {
       season, schedule: 'asItStood', squad, toGw: SEASON_GWS, variants: VARIANTS, shadow: false, referee: true,
       policies: [...BASE.filter(p => p.name === 'roll'), ...MILP_POLICIES],
     })));
+  } else if (argv.includes('--solver-repro')) {
+    // The app's solver path on the squads data/milp.json used, paired with its referee at report time; roll is re-run
+    // as in --milp, so the two files can be checked to be from the same code.
+    stage = 'solver-repro';
+    stageTasks = RUN_SEASONS.flatMap(season => squadsBySeason[season].map(squad => ({
+      season, schedule: 'asItStood', squad, toGw: SEASON_GWS, variants: VARIANTS, shadow: false,
+      policies: [...BASE.filter(p => p.name === 'roll'), ...REPRO_POLICIES],
+    })));
   } else if (argv.includes('--test-tuned')) {
     const tune = await readStage('tune');
     if (!tune) throw new Error('run.js: run --tune first');
@@ -1252,7 +1346,9 @@ async function main() {
     const md = stage === 'results' ? report([result], squadsBySeason)
       : stage === 'alt' ? altSection([result])
         : stage === 'milp' ? milpSection([result])
-          : tuningSection(stage === 'tune' ? [result] : (await readStage('tune')).results, stage === 'tuned' ? [result] : null);
+          // No data/milp.json for a few weeks: the section's own code is run with roll in the planner's place.
+          : stage === 'solver-repro' ? solverReproSection([{ ...result, out: { ...result.out, milp: result.out.roll } }])
+            : tuningSection(stage === 'tune' ? [result] : (await readStage('tune')).results, stage === 'tuned' ? [result] : null);
     console.log(stage === 'results' ? md.slice(md.indexOf('## Several moves'), md.indexOf('## Sensitivity')) : md);
     console.log(`${Math.round(result.ms / 1000)}s, rss ${Math.round(process.memoryUsage().rss / 1e6)} MB (main)`);
     return;
@@ -1307,11 +1403,12 @@ async function readPartial(stage) {
 }
 
 async function writeReport(squadsBySeason) {
-  const [main, tune, tuned, alt, tuneMulti, milp] = await Promise.all(['results', 'tune', 'tuned', 'alt', 'tune-multi', 'milp']
-    .map(readStage));
+  const [main, tune, tuned, alt, tuneMulti, milp, repro] = await Promise.all(['results', 'tune', 'tuned', 'alt', 'tune-multi', 'milp',
+    SOLVER_REPRO].map(readStage));
   if (!main) throw new Error('run.js: no data/results.json yet - run the backtest first');
   const md = report(main.results, squadsBySeason, { tune: tune?.results ?? null, tuned: tuned?.results ?? null,
-    alt: alt?.results ?? null, tuneMulti: tuneMulti?.results ?? null, milp: milp ? withMilp(main.results, milp.results) : null });
+    alt: alt?.results ?? null, tuneMulti: tuneMulti?.results ?? null, milp: milp ? withMilp(main.results, milp.results) : null,
+    solverRepro: milp && repro ? withSolverRepro(milp.results, repro.results) : null });
   await writeFile(new URL('../../docs/decision-engine-backtest.md', import.meta.url), md);
   console.log(md.slice(0, md.indexOf('## What was run')));
 }

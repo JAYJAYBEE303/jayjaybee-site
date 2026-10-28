@@ -40,6 +40,26 @@ export function projectionOf({ id, position, team, price, xip, pz = 0, fx = 1, a
   };
 }
 
+/**
+ * Every projection given a draw spec (engine/ceiling.js): each player always
+ * plays 60+ in a fixture of his own, nobody scores and nobody concedes, so his
+ * draws are a fixed 2 (6 for a keeper or defender, 3 for a midfielder) -
+ * unless `scoring` gives his club goals and him a share of them.
+ */
+export function withDraws(input, scoring = {}) {
+  const terms = goal => ({ share: 1, goal, assist: 0, defcon: 0, yellow: 0, red: 0, bonus: 0 });
+  const projections = new Map([...input.projections].map(([id, p]) => [id, { ...p, gws: p.gws.map(g => ({
+    ...g,
+    draw: {
+      position: p.position, availability: 1, appear: 1, p60: 1, savesPerXga: 0,
+      bonus: { goal: 0, assist: 0, cleanSheet: 0 },
+      full: terms(scoring[id]?.share ?? 0), short: terms(0),
+      sides: [{ fixtureId: id, teamId: id, opponentId: -id, goalsFor: scoring[id]?.goals ?? 0, goalsAgainst: 0, lambdaAgainst: 0 }],
+    },
+  })) }]));
+  return { ...input, projections };
+}
+
 export const BASE = [
   { id: 1, position: 'GKP', xip: 4 }, { id: 2, position: 'GKP', xip: 2 },
   { id: 3, position: 'DEF', xip: 5 }, { id: 4, position: 'DEF', xip: 5 }, { id: 5, position: 'DEF', xip: 4 },

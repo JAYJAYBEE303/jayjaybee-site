@@ -1642,6 +1642,45 @@ export const DECISION_ENGINE = {
       threshold: 0,
     },
   },
+
+  // ── The multi-week solver (engine/solver/, docs/decision-engine-solver-plan.md) ──
+  solver: {
+    // Off until the user switches it on: the single-move engine advises while it is false.
+    enabled: false,
+    // Terms per line of the model's LP text, which stays readable.
+    lpLineTerms: 8,
+    // Workers solving at once, at most (fewer on a machine with fewer cores).
+    workers: 3,
+    // A phone solves with one worker: a coarse pointer on a screen at most maxWidthPx wide (css/planner.css's narrow
+    // breakpoint), or fewer than minCores logical cores, or less than minMemoryGb of device memory.
+    phone: { maxWidthPx: 639, minCores: 4, minMemoryGb: 4 },
+    // A solve stops at this many seconds, or within absGap points of its bound, whichever comes first.
+    timeLimitS: 3,
+    absGap: 0.5,
+    // The page gives up on a worker's solve this many seconds after the limit: a stopped solve answers a little past it
+    // (3.03 to 3.09 s measured for 3), and a synchronous solve cannot be interrupted, so that worker is ended and
+    // replaced. A worker that has not loaded HiGHS by initTimeoutS seconds turns the solver off for the session.
+    timeoutMarginS: 2,
+    initTimeoutS: 20,
+    // The others a problem may buy, per position: the best `points` by weighted points over the mode's horizon, and the
+    // best `pointsPerTenth` by weighted points a tenth of £1m, among those the mode can buy; plus the engine's own buys.
+    pool: { points: 20, pointsPerTenth: 10 },
+    // Robustness stays off the cards until the check on its figures passes (solver plan, §1).
+    showRobustness: false,
+    // The decision log keeps this many entries, the oldest dropped first.
+    logMax: 5000,
+    // The vendored HiGHS build: its folder and the sha256 (base64) each file must match to be loaded.
+    vendor: { dir: 'assets/vendor/highs/1.15.4/', mjs: '8r39Bx0Zw3RXVqCHAmWJ6SQPMp44MVqG9iaCOueKQDY=', wasm: '8TE04+M157rZhP8Sq+tB6G4O7rF1KuioUyLMaDnfis0=' },
+    // Per mode: points added to the cost of every hit (on top of hitCost) in the solver's objective.
+    modes: {
+      now: { hitMargin: 0 },
+      longterm: { hitMargin: 0 },
+      future: { hitMargin: 0 },
+      funds: { hitMargin: 0 },
+      ceiling: { hitMargin: 0 },
+      structure: { hitMargin: 0 },
+    },
+  },
 };
 
 // Minimum gap between two point-in-time snapshots (js/snapshots.js). The brief

@@ -1213,9 +1213,9 @@ Still deliberately **not** applied to the Ranker's Next Fixture chip, the per-GW
 
 ---
 
-## 14. Transfer Planner: the decision engine (`engine/projections.js`, `engine/minutes.js`, `engine/points.js`, `engine/team-goals.js`, `engine/price-adapter.js`, `engine/squad-value.js`, `engine/decision.js`, `engine/robustness.js`)
+## 14. Transfer Planner: the decision engine (`engine/projections.js`, `engine/minutes.js`, `engine/points.js`, `engine/team-goals.js`, `engine/price-adapter.js`, `engine/squad-value.js`, `engine/decision.js`, `engine/robustness.js`, `engine/solver/`)
 
-The five lanes and the weekly verdict that lived here (`engine/transfers.js`, `engine/strategy.js`) are gone. In their place, every legal single transfer is scored by what it does to the whole squad's value V_t(S) over the next five gameweeks, and six modes - parameter presets of that one calculation - each name one move or "roll" (Future prep may also say "wait": a move as good next week). The data contract, formulas, modes and config are in `docs/decision-engine.md`; how they were built and tested, phase by phase, in `docs/decision-engine-plan.md`. The old design stays in `docs/superpowers/specs/2026-08-30-planner-multi-lens-transfers-design.md` as history (superseded).
+The five lanes and the weekly verdict that lived here (`engine/transfers.js`, `engine/strategy.js`) are gone. In their place, every legal single transfer is scored by what it does to the whole squad's value V_t(S) over the next five gameweeks, and six modes - parameter presets of that one calculation - each name one move or "roll" (Future prep may also say "wait": a move as good next week). The data contract, formulas, modes and config are in `docs/decision-engine.md`; how they were built and tested, phase by phase, in `docs/decision-engine-plan.md`. With `DECISION_ENGINE.solver.enabled` (off as shipped) the six modes take their moves from a multi-week plan solved by HiGHS in module workers, and this engine explains them: the solver's files, mode settings and switch are in `docs/decision-engine.md` ("The solver"), and its plan and phases in `docs/decision-engine-solver-plan.md`. The old design stays in `docs/superpowers/specs/2026-08-30-planner-multi-lens-transfers-design.md` as history (superseded).
 
 ### 14.1 Picking the XI (`engine/lineup.js → pickStartingXI`)
 
@@ -1324,11 +1324,13 @@ Phase 7b added several moves a week, a same-squad comparison of the picks, and a
 - **The tuning sweep** of the free-transfer value, threshold, hit margin, lambda, tau and decay, on 2024-25 (one move a week, and several for the free-transfer value and hit margin), found nothing worth 10 points a season. The presets stand.
 - **Ceiling's upper tail** (§14.4b), read every week, cost about 70 points a season against Ceiling on the mean, and its squads' five best weeks were lower too. Read only in a big week, it costs 16 (not clear), and the five best weeks are still a little lower (-4.8 over both seasons): in these seasons, with no chips played, the tail buys no upside even there.
 
-### 14.6 The MILP referee (`tools/milp/model.js`, `tools/backtest/milp.js`)
+### 14.6 The MILP referee (`engine/solver/model.js`, `tools/backtest/milp.js`)
 
-An offline second opinion, never loaded by the app. A mixed-integer program plans transfers over five gameweeks on the engine's own projections: each week's squad, XI, captain and bench, the bank at sell prices, free transfers banked to the cap, and hits. HiGHS (npm `highs`, MIT, installed in `tools/milp/` only) solves it. The formulation follows open-fpl-solver (Apache-2.0); no code is taken from it.
+An offline second opinion; the app loads its model only as the solver, once that is switched on. A mixed-integer program plans transfers over five gameweeks on the engine's own projections: each week's squad, XI, captain and bench, the bank at sell prices, free transfers banked to the cap, and hits. HiGHS (npm `highs`, MIT, vendored as WebAssembly in `assets/vendor/highs/1.15.4/`) solves it. The model began in `tools/milp/` and moved into `engine/solver/` with the solver plan's Phase 3, which also made its free-transfer count exact (a hit buys none), so weights may rise. The formulation follows open-fpl-solver (Apache-2.0); no code is taken from it.
 
 In the backtest (`run.js --milp`), making the first week of its plan each week, it beat the old engine on 2025-26 by about 110 points a season, and over both seasons beat roll+ as well, which no mode did. On the same squads, its week realised 7-12 points more over five GWs than every policy's. It makes about three moves a week, taking a hit in two weeks of five. The pairwise engine, one move at a time with each gated by the free transfer's value or the hit and its margin, leaves points on the table there. The engine's chip hints matched the referee's weeks or came within half a point most of the time (Bench Boost 71%, Triple Captain 93%).
+
+The app's own solver path, set as the referee was (`run.js --solver-repro`), scored 29.6 points a season less over both seasons ([-72.0, +13.5], no clear difference). The gap is the app's 3 s solve limit against the referee's 10 s, not the model: at 10 s the app's path matched the referee's objective and first-week moves in every week of the two squads with the widest gaps.
 
 ---
 

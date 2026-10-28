@@ -43,7 +43,7 @@ const POSITIONS = ['GKP', 'DEF', 'MID', 'FWD'];
 const VALUE_CHIPS = new Set(['benchboost', 'triplecaptain']);
 
 // Modes whose sells a high Ceiling lock value blocks (brief §6, mode 5).
-const LOCK_PROTECTED_MODES = new Set(['now', 'longterm', 'future', 'funds']);
+export const LOCK_PROTECTED_MODES = new Set(['now', 'longterm', 'future', 'funds']);
 
 /**
  * A cache of V values to pass back into runDecisionEngine between runs. It
@@ -140,6 +140,8 @@ export function runDecisionEngine(input, config = DECISION_ENGINE, cache = creat
     return {
       playerId: p.playerId,
       sellPriceTenths: p.sellPriceTenths,
+      // The change to expect in his sell price before the next chance to act (the signals' chances of a fall and a rise).
+      saleTenths: run.outlook.get(p.playerId).expected,
       keepValue, outScore, best,
       flags: flagsFor(run, p, { rootSells, ceiling, structure }),
       lockValue: ceiling.lockValues.get(p.playerId),
@@ -150,6 +152,85 @@ export function runDecisionEngine(input, config = DECISION_ENGINE, cache = creat
   });
 
   return { modes, players, lineup: lineupOf(run), chipHints: chipHints(run), shortlist: [...shortlist] };
+}
+
+/**
+ * A set of moves as one key: its sales and its buys, each sorted, as 'out,out>in,in'; '' for none (a roll). How the
+ * sales and buys are paired is not part of it - the same squad change is one key however it is ordered or paired. A
+ * single move's key is 'out>in', the one the engine caches its swap under.
+ *
+ * @param {Array<{outId: number, inId: number}>} moves
+ * @returns {string}
+ */
+export function moveSetKey(moves) {
+  if (moves.length === 0) return '';
+  const ids = key => moves.map(m => m[key]).sort((a, b) => a - b).join(',');
+  return `${ids('outId')}>${ids('inId')}`;
+}
+
+/**
+ * The engine on the squad after a set of moves (the solver's plan, engine/solver/plan.js): the mode's masked weights
+ * times the change the whole set makes to V in each GW, its five-GW figure, its moves' minutes risk and tags as
+ * buildMove makes them, Now's wait-for-team-news flag for any move of the set, and the words for it. It says which
+ * move set it explains (`key`, moveSetKey's), so a caller can check it against the moves it pairs it with. The money terms,
+ * the gates and the ranking belong to the solver's objective and are not applied: for one move the figures are the
+ * ones the engine's own move for that swap carries.
+ *
+ * MODEL: the transfers cost what the engine charges them one after another - the first the value of a free transfer
+ * rolled, the next the one after it, and each past the free ones a hit with its margin.
+ *
+ * @param {object} input   runDecisionEngine's
+ * @param {object} config
+ * @param {object} cache   the one runDecisionEngine ran on: V is read from it, a move set keyed by moveSetKey
+ * @param {string} modeId
+ * @param {Array<{outId: number, inId: number}>} moves  made in this GW, from the squad as it is
+ * @returns {{key: string, perGw: number[], deltaEv: number, overFiveGws: {points: number, gws: number[]}, hits: number,
+ *   waitForNews: boolean, moves: Array<{outId: number, inId: number, minutesRisk: object, tags: string[]}>,
+ *   why: {squad: string|null, cost: string|null}}}  hits: points, by FPL's rule (the moves past the free transfers)
+ */
+export function describePlan(input, config, cache, modeId, moves) {
+  const run = prepare(input, config, cache);
+  const raw = modeId === 'ceiling' ? ceilingSchedule(run).weights : weightsOf(run, config.modes[modeId]);
+  const weights = masked(run, raw);
+  const key = moveSetKey(moves);
+  const ids = moves.reduce((squad, m) => swapIn(squad, m.outId, m.inId), run.ids);
+  const dV = run.modeGws.map((gw, k) => (run.zeroed(gw) ? 0 : run.value(gw, ids, key || 'S') - run.base[k]));
+  const perGw = weights.map((w, k) => w * dV[k]);
+  const deltaEv = sum(perGw);
+
+  const described = moves.map(m => {
+    const p = run.owned.find(o => o.playerId === m.outId);
+    if (!p) throw new TypeError(`describePlan: ${m.outId} is not in the squad`);
+    return { outId: m.outId, inId: m.inId, ...moveFacts(run, modeId, p, m.inId) };
+  });
+  const { freeTransfers } = input;
+  const cost = sum(moves.map((_, i) => transferCost(freeTransfers - i, config)));
+  const blankIds = described.filter(m => m.tags.includes('blankGwOneWeek')).map(m => m.outId);
+  return {
+    key,
+    perGw,
+    deltaEv,
+    overFiveGws: overGws(run, dV, cost),
+    hits: Math.max(0, moves.length - freeTransfers) * config.hitCost,
+    waitForNews: modeId === 'now' && described.some(m => waitsForNews(run, m)),
+    moves: described,
+    why: moves.length === 0 ? { squad: null, cost: null } : {
+      squad: squadText(run, weights, moves.map(m => m.outId), moves.map(m => m.inId), deltaEv, blankIds),
+      cost: planCostText(config, moves.length, freeTransfers),
+    },
+  };
+}
+
+const NUMBER_WORDS = ['no', 'one', 'two', 'three', 'four', 'five'];
+
+/** "Uses 2 free transfers." / "Uses 1 free transfer and takes one 4-point hit." / "Takes two 4-point hits." */
+function planCostText(config, transfers, freeTransfers) {
+  const used = Math.min(transfers, freeTransfers);
+  const hits = transfers - used;
+  const free = `${used} free transfer${used === 1 ? '' : 's'}`;
+  const hit = `${NUMBER_WORDS[hits] ?? hits} ${config.hitCost}-point hit${hits === 1 ? '' : 's'}`;
+  if (hits === 0) return `Uses ${free}.`;
+  return used === 0 ? `Takes ${hit}.` : `Uses ${free} and takes ${hit}.`;
 }
 
 // ─── Setup ───────────────────────────────────────────────────────────────────
@@ -337,15 +418,10 @@ function ghostDeltas(run, p) {
  * MODEL: read as the GW with the most to gain for any squad, which also keeps
  * t* from moving with the moves being scored.
  *
- * Lock value: V_t*(S) - V_t*(S - p + his best affordable replacement); at or
- * above lockThreshold he is protected from sale in modes 1-4. With no
- * affordable replacement, or no t*, there is no sale to protect against: null.
- *
- * @returns {{ targetGw: number|null, weights: number[], lockValues: Map,
- *   protectedIds: Set, replacements: Set }}  weights before Free Hit / Wildcard
- *   masking; replacements: each player's best affordable replacement at t*
+ * @returns {{ target: {gw: number, k: number, total: number, doubles: number}|null, weights: number[] }}
+ *   weights before Free Hit / Wildcard masking
  */
-function ceilingTarget(run, pairs) {
+function ceilingSchedule(run) {
   const { config, modeGws } = run;
   const mode = config.modes.ceiling;
   const projections = [...run.input.projections.values()];
@@ -362,6 +438,23 @@ function ceilingTarget(run, pairs) {
   });
   const weights = modeGws.map(gw => (target === null ? 0
     : gw === target.gw ? mode.targetWeight : mode.otherWeight));
+  return { target, weights };
+}
+
+/**
+ * Mode 5's target GW (ceilingSchedule) and the lock list.
+ *
+ * Lock value: V_t*(S) - V_t*(S - p + his best affordable replacement); at or
+ * above lockThreshold he is protected from sale in modes 1-4. With no
+ * affordable replacement, or no t*, there is no sale to protect against: null.
+ *
+ * @returns {{ targetGw: number|null, weights: number[], lockValues: Map,
+ *   protectedIds: Set, replacements: Set }}  weights before Free Hit / Wildcard
+ *   masking; replacements: each player's best affordable replacement at t*
+ */
+function ceilingTarget(run, pairs) {
+  const mode = run.config.modes.ceiling;
+  const { target, weights } = ceilingSchedule(run);
 
   const lockValues = new Map();
   const replacements = new Set();
@@ -492,14 +585,27 @@ function structureSignals(run) {
   const uncovered = new Map(run.owned.map(p => [p.playerId,
     dot(weights, losses.map(loss => loss.get(p.playerId) ?? 0))]));
 
-  const availabilities = id => modeGws.map(gw => run.gwOf(id, gw)?.availability ?? 1);
-  const isDeadSlot = id =>
-    sum(availabilities(id).map(a => 1 - a)) >= mode.deadSlotMinGws;
+  const availabilities = id => modeGws.map(gw => availabilityIn(run.overlay.get(id), gw));
   const holds = new Set(run.owned.map(p => p.playerId).filter(id => {
     const a = availabilities(id);
     return a[0] < 1 && a.some(x => x >= mode.recoveredAvailability) && !run.outlook.get(id).fallLikely;
   }));
-  return { uncovered, isDeadSlot, holds };
+  return { uncovered, isDeadSlot: id => isDeadSlot(run.overlay.get(id), modeGws, mode), holds };
+}
+
+/** A player's availability in a GW (0-1); 1 where his projection has none. */
+const availabilityIn = (projection, gw) => projection?.gws.find(g => g.gw === gw)?.availability ?? 1;
+
+/**
+ * Whether a player is a dead slot over `gws`: the GWs he is expected to be unavailable reach the mode's
+ * deadSlotMinGws. The solver's problem (engine/solver/problem.js) asks it of candidates the engine only scores in pairs.
+ *
+ * @param {object|undefined} projection  buildProjections' entry for him
+ * @param {number[]} gws
+ * @param {{deadSlotMinGws: number}} mode  Structure's preset
+ */
+export function isDeadSlot(projection, gws, mode) {
+  return sum(gws.map(gw => 1 - availabilityIn(projection, gw))) >= mode.deadSlotMinGws;
 }
 
 // ─── Scoring one mode ────────────────────────────────────────────────────────
@@ -605,6 +711,10 @@ function scoreMode(run, { modeId, mode, raw, weights, share, pairs, ceiling, str
     waitForNews: modeId === 'now' && root !== null && waitsForNews(run, root),
     deferral,
     robustness: null,
+    // Whether the engine's upper tail scored this card (only Ceiling's, in a big week): the solver leaves such a card to it.
+    bigWeek: tail !== null,
+    // The share of the mode's weight no planned chip covers (0-1), which scales its money terms: the solver's too.
+    share,
   };
   if (modeId === 'ceiling') {
     summary.targetGw = ceiling.targetGw;
@@ -751,12 +861,7 @@ function buildMove(run, modeId, weights, record, freeTransfers = run.input.freeT
   const { config } = run;
   const cost = transferCost(freeTransfers, config);
   const first = run.modeGws[0];
-  const pGw = run.gwOf(p.playerId, first);
-  const qGw = run.gwOf(q.id, first);
-  const tags = [];
-  if (modeId === 'now' && pGw.fixtures === 0) tags.push('blankGwOneWeek');
-  if (p.sellPriceEstimated) tags.push('sellPriceEstimated');
-  if (pendingNews(pGw) || pendingNews(qGw)) tags.push('pendingNews');
+  const { tags, minutesRisk: risk } = moveFacts(run, modeId, p, q.id);
 
   return {
     mode: modeId,
@@ -776,11 +881,26 @@ function buildMove(run, modeId, weights, record, freeTransfers = run.input.freeT
     overFiveGws: record.pair.dV ? overGws(run, record.pair.dV, cost) : null,
     efficiency: record.efficiency,
     tentativeFromGw: first + 1,
-    minutesRisk: { out: minutesRisk(config, pGw), in: minutesRisk(config, qGw) },
+    minutesRisk: risk,
     chained: record.chained,
     tags,
     why: explain(run, weights, record, freeTransfers, tags),
   };
+}
+
+/**
+ * What a swap's two players say about it in the first GW: its tags and each side's minutes risk. `p` is the owned
+ * player (with his sell price's estimate flag), `inId` the buy.
+ */
+function moveFacts(run, modeId, p, inId) {
+  const first = run.modeGws[0];
+  const pGw = run.gwOf(p.playerId, first);
+  const qGw = run.gwOf(inId, first);
+  const tags = [];
+  if (modeId === 'now' && pGw.fixtures === 0) tags.push('blankGwOneWeek');
+  if (p.sellPriceEstimated) tags.push('sellPriceEstimated');
+  if (pendingNews(pGw) || pendingNews(qGw)) tags.push('pendingNews');
+  return { tags, minutesRisk: { out: minutesRisk(run.config, pGw), in: minutesRisk(run.config, qGw) } };
 }
 
 /** A swap's gain over the mode GWs this squad plays, at full weight, less its cost; and those GWs. */
@@ -810,15 +930,8 @@ const money = tenths => `£${fromTenths(Math.abs(tenths)).toFixed(1)}m`;
 function explain(run, weights, record, freeTransfers, tags) {
   const { p, q, moneyFreed } = record.pair;
   const name = id => run.names.get(id) ?? String(id);
-  const counted = run.modeGws.filter((_, k) => weights[k] > 0);
-  const span = counted.at(-1) - counted[0] === counted.length - 1
-    ? (counted.length === 1 ? `GW${counted[0]}` : `GW${counted[0]}–${counted.at(-1)}`)
-    : `${counted.slice(0, -1).map(gw => `GW${gw}`).join(', ')} and GW${counted.at(-1)}`;
-
-  let squad = `${name(p.playerId)} out, ${name(q.id)} in: ${points(record.deltaEv)} weighted points for the squad over ${span}.`;
-  if (tags.includes('blankGwOneWeek')) {
-    squad += ` ${name(p.playerId)} has no fixture in GW${run.modeGws[0]}: a one-week view.`;
-  }
+  const squad = squadText(run, weights, [p.playerId], [q.id], record.deltaEv,
+    tags.includes('blankGwOneWeek') ? [p.playerId] : []);
 
   let funds = null;
   if (record.chained) {
@@ -840,6 +953,20 @@ function explain(run, weights, record, freeTransfers, tags) {
   }
 
   return { squad, funds, price: priceText(run, p, q), cost: costText };
+}
+
+/**
+ * "A, B out, C, D in: +x weighted points for the squad over GWa-b." - and, for each seller with no fixture in the
+ * first GW (blankIds), that the view is one week's.
+ */
+function squadText(run, weights, outIds, inIds, deltaEv, blankIds) {
+  const name = id => run.names.get(id) ?? String(id);
+  const counted = run.modeGws.filter((_, k) => weights[k] > 0);
+  const span = counted.at(-1) - counted[0] === counted.length - 1
+    ? (counted.length === 1 ? `GW${counted[0]}` : `GW${counted[0]}–${counted.at(-1)}`)
+    : `${counted.slice(0, -1).map(gw => `GW${gw}`).join(', ')} and GW${counted.at(-1)}`;
+  return `${outIds.map(name).join(', ')} out, ${inIds.map(name).join(', ')} in: ${points(deltaEv)} weighted points for the squad over ${span}.`
+    + blankIds.map(id => ` ${name(id)} has no fixture in GW${run.modeGws[0]}: a one-week view.`).join('');
 }
 
 /** The price moves likely before the next chance to act, as they bear on this move; null with none. */

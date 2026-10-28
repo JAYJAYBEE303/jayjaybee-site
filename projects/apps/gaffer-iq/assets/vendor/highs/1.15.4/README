@@ -1,0 +1,30 @@
+HiGHS in WebAssembly, vendored for Gaffer IQ's multi-week solver
+(js/engine/solver/, docs/decision-engine-solver-plan.md).
+
+Source: npm package "highs" 1.15.4 (https://github.com/lovasoa/highs-js, MIT),
+which is HiGHS 1.15.1 (https://github.com/ERGO-Code/HiGHS, MIT) compiled to
+WebAssembly. highs.mjs and highs.wasm are the package's build/highs.mjs and
+build/highs.wasm, byte for byte. LICENSE is the package's, which names both
+copyright holders (highs-js and HiGHS); HiGHS's own LICENSE.txt is the same
+MIT text.
+
+Nothing here is loaded by the page at start-up. The solver worker
+(js/engine/solver/worker.js) is created on first use; it fetches highs.wasm
+with its SHA-256 as the fetch's integrity, so a changed file is refused and
+the planner keeps the single-move engine, and imports highs.mjs.
+
+To update:
+1. npm install highs@<version> in a scratch folder.
+2. Copy build/highs.mjs, build/highs.wasm and LICENSE into a new folder,
+   assets/vendor/highs/<version>/, and delete the old one.
+3. Hash both files:
+     openssl dgst -sha256 -binary highs.mjs | base64
+     openssl dgst -sha256 -binary highs.wasm | base64
+4. In js/config.js, DECISION_ENGINE.solver.vendor: set dir to the new folder
+   and mjs and wasm to the new hashes.
+5. In vercel.json, point the immutable Cache-Control header at the new folder.
+   A version's folder is cached for a year, so a new version never reuses an
+   old folder's name.
+6. Update this README's versions, then run npm test: tests/engine/solver/
+   vendor.test.js checks the files against the hashes, and the solved tests
+   run on this build.

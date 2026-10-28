@@ -3,7 +3,7 @@
  * The MILP referee in the decision backtest (tools/backtest/milp.js, plan
  * Phase 8): a week's state as the model's problem, the plan's first week as
  * moves FPL accepts one at a time, and the referee as a policy. The solved
- * tests are skipped when tools/milp's own dependency is not installed.
+ * tests run on the vendored HiGHS.
  */
 
 import { test } from 'node:test';
@@ -12,7 +12,6 @@ import assert from 'node:assert/strict';
 import { milpProblem, orderMoves, milpPolicy, loadSolver, newCounts, solvePlan } from '../../tools/backtest/milp.js';
 
 const solver = await loadSolver();
-const solved = solver ? test : test.skip;
 
 const SLOTS = [['GKP', 2], ['DEF', 5], ['MID', 5], ['FWD', 3]];
 
@@ -115,7 +114,7 @@ test('a solve stopped before it has any plan is tried again for longer; a second
 
 // ─── The referee as a policy ─────────────────────────────────────────────────
 
-solved('the referee makes its plan\'s first week: a clearly better buy now, nothing when nobody is better', () => {
+test('the referee makes its plan\'s first week: a clearly better buy now, nothing when nobody is better', () => {
   const policy = milpPolicy(solver, OPTS);
   const better = world([{ id: 101, position: 'MID', teamId: 101, price: 50, xpts: 6 }]);
   const { moves } = policy.decide({ t: 10, state: state(), world: better });
@@ -126,7 +125,7 @@ solved('the referee makes its plan\'s first week: a clearly better buy now, noth
   assert.equal(policy.counts.solves, 2);
 });
 
-solved('the referee waits for a free transfer it will have next week when the hit is not worth it', () => {
+test('the referee waits for a free transfer it will have next week when the hit is not worth it', () => {
   // Two buys, each a point worse this week and 1.5 better after: both next week on its two free transfers,
   // none now (a hit now, or a point lost now for a free move a week early).
   const policy = milpPolicy(solver, OPTS);

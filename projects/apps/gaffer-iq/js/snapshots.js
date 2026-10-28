@@ -17,16 +17,21 @@
  * The record builders are pure (engine/normalise.js); everything here takes
  * the store adapter as an argument, so tests run against an in-memory one.
  *
+ * The decision log lives here too (solver plan §4): what each card advised,
+ * kept so the solver's calls can be audited against what happened.
+ *
  * Adapter contract: { get(store, key), put(store, value), getAll(store),
- * getLast(store) }, all async, over two object stores - 'snapshots' keyed by
- * capturedAt and 'gwTables' keyed by gw.
+ * getLast(store), delete(store, key) }, all async, over three object stores -
+ * 'snapshots' keyed by capturedAt, 'gwTables' keyed by gw and 'decisions'
+ * keyed by key (logDecision's).
  */
 
 import { buildBootstrapSnapshot, normaliseLiveGw } from './engine/normalise.js';
+import { moveSetKey } from './engine/decision.js';
 import { SNAPSHOT_MIN_INTERVAL_MS } from './config.js';
 
 const DB_NAME    = 'gafferiq-snapshots';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 /** The adapter used when IndexedDB is unavailable: keeps nothing, never throws. */
 const NO_STORE = Object.freeze({
@@ -34,6 +39,7 @@ const NO_STORE = Object.freeze({
   put:     async () => {},
   getAll:  async () => [],
   getLast: async () => null,
+  delete:  async () => {},
 });
 
 /**
@@ -96,13 +102,49 @@ export async function captureGwTables(db, events, fetchLive, now) {
 }
 
 /**
- * Everything archived, for the offline tools (Phase 4 minutes model, Phase 7
- * backtest).
+ * Log what a settled card advised. An entry is keyed by gameweek, mode, call,
+ * move set and source (a wait of a move set is not a move of it, and a roll has
+ * the empty set): seeing the same one again (its gain or robustness landing
+ * after the card settled, or the next run reaching it again) updates the
+ * figures, the time and what the engine would have done, in place; a new key
+ * adds an entry. Past `max` entries
+ * the oldest by `at` are dropped.
+ *
  * @param {object} db  store adapter
- * @returns {Promise<{ snapshots: object[], gwTables: object[] }>}
+ * @param {{ gw: number, at: number, mode: string, source: string, call: 'move'|'wait'|'roll',
+ *   stopped: boolean, moves: Array<{outId: number, inId: number}>, gain: number|null,
+ *   robustness: number|null, engineFirst: Array<{outId: number, inId: number}>,
+ *   agrees: boolean }} entry  stopped: the solve that made the card stopped at its limit (false for an engine card)
+ * @param {{ max: number }} limits  DECISION_ENGINE.solver.logMax
+ */
+export async function logDecision(db, entry, { max }) {
+  const key = `${entry.gw}|${entry.mode}|${entry.call}|${moveSetKey(entry.moves)}|${entry.source}`;
+  const held = await db.get('decisions', key);
+  if (held) {
+    // The engine's own move can change between runs without changing the key, so the entry describes the latest run.
+    const { gain, robustness, at, engineFirst, agrees, stopped } = entry;
+    await db.put('decisions', { ...held, gain, robustness, at, engineFirst, agrees, stopped });
+    return;
+  }
+  await db.put('decisions', { ...entry, key });
+  // The whole log is read to find the oldest, once per new entry: cheap at logMax, an index on `at` if that ever grows far.
+  const all = await db.getAll('decisions');
+  const surplus = all.sort((a, b) => a.at - b.at).slice(0, Math.max(0, all.length - max));
+  for (const old of surplus) await db.delete('decisions', old.key);
+}
+
+/**
+ * Everything archived, for the offline tools (Phase 4 minutes model, Phase 7
+ * backtest) and the decision log.
+ * @param {object} db  store adapter
+ * @returns {Promise<{ snapshots: object[], gwTables: object[], decisions: object[] }>}
  */
 export async function exportSnapshots(db) {
-  return { snapshots: await db.getAll('snapshots'), gwTables: await db.getAll('gwTables') };
+  return {
+    snapshots: await db.getAll('snapshots'),
+    gwTables: await db.getAll('gwTables'),
+    decisions: await db.getAll('decisions'),
+  };
 }
 
 /**
@@ -145,8 +187,21 @@ export function openSnapshotDb() {
       if (!idb.objectStoreNames.contains('gwTables')) {
         idb.createObjectStore('gwTables', { keyPath: 'gw' });
       }
+      if (!idb.objectStoreNames.contains('decisions')) {
+        idb.createObjectStore('decisions', { keyPath: 'key' });
+      }
     };
-    request.onsuccess = () => resolve(wrapIdb(request.result));
+    // An older tab still holding version 1 keeps the upgrade pending for as long as it is open: answer without the
+    // archive rather than leave everything waiting on it hanging.
+    request.onblocked = () => {
+      console.warn('[snapshots] IndexedDB upgrade is blocked by another tab - snapshots are off');
+      resolve(NO_STORE);
+    };
+    request.onsuccess = () => {
+      // A newer tab upgrading the archive must not be kept waiting on this one.
+      request.result.onversionchange = () => request.result.close();
+      resolve(wrapIdb(request.result));
+    };
     request.onerror = () => {
       console.warn('[snapshots] IndexedDB refused to open - snapshots are off:', request.error);
       resolve(NO_STORE);
@@ -186,6 +241,8 @@ function wrapIdb(idb) {
       safely(() => run(storeName, 'readonly', s => s.get(key)).then(v => v ?? null), null),
     put: (storeName, value) =>
       safely(() => run(storeName, 'readwrite', s => s.put(value)).then(() => {}), undefined),
+    delete: (storeName, key) =>
+      safely(() => run(storeName, 'readwrite', s => s.delete(key)).then(() => {}), undefined),
     getAll: storeName =>
       safely(() => run(storeName, 'readonly', s => s.getAll()), []),
     // The newest record: the first stop of a cursor walking keys backwards.

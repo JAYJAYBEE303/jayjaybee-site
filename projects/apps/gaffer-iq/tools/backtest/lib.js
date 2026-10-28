@@ -19,7 +19,7 @@
 import { CAPTAIN_MULTIPLIER, MAX_PER_CLUB, SQUAD_LIMITS, XI_FORMATION_MIN } from '../../js/config.js';
 import { calcSellPrice } from '../../js/engine/prices.js';
 import { checkSwap } from '../../js/engine/feasibility.js';
-import { fromTenths, seededRandom } from '../../js/util.js';
+import { fromTenths, seededRandom, toTenths } from '../../js/util.js';
 
 const OUTFIELD = ['DEF', 'MID', 'FWD'];
 export const GAIN_WINDOWS = [1, 3, 5];
@@ -193,6 +193,24 @@ export function randomSquad(pool, random, { budgetTenths, minSpendTenths, maxPer
 }
 
 // ─── Policies ────────────────────────────────────────────────────────────────
+
+/**
+ * runDecisionEngine's input as the planner builds it (modules/planner.js runEngine), with no chips or price
+ * signals; locks and bans only within a week of several moves (pickRepeatedly). The first argument is a world's
+ * week, `world.at(t)`: {s: the normalised season, projections}.
+ */
+export function engineInput({ s, projections }, t, state, locks, bans) {
+  return {
+    planningGw: t,
+    squad: state.squad.map(p => {
+      const player = s.playersById[p.id];
+      return { playerId: p.id, name: player.name, position: player.position, teamId: player.teamId,
+        priceTenths: toTenths(player.price), purchaseTenths: p.purchaseTenths };
+    }),
+    bankTenths: state.bankTenths, freeTransfers: state.ft, chipPlan: {}, chipsUsed: [],
+    locks, bans, projections, candidates: s.players, priceSignals: null, hoursToDeadline: null,
+  };
+}
 
 /**
  * A week's moves made a pick at a time: `pick` sees the squad after the moves
