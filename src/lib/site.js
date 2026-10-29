@@ -48,7 +48,7 @@ export const projects = projectData.map((p, i) => ({ ...p, n: pad(i + 1), to: 'p
 
 // ---- Roles ----
 const meta = {
-  'exp-amf1': { slug: 'amf1', img: '/assets/images/roles/amf1.jpg', bg: '#00665E', stack: ['Entra ID', 'Intune', 'Jamf', 'Exchange Online', 'PowerShell'] },
+  'exp-amf1': { slug: 'amf1', img: '/assets/images/roles/amf1.jpg', bg: '#00665E', stack: ['Entra ID', 'Intune', 'Jamf', 'Exchange Online', 'PowerShell', 'Cohere: North'] },
   'exp-partnership': { slug: 'partnership', img: '/assets/images/roles/partnership.png', bg: '#D21E26', stack: ['Microsoft 365', 'Fortinet', 'AD + GPO', 'ConfigMgr'] },
   'exp-redbull': { slug: 'redbull', img: '/assets/images/roles/redbull.jpg', bg: '#071A30', stack: ['Task sequences', 'Imaging', 'Hardware lifecycle'] },
   'exp-apple': { slug: 'apple', img: '/assets/images/roles/apple-glyph.png', bg: '#EDEDEA', stack: ['Diagnostics', 'Repairs', 'Escalations'] }

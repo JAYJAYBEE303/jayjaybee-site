@@ -26,7 +26,7 @@
         },
         {
           "points": [
-            "Identity and access at scale across Entra ID and on-prem AD, including the scripting around it - built and maintain AMF1_AD_User_Create, a PowerShell tool that takes new-joiner provisioning from a manual checklist to a signed, repeatable workflow.",
+            "Deploying and managing Cohere: North AI single-handedly - planning every stage myself, from stakeholder management and the technical deployment through to the official approval pipelines.",
             "Endpoint management across a mixed Windows and Apple fleet - Intune and Jamf for deployment, compliance, and app delivery, with working knowledge of the bits that usually go wrong (AppLocker, MDM enrolment edge cases, EDR conflicts).",
             "Exchange Online and M365 administration end-to-end - mailbox lifecycle, GAL, calendar permissions, distribution and security groups, cross-tenant authentication, and the SharePoint and Planner quirks that come with them.",
             "PowerShell scripting as a daily tool rather than an occasional one - automating provisioning, reporting, and the repetitive work that otherwise eats a support queue.",
@@ -36,9 +36,9 @@
         },
         {
           "points": [
-            "Trusted as direct IT support for principal stakeholders including Adrian Newey and Lawrence Stroll, providing the highest standard in quality, resolution time, and descretion.",
+            "Trusted as direct IT support for high-profile SLT, providing the highest standard in quality, resolution time, and discretion.",
             "Piloted a reworked IT induction now used as the team's standard. Built a reputation across senior stakeholders as the person who closes the loop.",
-            "Designed and shipped AMF1_AD_User_Create.ps1, an internal PowerShell tool that consolidates new-joiner account provisioning into a single signed workflow - adopted by the wider IT function and now part of the standard onboarding process.",
+            "Planned and delivered the deployment of Cohere: North AI single-handedly - stakeholder management, technical rollout, and official approval pipelines - and now manage it day to day.",
             "Sustained one of the lowest open ticket counts on the team while covering the excluded functions solo, with first-response times held steady through peak periods."
           ]
         }
