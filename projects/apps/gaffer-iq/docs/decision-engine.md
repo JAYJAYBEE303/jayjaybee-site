@@ -119,8 +119,9 @@ money and the wait weigh against points as before.
 
 ## The solver
 
-Off as shipped. With `DECISION_ENGINE.solver.enabled`, each of the six modes becomes a setting of one multi-week
-planner, a mixed-integer program solved by HiGHS (WebAssembly, in module workers). It may make several moves in a week
+On as shipped for Long term, Future prep, Funds & flexibility and Structure fix, the four modes that passed the Phase 4
+backtest; Now and Ceiling keep the engine's move (`solver.modes.<id>.enabled`). With `DECISION_ENGINE.solver.enabled`,
+each mode switched on becomes a setting of one multi-week planner, a mixed-integer program solved by HiGHS (WebAssembly, in module workers). It may make several moves in a week
 and take hits. The engine stays: it supplies the sell and keep values, the protected players, the robustness candidates
 and the explanation of every move, and it supplies the move itself while the solver is working, when a solve returns
 nothing inside its cap, and on Ceiling's card in a big week. The solver plays no chip: the hints are unchanged, and a
@@ -165,7 +166,7 @@ Shared by all of them:
   (`ftValueSchedule`, or `ftValueFlat`), and the bank is worth the mode's lambda a £1m.
 - **Money** follows the engine: the bank's value, a likely fall in an owned player's sell price (worth selling for) and
   Structure's dead-slot penalty are scaled by `modes[m].share`, the part of the mode's weight no planned chip covers.
-- **Hits** cost `hitCost` plus the mode's `solver.modes.<id>.hitMargin` (0 as shipped; Phase 4 runs 0 and 2), flat: a hit in a
+- **Hits** cost `hitCost` plus the mode's `solver.modes.<id>.hitMargin` (2 for Now and Long term, 0 for the rest: Phase 4's choice on 2024-25), flat: a hit in a
   week that weighs 0.1 costs the same as one in a week that weighs 1, as the engine's `transferCost` prices it (the
   model's `flatHits`, on for every mode; only the reproduction check leaves it off, to hold Phase 8's planner).
 - **Planned Bench Boost and Triple Captain** put the bench at full weight, or the armband three times, in that GW.
@@ -322,7 +323,8 @@ files hold no other numbers but 0 and 1.
 
 | Key | Value | Meaning |
 |---|---|---|
-| `enabled` | false | the switch: false is the single-move engine exactly as it was |
+| `enabled` | true | the switch: false is the single-move engine exactly as it was |
+| `modes.<id>.enabled` | Long term, Future prep, Funds & flexibility, Structure fix | the modes the solver picks for; the others keep the engine's move with no solve |
 | `lpLineTerms` | 8 | terms per line of the model's LP text, which stays readable |
 | `workers`, `phone` | 3; { maxWidthPx 639, minCores 4, minMemoryGb 4 } | solver workers at most, and what counts as a phone (one worker) |
 | `timeLimitS`, `absGap` | 3, 0.5 | a solve stops at the limit or within `absGap` points of its bound |
@@ -332,7 +334,7 @@ files hold no other numbers but 0 and 1.
 | `showRobustness` | false | robustness stays off every card until Phase 4's check passes |
 | `logMax` | 5000 | decision log entries kept |
 | `vendor` | folder, SHA-256 (base64) of `highs.mjs` and `highs.wasm` | the build to load, and the hashes it must match |
-| `modes.<id>.hitMargin` | 0 | points added to every hit's cost in the solver's objective, per mode |
+| `modes.<id>.hitMargin` | 2 for Now and Long term, 0 for the rest | points added to every hit's cost in the solver's objective, per mode (Phase 4's choice on 2024-25) |
 
 To change a preset, run the decision backtest (`GAFFER_IQ_TESTING_ROADMAP.md`)
 before and after, and read the verdict against the last one.

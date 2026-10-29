@@ -15,7 +15,9 @@ import { modeSetting } from '../../js/engine/solver/problem.js';
 import { createSolverRunner } from '../../js/modules/planner-solver.js';
 import { GW, MODES, projectionOf, scenario, withDraws } from '../engine/decision-fixtures.js';
 
-const CONFIG = { ...DECISION_ENGINE, solver: { ...DECISION_ENGINE.solver, enabled: true } };
+// Every mode on the solver at margin 0, as the tests were written; the shipped per-mode switches have their own test.
+const CONFIG = { ...DECISION_ENGINE, solver: { ...DECISION_ENGINE.solver, enabled: true,
+  modes: Object.fromEntries(Object.keys(DECISION_ENGINE.solver.modes).map(id => [id, { enabled: true, hitMargin: 0 }])) } };
 const MODE_IDS = Object.keys(CONFIG.modes);
 const { timeLimitS, resolveTimeLimitS, absGap } = CONFIG.solver;
 
@@ -550,6 +552,23 @@ test('Ceiling in a big week stays the engine\'s, marked engine-tail; a mode with
   assert.equal(none.asked.length, 0);
   assert.equal(none.made.length, 0, 'and no worker is made for it');
   for (const modeId of MODE_IDS) assert.deepEqual(none.of(modeId).map(c => [c.source, c.state, c.call]), [['engine', 'ready', 'roll']], modeId);
+});
+
+test('a mode the solver is off for keeps the engine\'s move, with no solve; as shipped, Now and Ceiling are off', async t => {
+  const config = { ...CONFIG, solver: { ...CONFIG.solver, modes: { ...CONFIG.solver.modes, now: { enabled: false, hitMargin: 0 } } } };
+  const engine = engineOf(scenario({ candidates: CANDIDATES }));
+  const h = harness(t, { engine, config, solve: agree });
+  h.refresh();
+  await flush();
+  assert.deepEqual(h.of('now').map(c => [c.source, c.state]), [['engine', 'ready']]);
+  assert.equal(h.of('now')[0].root, engine.result.modes.now.root);
+  assert.ok(!h.asked.some(a => a.modeId === 'now'), 'no solve for it');
+  assert.equal(h.of('longterm').at(-1).source, 'solver', 'the others still solve');
+  assert.deepEqual(h.logs.filter(e => e.mode === 'now').map(e => [e.source, e.guard]), [['engine', 'engine']]);
+  // As shipped: the solver on, and on for the four modes that passed Phase 4's headline.
+  assert.equal(DECISION_ENGINE.solver.enabled, true);
+  assert.deepEqual(Object.entries(DECISION_ENGINE.solver.modes).filter(([, m]) => m.enabled).map(([id]) => id).sort(),
+    ['funds', 'future', 'longterm', 'structure']);
 });
 
 test('on a phone one worker, and only viewed cards solve, in the order viewed', async t => {

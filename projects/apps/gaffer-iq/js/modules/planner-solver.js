@@ -489,6 +489,11 @@ export function createSolverRunner({
       for (const modeId of modeIds) {
         const engine = result.modes[modeId];
         if (!engine) continue;
+        // A mode the solver is off for keeps the engine's move, with no solve.
+        if (!solver.modes[modeId]?.enabled) {
+          settleEngine(mine, modeId);
+          continue;
+        }
         let setting;
         try {
           setting = off ? null : modeSetting(input, result, modeId, config);

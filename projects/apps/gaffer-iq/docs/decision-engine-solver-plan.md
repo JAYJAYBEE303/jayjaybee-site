@@ -629,7 +629,7 @@ against the offline planner"; reference `docs/decision-engine.md`, "The solver")
   Phase 8 agreement as measured, and the decision log notes that an older tab blocking the IndexedDB upgrade leaves that visit
   with no snapshots, no log and the Planner on season totals.
 
-### Phase 4: evaluation (done, awaiting your decision)
+### Phase 4: evaluation (done; on for four modes)
 
 Each mode's solver policy runs against the previous engine, roll+ and Long
 term+, on 2025-26 alone and both seasons. The run is about 5,000 solves per
@@ -701,7 +701,10 @@ hit margin, roughly an hour each on four cores, and resumable.
 - **What the guard costs.** In the four heavy modes (Future prep, Funds & flexibility, Ceiling, Structure fix) the first
   pick is short of its bound in 21% to 45% of the weeks with a solve, and the engine's move is kept
   after the longer solve in 1% to 15% of weeks. Now and Long term almost never need it.
-- **`DECISION_ENGINE.solver.enabled` is still false.** Switching it on is your decision.
+- **Your decision (2026-10-29): on for the four modes that pass** (Long term, Future prep, Funds & flexibility,
+  Structure fix), so the modes' picks differ; Now and Ceiling keep the engine's move with no solve
+  (`solver.modes.<id>.enabled`). Robustness stays off the cards: early in a season the figures are low on every pick
+  and later high on every pick, so they do not tell picks apart.
 
 ## Files
 
