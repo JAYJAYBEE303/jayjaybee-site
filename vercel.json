@@ -5,6 +5,16 @@
   "outputDirectory": "dist",
   "redirects": [
     {
+      "source": "/work/amf1",
+      "destination": "/work/astonmartinf1/",
+      "permanent": true
+    },
+    {
+      "source": "/work/amf1/",
+      "destination": "/work/astonmartinf1/",
+      "permanent": true
+    },
+    {
       "source": "/projects/apps/gaffer-iq",
       "destination": "/projects/apps/gaffer-iq/",
       "permanent": true
