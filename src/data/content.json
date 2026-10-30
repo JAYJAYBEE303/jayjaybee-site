@@ -28,7 +28,7 @@
           "points": [
             "Deploying and managing Cohere: North AI independently - planning every stage independently, from stakeholder management and the technical deployment through to the official approval pipelines.",
             "Endpoint management across a mixed Windows and Apple fleet - Intune and Jamf for deployment, compliance, and app delivery, with working knowledge of the bits that usually go wrong.",
-            "Exchange Online and M365 administration end-to-end - mailbox lifecycle, GAL, calendar permissions, distribution and security groups, cross-tenant authentication, and the SharePoint and Planner quirks that come with them.",
+            "Exchange Online and M365 administration end-to-end - mailbox lifecycle, calendar permissions, distribution and security groups, and the SharePoint and Planner quirks that come with them.",
             "PowerShell scripting as a daily tool rather than an occasional one - automating provisioning, reporting, and the repetitive work that otherwise eats a support queue.",
             "Stakeholder management across a wide seniority range, from first-day new joiners to functional heads, with the judgement to know which register fits which conversation.",
             "Jamf 200 certified, formalising the Apple fleet management work already in flight day-to-day."
