@@ -27,6 +27,7 @@ import { calcBaseDifficulty, calcHomeAwaySplit, calcVenueEffect, calcFixtureHist
 import { calcTeamForm, calcPlayerForm, calcPlayingLikelihood } from './engine/form.js';
 import { calcStyleProfile, calcStyleClash } from './engine/style.js';
 import { buildUnderstatSlugsByTeamId } from './engine/channel.js';
+import { buildFplLeaguePayload } from './engine/fpl-league.js';
 import { pickStartingXI } from './engine/lineup.js';
 import { buildProjections } from './engine/projections.js';
 import { runDecisionEngine } from './engine/decision.js';
@@ -214,10 +215,19 @@ async function loadInitialData({ force = false } = {}) {
       store.setLeagueXg(leagueXgRes.value);
     } else {
       // MODEL: Understat is supplementary - log and continue with FPL-only data.
-      // style.js + form.js fall back to Phase 1 proxies and flag estimated:true
-      // on the breakdown. A failed Understat fetch must never block the main load.
+      // A failed Understat fetch must never block the main load.
       // ROADMAP.md §3A - this path is intentionally non-fatal; no store.setError().
-      console.warn('[Gaffer IQ] Understat league xG unavailable - falling back to FPL proxies.',
+      //
+      // Install the FPL-derived stand-in (engine/fpl-league.js) so this season's
+      // results still reach H2H and the venue window, and FPL's own season xG
+      // still reaches player form. It carries `synthetic: true`, which keeps
+      // every team/{slug} and match/{id} request from being made on its
+      // strength; the 'counter matchup' stays blank (no shot data exists here).
+      // If Understat is back, the fulfilled branch above wins and nothing else
+      // changes.
+      const season = store.getSeason();
+      if (season) store.setLeagueXg(buildFplLeaguePayload(season));
+      console.warn('[Gaffer IQ] Understat league xG unavailable - using an FPL-derived stand-in (results and season xG only).',
         leagueXgRes.reason?.message ?? leagueXgRes.reason);
     }
 
