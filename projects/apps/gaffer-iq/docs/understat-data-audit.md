@@ -1,5 +1,7 @@
 # Understat data audit - Gaffer IQ
 
+> **Update 2026-11-26:** `understat.com` has served a "We will come back soon" placeholder since 2026-11-03. The finished-season payloads (§5a) are now rebuilt from FPL results in `data/understat-compat/`, and the live season has an FPL-derived stand-in; see `ARCHITECTURE.md` §6 and `docs/superpowers/specs/2026-11-26-understat-compat-layer-design.md`. The counter matchup stays parked. Findings below describe the code as audited on 2026-11-09.
+
 Audited 2026-11-09. Inventory only: no source changed, no network call made.
 All `file:line` refs are relative to `projects/apps/gaffer-iq/`.
 
