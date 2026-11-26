@@ -1165,6 +1165,14 @@ export const UNDERSTAT_PREV_SEASON  = '2025';  // last completed season (2025/26
 // the current season has contributed none yet. Five seasons would top out at
 // exactly ten and so fall short for most of the campaign.
 export const UNDERSTAT_HISTORY_SEASONS = ['2024', '2023', '2022', '2021'];
+
+// The finished seasons js/api.js fetchLeagueXg serves from static files
+// (data/understat-compat/league-EPL-{year}.json) instead of Understat. They are
+// rebuilt from vaastav's FPL results by tools/understat-compat/build.js: run it
+// again whenever UNDERSTAT_SEASON / PREV / HISTORY are bumped. A season with no
+// file falls through to the Understat proxy, so a bump that forgets the script
+// degrades to the old behaviour rather than breaking.
+export const UNDERSTAT_COMPAT_SEASONS = [UNDERSTAT_PREV_SEASON, ...UNDERSTAT_HISTORY_SEASONS];
 // FPL team id -> Understat slug tables were removed here (Phase 3B): FPL's
 // numeric team.id is REASSIGNED every season as clubs are promoted/relegated
 // (see engine/normalise.js buildPlTenure's identical warning), so an id-keyed

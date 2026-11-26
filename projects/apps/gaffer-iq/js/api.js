@@ -7,7 +7,7 @@
  * See ARCHITECTURE.md §5 (proxy) and §6 (fetch strategy), CONVENTIONS.md §9.
  */
 
-import { UNDERSTAT_SEASON } from './config.js';
+import { UNDERSTAT_SEASON, UNDERSTAT_COMPAT_SEASONS } from './config.js';
 
 // Absolute URL of the Vercel proxy function.
 // Using an absolute URL means the app can be embedded on any origin
@@ -255,6 +255,11 @@ export async function fetchEntryHistory(teamId) {
  * Understat's real getLeagueData endpoint server-side and renames its
  * {teams, players, dates} response to {teamsData, playersData, datesData}.
  *
+ * A FINISHED season in UNDERSTAT_COMPAT_SEASONS is read from the committed
+ * static file of the same shape (data/understat-compat, built from FPL results
+ * by tools/understat-compat/build.js) - it can never change, and Understat is
+ * not required for it. A missing or unreadable file falls through to the proxy.
+ *
  * @param {string} season  four-digit start-year, e.g. '2026' for 2026/27 -
  *   REQUIRED, Understat has no "current season" default (confirmed live).
  *   Use config.js UNDERSTAT_SEASON / UNDERSTAT_PREV_SEASON.
@@ -266,6 +271,15 @@ export async function fetchLeagueXg(season) {
     throw new ApiError(`Invalid Understat season: ${season}`, { path: 'understat-league' });
   }
   const path = `league/EPL/${season}`;
+
+  if (UNDERSTAT_COMPAT_SEASONS.includes(season)) {
+    try {
+      const response = await fetch(
+        new URL(`../data/understat-compat/league-EPL-${season}.json`, import.meta.url));
+      if (response.ok) return await response.json();
+    } catch { /* no usable static file - fall through to the proxy */ }
+  }
+
   try {
     return await callProxy(path, 'understat');
   } catch (err) {
