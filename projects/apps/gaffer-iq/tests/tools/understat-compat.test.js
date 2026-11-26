@@ -7,8 +7,11 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import { buildLeagueCompat } from '../../tools/understat-compat/lib.js';
+import { PL_SEASONS } from '../../js/config.js';
+import { canonicalClubKey } from '../../js/engine/normalise.js';
 
 const TEAMS = 'id,name\n1,Arsenal\n2,Man City\n';
 const FIXTURES =
@@ -57,3 +60,31 @@ test('history and datesData are sorted by datetime ascending', () => {
   assert.deepEqual(out.teamsData['1'].history.map(r => r.date),
     ['2021-08-01 12:00:00', '2021-08-13 19:00:00']);
 });
+
+// ─── The committed finished-season files ─────────────────────────────────────
+
+for (const year of ['2021', '2022', '2023', '2024', '2025']) {
+  test(`data/understat-compat/league-EPL-${year}.json is a complete, resolvable season`, () => {
+    const data = JSON.parse(readFileSync(
+      new URL(`../../data/understat-compat/league-EPL-${year}.json`, import.meta.url), 'utf8'));
+    const teams = Object.values(data.teamsData);
+
+    assert.equal(teams.length, 20);
+    assert.equal(data.datesData.length, 380);
+    assert.ok(data.datesData.every(m =>
+      m.isResult === true
+      && /^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/.test(m.datetime)
+      && !('id' in m)));
+    assert.ok(teams.every(t => t.history.length === 38));
+
+    // Every goal is scored by one club and conceded by another.
+    const scored = teams.reduce((n, t) => n + t.history.reduce((s, r) => s + r.scored, 0), 0);
+    const goals = data.datesData.reduce((n, m) => n + m.goals.h + m.goals.a, 0);
+    assert.equal(scored, goals);
+
+    // Names join through the app's own resolver against that season's clubs.
+    const label = `${year}/${String(Number(year) + 1).slice(2)}`;
+    const known = new Set(PL_SEASONS[label].map(canonicalClubKey));
+    assert.deepEqual(teams.filter(t => !known.has(canonicalClubKey(t.title))).map(t => t.title), []);
+  });
+}
