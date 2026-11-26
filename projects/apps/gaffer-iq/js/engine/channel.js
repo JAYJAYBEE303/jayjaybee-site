@@ -36,10 +36,12 @@ import { buildRoleSignature, classifyRole } from './counter.js';
  *
  * @param {object|null} leagueXg   parsed Understat league/EPL payload
  * @param {Object<number,Team>} teamsById
- * @returns {Object<number,string>}  {} when no payload or no match.
+ * @returns {Object<number,string>}  {} when no payload or no match, and for the
+ *   FPL-derived stand-in (`synthetic`, engine/fpl-league.js): it names clubs but
+ *   is not Understat, so nothing may request team/{slug} on its strength.
  */
 export function buildUnderstatSlugsByTeamId(leagueXg, teamsById) {
-  if (!leagueXg || !leagueXg.teamsData) return {};
+  if (!leagueXg || !leagueXg.teamsData || leagueXg.synthetic) return {};
 
   const titleByKey = {};
   for (const t of Object.values(leagueXg.teamsData)) {

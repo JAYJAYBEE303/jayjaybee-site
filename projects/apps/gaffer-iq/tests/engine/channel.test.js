@@ -342,3 +342,16 @@ test('calcChannelCounter is not estimated when axes exist, however thin', () => 
   assert.equal(out.maturity, 0.05);
   assert.ok(out.value > 0);
 });
+
+// ─── Stand-in payloads must never drive Understat requests ───────────────────
+
+test('buildUnderstatSlugsByTeamId returns {} for a synthetic payload', () => {
+  // The FPL-derived stand-in (engine/fpl-league.js) names clubs but is not
+  // Understat: resolving slugs from it would fire 20 team/{slug} requests.
+  assert.deepEqual(buildUnderstatSlugsByTeamId({ ...leagueXg, synthetic: true }, teamsById), {});
+});
+
+test('buildUnderstatSlugsByTeamId still resolves a real payload when synthetic is false', () => {
+  const out = buildUnderstatSlugsByTeamId({ ...leagueXg, synthetic: false }, teamsById);
+  assert.equal(out[1], 'Arsenal');
+});
