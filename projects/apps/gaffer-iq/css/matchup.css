@@ -151,6 +151,15 @@
   .state__t { font: 600 22px/1.05 var(--font-head); letter-spacing: .05em; text-transform: uppercase; }
   .state p { color: var(--color-muted); text-wrap: pretty; }
 
+  /* source-down bar above Counter-matchups (modules/counterNotice.js): solid band-red with the
+     page's dark-on-bright text and soft glow - the .chip[data-band=excellent] idiom, in red. One line
+     on desktop; it wraps naturally on a phone rather than truncating the message. */
+  .alert { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-6); padding: var(--space-3) var(--space-4); border-radius: var(--radius-sm); background: var(--band-red); color: var(--color-bg); box-shadow: 0 0 0 1px var(--band-red), 0 0 18px color-mix(in srgb, var(--band-red) 45%, transparent); }
+  .alert__i { flex: none; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--color-bg); color: var(--band-red); font: 800 14px/1 var(--font-sans); }
+  .alert p { margin: 0; font: 600 14px/1.35 var(--font-sans); }
+  .alert b { font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+  .alert + .pn { padding-top: var(--space-5); }
+
   /* reveal */
   [data-rv] { opacity: 0; transform: translateY(8px); transition: opacity 380ms var(--ease-out), transform 380ms var(--ease-out); }
   [data-rv].in { opacity: 1; transform: none; }

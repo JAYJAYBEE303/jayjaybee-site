@@ -34,6 +34,7 @@ import {
 } from '../engine/counter.js';
 import { groupPerGwSlots, pendingFixturesForTeam } from '../engine/fixtures.js';
 import { invert, clamp } from '../util.js';
+import { counterNoticeHTML } from './counterNotice.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -1114,8 +1115,10 @@ function countersHTML(m) {
     : donutKey() + '<div class="ctr">' + (awayLeads(m)
       ? counterBlock(away, home, 0, settled) + counterBlock(home, away, 3, settled)
       : counterBlock(home, away, 0, settled) + counterBlock(away, home, 3, settled)) + '</div>';
-  return sec('detail', 'Detail', 'Counter-matchups',
-    `Each attack/defence pair splits 100 ${infoButton('donut', copy('donut'), 'how to read the donuts')}`, body);
+  // The bar sits ABOVE the section and appears only while Understat is down.
+  return counterNoticeHTML(store.getLeagueXg())
+    + sec('detail', 'Detail', 'Counter-matchups',
+      `Each attack/defence pair splits 100 ${infoButton('donut', copy('donut'), 'how to read the donuts')}`, body);
 }
 
 // ─── Render: outlook (Horizon) ────────────────────────────────────────────────
