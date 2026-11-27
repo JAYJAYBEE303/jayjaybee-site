@@ -267,6 +267,9 @@ gaffer-iq/                          (= projects/gaffer-iq/ in the repo)
         │                       #   intro/exit timeline (GSAP, see §4), live GW tag.
         ├── matchup.js          # Matchup Analyser: command bar + fixture/team drawers,
         │                       #   score tape, breakdown, counter donuts, 10-GW outlook.
+        ├── counterNotice.js    # Pure: the red "Understat.com is down" bar above the Matchup
+        │                       #   page's Counter-matchups. Shown only while the live league
+        │                       #   payload is the FPL stand-in (§6); removes itself on recovery.
         ├── fullSeason.js       # Full Season strip on the Matchup page: GW1–38 ribbon, chip
         │                       #   rail, expand/collapse choreography (FEATURE_ENGINE §15).
         ├── fixtures.js         # Fixtures: matchday clock + match report drawer, league
